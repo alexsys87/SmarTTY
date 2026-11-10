@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -1866,6 +1866,211 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.OpenVpn).Toggle(new[] { "port 1194" })), "# port 1194", "OpenVPN comment");
     }
 
+    private static void NetplanChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/01-netcfg.yaml"), L.Netplan, "a Netplan configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/50-cloud-init.yml"), L.Netplan, "a Netplan file with .yml");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/netplan/10-netplan.yaml"), L.Netplan, "a generated Netplan file");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/netplan.yaml"), L.Netplan, "netplan.yaml by its name");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/README"), L.Plain, "the README of /etc/netplan is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/notes.txt"), L.Plain, "a text file is not Netplan");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/netplan/backup.yaml.bak"), L.Plain, "a backup is not Netplan");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/network.yaml"), L.Yaml, "an ordinary network.yaml stays YAML");
+
+        Highlighted net = new Highlighted(L.Netplan,
+            "# Netplan configuration\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    enp3s0:\n" +
+            "      dhcp4: true\n      addresses:\n        - 192.168.1.10/24\n      gateway4: 192.168.1.1\n" +
+            "      nameservers:\n        addresses: [9.9.9.9, 149.112.112.112]\n        search: [example.com]\n" +
+            "  wifis:\n    wl0:\n      dhcp4: no\n      access-points:\n        \"home\":\n" +
+            "          password: \"secret\"\n      routes:\n        - to: default\n          via: 192.168.1.1\n" +
+            "          metric: 100\n      unknown-setting: 1\n");
+        Equal(Join(net.Tokens(0, SyntaxHighlighting.TypeComment)), "# Netplan configuration", "Netplan: a comment");
+        Equal(Join(net.Tokens(1, SyntaxHighlighting.TypeKeyword)), "network", "Netplan: the network block");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeKeyword)), "version", "Netplan: the version");
+        Equal(Join(net.Tokens(2, SyntaxHighlighting.TypeNumber)), "2", "Netplan: the version number");
+        Equal(Join(net.Tokens(3, SyntaxHighlighting.TypeKeyword)), "renderer|networkd", "Netplan: the renderer");
+        Equal(Join(net.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ethernets", "Netplan: the ethernet devices");
+        Equal(Join(net.Tokens(5, SyntaxHighlighting.TypeVariable)), "enp3s0", "Netplan: an interface name stays an ordinary key");
+        Equal(Join(net.Tokens(6, SyntaxHighlighting.TypeKeyword)), "dhcp4|true", "Netplan: DHCP");
+        Equal(Join(net.Tokens(7, SyntaxHighlighting.TypeKeyword)), "addresses", "Netplan: the addresses");
+        Equal(Join(net.Tokens(8, SyntaxHighlighting.TypeNumber)), "192.168.1.10|24", "Netplan: an address with its prefix");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeKeyword)), "gateway4", "Netplan: the gateway");
+        Equal(Join(net.Tokens(9, SyntaxHighlighting.TypeNumber)), "192.168.1.1", "Netplan: the gateway address");
+        Equal(Join(net.Tokens(10, SyntaxHighlighting.TypeKeyword)), "nameservers", "Netplan: the name servers");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeKeyword)), "addresses", "Netplan: the DNS addresses");
+        Equal(Join(net.Tokens(11, SyntaxHighlighting.TypeNumber)), "9.9.9.9|149.112.112.112", "Netplan: the DNS servers");
+        Equal(Join(net.Tokens(12, SyntaxHighlighting.TypeKeyword)), "search", "Netplan: the search domains");
+        Equal(Join(net.Tokens(13, SyntaxHighlighting.TypeKeyword)), "wifis", "Netplan: the Wi-Fi devices");
+        Equal(Join(net.Tokens(15, SyntaxHighlighting.TypeKeyword)), "dhcp4|no", "Netplan: DHCP off");
+        Equal(Join(net.Tokens(16, SyntaxHighlighting.TypeKeyword)), "access-points", "Netplan: the access points");
+        Equal(Join(net.Tokens(17, SyntaxHighlighting.TypeString)), "\"home\"", "Netplan: the SSID");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeKeyword)), "password", "Netplan: the password");
+        Equal(Join(net.Tokens(18, SyntaxHighlighting.TypeString)), "\"secret\"", "Netplan: the quoted password");
+        Equal(Join(net.Tokens(19, SyntaxHighlighting.TypeKeyword)), "routes", "Netplan: the routes");
+        Equal(Join(net.Tokens(20, SyntaxHighlighting.TypeKeyword)), "to|default", "Netplan: the default route");
+        Equal(Join(net.Tokens(21, SyntaxHighlighting.TypeKeyword)), "via", "Netplan: the route gateway");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeKeyword)), "metric", "Netplan: the route metric");
+        Equal(Join(net.Tokens(22, SyntaxHighlighting.TypeNumber)), "100", "Netplan: the metric value");
+        Equal(Join(net.Tokens(23, SyntaxHighlighting.TypeKeyword)), "", "Netplan: an unknown setting is not a keyword");
+        Equal(Join(net.Tokens(23, SyntaxHighlighting.TypeVariable)), "unknown-setting", "Netplan: ...it is a plain key");
+        Check(Folds(net).Length > 0, "Netplan blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("renderer"), "Netplan keywords contain 'renderer'");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("access-points"), "Netplan keywords contain 'access-points'");
+        Check(SyntaxHighlighting.GetKeywords(L.Netplan).Contains("networkd"), "Netplan keywords contain 'networkd'");
+        Equal(Join(CommentStyle.ForLanguage(L.Netplan).Toggle(new[] { "  dhcp4: true" })), "  # dhcp4: true", "Netplan comment");
+    }
+
+    private static void CloudInitChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/cloud.cfg"), L.CloudInit, "the cloud-init configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/cloud.cfg.d/99-fixes.cfg"), L.CloudInit, "a drop-in of cloud.cfg.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/cloud/cloud.cfg.d/05-logging.cfg"), L.CloudInit, "a vendor drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/cloud/cloud-config"), L.CloudInit, "a cloud-config seed");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/cloud.cfg"), L.CloudInit, "cloud.cfg anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/cloud/user-data"), L.CloudInit, "a user-data file under /cloud/");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/user-data"), L.Plain, "a user-data outside /cloud/ without a marker is plain");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/user-data", "#cloud-config"), L.CloudInit, "the #cloud-config marker");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml", "#cloud-config"), L.CloudInit, "the marker wins over the YAML name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/notes.yaml", "# just a comment"), L.Yaml, "another comment leaves YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/cloud/README"), L.Plain, "the README of /etc/cloud is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/cloud.cfg.bak"), L.Plain, "a backup of cloud.cfg is not cloud-init");
+
+        Highlighted init = new Highlighted(L.CloudInit,
+            "#cloud-config\nversion: 1\nhostname: web-01\nfqdn: web-01.example.com\nmanage_etc_hosts: true\n" +
+            "users:\n  - name: deploy\n    gecos: Deploy user\n    groups: [sudo, docker]\n    shell: /bin/bash\n" +
+            "    sudo: [\"ALL=(ALL) NOPASSWD:ALL\"]\n    ssh_authorized_keys:\n      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample\n" +
+            "ssh_pwauth: false\ndisable_root: true\nchpasswd:\n  expire: false\n  list: |\n    root:linux\n" +
+            "package_update: true\npackages:\n  - nginx\n  - curl\nwrite_files:\n  - path: /etc/motd\n" +
+            "    content: |\n      Welcome to the server\n    owner: root:root\n    permissions: '0644'\n" +
+            "runcmd:\n  - [systemctl, enable, --now, nginx]\n  - echo done > /tmp/done\n" +
+            "power_state:\n  mode: reboot\n  timeout: 30\n  condition: test -f /var/run/reboot-required\n" +
+            "unknown_module: 1\n");
+        Equal(Join(init.Tokens(0, SyntaxHighlighting.TypeComment)), "#cloud-config", "cloud-init: the marker");
+        Equal(Join(init.Tokens(1, SyntaxHighlighting.TypeKeyword)), "version", "cloud-init: the version");
+        Equal(Join(init.Tokens(1, SyntaxHighlighting.TypeNumber)), "1", "cloud-init: the version number");
+        Equal(Join(init.Tokens(2, SyntaxHighlighting.TypeKeyword)), "hostname", "cloud-init: the hostname");
+        Equal(Join(init.Tokens(3, SyntaxHighlighting.TypeKeyword)), "fqdn", "cloud-init: the FQDN");
+        Equal(Join(init.Tokens(4, SyntaxHighlighting.TypeKeyword)), "manage_etc_hosts|true", "cloud-init: /etc/hosts");
+        Equal(Join(init.Tokens(5, SyntaxHighlighting.TypeKeyword)), "users", "cloud-init: the users");
+        Equal(Join(init.Tokens(6, SyntaxHighlighting.TypeKeyword)), "name", "cloud-init: the name of a user");
+        Equal(Join(init.Tokens(7, SyntaxHighlighting.TypeKeyword)), "gecos", "cloud-init: gecos");
+        Equal(Join(init.Tokens(8, SyntaxHighlighting.TypeKeyword)), "groups", "cloud-init: the groups of a user");
+        Equal(Join(init.Tokens(9, SyntaxHighlighting.TypeKeyword)), "shell", "cloud-init: the shell of a user");
+        Equal(Join(init.Tokens(11, SyntaxHighlighting.TypeKeyword)), "ssh_authorized_keys", "cloud-init: the authorized keys");
+        Equal(Join(init.Tokens(13, SyntaxHighlighting.TypeKeyword)), "ssh_pwauth|false", "cloud-init: password authentication");
+        Equal(Join(init.Tokens(14, SyntaxHighlighting.TypeKeyword)), "disable_root|true", "cloud-init: the root account");
+        Equal(Join(init.Tokens(15, SyntaxHighlighting.TypeKeyword)), "chpasswd", "cloud-init: the passwords");
+        Equal(Join(init.Tokens(16, SyntaxHighlighting.TypeKeyword)), "expire|false", "cloud-init: the password expiry");
+        Equal(Join(init.Tokens(17, SyntaxHighlighting.TypeKeyword)), "list", "cloud-init: the password list");
+        Equal(Join(init.Tokens(18, SyntaxHighlighting.TypeString)), "root:linux", "cloud-init: the text of the block scalar");
+        Equal(Join(init.Tokens(19, SyntaxHighlighting.TypeKeyword)), "package_update|true", "cloud-init: the package update");
+        Equal(Join(init.Tokens(20, SyntaxHighlighting.TypeKeyword)), "packages", "cloud-init: the package list");
+        Equal(Join(init.Tokens(23, SyntaxHighlighting.TypeKeyword)), "write_files", "cloud-init: the files to write");
+        Equal(Join(init.Tokens(24, SyntaxHighlighting.TypeKeyword)), "path", "cloud-init: the path of a file");
+        Equal(Join(init.Tokens(25, SyntaxHighlighting.TypeKeyword)), "content", "cloud-init: the content of a file");
+        Equal(Join(init.Tokens(26, SyntaxHighlighting.TypeString)), "Welcome to the server", "cloud-init: the content block");
+        Equal(Join(init.Tokens(27, SyntaxHighlighting.TypeKeyword)), "owner", "cloud-init: the owner of a file");
+        Equal(Join(init.Tokens(28, SyntaxHighlighting.TypeKeyword)), "permissions", "cloud-init: the permissions of a file");
+        Equal(Join(init.Tokens(28, SyntaxHighlighting.TypeString)), "'0644'", "cloud-init: the mode of a file");
+        Equal(Join(init.Tokens(29, SyntaxHighlighting.TypeKeyword)), "runcmd", "cloud-init: the commands");
+        Equal(Join(init.Tokens(32, SyntaxHighlighting.TypeKeyword)), "power_state", "cloud-init: the power state");
+        Equal(Join(init.Tokens(33, SyntaxHighlighting.TypeKeyword)), "mode|reboot", "cloud-init: the reboot mode");
+        Equal(Join(init.Tokens(34, SyntaxHighlighting.TypeKeyword)), "timeout", "cloud-init: the power timeout");
+        Equal(Join(init.Tokens(34, SyntaxHighlighting.TypeNumber)), "30", "cloud-init: the timeout value");
+        Equal(Join(init.Tokens(35, SyntaxHighlighting.TypeKeyword)), "condition", "cloud-init: the power condition");
+        Equal(Join(init.Tokens(36, SyntaxHighlighting.TypeKeyword)), "", "cloud-init: an unknown module is not a keyword");
+        Equal(Join(init.Tokens(36, SyntaxHighlighting.TypeVariable)), "unknown_module", "cloud-init: ...it is a plain key");
+        Check(Folds(init).Length > 0, "cloud-init blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("write_files"), "cloud-init keywords contain 'write_files'");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("runcmd"), "cloud-init keywords contain 'runcmd'");
+        Check(SyntaxHighlighting.GetKeywords(L.CloudInit).Contains("reboot"), "cloud-init keywords contain 'reboot'");
+        Equal(Join(CommentStyle.ForLanguage(L.CloudInit).Toggle(new[] { "hostname: web-01" })), "# hostname: web-01", "cloud-init comment");
+    }
+
+    private static void PrometheusChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/prometheus.yml"), L.Prometheus, "the main Prometheus configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/rules/node.rules.yml"), L.Prometheus, "a rule file of /etc/prometheus");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yml"), L.Prometheus, "prometheus.yml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yaml"), L.Prometheus, "prometheus.yaml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yml.bak"), L.Plain, "a backup of the configuration is not Prometheus");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/prometheus/README"), L.Plain, "the README of /etc/prometheus is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/rules.yml"), L.Yaml, "a rules.yml outside the Prometheus tree stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+
+        Highlighted prom = new Highlighted(L.Prometheus,
+            "# Prometheus configuration\nglobal:\n  scrape_interval: 15s\n  evaluation_interval: 15s\n" +
+            "  external_labels:\n    monitor: prod\nrule_files:\n  - /etc/prometheus/rules/*.yml\n" +
+            "scrape_configs:\n  - job_name: prometheus\n    static_configs:\n" +
+            "      - targets: ['localhost:9090']\n  - job_name: node\n    scrape_interval: 30s\n" +
+            "    metrics_path: /metrics\n    scheme: https\n    basic_auth:\n      username: monitor\n" +
+            "      password: secret\n    static_configs:\n      - targets: ['node1:9100', 'node2:9100']\n" +
+            "        labels:\n          env: prod\n    relabel_configs:\n      - source_labels: [__address__]\n" +
+            "        target_label: instance\n        regex: '(.*):9100'\n        replacement: '$1'\n" +
+            "alerting:\n  alertmanagers:\n    - static_configs:\n        - targets: ['localhost:9093']\n" +
+            "remote_write:\n  - url: https://prometheus.example.com/api/v1/write\n    queue_config:\n" +
+            "      max_samples_per_send: 10000\n    tls_config:\n      insecure_skip_verify: false\n" +
+            "    authorization:\n      type: Bearer\n      credentials: token\nunknown_field: 1\n");
+        Equal(Join(prom.Tokens(0, SyntaxHighlighting.TypeComment)), "# Prometheus configuration", "Prometheus: a comment");
+        Equal(Join(prom.Tokens(1, SyntaxHighlighting.TypeKeyword)), "global", "Prometheus: the global block");
+        Equal(Join(prom.Tokens(2, SyntaxHighlighting.TypeKeyword)), "scrape_interval", "Prometheus: the scrape interval");
+        Equal(Join(prom.Tokens(3, SyntaxHighlighting.TypeKeyword)), "evaluation_interval", "Prometheus: the evaluation interval");
+        Equal(Join(prom.Tokens(4, SyntaxHighlighting.TypeKeyword)), "external_labels", "Prometheus: the external labels");
+        Equal(Join(prom.Tokens(5, SyntaxHighlighting.TypeVariable)), "monitor", "Prometheus: a label name stays an ordinary key");
+        Equal(Join(prom.Tokens(6, SyntaxHighlighting.TypeKeyword)), "rule_files", "Prometheus: the rule files");
+        Equal(Join(prom.Tokens(8, SyntaxHighlighting.TypeKeyword)), "scrape_configs", "Prometheus: the scrape configurations");
+        Equal(Join(prom.Tokens(9, SyntaxHighlighting.TypeKeyword)), "job_name", "Prometheus: the name of a job");
+        Equal(Join(prom.Tokens(10, SyntaxHighlighting.TypeKeyword)), "static_configs", "Prometheus: static targets");
+        Equal(Join(prom.Tokens(11, SyntaxHighlighting.TypeKeyword)), "targets", "Prometheus: the targets");
+        Equal(Join(prom.Tokens(12, SyntaxHighlighting.TypeKeyword)), "job_name", "Prometheus: the node job");
+        Equal(Join(prom.Tokens(15, SyntaxHighlighting.TypeKeyword)), "scheme|https", "Prometheus: the scheme");
+        Equal(Join(prom.Tokens(16, SyntaxHighlighting.TypeKeyword)), "basic_auth", "Prometheus: basic authentication");
+        Equal(Join(prom.Tokens(17, SyntaxHighlighting.TypeKeyword)), "username", "Prometheus: the user name");
+        Equal(Join(prom.Tokens(18, SyntaxHighlighting.TypeKeyword)), "password", "Prometheus: the password");
+        Equal(Join(prom.Tokens(20, SyntaxHighlighting.TypeKeyword)), "targets", "Prometheus: the node targets");
+        Equal(Join(prom.Tokens(21, SyntaxHighlighting.TypeKeyword)), "labels", "Prometheus: the labels of a target");
+        Equal(Join(prom.Tokens(22, SyntaxHighlighting.TypeVariable)), "env", "Prometheus: a label of a target stays an ordinary key");
+        Equal(Join(prom.Tokens(23, SyntaxHighlighting.TypeKeyword)), "relabel_configs", "Prometheus: the relabeling rules");
+        Equal(Join(prom.Tokens(24, SyntaxHighlighting.TypeKeyword)), "source_labels", "Prometheus: source_labels");
+        Equal(Join(prom.Tokens(25, SyntaxHighlighting.TypeKeyword)), "target_label", "Prometheus: target_label");
+        Equal(Join(prom.Tokens(26, SyntaxHighlighting.TypeKeyword)), "regex", "Prometheus: the regular expression");
+        Equal(Join(prom.Tokens(27, SyntaxHighlighting.TypeKeyword)), "replacement", "Prometheus: the replacement");
+        Equal(Join(prom.Tokens(28, SyntaxHighlighting.TypeKeyword)), "alerting", "Prometheus: the alerting block");
+        Equal(Join(prom.Tokens(29, SyntaxHighlighting.TypeKeyword)), "alertmanagers", "Prometheus: the alert managers");
+        Equal(Join(prom.Tokens(32, SyntaxHighlighting.TypeKeyword)), "remote_write", "Prometheus: the remote write");
+        Equal(Join(prom.Tokens(33, SyntaxHighlighting.TypeKeyword)), "url|https", "Prometheus: the remote write URL");
+        Equal(Join(prom.Tokens(34, SyntaxHighlighting.TypeKeyword)), "queue_config", "Prometheus: the queue configuration");
+        Equal(Join(prom.Tokens(35, SyntaxHighlighting.TypeKeyword)), "max_samples_per_send", "Prometheus: the batch size");
+        Equal(Join(prom.Tokens(35, SyntaxHighlighting.TypeNumber)), "10000", "Prometheus: the batch size value");
+        Equal(Join(prom.Tokens(36, SyntaxHighlighting.TypeKeyword)), "tls_config", "Prometheus: the TLS configuration");
+        Equal(Join(prom.Tokens(37, SyntaxHighlighting.TypeKeyword)), "insecure_skip_verify|false", "Prometheus: the certificate check");
+        Equal(Join(prom.Tokens(38, SyntaxHighlighting.TypeKeyword)), "authorization", "Prometheus: the authorization");
+        Equal(Join(prom.Tokens(39, SyntaxHighlighting.TypeKeyword)), "type|Bearer", "Prometheus: the authorization type");
+        Equal(Join(prom.Tokens(41, SyntaxHighlighting.TypeKeyword)), "", "Prometheus: an unknown field is not a keyword");
+        Equal(Join(prom.Tokens(41, SyntaxHighlighting.TypeVariable)), "unknown_field", "Prometheus: ...it is a plain key");
+        Check(Folds(prom).Length > 0, "Prometheus blocks fold");
+
+        Highlighted rules = new Highlighted(L.Prometheus,
+            "groups:\n  - name: node\n    rules:\n      - alert: InstanceDown\n        expr: up == 0\n" +
+            "        for: 5m\n        labels:\n          severity: critical\n        annotations:\n" +
+            "          summary: \"Instance is down\"\n          runbook_url: https://example.com/runbook\n");
+        Equal(Join(rules.Tokens(0, SyntaxHighlighting.TypeKeyword)), "groups", "Prometheus rules: groups");
+        Equal(Join(rules.Tokens(1, SyntaxHighlighting.TypeKeyword)), "name", "Prometheus rules: the name of a group");
+        Equal(Join(rules.Tokens(2, SyntaxHighlighting.TypeKeyword)), "rules", "Prometheus rules: the rules");
+        Equal(Join(rules.Tokens(3, SyntaxHighlighting.TypeKeyword)), "alert", "Prometheus rules: an alert");
+        Equal(Join(rules.Tokens(4, SyntaxHighlighting.TypeKeyword)), "expr", "Prometheus rules: the expression");
+        Equal(Join(rules.Tokens(5, SyntaxHighlighting.TypeKeyword)), "for", "Prometheus rules: the duration");
+        Equal(Join(rules.Tokens(6, SyntaxHighlighting.TypeKeyword)), "labels", "Prometheus rules: the labels");
+        Equal(Join(rules.Tokens(8, SyntaxHighlighting.TypeKeyword)), "annotations", "Prometheus rules: the annotations");
+        Equal(Join(rules.Tokens(9, SyntaxHighlighting.TypeKeyword)), "summary", "Prometheus rules: the summary");
+        Equal(Join(rules.Tokens(9, SyntaxHighlighting.TypeString)), "\"Instance is down\"", "Prometheus rules: the text of the annotation");
+        Equal(Join(rules.Tokens(10, SyntaxHighlighting.TypeKeyword)), "runbook_url|https", "Prometheus rules: the runbook");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("scrape_configs"), "Prometheus keywords contain 'scrape_configs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("relabel_configs"), "Prometheus keywords contain 'relabel_configs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Prometheus).Contains("https"), "Prometheus keywords contain 'https'");
+        Equal(Join(CommentStyle.ForLanguage(L.Prometheus).Toggle(new[] { "  scrape_interval: 15s" })), "  # scrape_interval: 15s", "Prometheus comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2579,6 +2784,9 @@ internal static class Program
         SambaChecks();
         PostfixChecks();
         OpenVpnChecks();
+        NetplanChecks();
+        CloudInitChecks();
+        PrometheusChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

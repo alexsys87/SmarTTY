@@ -1536,6 +1536,176 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(OpenVpnDirectives, startState, text, sink, out endState, valueKeywords: OpenVpnValues);
     }
 
+    // ---------------------------------------------------------------- Netplan
+
+    private static readonly HashSet<string> NetplanKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the renderer
+        @"
+          network version renderer",
+        // the kinds of the devices
+        @"
+          ethernets wifis bridges bonds vlans vrfs tunnels nm-devices dummy-devices modems",
+        // the settings of every device
+        @"
+          dhcp4 dhcp6 dhcp4-overrides dhcp6-overrides addresses gateway4 gateway6 routes routing-policy
+          nameservers search macaddress mtu optional set-name wakeonlan match accept-ra ipv6-address-generation
+          ipv6-address-token ipv6-privacy",
+        // the DHCP overrides
+        @"
+          use-dns use-ntp send-hostname use-hostname hostname use-routes route-metric use-domains",
+        // the routes and the routing policy
+        @"
+          to via from on-link scope metric table type priority mark",
+        // the bonds and the bridges
+        @"
+          interfaces parameters mode lacp-rate mii-monitor-interval up-delay down-delay transmit-hash-policy
+          ad-select primary resend-igmp all-slaves-active arp-interval arp-ip-targets arp-validate learn-packet-interval
+          stp forward-delay hello-time max-age ageing-time port-priority path-cost mac-learning",
+        // the VLANs, the VRFs and the tunnels
+        @"
+          id link table local remote key input-key output-key",
+        // the Wi-Fi access points and their authentication
+        @"
+          access-points auth password key-management ssid band channel bssid hidden network-name regulatory-domain
+          method identity anonymous-identity phase2-auth ca-certificate client-certificate client-key
+          private-key private-key-password eap",
+        // the modems of NetworkManager
+        @"
+          apn auto-config device-id network-id number pin sim-id sim-operator-id username");
+
+    private static readonly HashSet<string> NetplanValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the renderers
+        @"networkd NetworkManager openvswitch",
+        // the choices of the addresses, the bonds, the bridges and the access points
+        @"static dhcp none default link-local eui64 stable-privacy
+          active-backup balance-rr balance-xor broadcast 802.3ad balance-tlb balance-alb
+          psk eap wpa-psk wpa-eap infrastructure adhoc ap");
+
+    /// <summary>
+    /// Netplan: the colours and the folds of YAML with the keys of the network configuration known; the renderers
+    /// (networkd, NetworkManager, openvswitch), the address modes and the bond and Wi-Fi choices are values.
+    /// </summary>
+    private static bool TokenizeNetplan(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(NetplanKeywords, NetplanValues, startState, text, sink, out endState);
+    }
+
+    // -------------------------------------------------------------- cloud-init
+
+    private static readonly HashSet<string> CloudInitKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope of a user-data file
+        @"
+          version hostname fqdn manage_etc_hosts preserve_hostname timezone locale locale_configfile keyboard",
+        // the users and their keys
+        @"
+          users groups ssh_authorized_keys ssh_keys ssh_pwauth ssh_import_id ssh_redirect_user disable_root
+          chpasswd password expire list lock_passwd sudo shell gecos homedir primary_group no_create_home system
+          inactive selinux_user snapuser doas",
+        // the packages and the commands
+        @"
+          package_update package_upgrade package_reboot_if_required packages apt yum_repos dnf zypper apk_repos
+          snap snappy puppet chef salt_minion ansible runcmd bootcmd scripts_per_boot scripts_per_instance
+          scripts_per_once scripts_user script",
+        // the files, the mounts and the disks
+        @"
+          write_files path content owner permissions encoding append defer mkdir delete
+          mounts device fstype options dump passno swap filename maxsize ephemeral create migrate
+          disk_setup layout overwrite table_type partition size type fs label replace_fs extra_opts",
+        // the datasources and the network of a seed
+        @"
+          datasource datasource_list datasource_pkg_list vendor_data user_data metadata network config search dns
+          nameserver match mac name address netmask gateway routes id subnets broadcast dns_nameservers dns_search
+          mtu wakeonlan dhcp4 dhcp6 addresses renderer",
+        // the modules of /etc/cloud/cloud.cfg
+        @"
+          cloud_config_modules cloud_init_modules cloud_final_modules system_info default_user distro paths
+          package_mirrors apt_mirror security ntpservers",
+        // the power state, the phone home and the random seed
+        @"
+          power_state mode message timeout condition delay phone_home url post tries retries
+          random_seed file data command",
+        // the certificates, the merges and the system adjustments
+        @"
+          ca_certs remove_defaults trusted rsyslog configs remotes remote filter merge_how merge_type
+          byobu byobu_by_default growpart devices ignore_growroot_disabled resize_rootfs update_etc_hosts hosts
+          ubuntu_drivers install_drivers drivers");
+
+    private static readonly HashSet<string> CloudInitValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the power states, the schedules and the file systems
+        @"reboot poweroff halt shutdown
+          always once per-boot per-instance per-once
+          ext4 xfs btrfs vfat ntfs swap zfs
+          auto none dhcp static
+          cloud-init cloud-config");
+
+    /// <summary>
+    /// cloud-init: the colours and the folds of YAML with the modules of a user-data file and of /etc/cloud/cloud.cfg
+    /// known; the power states, the schedules, the file systems and the modes are values. The "#cloud-config" line is
+    /// the marker the detector recognizes even when the file has another name.
+    /// </summary>
+    private static bool TokenizeCloudInit(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(CloudInitKeywords, CloudInitValues, startState, text, sink, out endState);
+    }
+
+    // ------------------------------------------------------------- Prometheus
+
+    private static readonly HashSet<string> PrometheusKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the global settings
+        @"
+          global rule_files scrape_configs scrape_config_files alerting remote_write remote_read storage tracing
+          scrape_interval scrape_timeout evaluation_interval external_labels query_log_file
+          body_size_limit sample_limit target_limit label_limit label_name_length_limit label_value_length_limit
+          keep_dropped_targets",
+        // the scrape configurations and the service discovery
+        @"
+          job_name metrics_path scheme params basic_auth authorization oauth2 bearer_token bearer_token_file
+          tls_config proxy_url no_proxy follow_redirects enable_http2 static_configs targets labels
+          file_sd_configs files refresh_interval http_sd_configs dns_sd_configs names type port
+          kubernetes_sd_configs role api_server kubeconfig_file namespaces selectors
+          consul_sd_configs ec2_sd_configs azure_sd_configs gce_sd_configs openstack_sd_configs docker_sd_configs
+          dockerswarm_sd_configs marathon_sd_configs nerve_sd_configs serverset_sd_configs triton_sd_configs
+          digitalocean_sd_configs hetzner_sd_configs ionos_sd_configs linode_sd_configs nomad_sd_configs
+          ovhcloud_sd_configs puppetdb_sd_configs scaleway_sd_configs vultr_sd_configs eureka_sd_configs",
+        // the relabeling of the targets and the metrics
+        @"
+          relabel_configs metric_relabel_configs source_labels separator target_label regex modulus replacement action",
+        // the alert managers and the rules
+        @"
+          alertmanagers timeout api_version path_prefix http_headers groups name rules alert expr for record
+          keep_firing_for limit annotations summary description runbook_url",
+        // the remote storage and its queue
+        @"
+          url remote_timeout write_relabel_configs queue_config capacity max_shards min_shards max_samples_per_send
+          batch_send_deadline min_backoff max_backoff retry_on_http_429 sample_age_limit metadata_config send
+          send_exemplars send_native_histograms protobuf_message sigv4 azuread google_iam round_robin read_recent",
+        // the TLS, the authentication and the headers
+        @"
+          ca_file cert_file key_file server_name insecure_skip_verify min_version max_version ca cert key
+          username password credentials headers",
+        // the local storage and the tracing
+        @"
+          tsdb out_of_order_time_window retention wal_compression block_ranges no_lockfile
+          endpoint client_type sampling_fraction insecure compression otlp promote_resource_attributes
+          translation_strategy");
+
+    private static readonly HashSet<string> PrometheusValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the schemes and the authentication type
+        @"http https Bearer",
+        // the relabeling actions
+        @"replace keep drop hashmod labelmap labeldrop labelkeep lowercase uppercase keepequal dropequal",
+        // the roles of the service discovery
+        @"pod service endpoints endpointslice ingress");
+
+    /// <summary>
+    /// Prometheus: the colours and the folds of YAML with the settings of prometheus.yml and of the rule files known;
+    /// the schemes, the relabeling actions and the service discovery roles are values.
+    /// </summary>
+    private static bool TokenizePrometheus(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(PrometheusKeywords, PrometheusValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

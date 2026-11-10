@@ -146,6 +146,12 @@ internal static class Program
         Check(Names(L.Postfix, "", "").Contains("permit_mynetworks"), "the Postfix restriction 'permit_mynetworks' is offered");
         Check(Names(L.OpenVpn, "", "").Contains("proto"), "the OpenVPN option 'proto' is offered");
         Check(Names(L.OpenVpn, "", "").Contains("persist-key"), "the OpenVPN option 'persist-key' is offered");
+        Check(Names(L.Netplan, "", "").Contains("renderer"), "the Netplan key 'renderer' is offered");
+        Check(Names(L.Netplan, "", "").Contains("networkd"), "the Netplan renderer 'networkd' is offered");
+        Check(Names(L.CloudInit, "", "").Contains("write_files"), "the cloud-init module 'write_files' is offered");
+        Check(Names(L.CloudInit, "", "").Contains("reboot"), "the cloud-init power state 'reboot' is offered");
+        Check(Names(L.Prometheus, "", "").Contains("scrape_configs"), "the Prometheus setting 'scrape_configs' is offered");
+        Check(Names(L.Prometheus, "", "").Contains("relabel_configs"), "the Prometheus setting 'relabel_configs' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
