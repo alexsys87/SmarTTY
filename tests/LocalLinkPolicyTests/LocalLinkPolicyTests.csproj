@@ -7,7 +7,5 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Utilities/LocalLinkPolicy.cs" Link="LocalLinkPolicy.cs" />
-    <!-- The default list of link extensions is read from its source, so that the check follows the list. -->
-    <AssemblyMetadata Include="SettingsSource" Value="$(MSBuildProjectDirectory)/../../VisualTTY/VirtualTerminalSettings.cs" />
   </ItemGroup>
 </Project>

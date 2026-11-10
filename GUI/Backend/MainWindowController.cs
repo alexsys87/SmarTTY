@@ -2166,24 +2166,15 @@ public class MainWindowController : INotifyPropertyChanged
     {
         try
         {
-            // The path is one that the device printed (and that exists here). Starting it through the shell runs a .js in the Windows
-            // Script Host, a .py with the Python launcher, a .bat, a .exe: only addresses, folders and documents go that way, the
-            // rest is shown as text.
-            switch (LocalLinkPolicy.Decide(e.Path, Directory.Exists(e.Path), File.Exists(e.Path)))
+            // The text is what the device printed: only an address is opened (in the browser). A path in it is one of the device, not
+            // a file or folder of this computer ("/tmp" of a Linux host is C:\tmp here), so the disks here are not asked about it and
+            // nothing local is opened, whatever reaches this event.
+            if (LocalLinkPolicy.IsUrl(e.Path))
             {
-                case LocalLinkAction.OpenWithShell:
-                    Process.Start(new ProcessStartInfo(e.Path)
-                    {
-                        UseShellExecute = true
-                    });
-                    break;
-                case LocalLinkAction.OpenInNotepad:
-                    // By the full name, not through the shell: a notepad.exe next to the file or in the current directory is not looked for.
-                    Process.Start(new ProcessStartInfo(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "notepad.exe"), "\"" + e.Path + "\"")
-                    {
-                        UseShellExecute = false
-                    });
-                    break;
+                Process.Start(new ProcessStartInfo(e.Path)
+                {
+                    UseShellExecute = true
+                });
             }
         }
         catch (Exception exception)
