@@ -1090,6 +1090,43 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(SysctlDirectives, startState, text, sink, out endState, valueKeywords: SysctlValues);
     }
 
+    // -------------------------------------------------------------------- PAM
+
+    private static readonly HashSet<string> PamDirectives = Words(StringComparer.Ordinal,
+        // the management groups of a PAM rule
+        @"
+          auth account password session");
+
+    private static readonly HashSet<string> PamValues = Words(StringComparer.Ordinal,
+        // the management groups, the control flags and the key of a bracketed control
+        @"auth account password session
+          required requisite sufficient optional include substack die ok done bad ignore reset NONE
+          success default ignore bad done die reset",
+        // common arguments of the modules
+        @"nullok nullok_secure try_first_pass use_first_pass use_authtok not_set_pass nodelay remember
+          broken_shadow no_pass_expiry sha512 yescrypt md5 bigcrypt rounds minlen difok ucredit lcredit dcredit
+          ocredit enforce_for_root retry authtok_type obscure debug quiet audit silent standard relaxed
+          login tty user ruser rhost host service type",
+        // the modules of the usual stacks
+        @"pam_unix.so pam_env.so pam_systemd.so pam_pwquality.so pam_cracklib.so pam_limits.so pam_loginuid.so
+          pam_securetty.so pam_nologin.so pam_motd.so pam_mail.so pam_lastlog.so pam_faillock.so pam_tally2.so
+          pam_deny.so pam_permit.so pam_rootok.so pam_wheel.so pam_succeed_if.so pam_listfile.so pam_access.so
+          pam_time.so pam_echo.so pam_exec.so pam_script.so pam_selinux.so pam_apparmor.so pam_tty_audit.so
+          pam_umask.so pam_keyinit.so pam_namespace.so pam_pwhistory.so pam_krb5.so pam_ldap.so pam_sss.so
+          pam_winbind.so pam_google_authenticator.so pam_u2f.so pam_oath.so pam_fprintd.so pam_gnome_keyring.so
+          pam_kwallet.so pam_kwallet5.so pam_ecryptfs.so pam_mount.so pam_ccreds.so pam_localuser.so pam_shells.so
+          pam_issue.so pam_debug.so pam_faildelay.so pam_filter.so pam_ftp.so pam_group.so pam_mkhomedir.so
+          pam_pkcs11.so pam_rhosts.so pam_stress.so pam_timestamp.so pam_userdb.so pam_warn.so pam_xauth.so");
+
+    /// <summary>
+    /// PAM: the colours of Config with the management groups, control flags, module arguments and common modules
+    /// known; the words of a bracketed control ([success=1 default=ignore]) are coloured too. Comments are '#'.
+    /// </summary>
+    private static bool TokenizePam(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(PamDirectives, startState, text, sink, out endState, valueKeywords: PamValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

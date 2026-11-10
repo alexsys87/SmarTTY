@@ -1656,6 +1656,44 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Sysctl).Toggle(new[] { "vm.swappiness = 10" })), "# vm.swappiness = 10", "sysctl comment");
     }
 
+    private static void PamChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.conf"), L.Pam, "the single pam.conf");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/sshd"), L.Pam, "a service of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/common-auth"), L.Pam, "a common PAM stack");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/pam.d/system-auth"), L.Pam, "a vendor stack of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/pam.conf"), L.Pam, "a pam.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/README"), L.Plain, "the README of pam.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/notes.txt"), L.Plain, "another text file of pam.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d-available/sshd"), L.Plain, "pam.d-available is not read by PAM");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/pam.d/sshd.conf"), L.Config, "a .conf file of pam.d is not a service");
+
+        Highlighted pam = new Highlighted(L.Pam,
+            "#%PAM-1.0\nauth required pam_env.so\n" +
+            "auth [success=1 default=ignore] pam_unix.so nullok try_first_pass\n" +
+            "account required pam_unix.so\npassword requisite pam_pwquality.so retry=3\n" +
+            "session optional pam_systemd.so\nsession include system-auth\n@include common-auth\n" +
+            "-auth optional pam_echo.so\nauth required unknown_module.so\n");
+        Equal(Join(pam.Tokens(0, SyntaxHighlighting.TypeComment)), "#%PAM-1.0", "PAM: the version comment");
+        Equal(Join(pam.Tokens(1, SyntaxHighlighting.TypeKeyword)), "auth|required|pam_env.so", "PAM: a simple rule");
+        Equal(Join(pam.Tokens(2, SyntaxHighlighting.TypeKeyword)), "auth|success|default|ignore|pam_unix.so|nullok|try_first_pass", "PAM: a bracketed control and the module arguments");
+        Equal(Join(pam.Tokens(2, SyntaxHighlighting.TypeNumber)), "1", "PAM: the success count");
+        Equal(Join(pam.Tokens(3, SyntaxHighlighting.TypeKeyword)), "account|required|pam_unix.so", "PAM: the account stack");
+        Equal(Join(pam.Tokens(4, SyntaxHighlighting.TypeKeyword)), "password|requisite|pam_pwquality.so|retry", "PAM: the password stack");
+        Equal(Join(pam.Tokens(4, SyntaxHighlighting.TypeNumber)), "3", "PAM: the retry count");
+        Equal(Join(pam.Tokens(5, SyntaxHighlighting.TypeKeyword)), "session|optional|pam_systemd.so", "PAM: the session stack");
+        Equal(Join(pam.Tokens(6, SyntaxHighlighting.TypeKeyword)), "session|include", "PAM: an include control");
+        Equal(Join(pam.Tokens(7, SyntaxHighlighting.TypeKeyword)), "include", "PAM: the @include of Debian");
+        Equal(Join(pam.Tokens(8, SyntaxHighlighting.TypeKeyword)), "auth|optional|pam_echo.so", "PAM: a type written with a dash");
+        Equal(Join(pam.Tokens(9, SyntaxHighlighting.TypeKeyword)), "auth|required", "PAM: an unknown module is not a keyword");
+        Equal(Join(pam.Tokens(9, SyntaxHighlighting.TypeVariable)), "", "PAM: ...it stays an ordinary word");
+        Equal(Folds(pam), "", "PAM rules do not fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("pam_unix.so"), "PAM keywords contain 'pam_unix.so'");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("requisite"), "PAM keywords contain 'requisite'");
+        Check(SyntaxHighlighting.GetKeywords(L.Pam).Contains("try_first_pass"), "PAM keywords contain 'try_first_pass'");
+        Equal(Join(CommentStyle.ForLanguage(L.Pam).Toggle(new[] { "auth required pam_env.so" })), "# auth required pam_env.so", "PAM comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2365,6 +2403,7 @@ internal static class Program
         ModprobeChecks();
         LogrotateChecks();
         SysctlChecks();
+        PamChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
