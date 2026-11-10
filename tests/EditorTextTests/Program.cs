@@ -1619,6 +1619,43 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Logrotate).Toggle(new[] { "rotate 4" })), "# rotate 4", "logrotate comment");
     }
 
+    private static void SysctlChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.conf"), L.Sysctl, "the main sysctl configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/99-sysctl.conf"), L.Sysctl, "a drop-in of sysctl.d");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/lib/sysctl.d/50-default.conf"), L.Sysctl, "a drop-in of the distribution");
+        Equal(SyntaxHighlighting.DetectLanguage("/run/sysctl.d/90-local.conf"), L.Sysctl, "a generated drop-in");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/sysctl.conf"), L.Sysctl, "a sysctl.conf outside /etc");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/README"), L.Plain, "the README of sysctl.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d/notes.ini"), L.Config, "an ini file of sysctl.d is not sysctl");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/sysctl.d-available/99-local.conf"), L.Config, "sysctl.d-available is not read by sysctl");
+
+        Highlighted sc = new Highlighted(L.Sysctl,
+            "# kernel settings\nnet.ipv4.ip_forward = 1\nnet.ipv4.conf.all.rp_filter = 1\nvm.swappiness=10\n" +
+            "kernel.sysrq = 1\nfs.file-max = 2097152\nnet.core.somaxconn = 4096\n" +
+            "net.ipv4.tcp_congestion_control = bbr\nnet.ipv4.ip_local_port_range = 1024 65535\n" +
+            "unknown.tunable = 1\nnet.ipv4.ip_forward = 1 # routed\n");
+        Equal(Join(sc.Tokens(0, SyntaxHighlighting.TypeComment)), "# kernel settings", "sysctl: a comment");
+        Equal(Join(sc.Tokens(1, SyntaxHighlighting.TypeKeyword)), "net.ipv4.ip_forward", "sysctl: ip_forward");
+        Equal(Join(sc.Tokens(1, SyntaxHighlighting.TypeNumber)), "1", "sysctl: its value");
+        Equal(Join(sc.Tokens(2, SyntaxHighlighting.TypeKeyword)), "net.ipv4.conf.all.rp_filter", "sysctl: rp_filter");
+        Equal(Join(sc.Tokens(3, SyntaxHighlighting.TypeKeyword)), "vm.swappiness", "sysctl: a key written without spaces");
+        Equal(Join(sc.Tokens(3, SyntaxHighlighting.TypeNumber)), "10", "sysctl: the swappiness value");
+        Equal(Join(sc.Tokens(4, SyntaxHighlighting.TypeKeyword)), "kernel.sysrq", "sysctl: sysrq");
+        Equal(Join(sc.Tokens(5, SyntaxHighlighting.TypeKeyword)), "fs.file-max", "sysctl: file-max");
+        Equal(Join(sc.Tokens(6, SyntaxHighlighting.TypeKeyword)), "net.core.somaxconn", "sysctl: somaxconn");
+        Equal(Join(sc.Tokens(7, SyntaxHighlighting.TypeKeyword)), "net.ipv4.tcp_congestion_control|bbr", "sysctl: the congestion control algorithm");
+        Equal(Join(sc.Tokens(8, SyntaxHighlighting.TypeKeyword)), "net.ipv4.ip_local_port_range", "sysctl: the port range");
+        Equal(Join(sc.Tokens(8, SyntaxHighlighting.TypeNumber)), "1024|65535", "sysctl: the two ports");
+        Equal(Join(sc.Tokens(9, SyntaxHighlighting.TypeKeyword)), "", "sysctl: an unknown tunable is not a keyword");
+        Equal(Join(sc.Tokens(9, SyntaxHighlighting.TypeVariable)), "unknown.tunable", "sysctl: ...it is a plain key");
+        Equal(Join(sc.Tokens(10, SyntaxHighlighting.TypeComment)), "# routed", "sysctl: a trailing comment");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("net.ipv4.ip_forward"), "sysctl keywords contain 'net.ipv4.ip_forward'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("vm.swappiness"), "sysctl keywords contain 'vm.swappiness'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sysctl).Contains("bbr"), "sysctl keywords contain 'bbr'");
+        Equal(Join(CommentStyle.ForLanguage(L.Sysctl).Toggle(new[] { "vm.swappiness = 10" })), "# vm.swappiness = 10", "sysctl comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2327,6 +2364,7 @@ internal static class Program
         NftablesChecks();
         ModprobeChecks();
         LogrotateChecks();
+        SysctlChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
