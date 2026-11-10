@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2071,6 +2071,78 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Prometheus).Toggle(new[] { "  scrape_interval: 15s" })), "  # scrape_interval: 15s", "Prometheus comment");
     }
 
+    private static void AlertmanagerChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/alertmanager/alertmanager.yml"), L.Alertmanager, "the Alertmanager configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/alertmanager/alertmanager.yaml"), L.Alertmanager, "the .yaml spelling");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/alertmanager.yml"), L.Alertmanager, "alertmanager.yml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/alertmanager.yaml"), L.Alertmanager, "alertmanager.yaml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/alertmanager/templates/default.tmpl"), L.Plain, "a template is not the configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/alertmanager/README"), L.Plain, "the README of /etc/alertmanager is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/alertmanager/alertmanager.yml.bak"), L.Plain, "a backup is not Alertmanager");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/monitoring/prometheus.yml"), L.Prometheus, "Prometheus keeps its own name");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+
+        Highlighted am = new Highlighted(L.Alertmanager,
+            "# Alertmanager configuration\nglobal:\n  resolve_timeout: 5m\n  smtp_smarthost: smtp.example.com:587\n" +
+            "  smtp_from: alerts@example.com\n  smtp_auth_username: alerts\n  smtp_auth_password: secret\n" +
+            "  smtp_require_tls: true\nroute:\n  receiver: default\n  group_by: [alertname, instance]\n" +
+            "  group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  matchers:\n    - severity=\"critical\"\n" +
+            "  routes:\n    - receiver: pager\n      matchers:\n        - team=\"ops\"\n      continue: false\n" +
+            "receivers:\n  - name: default\n    email_configs:\n      - to: oncall@example.com\n" +
+            "        send_resolved: true\n        headers:\n          Subject: \"{{ .Status }}\"\n" +
+            "  - name: pager\n    slack_configs:\n      - api_url: https://hooks.slack.com/services/T000/B000\n" +
+            "        channel: \"#alerts\"\n        send_resolved: true\n        title: \"{{ .CommonLabels.alertname }}\"\n" +
+            "inhibit_rules:\n  - source_matchers:\n      - severity=\"critical\"\n    target_matchers:\n" +
+            "      - severity=\"warning\"\n    equal: [alertname, instance]\n" +
+            "mute_time_intervals:\n  - name: weekends\n    time_intervals:\n" +
+            "      - weekdays: [saturday, sunday]\n        start_time: \"00:00\"\n        end_time: \"24:00\"\n" +
+            "unknown_field: 1\n");
+        Equal(Join(am.Tokens(0, SyntaxHighlighting.TypeComment)), "# Alertmanager configuration", "Alertmanager: a comment");
+        Equal(Join(am.Tokens(1, SyntaxHighlighting.TypeKeyword)), "global", "Alertmanager: the global block");
+        Equal(Join(am.Tokens(2, SyntaxHighlighting.TypeKeyword)), "resolve_timeout", "Alertmanager: the resolve timeout");
+        Equal(Join(am.Tokens(3, SyntaxHighlighting.TypeKeyword)), "smtp_smarthost", "Alertmanager: the SMTP host");
+        Equal(Join(am.Tokens(5, SyntaxHighlighting.TypeKeyword)), "smtp_auth_username", "Alertmanager: the SMTP user");
+        Equal(Join(am.Tokens(7, SyntaxHighlighting.TypeKeyword)), "smtp_require_tls|true", "Alertmanager: TLS for SMTP");
+        Equal(Join(am.Tokens(8, SyntaxHighlighting.TypeKeyword)), "route", "Alertmanager: the route");
+        Equal(Join(am.Tokens(9, SyntaxHighlighting.TypeKeyword)), "receiver", "Alertmanager: the receiver of a route");
+        Equal(Join(am.Tokens(10, SyntaxHighlighting.TypeKeyword)), "group_by", "Alertmanager: the grouping");
+        Equal(Join(am.Tokens(13, SyntaxHighlighting.TypeKeyword)), "repeat_interval", "Alertmanager: the repeat interval");
+        Equal(Join(am.Tokens(14, SyntaxHighlighting.TypeKeyword)), "matchers", "Alertmanager: the matchers");
+        Equal(Join(am.Tokens(16, SyntaxHighlighting.TypeKeyword)), "routes", "Alertmanager: the child routes");
+        Equal(Join(am.Tokens(17, SyntaxHighlighting.TypeKeyword)), "receiver", "Alertmanager: a child receiver");
+        Equal(Join(am.Tokens(20, SyntaxHighlighting.TypeKeyword)), "continue|false", "Alertmanager: the continue flag");
+        Equal(Join(am.Tokens(21, SyntaxHighlighting.TypeKeyword)), "receivers", "Alertmanager: the receivers");
+        Equal(Join(am.Tokens(22, SyntaxHighlighting.TypeKeyword)), "name", "Alertmanager: the name of a receiver");
+        Equal(Join(am.Tokens(23, SyntaxHighlighting.TypeKeyword)), "email_configs", "Alertmanager: the e-mail settings");
+        Equal(Join(am.Tokens(24, SyntaxHighlighting.TypeKeyword)), "to", "Alertmanager: the recipient");
+        Equal(Join(am.Tokens(25, SyntaxHighlighting.TypeKeyword)), "send_resolved|true", "Alertmanager: the resolved notices");
+        Equal(Join(am.Tokens(26, SyntaxHighlighting.TypeKeyword)), "headers", "Alertmanager: the headers");
+        Equal(Join(am.Tokens(27, SyntaxHighlighting.TypeVariable)), "Subject", "Alertmanager: a header name stays an ordinary key");
+        Equal(Join(am.Tokens(29, SyntaxHighlighting.TypeKeyword)), "slack_configs", "Alertmanager: the Slack settings");
+        Equal(Join(am.Tokens(30, SyntaxHighlighting.TypeKeyword)), "api_url|https", "Alertmanager: the Slack webhook");
+        Equal(Join(am.Tokens(31, SyntaxHighlighting.TypeKeyword)), "channel", "Alertmanager: the Slack channel");
+        Equal(Join(am.Tokens(31, SyntaxHighlighting.TypeString)), "\"#alerts\"", "Alertmanager: the channel name");
+        Equal(Join(am.Tokens(33, SyntaxHighlighting.TypeKeyword)), "title", "Alertmanager: the title of a message");
+        Equal(Join(am.Tokens(34, SyntaxHighlighting.TypeKeyword)), "inhibit_rules", "Alertmanager: the inhibition rules");
+        Equal(Join(am.Tokens(35, SyntaxHighlighting.TypeKeyword)), "source_matchers", "Alertmanager: the source matchers");
+        Equal(Join(am.Tokens(37, SyntaxHighlighting.TypeKeyword)), "target_matchers", "Alertmanager: the target matchers");
+        Equal(Join(am.Tokens(39, SyntaxHighlighting.TypeKeyword)), "equal", "Alertmanager: the equal labels");
+        Equal(Join(am.Tokens(40, SyntaxHighlighting.TypeKeyword)), "mute_time_intervals", "Alertmanager: the mute intervals");
+        Equal(Join(am.Tokens(42, SyntaxHighlighting.TypeKeyword)), "time_intervals", "Alertmanager: the time intervals");
+        Equal(Join(am.Tokens(43, SyntaxHighlighting.TypeKeyword)), "weekdays|saturday|sunday", "Alertmanager: the weekdays");
+        Equal(Join(am.Tokens(44, SyntaxHighlighting.TypeKeyword)), "start_time", "Alertmanager: the start of an interval");
+        Equal(Join(am.Tokens(44, SyntaxHighlighting.TypeString)), "\"00:00\"", "Alertmanager: the start time");
+        Equal(Join(am.Tokens(45, SyntaxHighlighting.TypeKeyword)), "end_time", "Alertmanager: the end of an interval");
+        Equal(Join(am.Tokens(46, SyntaxHighlighting.TypeKeyword)), "", "Alertmanager: an unknown field is not a keyword");
+        Equal(Join(am.Tokens(46, SyntaxHighlighting.TypeVariable)), "unknown_field", "Alertmanager: ...it is a plain key");
+        Check(Folds(am).Length > 0, "Alertmanager blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Alertmanager).Contains("receivers"), "Alertmanager keywords contain 'receivers'");
+        Check(SyntaxHighlighting.GetKeywords(L.Alertmanager).Contains("slack_configs"), "Alertmanager keywords contain 'slack_configs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Alertmanager).Contains("saturday"), "Alertmanager keywords contain 'saturday'");
+        Equal(Join(CommentStyle.ForLanguage(L.Alertmanager).Toggle(new[] { "  resolve_timeout: 5m" })), "  # resolve_timeout: 5m", "Alertmanager comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2787,6 +2859,7 @@ internal static class Program
         NetplanChecks();
         CloudInitChecks();
         PrometheusChecks();
+        AlertmanagerChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

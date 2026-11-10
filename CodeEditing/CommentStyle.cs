@@ -55,6 +55,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Netplan:
                 case SyntaxHighlighting.Language.CloudInit:
                 case SyntaxHighlighting.Language.Prometheus:
+                case SyntaxHighlighting.Language.Alertmanager:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:
