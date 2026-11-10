@@ -1805,6 +1805,67 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Postfix).Toggle(new[] { "myhostname = mail.example.com" })), "# myhostname = mail.example.com", "Postfix comment");
     }
 
+    private static void OpenVpnChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/openvpn/server.conf"), L.OpenVpn, "a server profile of /etc/openvpn");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/openvpn/client/home.conf"), L.OpenVpn, "a client profile of /etc/openvpn");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/openvpn/server/site.conf"), L.OpenVpn, "a profile of the server directory");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/mullvad.ovpn"), L.OpenVpn, "an .ovpn profile anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/openvpn.conf"), L.OpenVpn, "openvpn.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/openvpn/README"), L.Plain, "the README of /etc/openvpn is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/openvpn/update-resolv-conf"), L.Plain, "a helper script is not a profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/server.conf"), L.Config, "a server.conf elsewhere is a plain config");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/work.ovpn.backup"), L.Plain, "a backup of a profile is not OpenVPN");
+
+        Highlighted vpn = new Highlighted(L.OpenVpn,
+            "# OpenVPN server profile\nport 1194\nproto udp\ndev tun\nca /etc/openvpn/ca.crt\n" +
+            "cert /etc/openvpn/server.crt\nkey /etc/openvpn/server.key   # keep secret\n" +
+            "dh none\ntls-crypt /etc/openvpn/ta.key\nserver 10.8.0.0 255.255.255.0\n" +
+            "push \"redirect-gateway def1 bypass-dhcp\"\npush \"dhcp-option DNS 10.8.0.1\"\n" +
+            "keepalive 10 120\ncipher AES-256-GCM\ndata-ciphers AES-256-GCM:AES-128-GCM\n" +
+            "auth SHA256\nuser nobody\npersist-key\npersist-tun\nstatus /var/log/openvpn-status.log\n" +
+            "verb 3\nclient\nremote vpn.example.com 1194\nremote-cert-tls server\n" +
+            "resolv-retry infinite\nnobind\ntls-version-min 1.2\nverify-client-cert require\n" +
+            "unknown-option 1\n; a semicolon comment\n");
+        Equal(Join(vpn.Tokens(0, SyntaxHighlighting.TypeComment)), "# OpenVPN server profile", "OpenVPN: a comment");
+        Equal(Join(vpn.Tokens(1, SyntaxHighlighting.TypeKeyword)), "port", "OpenVPN: port");
+        Equal(Join(vpn.Tokens(1, SyntaxHighlighting.TypeNumber)), "1194", "OpenVPN: the port number");
+        Equal(Join(vpn.Tokens(2, SyntaxHighlighting.TypeKeyword)), "proto|udp", "OpenVPN: the transport");
+        Equal(Join(vpn.Tokens(3, SyntaxHighlighting.TypeKeyword)), "dev|tun", "OpenVPN: the device");
+        Equal(Join(vpn.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ca", "OpenVPN: the CA file");
+        Equal(Join(vpn.Tokens(6, SyntaxHighlighting.TypeKeyword)), "key", "OpenVPN: the key file");
+        Equal(Join(vpn.Tokens(6, SyntaxHighlighting.TypeComment)), "# keep secret", "OpenVPN: a trailing comment");
+        Equal(Join(vpn.Tokens(7, SyntaxHighlighting.TypeKeyword)), "dh|none", "OpenVPN: no Diffie-Hellman parameters");
+        Equal(Join(vpn.Tokens(8, SyntaxHighlighting.TypeKeyword)), "tls-crypt", "OpenVPN: tls-crypt");
+        Equal(Join(vpn.Tokens(9, SyntaxHighlighting.TypeKeyword)), "server", "OpenVPN: the server directive");
+        Equal(Join(vpn.Tokens(9, SyntaxHighlighting.TypeNumber)), "10.8.0.0|255.255.255.0", "OpenVPN: the VPN network");
+        Equal(Join(vpn.Tokens(10, SyntaxHighlighting.TypeKeyword)), "push", "OpenVPN: a push");
+        Equal(Join(vpn.Tokens(10, SyntaxHighlighting.TypeString)), "\"redirect-gateway def1 bypass-dhcp\"", "OpenVPN: the pushed route");
+        Equal(Join(vpn.Tokens(12, SyntaxHighlighting.TypeKeyword)), "keepalive", "OpenVPN: keepalive");
+        Equal(Join(vpn.Tokens(12, SyntaxHighlighting.TypeNumber)), "10|120", "OpenVPN: the keepalive timers");
+        Equal(Join(vpn.Tokens(13, SyntaxHighlighting.TypeKeyword)), "cipher|AES-256-GCM", "OpenVPN: the cipher");
+        Equal(Join(vpn.Tokens(14, SyntaxHighlighting.TypeKeyword)), "data-ciphers|AES-256-GCM|AES-128-GCM", "OpenVPN: the cipher list");
+        Equal(Join(vpn.Tokens(15, SyntaxHighlighting.TypeKeyword)), "auth|SHA256", "OpenVPN: the digest");
+        Equal(Join(vpn.Tokens(17, SyntaxHighlighting.TypeKeyword)), "persist-key", "OpenVPN: a directive without a value");
+        Equal(Join(vpn.Tokens(18, SyntaxHighlighting.TypeKeyword)), "persist-tun", "OpenVPN: another directive without a value");
+        Equal(Join(vpn.Tokens(20, SyntaxHighlighting.TypeKeyword)), "verb", "OpenVPN: verb");
+        Equal(Join(vpn.Tokens(20, SyntaxHighlighting.TypeNumber)), "3", "OpenVPN: the verbosity");
+        Equal(Join(vpn.Tokens(21, SyntaxHighlighting.TypeKeyword)), "client", "OpenVPN: the client mode");
+        Equal(Join(vpn.Tokens(22, SyntaxHighlighting.TypeKeyword)), "remote", "OpenVPN: a remote");
+        Equal(Join(vpn.Tokens(22, SyntaxHighlighting.TypeNumber)), "1194", "OpenVPN: the remote port");
+        Equal(Join(vpn.Tokens(23, SyntaxHighlighting.TypeKeyword)), "remote-cert-tls|server", "OpenVPN: the certificate role");
+        Equal(Join(vpn.Tokens(24, SyntaxHighlighting.TypeKeyword)), "resolv-retry|infinite", "OpenVPN: the resolver retries");
+        Equal(Join(vpn.Tokens(26, SyntaxHighlighting.TypeKeyword)), "tls-version-min", "OpenVPN: the minimum TLS version");
+        Equal(Join(vpn.Tokens(27, SyntaxHighlighting.TypeKeyword)), "verify-client-cert|require", "OpenVPN: the client certificate check");
+        Equal(Join(vpn.Tokens(28, SyntaxHighlighting.TypeKeyword)), "", "OpenVPN: an unknown option is not a keyword");
+        Equal(Join(vpn.Tokens(28, SyntaxHighlighting.TypeVariable)), "unknown-option", "OpenVPN: ...it is a plain key");
+        Equal(Join(vpn.Tokens(29, SyntaxHighlighting.TypeComment)), "; a semicolon comment", "OpenVPN: a semicolon comment");
+        Check(SyntaxHighlighting.GetKeywords(L.OpenVpn).Contains("tls-crypt"), "OpenVPN keywords contain 'tls-crypt'");
+        Check(SyntaxHighlighting.GetKeywords(L.OpenVpn).Contains("persist-key"), "OpenVPN keywords contain 'persist-key'");
+        Check(SyntaxHighlighting.GetKeywords(L.OpenVpn).Contains("AES-256-GCM"), "OpenVPN keywords contain 'AES-256-GCM'");
+        Equal(Join(CommentStyle.ForLanguage(L.OpenVpn).Toggle(new[] { "port 1194" })), "# port 1194", "OpenVPN comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2517,6 +2578,7 @@ internal static class Program
         PamChecks();
         SambaChecks();
         PostfixChecks();
+        OpenVpnChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

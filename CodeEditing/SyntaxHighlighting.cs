@@ -113,14 +113,15 @@ namespace SmarTTY.CodeEditing
             Sysctl, // /etc/sysctl.conf, /etc/sysctl.d/*.conf: the colors of Config with the kernel tunables known
             Pam, // /etc/pam.conf, /etc/pam.d/*: the colors of Config with the PAM types, controls and modules known
             Samba, // smb.conf: the colors of Config with the [global] and [share] parameters known
-            Postfix // main.cf, master.cf: the colors of Config with the Postfix parameters and services known
+            Postfix, // main.cf, master.cf: the colors of Config with the Postfix parameters and services known
+            OpenVpn // *.ovpn, /etc/openvpn/*.conf: the colors of Config with the OpenVPN options known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.OpenVpn, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -170,6 +171,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Pam: return "PAM";
                 case Language.Samba: return "Samba (smb.conf)";
                 case Language.Postfix: return "Postfix";
+                case Language.OpenVpn: return "OpenVPN";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -421,6 +423,12 @@ namespace SmarTTY.CodeEditing
                 (lowerCasePath.Contains("/postfix/") && name.EndsWith(".cf", StringComparison.Ordinal)))
             {
                 return Language.Postfix;
+            }
+            // OpenVPN: the .ovpn profiles users exchange and the .conf files of /etc/openvpn, openvpn.conf anywhere.
+            if (name.EndsWith(".ovpn", StringComparison.Ordinal) || name == "openvpn.conf" ||
+                (lowerCasePath.Contains("/openvpn/") && name.EndsWith(".conf", StringComparison.Ordinal)))
+            {
+                return Language.OpenVpn;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1140,6 +1148,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Pam: return TokenizePam;
                 case Language.Samba: return TokenizeSamba;
                 case Language.Postfix: return TokenizePostfix;
+                case Language.OpenVpn: return TokenizeOpenVpn;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1298,6 +1307,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(SambaDirectives, SambaValues);
                 case Language.Postfix:
                     return Combine(PostfixDirectives, PostfixValues);
+                case Language.OpenVpn:
+                    return Combine(OpenVpnDirectives, OpenVpnValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
