@@ -1754,6 +1754,65 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(AlertmanagerKeywords, AlertmanagerValues, startState, text, sink, out endState);
     }
 
+    // ---------------------------------------------------------------- MongoDB
+
+    private static readonly HashSet<string> MongoDbKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope, the logging and the process
+        @"
+          systemLog destination path logAppend logRotate verbosity quiet component timeStampFormat syslogFacility
+          processManagement fork pidFilePath timeZoneInfo",
+        // the network and the TLS connection
+        @"
+          net port bindIp bindIpAll ipv6 maxIncomingConnections unixDomainSocket compression serviceExecutor
+          ssl tls mode PEMKeyFile PEMKeyPassword clusterFile clusterPassword CAFile CRLFile
+          allowConnectionsWithoutCertificates allowInvalidCertificates allowInvalidHostnames disabledProtocols
+          FIPSMode certificateSelector certificateKeyFile certificateKeyFilePassword",
+        // the authentication and the encryption at rest
+        @"
+          security authorization keyFile clusterAuthMode javascriptEnabled redactClientLogData enableEncryption
+          encryptionCipherMode kmip sasl authenticationRestrictions clientSource serverAddress
+          host serviceName saslMechanisms saslSource queryUser queryPassword userCacheInvalidationIntervalSecs",
+        // the storage engine and the journal
+        @"
+          storage dbPath journal enabled commitIntervalMs directoryPerDB syncPeriodSecs engine wiredTiger
+          collectionConfig blockCompressor indexConfig prefixCompression journalCompressor engineConfig cacheSizeGB
+          statisticsLogDelaySecs directoryForIndexes configString mmapv1 nsSize smallFiles inMemory inMemorySizeGB
+          ephemeralForTest repairPath oplogMinRetentionHours usePowerOf2Sizes",
+        // the profiler, the replication and the sharding
+        @"
+          operationProfiling slowOpThresholdMs slowOpSampleRate filter
+          replication replSetName oplogSizeMB enableMajorityReadConcern chainingAllowed catchUpTimeoutMillis
+          electionTimeoutMillis heartbeatIntervalMillis heartbeatTimeoutSecs rollbackTimeLimitSecs priority
+          arbiterOnly buildIndexes hidden secondaryDelaySecs votes tags getLastErrorModes getLastErrorDefaults
+          useHostName useIPv6 localPingThresholdMs waitForSecondaryBeforeNoopWriteMS
+          sharding clusterRole shardingState configDB archiveMovedChunks chunkSize balancer autoSplit
+          proposedSplitVectorThresholdMB migrateChunkSizeBytes",
+        // the audit log, the parameters and the search index
+        @"
+          auditLog format compressionMode snmp subagent
+          setParameter enableLocalhostAuthBypass authenticationMechanisms notablescan logLevel
+          diagnosticDataCollectionEnabled textSearch searchScore indexRoller");
+
+    private static readonly HashSet<string> MongoDbValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the log destinations, the TLS modes and the states
+        @"file syslog console JSON BSON enabled disabled
+          requireTLS allowTLS preferTLS
+          keyFile sendKeyFile sendKeyAndCertificate x509",
+        // the storage engines and the roles of a node
+        @"wiredTiger inMemory ephemeralForTest mmapv1 configsvr shardsvr",
+        // the profiling modes and the choices of the options
+        @"off slowOp all none reopen
+          SCRAM-SHA-1 SCRAM-SHA-256 MONGODB-CR snappy zlib zstd noop");
+
+    /// <summary>
+    /// MongoDB: the colours and the folds of YAML with the settings of mongod.conf and mongos.conf known; the log
+    /// destinations, the TLS modes, the storage engines, the node roles and the profiling modes are values.
+    /// </summary>
+    private static bool TokenizeMongoDb(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(MongoDbKeywords, MongoDbValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

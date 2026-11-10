@@ -154,6 +154,8 @@ internal static class Program
         Check(Names(L.Prometheus, "", "").Contains("relabel_configs"), "the Prometheus setting 'relabel_configs' is offered");
         Check(Names(L.Alertmanager, "", "").Contains("receivers"), "the Alertmanager setting 'receivers' is offered");
         Check(Names(L.Alertmanager, "", "").Contains("saturday"), "the Alertmanager weekday 'saturday' is offered");
+        Check(Names(L.MongoDb, "", "").Contains("wiredTiger"), "the MongoDB setting 'wiredTiger' is offered");
+        Check(Names(L.MongoDb, "", "").Contains("requireTLS"), "the MongoDB TLS mode 'requireTLS' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
