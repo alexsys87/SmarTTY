@@ -16,6 +16,23 @@ public static class LocalLinkRules
         return path != null && path.Length >= 2 && IsSeparator(path[0]) && IsSeparator(path[1]);
     }
 
+    /// <summary>
+    /// True for a path that names a file or folder of this machine: one with a drive letter (C:\x\file.log, C:/x/file.log). The other
+    /// paths in the text of a device are the device's own: "/tmp" printed by a Linux host behind a telnet or serial line is its /tmp,
+    /// and Windows would read it as C:\tmp of this machine (opened in Explorer by a click when such a folder exists here). A name
+    /// without a folder ("notes.txt") or one rooted without a drive ("\x") is relative to a directory of the device, not to the
+    /// working directory of SmarTTY. Network and device paths are excluded (<see cref="IsNetworkOrDevicePath"/>).
+    /// </summary>
+    public static bool IsLocalPath(string path)
+    {
+        return path != null && path.Length >= 3 && IsAsciiLetter(path[0]) && path[1] == ':' && IsSeparator(path[2]) && !IsNetworkOrDevicePath(path.Substring(2));
+    }
+
+    private static bool IsAsciiLetter(char ch)
+    {
+        return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+    }
+
     private static bool IsSeparator(char ch)
     {
         return ch == '/' || ch == '\\';

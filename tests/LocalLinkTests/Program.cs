@@ -104,6 +104,22 @@ internal static class Program
             Check(!LocalLinkRules.IsNetworkOrDevicePath(path), "rules: " + (path ?? "null") + " is an ordinary path");
         }
 
+        // --- only a path with a drive letter is one of this machine ---
+        // A Linux host behind a telnet or serial line prints its own paths: "cd /tmp" or the panel of mc showed /tmp as a link that
+        // opened C:\tmp of this computer in Explorer.
+        foreach (string path in new[] { @"C:\Windows\x.log", "C:/Windows/x.log", @"d:\build\out.txt", @"Z:\", "C:/" })
+        {
+            Check(LocalLinkRules.IsLocalPath(path), "local: " + path + " is a path of this machine");
+        }
+        foreach (string path in new[]
+        {
+            "/tmp", "/", "/etc/passwd", "/var/log/syslog", "/home/user/notes.txt", @"\Windows\x", @"\", "relative.txt", @"a\b.txt", "./run.sh", "../x.log",
+            "C:", "C:foo.txt", "1:/x", "::/x", @"\\host\share\x.txt", "//host/share/x.txt", @"C:\\server\share", "C://server/share", "", null,
+        })
+        {
+            Check(!LocalLinkRules.IsLocalPath(path), "local: " + (path ?? "null") + " is not a path of this machine");
+        }
+
         // --- the cache: nothing is read on the thread that asks ---
         Fixture f = new Fixture();
         f.Disk["a"] = true;

@@ -178,24 +178,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private bool IsLinkExtension(string extension)
-    {
-        string autoLinkExtensions = AppSettings?.VirtualTerminal?.AutoLinkExtensions;
-        if (string.IsNullOrEmpty(autoLinkExtensions))
-        {
-            return false;
-        }
-        foreach (string item in autoLinkExtensions.Split(';'))
-        {
-            if (string.Equals(item, extension, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals("." + item, extension, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // Completion infrastructure
     private enum CompletionTarget
     {
@@ -2351,7 +2333,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         Word,
         Rejected,
-        AbsolutePath,
         Position
     }
 
@@ -2364,18 +2345,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private readonly SerialTerminalControl _terminal;
 
-        private readonly string _baseDirectory;
-
         private readonly StringBuilder _path = new StringBuilder();
-
-        private StringBuilder _extension;
 
         public LocalLinkCandidate(SerialTerminalControl terminal, char firstChar)
         {
             _terminal = terminal;
-            _baseDirectory = Environment.CurrentDirectory;
             _path.Append(firstChar);
-            State = (firstChar == '\\' || firstChar == '/') ? LinkCandidateState.AbsolutePath : LinkCandidateState.Word;
+            State = LinkCandidateState.Word;
         }
 
         public bool IsActive
@@ -2450,25 +2426,16 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 {
                     return path;
                 }
-                // The text comes from the device. Windows connects to the host of a network path (\\host\share, //host/share)
-                // as soon as it is asked whether the path exists, and offers the credentials of the user to that host: such a
-                // name is no link, and nothing is asked about it.
-                if (SmarTTY.Utilities.LocalLinkRules.IsNetworkOrDevicePath(path))
+                // The text comes from the device: only a path with a drive letter names this machine (see LocalLinkRules.IsLocalPath).
+                // "/tmp" of a Linux host would be C:\tmp here, and a network path would make Windows connect to its host and offer
+                // the credentials of the user as soon as it is asked whether the path exists: neither is looked at.
+                if (!SmarTTY.Utilities.LocalLinkRules.IsLocalPath(path))
                 {
                     return null;
                 }
-                bool isDosDrive = path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
-                string fullPath;
-                if (State == LinkCandidateState.AbsolutePath || isDosDrive)
-                {
-                    fullPath = Path.GetFullPath(path);
-                }
-                else
-                {
-                    fullPath = Path.GetFullPath(Path.Combine(_baseDirectory, path));
-                }
-                // A name that is resolved against a working directory on a network share ends up on that share as well.
-                return SmarTTY.Utilities.LocalLinkRules.IsNetworkOrDevicePath(fullPath) ? null : fullPath;
+                string fullPath = Path.GetFullPath(path);
+                // "C:\a\..\..\x" stays on C:, but check the result as well.
+                return SmarTTY.Utilities.LocalLinkRules.IsLocalPath(fullPath) ? fullPath : null;
             }
             catch
             {
@@ -2482,14 +2449,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 return false;
             }
-            if (ch == '.')
-            {
-                _extension = new StringBuilder();
-            }
             if (PathCharacters.IndexOf(ch) >= 0)
             {
                 _path.Append(ch);
-                _extension?.Append(ch);
                 return true;
             }
             Complete();
@@ -2502,20 +2464,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 return;
             }
+            // An address, or a path of this machine with a drive letter. A Unix path ("/tmp", "/var/log/syslog") and a bare
+            // name ("build.log") are those of the device on the other end of the line, not files of this computer.
             string path = _path.ToString();
-            bool isDosDrive = path.Length >= 2 && char.IsLetter(path[0]) && path[1] == ':';
-            if (IsUrl(path) || State == LinkCandidateState.AbsolutePath || isDosDrive)
-            {
-                State = LinkCandidateState.Position;
-            }
-            else if (_extension != null && _terminal.IsLinkExtension(_extension.ToString()))
-            {
-                State = LinkCandidateState.Position;
-            }
-            else
-            {
-                State = LinkCandidateState.Rejected;
-            }
+            State = (IsUrl(path) || SmarTTY.Utilities.LocalLinkRules.IsLocalPath(path)) ? LinkCandidateState.Position : LinkCandidateState.Rejected;
         }
     }
 
