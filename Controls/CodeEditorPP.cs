@@ -490,7 +490,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
                 return new HoverTarget
                 {
                     Cursor = Cursors.Hand,
-                    ClickAction = () => SmarTTY.GUI.UrlOpener.Open(url)
+                    ClickAction = () => UrlOpener.Open(url)
                 };
             }
         }

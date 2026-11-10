@@ -512,7 +512,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     /// <summary>An address in the output was clicked: it opens in the browser, not in the editor of the server.</summary>
     public void RequestOpenUrl(string url)
     {
-        SmarTTY.GUI.UrlOpener.Open(url);
+        UrlOpener.Open(url);
     }
 
     public void RequestOpenFile(string text, int? line, int? column, SmarTTY.CodeEditing.ColumnUnit unit)

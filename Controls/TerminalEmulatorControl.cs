@@ -77,7 +77,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
         public void RequestOpenUrl(string url)
         {
-            SmarTTY.GUI.UrlOpener.Open(url);
+            UrlOpener.Open(url);
         }
     }
 
