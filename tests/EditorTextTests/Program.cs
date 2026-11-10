@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2143,6 +2143,89 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Alertmanager).Toggle(new[] { "  resolve_timeout: 5m" })), "  # resolve_timeout: 5m", "Alertmanager comment");
     }
 
+    private static void MongoDbChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongod.conf"), L.MongoDb, "the mongod configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongos.conf"), L.MongoDb, "the mongos configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongodb.conf"), L.MongoDb, "the older MongoDB configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/mongod.conf"), L.MongoDb, "mongod.conf anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongodb/mongod.conf"), L.MongoDb, "a configuration under /etc/mongodb");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongodb/conf/mongos.conf"), L.MongoDb, "a nested mongos configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongod.conf.bak"), L.Plain, "a backup of mongod.conf is not MongoDB");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/mongodb/README"), L.Plain, "the README of /etc/mongodb is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/server.conf"), L.Config, "an ordinary .conf stays Config");
+
+        Highlighted mongo = new Highlighted(L.MongoDb,
+            "# MongoDB configuration\nsystemLog:\n  destination: file\n  path: /var/log/mongodb/mongod.log\n" +
+            "  logAppend: true\n  logRotate: reopen\nstorage:\n  dbPath: /var/lib/mongodb\n  journal:\n" +
+            "    enabled: true\n  engine: wiredTiger\n  wiredTiger:\n    engineConfig:\n      cacheSizeGB: 2\n" +
+            "    collectionConfig:\n      blockCompressor: snappy\n    indexConfig:\n      prefixCompression: true\n" +
+            "  directoryPerDB: true\nnet:\n  port: 27017\n  bindIp: 127.0.0.1,10.0.0.5\n  ipv6: false\n" +
+            "  maxIncomingConnections: 65536\n  tls:\n    mode: requireTLS\n" +
+            "    certificateKeyFile: /etc/ssl/mongodb.pem\n    allowConnectionsWithoutCertificates: false\n" +
+            "processManagement:\n  fork: true\n  pidFilePath: /var/run/mongodb/mongod.pid\nsecurity:\n" +
+            "  authorization: enabled\n  keyFile: /etc/mongodb/key\n  javascriptEnabled: false\n" +
+            "operationProfiling:\n  mode: slowOp\n  slowOpThresholdMs: 100\nreplication:\n  replSetName: rs0\n" +
+            "  oplogSizeMB: 2048\nsharding:\n  clusterRole: shardsvr\nauditLog:\n  destination: file\n" +
+            "  format: JSON\n  path: /var/log/mongodb/audit.json\nsetParameter:\n" +
+            "  enableLocalhostAuthBypass: false\n  authenticationMechanisms: SCRAM-SHA-256\nunknown_option: 1\n");
+        Equal(Join(mongo.Tokens(0, SyntaxHighlighting.TypeComment)), "# MongoDB configuration", "MongoDB: a comment");
+        Equal(Join(mongo.Tokens(1, SyntaxHighlighting.TypeKeyword)), "systemLog", "MongoDB: the systemLog block");
+        Equal(Join(mongo.Tokens(2, SyntaxHighlighting.TypeKeyword)), "destination|file", "MongoDB: the log destination");
+        Equal(Join(mongo.Tokens(3, SyntaxHighlighting.TypeKeyword)), "path", "MongoDB: the log path");
+        Equal(Join(mongo.Tokens(4, SyntaxHighlighting.TypeKeyword)), "logAppend|true", "MongoDB: append to the log");
+        Equal(Join(mongo.Tokens(5, SyntaxHighlighting.TypeKeyword)), "logRotate|reopen", "MongoDB: the log rotation");
+        Equal(Join(mongo.Tokens(6, SyntaxHighlighting.TypeKeyword)), "storage", "MongoDB: the storage block");
+        Equal(Join(mongo.Tokens(7, SyntaxHighlighting.TypeKeyword)), "dbPath", "MongoDB: the data directory");
+        Equal(Join(mongo.Tokens(9, SyntaxHighlighting.TypeKeyword)), "enabled|true", "MongoDB: the journal");
+        Equal(Join(mongo.Tokens(10, SyntaxHighlighting.TypeKeyword)), "engine|wiredTiger", "MongoDB: the storage engine");
+        Equal(Join(mongo.Tokens(11, SyntaxHighlighting.TypeKeyword)), "wiredTiger", "MongoDB: the WiredTiger block");
+        Equal(Join(mongo.Tokens(12, SyntaxHighlighting.TypeKeyword)), "engineConfig", "MongoDB: the engine configuration");
+        Equal(Join(mongo.Tokens(13, SyntaxHighlighting.TypeKeyword)), "cacheSizeGB", "MongoDB: the cache size");
+        Equal(Join(mongo.Tokens(13, SyntaxHighlighting.TypeNumber)), "2", "MongoDB: the cache size value");
+        Equal(Join(mongo.Tokens(15, SyntaxHighlighting.TypeKeyword)), "blockCompressor|snappy", "MongoDB: the compressor");
+        Equal(Join(mongo.Tokens(17, SyntaxHighlighting.TypeKeyword)), "prefixCompression|true", "MongoDB: the index prefix compression");
+        Equal(Join(mongo.Tokens(19, SyntaxHighlighting.TypeKeyword)), "net", "MongoDB: the network block");
+        Equal(Join(mongo.Tokens(20, SyntaxHighlighting.TypeKeyword)), "port", "MongoDB: the port");
+        Equal(Join(mongo.Tokens(20, SyntaxHighlighting.TypeNumber)), "27017", "MongoDB: the port number");
+        Equal(Join(mongo.Tokens(21, SyntaxHighlighting.TypeKeyword)), "bindIp", "MongoDB: the bind addresses");
+        Equal(Join(mongo.Tokens(22, SyntaxHighlighting.TypeKeyword)), "ipv6|false", "MongoDB: the IPv6 flag");
+        Equal(Join(mongo.Tokens(23, SyntaxHighlighting.TypeKeyword)), "maxIncomingConnections", "MongoDB: the connection limit");
+        Equal(Join(mongo.Tokens(23, SyntaxHighlighting.TypeNumber)), "65536", "MongoDB: the connection limit value");
+        Equal(Join(mongo.Tokens(25, SyntaxHighlighting.TypeKeyword)), "mode|requireTLS", "MongoDB: the TLS mode");
+        Equal(Join(mongo.Tokens(26, SyntaxHighlighting.TypeKeyword)), "certificateKeyFile", "MongoDB: the certificate");
+        Equal(Join(mongo.Tokens(27, SyntaxHighlighting.TypeKeyword)), "allowConnectionsWithoutCertificates|false", "MongoDB: the client certificate check");
+        Equal(Join(mongo.Tokens(28, SyntaxHighlighting.TypeKeyword)), "processManagement", "MongoDB: the process block");
+        Equal(Join(mongo.Tokens(29, SyntaxHighlighting.TypeKeyword)), "fork|true", "MongoDB: the fork flag");
+        Equal(Join(mongo.Tokens(31, SyntaxHighlighting.TypeKeyword)), "security", "MongoDB: the security block");
+        Equal(Join(mongo.Tokens(32, SyntaxHighlighting.TypeKeyword)), "authorization|enabled", "MongoDB: the authorization");
+        Equal(Join(mongo.Tokens(33, SyntaxHighlighting.TypeKeyword)), "keyFile", "MongoDB: the key file");
+        Equal(Join(mongo.Tokens(34, SyntaxHighlighting.TypeKeyword)), "javascriptEnabled|false", "MongoDB: the JavaScript engine");
+        Equal(Join(mongo.Tokens(35, SyntaxHighlighting.TypeKeyword)), "operationProfiling", "MongoDB: the profiler block");
+        Equal(Join(mongo.Tokens(36, SyntaxHighlighting.TypeKeyword)), "mode|slowOp", "MongoDB: the profiling mode");
+        Equal(Join(mongo.Tokens(37, SyntaxHighlighting.TypeKeyword)), "slowOpThresholdMs", "MongoDB: the slow operation threshold");
+        Equal(Join(mongo.Tokens(37, SyntaxHighlighting.TypeNumber)), "100", "MongoDB: the threshold value");
+        Equal(Join(mongo.Tokens(38, SyntaxHighlighting.TypeKeyword)), "replication", "MongoDB: the replication block");
+        Equal(Join(mongo.Tokens(39, SyntaxHighlighting.TypeKeyword)), "replSetName", "MongoDB: the replica set name");
+        Equal(Join(mongo.Tokens(40, SyntaxHighlighting.TypeKeyword)), "oplogSizeMB", "MongoDB: the oplog size");
+        Equal(Join(mongo.Tokens(40, SyntaxHighlighting.TypeNumber)), "2048", "MongoDB: the oplog size value");
+        Equal(Join(mongo.Tokens(41, SyntaxHighlighting.TypeKeyword)), "sharding", "MongoDB: the sharding block");
+        Equal(Join(mongo.Tokens(42, SyntaxHighlighting.TypeKeyword)), "clusterRole|shardsvr", "MongoDB: the node role");
+        Equal(Join(mongo.Tokens(43, SyntaxHighlighting.TypeKeyword)), "auditLog", "MongoDB: the audit log");
+        Equal(Join(mongo.Tokens(45, SyntaxHighlighting.TypeKeyword)), "format|JSON", "MongoDB: the audit format");
+        Equal(Join(mongo.Tokens(47, SyntaxHighlighting.TypeKeyword)), "setParameter", "MongoDB: the server parameters");
+        Equal(Join(mongo.Tokens(48, SyntaxHighlighting.TypeKeyword)), "enableLocalhostAuthBypass|false", "MongoDB: the localhost bypass");
+        Equal(Join(mongo.Tokens(49, SyntaxHighlighting.TypeKeyword)), "authenticationMechanisms|SCRAM-SHA-256", "MongoDB: the authentication mechanism");
+        Equal(Join(mongo.Tokens(50, SyntaxHighlighting.TypeKeyword)), "", "MongoDB: an unknown option is not a keyword");
+        Equal(Join(mongo.Tokens(50, SyntaxHighlighting.TypeVariable)), "unknown_option", "MongoDB: ...it is a plain key");
+        Check(Folds(mongo).Length > 0, "MongoDB blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.MongoDb).Contains("wiredTiger"), "MongoDB keywords contain 'wiredTiger'");
+        Check(SyntaxHighlighting.GetKeywords(L.MongoDb).Contains("requireTLS"), "MongoDB keywords contain 'requireTLS'");
+        Check(SyntaxHighlighting.GetKeywords(L.MongoDb).Contains("shardsvr"), "MongoDB keywords contain 'shardsvr'");
+        Equal(Join(CommentStyle.ForLanguage(L.MongoDb).Toggle(new[] { "  dbPath: /var/lib/mongodb" })), "  # dbPath: /var/lib/mongodb", "MongoDB comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2860,6 +2943,7 @@ internal static class Program
         CloudInitChecks();
         PrometheusChecks();
         AlertmanagerChecks();
+        MongoDbChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
