@@ -364,6 +364,9 @@ internal abstract class CommandSyncEngine : ISyncEngine, IDisposable
                     {
                         continue;
                     }
+                    // The times of the plan are on the clock of this computer, like those of the resolved symlinks above: uploads add the
+                    // offset to the time they set, so it has to come off here, or every file of a device with a wrong clock looks changed.
+                    statEntry.ModifiedTime -= _settings.ClockOffset.Seconds;
                     string entryPath = currentDir.FullPath + "/" + statEntry.Name;
                     switch (statEntry.Kind)
                     {

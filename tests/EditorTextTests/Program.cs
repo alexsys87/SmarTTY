@@ -92,6 +92,26 @@ internal static class Program
         lf.InsertText(start, removed);
         Equal(lf.GetText(), original, "re-inserting the removed text restores the LF file exactly");
 
+        // A file with mixed endings: the join keeps the ending of the second line, and the undo puts every ending back where it was.
+        const string mixed = "ab\r\ncd\nef\r\n";
+        EditableTextDocument mix = Document(mixed);
+        TextDocument.TextPosition mixStart = new TextDocument.TextPosition(1, 0);
+        TextDocument.TextPosition mixEnd = new TextDocument.TextPosition(1, 1);
+        string mixRemoved = mix.GetRangeText(mixStart, mixEnd, mix.GetEffectiveLineTerminator);
+        Equal(mixRemoved, "b\r\nc", "the removed text keeps the ending of the line break it contains");
+        DeleteRange(mix, mixStart, mixEnd);
+        Equal(mix.GetText(), "ad\nef\r\n", "the joined line ends like the second line did");
+        mix.InsertText(mixStart, mixRemoved);
+        Equal(mix.GetText(), mixed, "re-inserting the removed text restores every ending of a mixed file");
+
+        // The tabs of a line are counted again when it is edited (the width of the longest line depends on it).
+        EditableTextDocument tabs = Document("a");
+        Equal(tabs.GetMaxLineWidth(8), 1, "a line without tabs is as wide as it is long");
+        tabs.ReplaceInLine(0, 1, 0, "\t\t");
+        Equal(tabs.GetMaxLineWidth(8), 17, "tabs typed into a line widen it");
+        tabs.ReplaceInLine(0, 1, 2, "");
+        Equal(tabs.GetMaxLineWidth(8), 1, "and the width goes back when they are deleted");
+
         EditableTextDocument crlfUndo = Document("a\r\nb\r\nc");
         string crlfRemoved = crlfUndo.GetRangeText(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(0, 2), crlfUndo.GetEffectiveLineTerminator);
         Equal(crlfRemoved, "a\r\nb\r\n", "CRLF terminators are kept as well");
@@ -239,6 +259,8 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/profile.psrc"), L.PowerShell, ".psrc is PowerShell");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/DEPLOY.PS1"), L.PowerShell, ".PS1 is PowerShell too");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env pwsh"), L.PowerShell, "a pwsh shebang is PowerShell");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env LANG=C python3"), L.Python, "variable assignments after env are skipped");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/env -S PYTHONUNBUFFERED=1 python3 -u"), L.Python, "also after env -S");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/bin/tool", "#!/usr/bin/powershell -NoProfile"), L.PowerShell, "a powershell shebang is PowerShell");
         Equal(SyntaxHighlighting.GetDisplayName(L.PowerShell), "PowerShell", "PowerShell has its own display name");
         Check(SyntaxHighlighting.SelectableLanguages.Contains(L.PowerShell), "PowerShell is in the syntax menu");

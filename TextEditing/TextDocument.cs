@@ -175,6 +175,11 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
                 OnChanged(isInsert: true, offset, newText.Length);
                 _text = _text.Insert(offset, newText);
             }
+            if (length != 0 || newText.Length != 0)
+            {
+                // The number of tabs is what GetMaxWidth counts with: left as it was, the width of a line that got tabs (or lost them) was wrong.
+                CountTabs();
+            }
             return text;
         }
     }

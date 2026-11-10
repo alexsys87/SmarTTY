@@ -264,19 +264,9 @@ public partial class HexTerminalControl : DpiAwareControl
                 }
                 currentColumn++;
                 stringBuilder.AppendFormat("{0:x2}", currentByte);
-                string text = "";
-                if (currentByte >= 32)
-                {
-                    text = Encoding.ASCII.GetString(new byte[1] { currentByte });
-                }
-                if (text.Length == 1)
-                {
-                    hexTextBuilder.Append(text);
-                }
-                else
-                {
-                    hexTextBuilder.Append(".");
-                }
+                // Only the printable ASCII range is shown as it is. Encoding.ASCII turned every byte above 0x7F into "?" (the same as a real
+                // 0x3F), and 0x7F went to the screen as a control character.
+                hexTextBuilder.Append(HexDocument.IsPrintable(currentByte) ? (char)currentByte : '.');
             }
             termHex.WriteText(stringBuilder.ToString());
             termText.WriteText(hexTextBuilder.ToString());
@@ -328,7 +318,9 @@ public partial class HexTerminalControl : DpiAwareControl
         {
             bytesPerLineLimit = 1;
         }
-        _bytesPerLine = Math.Min(bytesPerLineLimit, HexSettings.MaximumBytesPerLine);
+        // A maximum of 0 (or less) was typed in the settings: the width of the window decides, instead of one byte on every line.
+        int configuredMaximum = HexSettings.MaximumBytesPerLine;
+        _bytesPerLine = configuredMaximum > 0 ? Math.Min(bytesPerLineLimit, configuredMaximum) : bytesPerLineLimit;
     }
 
     private void SyncSelectionToText(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool select)

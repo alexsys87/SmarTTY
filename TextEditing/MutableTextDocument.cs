@@ -45,7 +45,12 @@ public class MutableTextDocument : TextDocument
                 lineIndex = this.LineList.Count - 1;
                 offset = int.MaxValue;
             }
-            InsertLine(lineIndex + 1, this.LineList[lineIndex].Replace(offset, -1, ""), lineEnding);
+            // The line break that is made here ends the first half, with the ending that was asked for; the second half keeps the ending the
+            // line had, so that the terminators of the lines after the break stay as they were (a file with mixed endings).
+            DocumentLine line = this.LineList[lineIndex];
+            LineEnding originalEnding = line.Ending;
+            InsertLine(lineIndex + 1, line.Replace(offset, -1, ""), originalEnding);
+            line.Ending = lineEnding;
         }
     }
 
@@ -53,9 +58,12 @@ public class MutableTextDocument : TextDocument
     {
         if (lineIndex < LineList.Count - 1)
         {
-            string text = LineList[lineIndex + 1].GetText();
+            DocumentLine next = LineList[lineIndex + 1];
+            string text = next.GetText();
             RemoveLines(lineIndex + 1, 1);
             LineList[lineIndex].Replace(-1, 0, text);
+            // The line break between the two lines is gone, and the joined line ends where the second one ended.
+            LineList[lineIndex].Ending = next.Ending;
         }
     }
 

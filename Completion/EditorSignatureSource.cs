@@ -39,14 +39,16 @@ public static class EditorSignatureSource
             return null;
         }
         string text = Normalize(documentText);
-        if (!FindCall(language, text, line, column, out string name, out activeParameter))
+        int offset = OffsetOf(text, line, column);
+        if (offset < 0 || !FindCallAt(language, text, offset, out string name, out activeParameter, out bool qualified))
         {
             return null;
         }
-        foreach (ParameterSignature signature in ParseDefinitionsNormalized(language, text))
+        foreach (ParameterSignature definition in ParseDefinitionsNormalized(language, text))
         {
-            if (signature.Name == name)
+            if (definition.Name == name)
             {
+                ParameterSignature signature = DropReceiver(language, definition, qualified);
                 if (activeParameter >= signature.ParameterCount)
                 {
                     activeParameter = Math.Max(0, signature.ParameterCount - 1);
@@ -87,7 +89,59 @@ public static class EditorSignatureSource
         {
             return false;
         }
-        return FindCallAt(language, text, offset, out name, out activeParameter);
+        return FindCallAt(language, text, offset, out name, out activeParameter, out _);
+    }
+
+    /// <summary>
+    /// "obj.method(" calls a method with the object as its first parameter, which the definition of Python ("self", "cls") and Rust
+    /// ("self", "&amp;self", "&amp;mut self") names but the call does not: without it the hint would mark the wrong parameter.
+    /// </summary>
+    private static ParameterSignature DropReceiver(SyntaxHighlighting.Language language, ParameterSignature signature, bool qualified)
+    {
+        if (!qualified || signature.ParameterCount == 0 ||
+            (language != SyntaxHighlighting.Language.Python && language != SyntaxHighlighting.Language.Rust))
+        {
+            return signature;
+        }
+        string first = signature.GetParameter(0).Text;
+        int colon = first.IndexOf(':');
+        string bare = (colon >= 0 ? first.Substring(0, colon) : first).Trim();
+        bool receiver = language == SyntaxHighlighting.Language.Python
+            ? (bare == "self" || bare == "cls")
+            : (bare == "self" || bare == "&self" || bare == "&mut self" || bare == "mut self" || bare == "& self" || bare == "& mut self");
+        if (!receiver)
+        {
+            return signature;
+        }
+        string[] rest = new string[signature.ParameterCount - 1];
+        for (int i = 1; i < signature.ParameterCount; i++)
+        {
+            rest[i - 1] = signature.GetParameter(i).Text;
+        }
+        return new ParameterSignature(signature.Name, rest);
+    }
+
+    /// <summary>
+    /// Languages with type arguments in angle brackets ("Map&lt;String, int&gt;"), where a comma inside "&lt;&gt;" does not separate parameters.
+    /// </summary>
+    private static bool UsesAngleBrackets(SyntaxHighlighting.Language language)
+    {
+        switch (language)
+        {
+            case SyntaxHighlighting.Language.Cpp:
+            case SyntaxHighlighting.Language.CSharp:
+            case SyntaxHighlighting.Language.Java:
+            case SyntaxHighlighting.Language.Kotlin:
+            case SyntaxHighlighting.Language.Scala:
+            case SyntaxHighlighting.Language.Groovy:
+            case SyntaxHighlighting.Language.Rust:
+            case SyntaxHighlighting.Language.Swift:
+            case SyntaxHighlighting.Language.Dart:
+            case SyntaxHighlighting.Language.TypeScript:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static List<ParameterSignature> ParseDefinitionsNormalized(SyntaxHighlighting.Language language, string text)
@@ -96,16 +150,18 @@ public static class EditorSignatureSource
         int offset = 0;
         foreach (string line in text.Split('\n'))
         {
-            if (TryParseDefinitionHead(language, line, out string name, out int openParen, out bool skipFirstName))
+            if (TryParseDefinitionHead(language, line, text, offset, out string name, out int openParen, out bool skipFirstName))
             {
-                string inner = ExtractParenGroup(text, offset + openParen);
+                string inner = ExtractParenGroup(language, text, offset + openParen);
                 if (inner != null)
                 {
+                    // A parameter list that goes over several lines may have comments between the parameters.
+                    inner = StripComments(language, inner);
                     if (skipFirstName)
                     {
                         inner = RemoveFirstWord(inner);
                     }
-                    result.Add(new ParameterSignature(name, ParameterSignature.SplitParameters(inner)));
+                    result.Add(new ParameterSignature(name, ParameterSignature.SplitParameters(inner, UsesAngleBrackets(language), language != SyntaxHighlighting.Language.Rust)));
                 }
             }
             offset += line.Length + 1;
@@ -113,32 +169,24 @@ public static class EditorSignatureSource
         return result;
     }
 
-    private static bool FindCallAt(SyntaxHighlighting.Language language, string text, int offset, out string name, out int activeParameter)
+    private static bool FindCallAt(SyntaxHighlighting.Language language, string text, int offset, out string name, out int activeParameter, out bool qualified)
     {
         name = null;
         activeParameter = 0;
+        qualified = false;
+        offset = Math.Min(offset, text.Length);
         List<int> stack = new List<int>();
         int i = 0;
         while (i < offset)
         {
             char c = text[i];
-            if (IsStringQuote(language, c))
+            if (IsStringQuote(language, text, i))
             {
                 i = SkipString(text, i, offset);
                 continue;
             }
-            if (IsBlockCommentStart(language, text, i))
+            if (TrySkipComment(language, text, ref i, offset))
             {
-                int commentEnd = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
-                i = (commentEnd < 0 || commentEnd + 2 > offset) ? offset : commentEnd + 2;
-                continue;
-            }
-            if (IsLineCommentStart(language, text, i))
-            {
-                while (i < offset && text[i] != '\n')
-                {
-                    i++;
-                }
                 continue;
             }
             if (c == '(')
@@ -162,6 +210,23 @@ public static class EditorSignatureSource
         {
             end--;
         }
+        if (end >= 0 && text[end] == '>' && UsesAngleBrackets(language))
+        {
+            // A call with type arguments ("convert<int>(", "parse::<T>(" in Rust): the name is in front of them.
+            int open = FindTypeArgumentsStart(text, end);
+            if (open >= 0)
+            {
+                end = open - 1;
+                if (end >= 1 && text[end] == ':' && text[end - 1] == ':')
+                {
+                    end -= 2;
+                }
+                while (end >= 0 && char.IsWhiteSpace(text[end]))
+                {
+                    end--;
+                }
+            }
+        }
         int nameEnd = end;
         if (language == SyntaxHighlighting.Language.Ruby && end >= 0 && (text[end] == '?' || text[end] == '!'))
         {
@@ -179,38 +244,121 @@ public static class EditorSignatureSource
             return false;
         }
         name = text.Substring(start, nameEnd - start + 1);
+        qualified = start > 0 && text[start - 1] == '.';
         activeParameter = CountParameters(language, text, top + 1, offset, depth);
         return true;
+    }
+
+    /// <summary>The text without its comments (each is replaced by a space); strings are left as they are.</summary>
+    private static string StripComments(SyntaxHighlighting.Language language, string text)
+    {
+        System.Text.StringBuilder result = null;
+        int copied = 0;
+        int i = 0;
+        while (i < text.Length)
+        {
+            if (IsStringQuote(language, text, i))
+            {
+                i = SkipString(text, i, text.Length);
+                continue;
+            }
+            int start = i;
+            if (TrySkipComment(language, text, ref i, text.Length))
+            {
+                result = result ?? new System.Text.StringBuilder();
+                result.Append(text, copied, start - copied).Append(' ');
+                copied = i;
+                continue;
+            }
+            i++;
+        }
+        if (result == null)
+        {
+            return text;
+        }
+        result.Append(text, copied, text.Length - copied);
+        return result.ToString();
+    }
+
+    /// <summary>The "&lt;" that matches the "&gt;" at <paramref name="close"/> (on the same line), or -1.</summary>
+    private static int FindTypeArgumentsStart(string text, int close)
+    {
+        int depth = 0;
+        for (int i = close; i >= 0 && close - i < 200; i--)
+        {
+            char c = text[i];
+            if (c == '\n' || c == ';' || c == '{' || c == '}' || c == '(' || c == ')')
+            {
+                return -1;
+            }
+            if (c == '>')
+            {
+                depth++;
+            }
+            else if (c == '<')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return i > 0 && (EditorCompletionSource.IsIdentifierChar(text[i - 1]) || text[i - 1] == ':' || char.IsWhiteSpace(text[i - 1])) ? i : -1;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Steps over a comment that starts at <paramref name="i"/> (up to <paramref name="limit"/>). A string that has an apostrophe in a comment
+    /// ("don't") must not open a string of its own.
+    /// </summary>
+    private static bool TrySkipComment(SyntaxHighlighting.Language language, string text, ref int i, int limit)
+    {
+        if (IsBlockCommentStart(language, text, i))
+        {
+            int commentEnd = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+            i = (commentEnd < 0 || commentEnd + 2 > limit) ? limit : commentEnd + 2;
+            return true;
+        }
+        if (IsLineCommentStart(language, text, i))
+        {
+            while (i < limit && text[i] != '\n')
+            {
+                i++;
+            }
+            return true;
+        }
+        return false;
     }
 
     private static int CountParameters(SyntaxHighlighting.Language language, string text, int from, int to, int depth)
     {
         int count = 0;
         int current = depth;
+        int angle = 0;
+        bool angles = UsesAngleBrackets(language);
         int i = from;
         while (i < to)
         {
             char c = text[i];
-            if (IsStringQuote(language, c))
+            if (IsStringQuote(language, text, i))
             {
                 i = SkipString(text, i, to);
                 continue;
             }
-            if (IsBlockCommentStart(language, text, i))
+            if (TrySkipComment(language, text, ref i, to))
             {
-                int commentEnd = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
-                i = (commentEnd < 0 || commentEnd + 2 > to) ? to : commentEnd + 2;
                 continue;
             }
-            if (IsLineCommentStart(language, text, i))
+            if (angles && c == '<' && i > 0 && EditorCompletionSource.IsIdentifierChar(text[i - 1]))
             {
-                while (i < to && text[i] != '\n')
-                {
-                    i++;
-                }
-                continue;
+                // "new Dictionary<string, int>()": the comma between the type arguments does not start another argument.
+                angle++;
             }
-            if (c == '(' || c == '[' || c == '{')
+            else if (angles && c == '>' && angle > 0 && text[i - 1] != '-' && text[i - 1] != '=')
+            {
+                angle--;
+            }
+            else if (c == '(' || c == '[' || c == '{')
             {
                 current++;
             }
@@ -218,7 +366,7 @@ public static class EditorSignatureSource
             {
                 current--;
             }
-            else if (c == ',' && current == depth)
+            else if (c == ',' && current == depth && angle == 0)
             {
                 count++;
             }
@@ -227,7 +375,9 @@ public static class EditorSignatureSource
         return count;
     }
 
-    private static bool TryParseDefinitionHead(SyntaxHighlighting.Language language, string line, out string name, out int openParen, out bool skipFirstName)
+    // line: the text of one line; fullText and lineStart: the whole document and where the line begins in it (the parameter list and the
+    // brace of a definition can be on the next lines).
+    private static bool TryParseDefinitionHead(SyntaxHighlighting.Language language, string line, string fullText, int lineStart, out string name, out int openParen, out bool skipFirstName)
     {
         name = null;
         openParen = -1;
@@ -258,7 +408,7 @@ public static class EditorSignatureSource
                 }
                 return TryKeywordDefinition(text, i, out name, out openParen, "function");
             case SyntaxHighlighting.Language.Bash:
-                return TryBareDefinition(text, i, out name, out openParen);
+                return TryBareDefinition(language, text, i, fullText, lineStart, out name, out openParen);
             case SyntaxHighlighting.Language.Ruby:
                 return TryKeywordDefinition(text, i, out name, out openParen, "def");
             case SyntaxHighlighting.Language.Perl:
@@ -270,7 +420,7 @@ public static class EditorSignatureSource
                 return TryKeywordDefinition(text, i, out name, out openParen, "function", "func");
             case SyntaxHighlighting.Language.Script:
                 return TryKeywordDefinition(text, i, out name, out openParen, "function", "fn")
-                    || TryBareDefinition(text, i, out name, out openParen);
+                    || TryBareDefinition(language, text, i, fullText, lineStart, out name, out openParen);
             case SyntaxHighlighting.Language.CLike:
             case SyntaxHighlighting.Language.Cpp:
             case SyntaxHighlighting.Language.CSharp:
@@ -288,7 +438,7 @@ public static class EditorSignatureSource
             case SyntaxHighlighting.Language.Css:
             case SyntaxHighlighting.Language.Protobuf:
                 return TryKeywordDefinition(text, i, out name, out openParen, "function", "func", "fn", "fun", "def")
-                    || TryCStyleDefinition(text, i, out name, out openParen);
+                    || TryCStyleDefinition(language, text, i, fullText, lineStart, out name, out openParen);
             default:
                 return false;
         }
@@ -308,6 +458,20 @@ public static class EditorSignatureSource
             while (p < text.Length && char.IsWhiteSpace(text[p]))
             {
                 p++;
+            }
+            // "fun <T> name(" (Kotlin) puts the type parameters in front of the name, and "func (r *T) name(" (Go) the receiver.
+            if (p < text.Length && (text[p] == '<' || (text[p] == '(' && keyword == "func")))
+            {
+                int skipped = SkipBalanced(text, p);
+                if (skipped < 0)
+                {
+                    continue;
+                }
+                p = skipped;
+                while (p < text.Length && char.IsWhiteSpace(text[p]))
+                {
+                    p++;
+                }
             }
             int nameStart = p;
             // A dotted name ("function M.add") keeps its last segment, which is the callable one.
@@ -331,6 +495,19 @@ public static class EditorSignatureSource
             {
                 q++;
             }
+            // Type parameters after the name: "fn name<T>(" (Rust), "function name<T>(" (TypeScript), "def name[T](" (Scala).
+            if (q < text.Length && (text[q] == '<' || text[q] == '['))
+            {
+                int skipped = SkipBalanced(text, q);
+                if (skipped >= 0)
+                {
+                    q = skipped;
+                    while (q < text.Length && char.IsWhiteSpace(text[q]))
+                    {
+                        q++;
+                    }
+                }
+            }
             if (q < text.Length && text[q] == '(')
             {
                 name = shortName;
@@ -339,6 +516,34 @@ public static class EditorSignatureSource
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// The index after the bracket group that opens at <paramref name="open"/> ("(...)", "&lt;...&gt;", "[...]"; "-&gt;" does not close one),
+    /// or -1 when it does not close in the text.
+    /// </summary>
+    private static int SkipBalanced(string text, int open)
+    {
+        char opening = text[open];
+        char closing = opening == '(' ? ')' : (opening == '<' ? '>' : ']');
+        int depth = 0;
+        for (int i = open; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (c == opening)
+            {
+                depth++;
+            }
+            else if (c == closing && !(c == '>' && i > 0 && (text[i - 1] == '-' || text[i - 1] == '=')))
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return i + 1;
+                }
+            }
+        }
+        return -1;
     }
 
     /// <summary>
@@ -401,7 +606,7 @@ public static class EditorSignatureSource
     }
 
     /// <summary>A shell-style definition: "name(args) { ... }" (the brace makes it a definition, not a call).</summary>
-    private static bool TryBareDefinition(string text, int start, out string name, out int openParen)
+    private static bool TryBareDefinition(SyntaxHighlighting.Language language, string text, int start, string fullText, int lineStart, out string name, out int openParen)
     {
         name = null;
         openParen = -1;
@@ -424,17 +629,24 @@ public static class EditorSignatureSource
         {
             return false;
         }
-        int match = FindMatchingParen(text, q);
+        int match = FindMatchingParen(language, fullText, lineStart + q);
         if (match < 0)
         {
             return false;
         }
         int after = match + 1;
-        while (after < text.Length && char.IsWhiteSpace(text[after]))
+        while (after < fullText.Length)
         {
-            after++;
+            if (char.IsWhiteSpace(fullText[after]))
+            {
+                after++;
+            }
+            else if (!TrySkipComment(language, fullText, ref after, fullText.Length))
+            {
+                break;
+            }
         }
-        if (after >= text.Length || text[after] != '{')
+        if (after >= fullText.Length || fullText[after] != '{')
         {
             return false;
         }
@@ -443,7 +655,7 @@ public static class EditorSignatureSource
         return true;
     }
 
-    private static bool TryCStyleDefinition(string text, int start, out string name, out int openParen)
+    private static bool TryCStyleDefinition(SyntaxHighlighting.Language language, string text, int start, string fullText, int lineStart, out string name, out int openParen)
     {
         name = null;
         openParen = -1;
@@ -473,17 +685,28 @@ public static class EditorSignatureSource
         {
             return false;
         }
-        int match = FindMatchingParen(text, paren);
+        // The parameters can go on over several lines, and the brace is often on a line of its own.
+        int match = FindMatchingParen(language, fullText, lineStart + paren);
         if (match < 0)
         {
             return false;
         }
         int after = match + 1;
-        while (after < text.Length && char.IsWhiteSpace(text[after]))
+        // Qualifiers between the parameters and the body: "const", "noexcept", "override", "throws IOException", "-> int".
+        while (after < fullText.Length)
         {
+            if (TrySkipComment(language, fullText, ref after, fullText.Length))
+            {
+                continue;
+            }
+            char tail = fullText[after];
+            if (!(char.IsWhiteSpace(tail) || EditorCompletionSource.IsIdentifierChar(tail) || ",.:<>&*-".IndexOf(tail) >= 0))
+            {
+                break;
+            }
             after++;
         }
-        if (after >= text.Length || (text[after] != '{' && text[after] != ';'))
+        if (after >= fullText.Length || (fullText[after] != '{' && fullText[after] != ';'))
         {
             return false;
         }
@@ -500,7 +723,8 @@ public static class EditorSignatureSource
         }
         foreach (char c in prefix)
         {
-            if (!(EditorCompletionSource.IsIdentifierChar(c) || char.IsWhiteSpace(c) || "*&:<>,~".IndexOf(c) >= 0))
+            // "[]" and "?" for the return types "byte[]" (Java, C#) and "string?" (C#, Kotlin, Dart).
+            if (!(EditorCompletionSource.IsIdentifierChar(c) || char.IsWhiteSpace(c) || "*&:<>,~[]?".IndexOf(c) >= 0))
             {
                 return false;
             }
@@ -546,7 +770,7 @@ public static class EditorSignatureSource
         }
     }
 
-    private static string ExtractParenGroup(string text, int openOffset)
+    private static string ExtractParenGroup(SyntaxHighlighting.Language language, string text, int openOffset)
     {
         if (openOffset < 0 || openOffset >= text.Length || text[openOffset] != '(')
         {
@@ -557,9 +781,13 @@ public static class EditorSignatureSource
         while (i < text.Length)
         {
             char c = text[i];
-            if (c == '\'' || c == '"')
+            if (IsStringQuote(language, text, i))
             {
                 i = SkipString(text, i, text.Length);
+                continue;
+            }
+            if (TrySkipComment(language, text, ref i, text.Length))
+            {
                 continue;
             }
             if (c == '(')
@@ -579,7 +807,7 @@ public static class EditorSignatureSource
         return null;
     }
 
-    private static int FindMatchingParen(string text, int openOffset)
+    private static int FindMatchingParen(SyntaxHighlighting.Language language, string text, int openOffset)
     {
         if (openOffset < 0 || openOffset >= text.Length || text[openOffset] != '(')
         {
@@ -589,9 +817,15 @@ public static class EditorSignatureSource
         for (int i = openOffset; i < text.Length; i++)
         {
             char c = text[i];
-            if (c == '\'' || c == '"')
+            if (IsStringQuote(language, text, i))
             {
                 i = SkipString(text, i, text.Length) - 1;
+                continue;
+            }
+            if (TrySkipComment(language, text, ref i, text.Length))
+            {
+                // The loop adds one: the comment ends at i, and the character there (a line break) is not a bracket.
+                i--;
                 continue;
             }
             if (c == '(')
@@ -614,7 +848,7 @@ public static class EditorSignatureSource
     {
         for (int i = 0; i < line.Length; i++)
         {
-            if (IsStringQuote(language, line[i]))
+            if (IsStringQuote(language, line, i))
             {
                 i = SkipString(line, i, line.Length) - 1;
                 continue;
@@ -631,14 +865,23 @@ public static class EditorSignatureSource
     /// True for a character that opens a string. Verilog uses the apostrophe in based literals (4'b1010)
     /// and VHDL in attributes (clk'event) and character literals, so there it is an ordinary character.
     /// </summary>
-    private static bool IsStringQuote(SyntaxHighlighting.Language language, char c)
+    private static bool IsStringQuote(SyntaxHighlighting.Language language, string text, int i)
     {
+        char c = text[i];
         if (c == '"')
         {
             return true;
         }
-        return c == '\'' && language != SyntaxHighlighting.Language.Verilog &&
-            language != SyntaxHighlighting.Language.Vhdl;
+        if (c != '\'' || language == SyntaxHighlighting.Language.Verilog || language == SyntaxHighlighting.Language.Vhdl)
+        {
+            return false;
+        }
+        if (language == SyntaxHighlighting.Language.Rust)
+        {
+            // A lifetime ("&'a str") is no string: only 'x' and '\n' are character literals.
+            return (i + 2 < text.Length && text[i + 2] == '\'') || (i + 1 < text.Length && text[i + 1] == '\\');
+        }
+        return true;
     }
 
     private static bool IsLineCommentStart(SyntaxHighlighting.Language language, string text, int i)
@@ -802,7 +1045,13 @@ public static class EditorSignatureSource
         {
             return -1;
         }
-        return offset + column;
+        // A column past the end of the line (a stale caret) stays on the line: the scan reads the text up to this offset.
+        int lineEnd = text.IndexOf('\n', offset);
+        if (lineEnd < 0)
+        {
+            lineEnd = text.Length;
+        }
+        return Math.Min(offset + column, lineEnd);
     }
 
     private static string Normalize(string text)

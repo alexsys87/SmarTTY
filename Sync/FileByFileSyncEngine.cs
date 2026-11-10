@@ -169,7 +169,7 @@ internal class FileByFileSyncEngine : CommandSyncEngine
     }
 
     /// <summary>Put in front of a command that works on a name relative to the current folder: it is skipped inside a folder that could not be entered.</summary>
-    private const string SkipWhenLost = "[ \"$f\" -gt 0 ] ||";
+    internal const string SkipWhenLost = "[ \"$f\" -gt 0 ] ||";
 
     /// <summary>"cd" into a folder (by its full path), counting the folders entered after a failure; reports the failure of the action.</summary>
     internal static string EnterScript(string fullPath, int actionIndex)
@@ -303,17 +303,17 @@ internal class FileByFileSyncEngine : CommandSyncEngine
                         int permissions = permissionProvider?.GetFilePermissions(localPaths[action.Argument]) ?? defaultPermissions;
                         // Not in a folder that could not be entered: touch would create an empty file of this name in the folder above.
                         streamWriter.WriteLine(SkipWhenLost + " chmod " + Convert.ToString(permissions, 8) + " -- " + RemotePathUtils.ShellQuote(action.Path));
-                        streamWriter.WriteLine($"{SkipWhenLost} touch -d @{new LocalFileSystem.FileStamp(0L, uploadedFiles[action.Argument].Size + _settings.ClockOffset.Seconds).UnixSeconds} -- {RemotePathUtils.ShellQuote(action.Path)}");
+                        streamWriter.WriteLine($"{SkipWhenLost} touch -d @{new LocalFileSystem.FileStamp(0L, uploadedFiles[action.Argument].Size + (long)_settings.ClockOffset.Seconds * 10000000L).UnixSeconds} -- {RemotePathUtils.ShellQuote(action.Path)}");
                         break;
                     }
                 case SyncPlan.ActionType.CreateRemoteSymlink:
                     {
                         KeyValuePair<string, string> symlinkPair = StringUtils.SplitAtFirst(action.Path, '\n');
-                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
                         if (symlinkPair.Key == null || symlinkPair.Value == null)
                         {
                             throw new Exception("Invalid queued symlink: " + action.Path);
                         }
+                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
                         streamWriter.WriteLine(SkipWhenLost + " rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
                         streamWriter.WriteLine($"{SkipWhenLost} ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
                         break;

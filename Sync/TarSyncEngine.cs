@@ -163,6 +163,10 @@ internal class TarSyncEngine : CommandSyncEngine
         };
         streamWriter.WriteLine("echo " + marker);
         streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(_settings.RemotePath) + " || exit 1");
+        // The commands below use names relative to the folder the script is in. When a "cd" fails the script stays in the folder above,
+        // and an "rm" or an "ln -s" of the same name there would hit an unrelated file. $f counts the folders entered since a "cd" failed:
+        // while it is not 0 the commands of the plan are skipped (the same rule as in FileByFileSyncEngine).
+        streamWriter.WriteLine("f=0");
         for (int i = 0; i < actions.Count; i++)
         {
             SyncPlan.SyncAction action = actions[i];
@@ -178,23 +182,23 @@ internal class TarSyncEngine : CommandSyncEngine
                 case SyncPlan.ActionType.EnterDirectory:
                     remoteDir = RemotePathUtils.Combine(remoteDir, action.Path);
                     relativeRemotePath = relativeRemotePath.Combine(action.Path);
-                    streamWriter.WriteLine($"cd {RemotePathUtils.ShellQuote(remoteDir)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine(FileByFileSyncEngine.EnterScript(remoteDir, i));
                     break;
                 case SyncPlan.ActionType.GoToParentDirectory:
                     remoteDir = RemotePathUtils.GetDirectoryName(remoteDir);
                     relativeRemotePath = new RelativeRemotePath(RemotePathUtils.GetDirectoryName(relativeRemotePath.Path));
-                    streamWriter.WriteLine("cd " + RemotePathUtils.ShellQuote(remoteDir));
+                    streamWriter.WriteLine(FileByFileSyncEngine.LeaveScript(remoteDir));
                     break;
                 case SyncPlan.ActionType.CreateRemoteSymlink:
                     {
                         KeyValuePair<string, string> symlinkPair = StringUtils.SplitAtFirst(action.Path, '\n');
-                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
                         if (symlinkPair.Key == null || symlinkPair.Value == null)
                         {
                             throw new Exception("Invalid queued symlink: " + action.Path);
                         }
-                        streamWriter.WriteLine("rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
-                        streamWriter.WriteLine($"ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
+                        string linkFileName = RemotePathUtils.GetFileName(symlinkPair.Key);
+                        streamWriter.WriteLine(FileByFileSyncEngine.SkipWhenLost + " rm -f -- " + RemotePathUtils.ShellQuote(linkFileName));
+                        streamWriter.WriteLine($"{FileByFileSyncEngine.SkipWhenLost} ln -s -- {RemotePathUtils.ShellQuote(symlinkPair.Value)} {RemotePathUtils.ShellQuote(linkFileName)} || echo \"cmdfail:{i}\"");
                         scriptCommandCount++;
                         break;
                     }
@@ -205,13 +209,12 @@ internal class TarSyncEngine : CommandSyncEngine
                         try
                         {
                             using LocalFileSystem.NativeFile nativeFile = LocalFileSystem.OpenFile(localPaths[action.Argument], LocalFileSystem.FileOpenMode.Open);
-                            long writeTime = nativeFile.GetLastWriteTime();
-                            writeTime += (long)_settings.ClockOffset.Seconds * 10000000L;
+                            long localWriteTime = nativeFile.GetLastWriteTime();
+                            long writeTime = localWriteTime + (long)_settings.ClockOffset.Seconds * 10000000L;
                             long fileSize = nativeFile.GetSize();
                             warningType = QuickSyncWarningType.CannotCreateTargetFile;
                             int fileIndex = action.Argument;
                             int permissions = permissionProvider?.GetFilePermissions(localPaths[fileIndex]) ?? defaultPermissions;
-                            fileStamps[fileIndex] = new LocalFileSystem.FileStamp(fileSize, writeTime);
                             byte[] header = tarWriter.CreateHeader(relativeRemotePath.Combine(action.Path).Path, isDirectory: false, fileSize, DateTime.FromFileTimeUtc(writeTime), out paddingBytes, isLongLink: false, permissions);
                             destinationStream.Write(header, 0, header.Length);
                             headerWritten = true;
@@ -254,9 +257,16 @@ internal class TarSyncEngine : CommandSyncEngine
                                 paddingBuffer = new byte[paddingBytes];
                             }
                             destinationStream.Write(paddingBuffer, 0, paddingBytes);
-                            if (shortReadOccurred)
+                            if (!shortReadOccurred)
                             {
-                                base._events.OnWarning(new SyncWarning
+                                // Cached only for a file that went out whole: a file that failed before its header, or that was read short,
+                                // must not look uploaded to the next synchronization.
+                                // The stamp is of the local file (without the offset the archive carries), as the cache is compared with the local files.
+                                fileStamps[fileIndex] = new LocalFileSystem.FileStamp(fileSize, localWriteTime);
+                            }
+                            else
+                            {
+                                base._events?.OnWarning(new SyncWarning
                                 {
                                     Warning = new QuickSyncWarning(QuickSyncWarningType.CannotReadLocalFile, localPaths[action.Argument].FullPath, 0)
                                 });
@@ -272,7 +282,7 @@ internal class TarSyncEngine : CommandSyncEngine
                             {
                                 throw;
                             }
-                            base._events.OnWarning(new SyncWarning
+                            base._events?.OnWarning(new SyncWarning
                             {
                                 Exception = exception,
                                 Warning = new QuickSyncWarning(warningType, localPaths[action.Argument].FullPath, 0)
@@ -281,7 +291,7 @@ internal class TarSyncEngine : CommandSyncEngine
                         break;
                     }
                 case SyncPlan.ActionType.DeleteTargetFile:
-                    streamWriter.WriteLine($"rm -f -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
+                    streamWriter.WriteLine($"{FileByFileSyncEngine.SkipWhenLost} rm -f -- {RemotePathUtils.ShellQuote(action.Path)} || echo \"cmdfail:{i}\"");
                     scriptCommandCount++;
                     break;
             }

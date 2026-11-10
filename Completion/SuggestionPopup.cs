@@ -55,15 +55,6 @@ internal class SuggestionPopup
     {
         Rectangle bounds = _host.CaretScreenBounds;
         Screen screen = Screen.FromControl(_host.HostControl);
-        int xPos = bounds.Left - 16;
-        if (xPos < screen.WorkingArea.Left)
-        {
-            xPos = screen.WorkingArea.Left;
-        }
-        if (xPos + _form.Width >= screen.WorkingArea.Right)
-        {
-            xPos = screen.WorkingArea.Right - _form.Width;
-        }
         if (autoSize)
         {
             int maxItemWidth = 0;
@@ -83,6 +74,16 @@ internal class SuggestionPopup
                 maxItemWidth = _maxWidth;
             }
             _form.SetSize(maxItemWidth, 0, _maxHeight);
+        }
+        // The place depends on the size, which is known only now: the window may be narrower than it was before it was fitted to its items.
+        int xPos = bounds.Left - 16;
+        if (xPos < screen.WorkingArea.Left)
+        {
+            xPos = screen.WorkingArea.Left;
+        }
+        if (xPos + _form.Width >= screen.WorkingArea.Right)
+        {
+            xPos = screen.WorkingArea.Right - _form.Width;
         }
         int yPos = bounds.Bottom + 5;
         if (yPos + _form.Height >= screen.WorkingArea.Bottom)

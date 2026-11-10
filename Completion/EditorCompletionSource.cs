@@ -231,6 +231,8 @@ public static class EditorCompletionSource
         {
             return a.Rank - b.Rank;
         }
-        return string.Compare(a.Text, b.Text, StringComparison.OrdinalIgnoreCase);
+        int result = string.Compare(a.Text, b.Text, StringComparison.OrdinalIgnoreCase);
+        // Words that differ only in case ("Foo", "foo") keep a fixed order: List.Sort is not stable, so the popup would show them in any order.
+        return result != 0 ? result : string.CompareOrdinal(a.Text, b.Text);
     }
 }

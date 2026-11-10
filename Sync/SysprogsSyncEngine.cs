@@ -101,9 +101,14 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
 
         private bool _transferActive;
 
-        public SysprogsSyncFileSource(SshShellChannel sshShellChannel)
+        // The difference between the clock of the server and this computer: the file list is read with it taken off (RemoteFileSetReader),
+        // and so must be the time that the local copy of a downloaded file gets.
+        private readonly int _clockOffsetSeconds;
+
+        public SysprogsSyncFileSource(SshShellChannel sshShellChannel, int clockOffsetSeconds)
         {
             this._reader = new SyncStreamReader(sshShellChannel, 1048576);
+            _clockOffsetSeconds = clockOffsetSeconds;
         }
 
         public void Dispose()
@@ -128,7 +133,7 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 throw new Exception($"Remote SysprogsSync sent unexpected fileID: {receivedFileId}, expected {fileId}");
             }
             int errorCode = BitConverter.ToInt32(_headerBuffer, 4);
-            LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(0L, BitConverter.ToInt32(_headerBuffer, 8));
+            LocalFileSystem.FileStamp fileStamp = new LocalFileSystem.FileStamp(0L, BitConverter.ToInt32(_headerBuffer, 8) - _clockOffsetSeconds);
             _transferActive = errorCode == 0;
             return new SysprogsSyncFileStream(this, fileStamp, errorCode);
         }
@@ -256,7 +261,15 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
                 }
                 catch
                 {
-                    WriteInt(0);
+                    // Ends the chunks of this file so that the helper does not wait for more. When the channel itself is what failed, this fails
+                    // too, and must not hide the error that is being thrown.
+                    try
+                    {
+                        WriteInt(0);
+                    }
+                    catch
+                    {
+                    }
                     throw;
                 }
             }
@@ -590,7 +603,7 @@ internal class SysprogsSyncEngine : IDisposable, ISyncEngine
         _channel.Input.Write(BitConverter.GetBytes(bufferSize), 0, 4);
         _channel.Input.Write(BitConverter.GetBytes(bytesList.Count), 0, 4);
         _channel.Input.Write(bytesList.ToArray(), 0, bytesList.Count);
-        return new SysprogsSyncFileSource(_channel);
+        return new SysprogsSyncFileSource(_channel, _settings.ClockOffset.Seconds);
     }
 
     private static void WaitForReady(SshShellChannel sshShellChannel)
