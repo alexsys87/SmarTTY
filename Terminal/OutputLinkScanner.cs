@@ -18,6 +18,9 @@ internal interface IOutputLinkHost
     /// they are known.
     /// </summary>
     void RequestOpenFile(string path, int? line, int? column, ColumnUnit unit);
+
+    /// <summary>An address was clicked (http, https or ftp, already trimmed of the punctuation after it): open it in the browser.</summary>
+    void RequestOpenUrl(string url);
 }
 
 /// <summary>
@@ -305,23 +308,36 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     {
         // The characters of a scheme that have been read in a row (letters, digits, "+", "-", "."). A scheme has two or more of them:
         // a single letter in front of ":" is a drive ("C://dir"), not a scheme.
-        private int _schemeLength;
+        private readonly StringBuilder _scheme = new StringBuilder();
+
+        // The scheme in front of the ":" that was read last.
+        private string _pendingScheme;
 
         // 0: nothing; 1: a scheme and ":" have been read; 2: and one "/" as well.
         private int _stage;
 
         public bool InUrl { get; private set; }
 
+        /// <summary>True when the last character fed was the one that made an address of what came before it (the second "/").</summary>
+        public bool JustStarted { get; private set; }
+
+        /// <summary>The scheme of the current address ("https"), as it was written.</summary>
+        public string Scheme { get; private set; }
+
         public void Reset()
         {
-            _schemeLength = 0;
+            _scheme.Clear();
+            _pendingScheme = null;
             _stage = 0;
             InUrl = false;
+            JustStarted = false;
+            Scheme = null;
         }
 
         /// <summary>True when the character is part of an address (from the second "/" after the scheme on).</summary>
         public bool Feed(char ch)
         {
+            JustStarted = false;
             if (InUrl)
             {
                 if (EndsUrl(ch))
@@ -331,10 +347,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
                 }
                 return true;
             }
-            if (ch == ':' && _schemeLength >= 2)
+            if (ch == ':' && _scheme.Length >= 2)
             {
                 _stage = 1;
-                _schemeLength = 0;
+                _pendingScheme = _scheme.ToString();
+                _scheme.Clear();
                 return false;
             }
             if (ch == '/' && _stage == 1)
@@ -345,11 +362,25 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             if (ch == '/' && _stage == 2)
             {
                 InUrl = true;
+                JustStarted = true;
+                Scheme = _pendingScheme;
                 _stage = 0;
                 return true;
             }
             _stage = 0;
-            _schemeLength = IsSchemeChar(ch) ? Math.Min(_schemeLength + 1, 64) : 0;
+            if (IsSchemeChar(ch))
+            {
+                // A run longer than any scheme keeps its last characters: "xxxx...https" still ends in a scheme.
+                if (_scheme.Length >= 64)
+                {
+                    _scheme.Remove(0, 1);
+                }
+                _scheme.Append(ch);
+            }
+            else
+            {
+                _scheme.Clear();
+            }
             return false;
         }
 
@@ -359,15 +390,86 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
             return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '+' || ch == '-' || ch == '.';
         }
 
-        // No address holds a blank or a control character, and a quote or an angle bracket is not written in one either: it ends an address
-        // that was put in quotes or in "<...>". A closing ")" or "]" can be in an address, so it does not end it.
+        // Where an address ends: the same rule as for the addresses of the device terminals and of the editor.
         private static bool EndsUrl(char ch)
         {
-            return char.IsWhiteSpace(ch) || char.IsControl(ch) || ch == '"' || ch == '\'' || ch == '<' || ch == '>' || ch == '`';
+            return Utilities.UrlLinks.EndsUrl(ch);
+        }
+    }
+
+    /// <summary>
+    /// An address in the output, as a link that opens it in the browser. Every cell of the address points at the same object, which
+    /// grows as the address arrives (it may come in several pieces); the scheme decides whether it is opened at all (http, https,
+    /// ftp: "s3://bucket/key" or "git+ssh://host/x" are no files and no links either).
+    /// </summary>
+    private sealed class UrlLink : TerminalEmulatorBase.ILinkTarget
+    {
+        private readonly IOutputLinkHost _host;
+
+        private readonly StringBuilder _text = new StringBuilder();
+
+        // IsActive is asked at every paint: the answer is worked out again only when the address has grown.
+        private int _checkedLength = -1;
+
+        private bool _active;
+
+        public UrlLink(IOutputLinkHost host, string start)
+        {
+            _host = host;
+            _text.Append(start);
+        }
+
+        public void Append(char ch)
+        {
+            // An address far longer than any real one is not followed further (a dump of base64 after "data://").
+            if (_text.Length < 8192)
+            {
+                _text.Append(ch);
+            }
+        }
+
+        public string Url => Utilities.UrlLinks.Trim(_text.ToString());
+
+        public bool IsActive
+        {
+            get
+            {
+                if (_checkedLength != _text.Length)
+                {
+                    _checkedLength = _text.Length;
+                    _active = Utilities.UrlLinks.IsOpenable(Url);
+                }
+                return _active;
+            }
+        }
+
+        public void Activate()
+        {
+            string url = Url;
+            if (Utilities.UrlLinks.IsOpenable(url))
+            {
+                _host.RequestOpenUrl(url);
+            }
+        }
+
+        public override string ToString()
+        {
+            return "url:" + _text;
         }
     }
 
     private readonly UrlTracker _url = new UrlTracker();
+
+    // The address being read, when addresses are links (see the constructor); null outside of one.
+    private UrlLink _urlLink;
+
+    // The address that the last character belongs to, and how many characters before it (its scheme and ":/", read before it was
+    // known to be an address) belong to it as well.
+    private UrlLink _lastUrl;
+
+    private int _urlBackfill;
+
+    private readonly bool _urls;
 
     private readonly IOutputLinkHost _host;
 
@@ -419,9 +521,11 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     /// <param name="logLevels">Mark the lines of a log from their level (ERROR, WARN, [error], level=warn) to the end.</param>
     /// <param name="columnSetting">What the columns count, or Auto to tell it from the command line.</param>
     /// <param name="strictAbsolute">An absolute name is a link only when it is a known kind of file or has a position (a classic terminal tab).</param>
-    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false, ColumnUnit columnSetting = ColumnUnit.Auto, bool strictAbsolute = false)
+    /// <param name="urls">Make links of the http, https and ftp addresses, which open in the browser. With or without it, no file name is looked for in an address.</param>
+    public OutputLinkScanner(IOutputLinkHost host, string workingDirectory, string commandText, bool links = true, bool highlight = false, bool logLevels = false, ColumnUnit columnSetting = ColumnUnit.Auto, bool strictAbsolute = false, bool urls = false)
     {
         _host = host;
+        _urls = urls;
         _strictAbsolute = strictAbsolute;
         _columnUnit = CompilerColumns.Resolve(columnSetting, commandText);
         _links = links;
@@ -470,6 +574,20 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         }
     }
 
+    // The scheme of an address from the run of scheme characters in front of its ":": "see.https" or "a-http" end with one that is
+    // opened, after a character that is not a letter or a digit; that one is the start of the link.
+    private static string SchemeOf(string run)
+    {
+        foreach (string scheme in new[] { "https", "http", "ftp" })
+        {
+            if (run.Length > scheme.Length && run.EndsWith(scheme, StringComparison.OrdinalIgnoreCase) && !char.IsLetterOrDigit(run[run.Length - scheme.Length - 1]))
+            {
+                return run.Substring(run.Length - scheme.Length);
+            }
+        }
+        return run;
+    }
+
     private LinkCandidate ReadChar(char ch)
     {
         TrackDirectories(ch);
@@ -479,6 +597,24 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         {
             // Inside an address: no file name is looked for in it (and the one that had begun is not a name).
             _current = null;
+            if (_urls)
+            {
+                if (_url.JustStarted)
+                {
+                    // The scheme, the ":" and the first "/" came before: they belong to the link as well.
+                    string scheme = SchemeOf(_url.Scheme ?? "");
+                    _urlLink = new UrlLink(_host, scheme + ":/");
+                    _urlBackfill = scheme.Length + 2;
+                }
+                _urlLink?.Append(ch);
+                _lastUrl = _urlLink;
+            }
+            return null;
+        }
+        _urlLink = null;
+        _lastUrl = null;
+        if (!_links)
+        {
             return null;
         }
         if (_current == null)
@@ -518,15 +654,37 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         TerminalEmulatorBase.LinkCell[] cells = new TerminalEmulatorBase.LinkCell[text.Length];
         if (column == 0)
         {
-            // A new line: an address that was not ended by a blank (the line was cut where the screen ends) does not go on in it.
+            // A new line: an address that was not ended by a blank does not go on in it. A row that only continues the one above it
+            // (the text was wrapped at the edge of the screen) is passed with the column -1 by the terminal, and the address goes on.
             _url.Reset();
+            _urlLink = null;
         }
-        if (_links)
+        if (_links || _urls)
         {
             char[] charArray = text.ToArray();
-            LinkCandidate[] candidateArray = charArray.Select(ReadChar).ToArray();
+            LinkCandidate[] candidateArray = new LinkCandidate[charArray.Length];
+            UrlLink[] urlArray = new UrlLink[charArray.Length];
+            for (int i = 0; i < charArray.Length; i++)
+            {
+                candidateArray[i] = ReadChar(charArray[i]);
+                urlArray[i] = _lastUrl;
+                if (_urlBackfill > 0)
+                {
+                    // Within this piece; a scheme that arrived in an earlier piece stays as it was drawn (the rest of the address is the link).
+                    for (int j = i - 1; j >= 0 && j >= i - _urlBackfill; j--)
+                    {
+                        urlArray[j] = _lastUrl;
+                    }
+                    _urlBackfill = 0;
+                }
+            }
             for (int i = 0; i < candidateArray.Length; i++)
             {
+                if (urlArray[i] != null)
+                {
+                    cells[i].Target = urlArray[i];
+                    continue;
+                }
                 if (candidateArray[i] != null && candidateArray[i].State == CandidateState.Rejected)
                 {
                     candidateArray[i] = null;

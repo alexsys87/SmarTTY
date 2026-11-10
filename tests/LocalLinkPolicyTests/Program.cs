@@ -29,6 +29,48 @@ internal static class Program
         return LocalLinkPolicy.Decide(path, isDirectory: false, isFile: true);
     }
 
+    // The rules of the addresses that a click opens (Utilities/UrlLinks.cs), shared by the device terminals, the SSH tabs and the editor.
+    private static void UrlRuleChecks()
+    {
+        foreach (string url in new[] { "http://a", "https://example.com/", "FTP://host/x", "HTTPS://host/a?b=c&d=e#f" })
+        {
+            Check(UrlLinks.IsOpenable(url), "opened: " + url);
+        }
+        foreach (string text in new[] { "https://", "http://", "file:///C:/x", "ms-settings:", "search-ms:query=x", "javascript:alert(1)", "mailto:a@b", "ssh://host", "git+ssh://host/x", "s3://bucket/key", "C:\\x", "/tmp", "", null })
+        {
+            Check(!UrlLinks.IsOpenable(text), "not opened: " + (text ?? "null"));
+        }
+        Check(UrlLinks.StartsWithOpenableScheme("https://") && UrlLinks.StartsWithOpenableScheme("ftp://x") && !UrlLinks.StartsWithOpenableScheme("https:/"), "the scheme with its :// starts an address");
+        foreach (char ch in new[] { ' ', '\t', '\n', '\r', '"', '\'', '<', '>', '`', '\u0007' })
+        {
+            Check(UrlLinks.EndsUrl(ch), "ends an address: U+" + ((int)ch).ToString("X4"));
+        }
+        foreach (char ch in "?&=%#~@+!$()*,;:/[]{}|^.-_ü")
+        {
+            Check(!UrlLinks.EndsUrl(ch), "part of an address: " + ch);
+        }
+
+        Check(UrlLinks.Trim("https://example.com/a.") == "https://example.com/a", "a full stop after an address is the sentence's");
+        Check(UrlLinks.Trim("https://example.com/a,") == "https://example.com/a" && UrlLinks.Trim("https://example.com/a:") == "https://example.com/a" && UrlLinks.Trim("https://x/a?!") == "https://x/a", "commas, colons and marks too");
+        Check(UrlLinks.Trim("https://example.com/a)") == "https://example.com/a", "a bracket closed after the address is not part of it: (https://example.com/a)");
+        Check(UrlLinks.Trim("https://en.wikipedia.org/wiki/C_(language)") == "https://en.wikipedia.org/wiki/C_(language)", "a bracket of the address stays");
+        Check(UrlLinks.Trim("https://en.wikipedia.org/wiki/C_(language))") == "https://en.wikipedia.org/wiki/C_(language)", "the bracket of the sentence goes, the one of the address stays");
+        Check(UrlLinks.Trim("https://x/a].") == "https://x/a" && UrlLinks.Trim("https://x/a[1]") == "https://x/a[1]", "square brackets the same way");
+        Check(UrlLinks.Trim("https://x/a?b=1&c=2#top") == "https://x/a?b=1&c=2#top", "the query and the fragment stay whole");
+
+        string line = "Docs: see https://example.com/page?id=5&x=1, or (ftp://host/pub/file.tar.gz).";
+        int at = line.IndexOf("https", StringComparison.Ordinal);
+        Check(UrlLinks.FindAt(line, at, out int start) == "https://example.com/page?id=5&x=1" && start == at, "editor: the first character of an address finds it whole");
+        Check(UrlLinks.FindAt(line, line.IndexOf("x=1", StringComparison.Ordinal), out _) == "https://example.com/page?id=5&x=1", "editor: a character of the query finds the same address");
+        Check(UrlLinks.FindAt(line, line.IndexOf("x=1", StringComparison.Ordinal) + 3, out _) == null, "editor: the comma after it is no part of it");
+        Check(UrlLinks.FindAt(line, line.IndexOf("ftp", StringComparison.Ordinal) + 10, out _) == "ftp://host/pub/file.tar.gz", "editor: an address in brackets, without the bracket and the full stop");
+        Check(UrlLinks.FindAt(line, 2, out _) == null && UrlLinks.FindAt(line, line.Length - 1, out _) == null, "editor: the text around addresses is no link");
+        Check(UrlLinks.FindAt("xhttp://host/a", 3, out _) == null, "editor: a scheme at the end of a longer word is none");
+        Check(UrlLinks.FindAt("ssh://host/x and https://a/b", 2, out _) == null && UrlLinks.FindAt("ssh://host/x and https://a/b", 20, out _) == "https://a/b", "editor: another scheme is no link, the address after it is");
+        Check(UrlLinks.FindAt("url=\"https://a/b\"", 8, out _) == "https://a/b", "editor: an address in quotes");
+        Check(UrlLinks.FindAt("https://", 2, out _) == null && UrlLinks.FindAt(null, 0, out _) == null && UrlLinks.FindAt("https://a", 20, out _) == null && UrlLinks.FindAt("https://a", -1, out _) == null, "editor: nothing to find");
+    }
+
     private static int Main()
     {
         // Addresses and folders.
@@ -88,6 +130,8 @@ internal static class Program
         Check(folder != null && folder.Contains("C:\\logs") && folder.Contains("this computer") && folder.Contains("Explorer"), "a folder: the question names the path, this computer and Explorer");
         Check(LocalLinkPolicy.ConfirmationText("C:\\a\\report.pdf", LocalLinkAction.OpenWithShell, false).Contains("with its program"), "a document: opened with its program");
         Check(LocalLinkPolicy.ConfirmationText("C:\\a\\x.js", LocalLinkAction.OpenInNotepad, false).Contains("not run"), "a script: the question says it is shown as text and not run");
+
+        UrlRuleChecks();
 
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " checks passed.");

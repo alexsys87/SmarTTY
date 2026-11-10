@@ -2098,6 +2098,8 @@ public class MainWindowController : INotifyPropertyChanged
             // Ctrl+click on a file name in the output opens it in the editor; relative names are resolved against the directory
             // the shell reports (OSC 7) or, failing that, the one read from the title or the prompt.
             terminalEmulatorControl.FileLinks = session.VTSettings.ClassicTerminalLinks && !session.IsWindowsHost && !session.IsDevice;
+            // Addresses name no file of either computer: they are links on a Windows host too, and open in the browser.
+            terminalEmulatorControl.UrlLinks = session.VTSettings.ClassicTerminalLinks && !session.IsDevice;
             terminalEmulatorControl.DirectoryFallback = () => session.TryExtractCurrentDir();
             terminalEmulatorControl.FileLinkClicked += Vt_FileOpenRequested;
             SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminalEmulatorControl.ByteOrientedLineEditing);

@@ -29,6 +29,6 @@ internal class CommandRun
     internal TerminalEmulatorBase.ILinkScanner CreateScanner(bool links, bool highlightDiagnostics)
     {
         return new OutputLinkScanner(_terminal, WorkingDirectory, CommandText, links, highlightDiagnostics, logLevels: false,
-            columnSetting: _terminal.VtSettings?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto);
+            columnSetting: _terminal.VtSettings?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto, urls: true);
     }
 }

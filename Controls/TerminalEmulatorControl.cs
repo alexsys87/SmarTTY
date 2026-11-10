@@ -32,6 +32,12 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     public bool FileLinks { get; set; }
 
     /// <summary>
+    /// The http, https and ftp addresses in the output are links (Ctrl+click opens them in the browser). Also on a Windows host,
+    /// where file names are no links: an address names no file of either computer.
+    /// </summary>
+    public bool UrlLinks { get; set; }
+
+    /// <summary>
     /// The directory the shell reported with OSC 7 (the prompt of bash or zsh sends it on many systems), or null. Relative names in
     /// the output are resolved against it.
     /// </summary>
@@ -67,6 +73,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         public void RequestOpenFile(string path, int? line, int? column, CodeEditing.ColumnUnit unit)
         {
             _terminal.OpenLinkedFile(path, line, column, unit);
+        }
+
+        public void RequestOpenUrl(string url)
+        {
+            SmarTTY.GUI.UrlOpener.Open(url);
         }
     }
 
@@ -107,7 +118,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     // Only an ordinary screen of a shell has links: a full-screen program (an editor, a pager) draws its own text, and one that
     // takes the mouse needs the clicks.
-    private bool LinksAvailable => FileLinks && ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
+    private bool LinksAvailable => (FileLinks || UrlLinks) && ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
 
     internal override ILinkScanner CreateLinkScanner()
     {
@@ -117,8 +128,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         if (LinksAvailable)
         {
-            return new SmarTTY.Terminal.OutputLinkScanner(new ClassicLinkHost(this), ReportedDirectory ?? "", null, links: true, highlight: false, logLevels: false,
-                columnSetting: AppSettings?.VirtualTerminal?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto, strictAbsolute: true);
+            return new SmarTTY.Terminal.OutputLinkScanner(new ClassicLinkHost(this), ReportedDirectory ?? "", null, links: FileLinks, highlight: false, logLevels: false,
+                columnSetting: AppSettings?.VirtualTerminal?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto, strictAbsolute: true, urls: UrlLinks);
         }
         return base.CreateLinkScanner();
     }
@@ -158,7 +169,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     protected override void OnKeyUp(KeyEventArgs e)
     {
         base.OnKeyUp(e);
-        if (FileLinks && e.KeyCode == Keys.ControlKey)
+        if ((FileLinks || UrlLinks) && e.KeyCode == Keys.ControlKey)
         {
             RefreshHoverTarget();
         }
@@ -1774,7 +1785,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (FileLinks && e.KeyCode == Keys.ControlKey)
+        if ((FileLinks || UrlLinks) && e.KeyCode == Keys.ControlKey)
         {
             RefreshHoverTarget();
         }
