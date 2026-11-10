@@ -1536,6 +1536,60 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(OpenVpnDirectives, startState, text, sink, out endState, valueKeywords: OpenVpnValues);
     }
 
+    // ---------------------------------------------------------------- Netplan
+
+    private static readonly HashSet<string> NetplanKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the envelope and the renderer
+        @"
+          network version renderer",
+        // the kinds of the devices
+        @"
+          ethernets wifis bridges bonds vlans vrfs tunnels nm-devices dummy-devices modems",
+        // the settings of every device
+        @"
+          dhcp4 dhcp6 dhcp4-overrides dhcp6-overrides addresses gateway4 gateway6 routes routing-policy
+          nameservers search macaddress mtu optional set-name wakeonlan match accept-ra ipv6-address-generation
+          ipv6-address-token ipv6-privacy",
+        // the DHCP overrides
+        @"
+          use-dns use-ntp send-hostname use-hostname hostname use-routes route-metric use-domains",
+        // the routes and the routing policy
+        @"
+          to via from on-link scope metric table type priority mark",
+        // the bonds and the bridges
+        @"
+          interfaces parameters mode lacp-rate mii-monitor-interval up-delay down-delay transmit-hash-policy
+          ad-select primary resend-igmp all-slaves-active arp-interval arp-ip-targets arp-validate learn-packet-interval
+          stp forward-delay hello-time max-age ageing-time port-priority path-cost mac-learning",
+        // the VLANs, the VRFs and the tunnels
+        @"
+          id link table local remote key input-key output-key",
+        // the Wi-Fi access points and their authentication
+        @"
+          access-points auth password key-management ssid band channel bssid hidden network-name regulatory-domain
+          method identity anonymous-identity phase2-auth ca-certificate client-certificate client-key
+          private-key private-key-password eap",
+        // the modems of NetworkManager
+        @"
+          apn auto-config device-id network-id number pin sim-id sim-operator-id username");
+
+    private static readonly HashSet<string> NetplanValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the renderers
+        @"networkd NetworkManager openvswitch",
+        // the choices of the addresses, the bonds, the bridges and the access points
+        @"static dhcp none default link-local eui64 stable-privacy
+          active-backup balance-rr balance-xor broadcast 802.3ad balance-tlb balance-alb
+          psk eap wpa-psk wpa-eap infrastructure adhoc ap");
+
+    /// <summary>
+    /// Netplan: the colours and the folds of YAML with the keys of the network configuration known; the renderers
+    /// (networkd, NetworkManager, openvswitch), the address modes and the bond and Wi-Fi choices are values.
+    /// </summary>
+    private static bool TokenizeNetplan(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(NetplanKeywords, NetplanValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,

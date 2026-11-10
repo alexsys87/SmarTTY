@@ -52,6 +52,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Samba:
                 case SyntaxHighlighting.Language.Postfix:
                 case SyntaxHighlighting.Language.OpenVpn:
+                case SyntaxHighlighting.Language.Netplan:
                 case SyntaxHighlighting.Language.Kubernetes:
                 case SyntaxHighlighting.Language.DockerCompose:
                 case SyntaxHighlighting.Language.Ansible:

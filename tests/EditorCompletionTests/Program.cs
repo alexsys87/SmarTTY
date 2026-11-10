@@ -146,6 +146,8 @@ internal static class Program
         Check(Names(L.Postfix, "", "").Contains("permit_mynetworks"), "the Postfix restriction 'permit_mynetworks' is offered");
         Check(Names(L.OpenVpn, "", "").Contains("proto"), "the OpenVPN option 'proto' is offered");
         Check(Names(L.OpenVpn, "", "").Contains("persist-key"), "the OpenVPN option 'persist-key' is offered");
+        Check(Names(L.Netplan, "", "").Contains("renderer"), "the Netplan key 'renderer' is offered");
+        Check(Names(L.Netplan, "", "").Contains("networkd"), "the Netplan renderer 'networkd' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
