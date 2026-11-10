@@ -16,6 +16,12 @@ public class NewConnectionController : INotifyPropertyChanged
     {
         public bool SaveCheckboxVisible = true;
 
+        /// <summary>
+        /// The initial state of "Save this connection to connections list". A computer found by the network scan is
+        /// not saved unless the user asks for it, so the box starts unchecked there.
+        /// </summary>
+        public bool SaveSettingsByDefault = true;
+
         public bool BypassHostKeyCheck;
 
         public string Caption { get; set; } = "SmarTTY - New SSH Connection";
@@ -314,6 +320,10 @@ public class NewConnectionController : INotifyPropertyChanged
         _BackgroundSessionInitiator.Connected += backgroundSessionInitiator1_SessionCreated;
         _BackgroundSessionInitiator.ProxyCredentialsRequested += backgroundSessionInitiator1_ProxyAuthRequest;
         Customization = customization;
+        if (customization != null)
+        {
+            SaveSettings = customization.SaveSettingsByDefault;
+        }
         if (customization != null && customization.VMNameText != null)
         {
             HostNameCaption = "QEMU VM:";

@@ -751,9 +751,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public ControllerImpl(DeviceTerminalSettings settings, bool showSaveCheckbox)
+        public ControllerImpl(DeviceTerminalSettings settings, bool showSaveCheckbox, bool saveByDefault)
         {
             Settings = settings.Clone();
+            SaveSettings = saveByDefault;
             // Seed the list from the profile: the dialog used to always start at "Text only" and never wrote the
             // choice back, so the mode looked like it did nothing at all.
             _EffectiveDisplayMode = ToEffectiveDisplayMode(Settings);
@@ -974,10 +975,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
     public bool SaveSettings => _Controller.SaveSettings;
 
-    public RawConnectionSettingsWindow(DeviceTerminalSettings settings, bool testOnOK, bool showSaveCheckbox)
+    /// <param name="saveByDefault">The initial state of the "save" box: off for a computer found by the network scan, which is saved only when asked.</param>
+    public RawConnectionSettingsWindow(DeviceTerminalSettings settings, bool testOnOK, bool showSaveCheckbox, bool saveByDefault = true)
     {
         InitializeComponent();
-        this.DataContext = (_Controller = new ControllerImpl(settings, showSaveCheckbox));
+        this.DataContext = (_Controller = new ControllerImpl(settings, showSaveCheckbox, saveByDefault));
         _TestOnOK = testOnOK;
         if (_Controller.IsNetconsole)
         {
