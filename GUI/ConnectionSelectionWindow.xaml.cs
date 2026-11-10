@@ -676,7 +676,18 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             public bool IsDiscovered => true;
 
-            public event PropertyChangedEventHandler PropertyChanged;
+            // Nothing of a found computer ever changes, so the event is never raised. The interface stays: WPF keeps a
+            // binding to an object without INotifyPropertyChanged alive through PropertyDescriptor (a memory leak).
+            // Empty accessors instead of a field-like event, which the compiler reports as never used (CS0067).
+            public event PropertyChangedEventHandler PropertyChanged
+            {
+                add
+                {
+                }
+                remove
+                {
+                }
+            }
 
             public bool MatchesFilter(string filter)
             {
