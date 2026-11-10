@@ -867,7 +867,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2226,6 +2226,68 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.MongoDb).Toggle(new[] { "  dbPath: /var/lib/mongodb" })), "  # dbPath: /var/lib/mongodb", "MongoDB comment");
     }
 
+    private static void ElasticsearchChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/elasticsearch/elasticsearch.yml"), L.Elasticsearch, "the Elasticsearch configuration");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/elasticsearch/elasticsearch.yaml"), L.Elasticsearch, "the .yaml spelling");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/elasticsearch.yml"), L.Elasticsearch, "elasticsearch.yml anywhere");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/elasticsearch.yml.bak"), L.Plain, "a backup of the configuration is not Elasticsearch");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/elasticsearch/README"), L.Plain, "the README of /etc/elasticsearch is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/elasticsearch/jvm.options"), L.Plain, "the JVM options are not Elasticsearch YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/app.yml"), L.Yaml, "an ordinary .yml stays YAML");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/mongod.conf"), L.MongoDb, "MongoDB keeps its own name");
+
+        Highlighted es = new Highlighted(L.Elasticsearch,
+            "# Elasticsearch configuration\ncluster.name: logs\n" +
+            "cluster.initial_master_nodes: [\"node-1\", \"node-2\"]\nnode.name: node-1\n" +
+            "node.roles: [master, data_hot, ingest]\npath.data: /var/lib/elasticsearch\n" +
+            "path.logs: /var/log/elasticsearch\nnetwork.host: 0.0.0.0\nhttp.port: 9200\n" +
+            "xpack.security.enabled: true\nxpack.security.transport.ssl.enabled: true\n" +
+            "xpack.security.transport.ssl.verification_mode: certificate\n" +
+            "xpack.security.transport.ssl.keystore.path: certs/elastic-certificates.p12\n" +
+            "xpack.security.http.ssl.enabled: true\nxpack.security.http.ssl.keystore.path: certs/http.p12\n" +
+            "discovery.seed_hosts: [\"es-1:9300\", \"es-2:9300\"]\ndiscovery.type: single-node\n" +
+            "bootstrap.memory_lock: true\naction.destructive_requires_name: true\n" +
+            "indices.query.bool.max_clause_count: 4096\nthread_pool.write.queue_size: 1000\n" +
+            "xpack.ml.enabled: false\nxpack.security.authc.realms:\n  native:\n    order: 0\nunknown.setting: 1\n");
+        Equal(Join(es.Tokens(0, SyntaxHighlighting.TypeComment)), "# Elasticsearch configuration", "Elasticsearch: a comment");
+        Equal(Join(es.Tokens(1, SyntaxHighlighting.TypeKeyword)), "cluster.name", "Elasticsearch: the cluster name");
+        Equal(Join(es.Tokens(2, SyntaxHighlighting.TypeKeyword)), "cluster.initial_master_nodes", "Elasticsearch: the initial masters");
+        Equal(Join(es.Tokens(2, SyntaxHighlighting.TypeString)), "\"node-1\"|\"node-2\"", "Elasticsearch: the master names");
+        Equal(Join(es.Tokens(3, SyntaxHighlighting.TypeKeyword)), "node.name", "Elasticsearch: the node name");
+        Equal(Join(es.Tokens(4, SyntaxHighlighting.TypeKeyword)), "node.roles|master|data_hot|ingest", "Elasticsearch: the node roles");
+        Equal(Join(es.Tokens(5, SyntaxHighlighting.TypeKeyword)), "path.data", "Elasticsearch: the data path");
+        Equal(Join(es.Tokens(6, SyntaxHighlighting.TypeKeyword)), "path.logs", "Elasticsearch: the log path");
+        Equal(Join(es.Tokens(7, SyntaxHighlighting.TypeKeyword)), "network.host", "Elasticsearch: the bind address");
+        Equal(Join(es.Tokens(8, SyntaxHighlighting.TypeKeyword)), "http.port", "Elasticsearch: the HTTP port");
+        Equal(Join(es.Tokens(8, SyntaxHighlighting.TypeNumber)), "9200", "Elasticsearch: the port number");
+        Equal(Join(es.Tokens(9, SyntaxHighlighting.TypeKeyword)), "xpack.security.enabled|true", "Elasticsearch: the security switch");
+        Equal(Join(es.Tokens(10, SyntaxHighlighting.TypeKeyword)), "xpack.security.transport.ssl.enabled|true", "Elasticsearch: TLS on the transport");
+        Equal(Join(es.Tokens(11, SyntaxHighlighting.TypeKeyword)), "xpack.security.transport.ssl.verification_mode|certificate", "Elasticsearch: the TLS verification");
+        Equal(Join(es.Tokens(12, SyntaxHighlighting.TypeKeyword)), "xpack.security.transport.ssl.keystore.path", "Elasticsearch: the transport keystore");
+        Equal(Join(es.Tokens(13, SyntaxHighlighting.TypeKeyword)), "xpack.security.http.ssl.enabled|true", "Elasticsearch: TLS on the HTTP layer");
+        Equal(Join(es.Tokens(14, SyntaxHighlighting.TypeKeyword)), "xpack.security.http.ssl.keystore.path", "Elasticsearch: the HTTP keystore");
+        Equal(Join(es.Tokens(15, SyntaxHighlighting.TypeKeyword)), "discovery.seed_hosts", "Elasticsearch: the seed hosts");
+        Equal(Join(es.Tokens(15, SyntaxHighlighting.TypeString)), "\"es-1:9300\"|\"es-2:9300\"", "Elasticsearch: the seed host names");
+        Equal(Join(es.Tokens(16, SyntaxHighlighting.TypeKeyword)), "discovery.type|single-node", "Elasticsearch: the single-node discovery");
+        Equal(Join(es.Tokens(17, SyntaxHighlighting.TypeKeyword)), "bootstrap.memory_lock|true", "Elasticsearch: the memory lock");
+        Equal(Join(es.Tokens(18, SyntaxHighlighting.TypeKeyword)), "action.destructive_requires_name|true", "Elasticsearch: the destructive actions");
+        Equal(Join(es.Tokens(19, SyntaxHighlighting.TypeKeyword)), "indices.query.bool.max_clause_count", "Elasticsearch: the clause limit");
+        Equal(Join(es.Tokens(19, SyntaxHighlighting.TypeNumber)), "4096", "Elasticsearch: the clause limit value");
+        Equal(Join(es.Tokens(20, SyntaxHighlighting.TypeKeyword)), "thread_pool.write.queue_size", "Elasticsearch: the write queue");
+        Equal(Join(es.Tokens(20, SyntaxHighlighting.TypeNumber)), "1000", "Elasticsearch: the queue size");
+        Equal(Join(es.Tokens(21, SyntaxHighlighting.TypeKeyword)), "xpack.ml.enabled|false", "Elasticsearch: machine learning off");
+        Equal(Join(es.Tokens(22, SyntaxHighlighting.TypeKeyword)), "xpack.security.authc.realms", "Elasticsearch: the authentication realms");
+        Equal(Join(es.Tokens(24, SyntaxHighlighting.TypeKeyword)), "order", "Elasticsearch: the realm order");
+        Equal(Join(es.Tokens(25, SyntaxHighlighting.TypeKeyword)), "", "Elasticsearch: an unknown setting is not a keyword");
+        Equal(Join(es.Tokens(25, SyntaxHighlighting.TypeVariable)), "unknown.setting", "Elasticsearch: ...it is a plain key");
+        Check(Folds(es).Length > 0, "Elasticsearch blocks fold");
+        Check(SyntaxHighlighting.GetKeywords(L.Elasticsearch).Contains("discovery.seed_hosts"), "Elasticsearch keywords contain 'discovery.seed_hosts'");
+        Check(SyntaxHighlighting.GetKeywords(L.Elasticsearch).Contains("single-node"), "Elasticsearch keywords contain 'single-node'");
+        Check(SyntaxHighlighting.GetKeywords(L.Elasticsearch).Contains("data_hot"), "Elasticsearch keywords contain 'data_hot'");
+        Equal(Join(CommentStyle.ForLanguage(L.Elasticsearch).Toggle(new[] { "network.host: 0.0.0.0" })), "# network.host: 0.0.0.0", "Elasticsearch comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -2944,6 +3006,7 @@ internal static class Program
         PrometheusChecks();
         AlertmanagerChecks();
         MongoDbChecks();
+        ElasticsearchChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

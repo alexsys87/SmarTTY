@@ -1813,6 +1813,88 @@ public static partial class SyntaxHighlighting
         return TokenizeYamlCore(MongoDbKeywords, MongoDbValues, startState, text, sink, out endState);
     }
 
+    // ----------------------------------------------------------- Elasticsearch
+
+    private static readonly HashSet<string> ElasticsearchKeywords = Words(StringComparer.OrdinalIgnoreCase,
+        // the cluster and the node
+        @"
+          cluster.name cluster.uuid cluster.initial_master_nodes cluster.initial_cluster_manager_nodes
+          cluster.max_shards_per_node cluster.info.update.interval
+          node.name node.roles node.attr node.data node.master node.ingest node.ml node.max_local_storage_nodes",
+        // the paths of the data and the logs
+        @"
+          path.data path.logs path.repo path.scripts path.home",
+        // the network and the HTTP layer
+        @"
+          network.host network.bind_host network.publish_host network.tcp.keep_alive network.tcp.no_delay
+          network.tcp.send_buffer_size network.tcp.receive_buffer_size
+          http.port http.host http.bind_host http.publish_host http.enabled http.compression
+          http.cors.enabled http.cors.allow-origin http.cors.allow-headers http.cors.allow-credentials
+          http.cors.allow-methods http.max_content_length http.max_initial_line_length http.max_header_size
+          transport.port transport.host transport.bind_host transport.publish_host transport.tcp.compress
+          transport.compress transport.type",
+        // the discovery, the gateway and the bootstrap checks
+        @"
+          discovery.type discovery.seed_hosts discovery.seed_providers discovery.cluster_formation_warning_timeout
+          discovery.find_peers_interval discovery.probe.connect_timeout discovery.probe.handshake_timeout
+          discovery.request_peers_timeout
+          gateway.recover_after_nodes gateway.recover_after_data_nodes gateway.expected_nodes
+          gateway.expected_data_nodes gateway.recover_after_time
+          bootstrap.memory_lock bootstrap.system_call_filter bootstrap.systems",
+        // the security and the TLS certificates
+        @"
+          xpack.security.enabled xpack.security.transport.ssl.enabled
+          xpack.security.transport.ssl.verification_mode xpack.security.transport.ssl.keystore.path
+          xpack.security.transport.ssl.keystore.password xpack.security.transport.ssl.keystore.secure_password
+          xpack.security.transport.ssl.truststore.path xpack.security.transport.ssl.truststore.password
+          xpack.security.transport.ssl.truststore.secure_password xpack.security.transport.ssl.certificate
+          xpack.security.transport.ssl.certificate_authorities xpack.security.transport.ssl.key
+          xpack.security.http.ssl.enabled xpack.security.http.ssl.keystore.path
+          xpack.security.http.ssl.keystore.password xpack.security.http.ssl.keystore.secure_password
+          xpack.security.http.ssl.truststore.path xpack.security.http.ssl.truststore.password
+          xpack.security.http.ssl.certificate xpack.security.http.ssl.certificate_authorities
+          xpack.security.http.ssl.key xpack.security.http.ssl.client_authentication
+          xpack.security.authc.realms xpack.security.authc.api_key.enabled xpack.security.authc.token.enabled
+          xpack.security.audit.enabled xpack.security.audit.outputs order",
+        // the features of the subscription
+        @"
+          xpack.ml.enabled xpack.ml.max_machine_memory_percent xpack.monitoring.enabled
+          xpack.monitoring.collection.enabled xpack.watcher.enabled xpack.ilm.enabled xpack.slm.enabled
+          xpack.transform.enabled xpack.rollup.enabled xpack.ccr.enabled xpack.graph.enabled xpack.profiling.enabled",
+        // the indices, the thread pools and the snapshots
+        @"
+          action.destructive_requires_name action.auto_create_index indices.query.bool.max_clause_count
+          indices.fielddata.cache.size indices.memory.index_buffer_size indices.recovery.max_bytes_per_sec
+          thread_pool.search.size thread_pool.search.queue_size thread_pool.write.size thread_pool.write.queue_size
+          ingest.geoip.downloader.enabled reindex.remote.whitelist repositories.url.allowed_urls
+          snapshot.max_concurrent_snapshots script.allowed_types script.allowed_contexts search.max_buckets
+          cluster.routing.allocation.disk.threshold_enabled cluster.routing.allocation.disk.watermark.low
+          cluster.routing.allocation.disk.watermark.high cluster.routing.allocation.disk.watermark.flood_stage
+          cluster.routing.allocation.awareness.attributes cluster.routing.allocation.enable
+          cluster.routing.rebalance.enable");
+
+    private static readonly HashSet<string> ElasticsearchValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the discovery modes and the roles of the nodes
+        @"single-node multi-node
+          master data data_content data_hot data_warm data_cold data_frozen ingest ml remote_cluster_client
+          transform voting_only coordinating_only index search",
+        // the TLS checks, the client authentication and the realm types
+        @"full certificate none optional required
+          native ldap active_directory pki file saml oidc kerberos",
+        // the allocation and rebalance choices, the audit outputs and the licenses
+        @"all primaries newprimaries replicas
+          deprecation index access
+          basic trial gold platinum enterprise");
+
+    /// <summary>
+    /// Elasticsearch: the colours and the folds of YAML with the settings of elasticsearch.yml known; the discovery
+    /// modes, the node roles, the TLS checks, the realm types and the allocation choices are values.
+    /// </summary>
+    private static bool TokenizeElasticsearch(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeYamlCore(ElasticsearchKeywords, ElasticsearchValues, startState, text, sink, out endState);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
