@@ -136,6 +136,9 @@ jobs:
       - name: Run raw TCP transport checks (IPv4/IPv6, keep-alive, connect abort, data flood back-pressure)
         run: dotnet run --project tests/TcpTransportTests -c Release
 
+      - name: Run local network scan checks (scanned address ranges, open SSH/telnet ports, cancellation, name lookup)
+        run: dotnet run --project tests/LocalNetworkScanTests -c Release
+
       - name: Run Telnet protocol checks (options, LINEMODE, STATUS, CHARSET, TLS and STARTTLS, output queue)
         run: dotnet run --project tests/TelnetStreamTests -c Release
 

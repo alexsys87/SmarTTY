@@ -201,6 +201,20 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
               <Image Width="48" Height="48" Grid.RowSpan="4" Margin="0 0 5 0" Panel.ZIndex="0" Source="{Binding Image}" />
+              <!-- The mark of a computer found by the network scan: it is not saved. -->
+              <Border Grid.RowSpan="4" HorizontalAlignment="Left" VerticalAlignment="Top" Width="18" Height="18" CornerRadius="9" Background="#FFE67E22" BorderBrush="#FFFFFFFF" BorderThickness="1" Panel.ZIndex="1" ToolTip="Found by the network scan, not saved. Connect and tick &quot;Save this connection&quot;, or use Edit, to keep it." AutomationProperties.Name="Found by the network scan">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type Border}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Value="true" Binding="{Binding IsDiscovered}">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+                <Path Stroke="#FFFFFFFF" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 4.5,7.5 A 3,3 0 1 0 10.5,7.5 A 3,3 0 1 0 4.5,7.5 M 9.7,9.7 L 12.5,12.5" />
+              </Border>
               <ToggleButton VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.RowSpan="4" Margin="2" Checked="IconPicker_Checked">
                 <FrameworkElement.Style>
                   <Style BasedOn="{StaticResource DynamicToggleButtonStyle}" TargetType="{x:Type ToggleButton}">
@@ -215,6 +229,10 @@
                       <Trigger Property="ToggleButton.IsChecked" Value="true">
                         <Setter Property="Visibility" Value="Visible" />
                       </Trigger>
+                      <!-- A found computer has no profile to keep an icon in. -->
+                      <DataTrigger Value="true" Binding="{Binding IsDiscovered}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
                     </Style.Triggers>
                   </Style>
                 </FrameworkElement.Style>
@@ -320,19 +338,33 @@
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Button Grid.Row="1" Margin="0 2 0 2" ToolTip="Delete current connection" Click="Delete_Click">
+                <Button Grid.Row="1" Margin="0 2 0 2" Click="Delete_Click">
                   <FrameworkElement.Style>
                     <Style BasedOn="{StaticResource EditButton}" TargetType="{x:Type Button}">
+                      <Setter Property="ToolTip" Value="Delete current connection" />
                       <Style.Triggers>
                         <DataTrigger Value="true" Binding="{Binding HasBaudRate}">
                           <Setter Property="Visibility" Value="Hidden" />
+                        </DataTrigger>
+                        <DataTrigger Value="true" Binding="{Binding IsDiscovered}">
+                          <Setter Property="ToolTip" Value="Remove from the list (it is not saved)" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
                   </FrameworkElement.Style>
                   <Image Width="16" Height="16" Source="../icons/delete16.png" />
                 </Button>
-                <Button Grid.Row="0" Margin="0 2 0 2" Style="{StaticResource EditButton}" ToolTip="Edit current connection" Click="Edit_Click">
+                <Button Grid.Row="0" Margin="0 2 0 2" Click="Edit_Click">
+                  <FrameworkElement.Style>
+                    <Style BasedOn="{StaticResource EditButton}" TargetType="{x:Type Button}">
+                      <Setter Property="ToolTip" Value="Edit current connection" />
+                      <Style.Triggers>
+                        <DataTrigger Value="true" Binding="{Binding IsDiscovered}">
+                          <Setter Property="ToolTip" Value="Save this computer to the connections list..." />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </FrameworkElement.Style>
                   <Image Width="16" Height="16" Source="../icons/edit16.png" />
                 </Button>
               </Grid>
@@ -422,6 +454,12 @@
             <AccessText Text="Quick telnet _connection..." />
           </StackPanel>
         </Button>
+        <Button HorizontalAlignment="Left" Click="ScanNetwork_Click" ToolTip="Look for computers with an open SSH (22) or telnet (23) port in the local networks of this computer. SmarTTY opens and immediately closes a TCP connection to each address. Found computers are marked in the list and are not saved unless you save them.">
+          <StackPanel Orientation="Horizontal">
+            <Image Source="../Icons/net16.png" />
+            <AccessText Text="{Binding ScanButtonText}" />
+          </StackPanel>
+        </Button>
       </WrapPanel>
       <TextBlock VerticalAlignment="Center" Margin="0 0 5 0" Text="{Binding ProgressText}">
         <FrameworkElement.Style>
@@ -470,6 +508,35 @@
           </StackPanel>
         </Border>
       </Popup>
+    </Grid>
+    <!-- What the network scan is doing, or what it found. -->
+    <Grid Grid.Row="3" Grid.ColumnSpan="3" Margin="5 0 5 5">
+      <FrameworkElement.Style>
+        <Style TargetType="{x:Type Grid}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding ScanStatusText}" Value="{x:Null}">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </FrameworkElement.Style>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <ProgressBar IsIndeterminate="True" Width="60" Height="10" Margin="0 0 8 0" VerticalAlignment="Center">
+        <FrameworkElement.Style>
+          <Style TargetType="{x:Type ProgressBar}" BasedOn="{StaticResource {x:Type ProgressBar}}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </FrameworkElement.Style>
+      </ProgressBar>
+      <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" Opacity="0.8" Text="{Binding ScanStatusText}" />
     </Grid>
   </Grid>
 </Window>
