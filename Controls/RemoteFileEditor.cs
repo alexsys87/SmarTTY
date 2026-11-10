@@ -693,11 +693,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             }
             catch (InvalidOperationException)
             {
-                // The handle was destroyed between the check and the call: the tab is closing.
-                return false;
-            }
-            catch (ObjectDisposedException)
-            {
+                // The handle was destroyed between the check and the call (ObjectDisposedException is one of these too): the tab is closing.
                 return false;
             }
             Thread.Sleep(50);
