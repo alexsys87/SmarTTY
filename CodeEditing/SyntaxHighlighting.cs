@@ -110,14 +110,15 @@ namespace SmarTTY.CodeEditing
             Nftables, // nftables.conf, *.nft: the colors of Config with the commands and expressions of nft known
             Modprobe, // /etc/modprobe.d/*.conf, modprobe.conf: the colors of Config with the module loader directives
             Logrotate, // /etc/logrotate.conf, /etc/logrotate.d/*: the colors of Config with the logrotate directives
-            Sysctl // /etc/sysctl.conf, /etc/sysctl.d/*.conf: the colors of Config with the kernel tunables known
+            Sysctl, // /etc/sysctl.conf, /etc/sysctl.d/*.conf: the colors of Config with the kernel tunables known
+            Pam // /etc/pam.conf, /etc/pam.d/*: the colors of Config with the PAM types, controls and modules known
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
             Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
-            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
+            Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
             Language.Verilog, Language.Vhdl, Language.Swift,
@@ -164,6 +165,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Modprobe: return "modprobe.d";
                 case Language.Logrotate: return "logrotate";
                 case Language.Sysctl: return "sysctl";
+                case Language.Pam: return "PAM";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -397,6 +399,13 @@ namespace SmarTTY.CodeEditing
                 (lowerCasePath.Contains("/sysctl.d/") && name.EndsWith(".conf", StringComparison.Ordinal)))
             {
                 return Language.Sysctl;
+            }
+            // PAM: the single pam.conf and the service files of pam.d, which have no extension.
+            if (name == "pam.conf" ||
+                (lowerCasePath.Contains("/pam.d/") && name.IndexOf('.') < 0 &&
+                 !name.StartsWith("readme", StringComparison.Ordinal)))
+            {
+                return Language.Pam;
             }
             // Docker Compose: the conventional names, including the override and the per-file variants.
             bool yamlFile = name.EndsWith(".yml", StringComparison.Ordinal) || name.EndsWith(".yaml", StringComparison.Ordinal);
@@ -1113,6 +1122,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Modprobe: return TokenizeModprobe;
                 case Language.Logrotate: return TokenizeLogrotate;
                 case Language.Sysctl: return TokenizeSysctl;
+                case Language.Pam: return TokenizePam;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1265,6 +1275,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(LogrotateDirectives, LogrotateValues);
                 case Language.Sysctl:
                     return Combine(SysctlDirectives, SysctlValues);
+                case Language.Pam:
+                    return Combine(PamDirectives, PamValues);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
