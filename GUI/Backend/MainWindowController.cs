@@ -2166,15 +2166,33 @@ public class MainWindowController : INotifyPropertyChanged
     {
         try
         {
-            // The text is what the device printed: only an address is opened (in the browser). A path in it is one of the device, not
-            // a file or folder of this computer ("/tmp" of a Linux host is C:\tmp here), so the disks here are not asked about it and
-            // nothing local is opened, whatever reaches this event.
-            if (LocalLinkPolicy.IsUrl(e.Path))
+            // The path is one that the device printed (and that exists here). Starting it through the shell runs a .js in the Windows
+            // Script Host, a .py with the Python launcher, a .bat, a .exe: only addresses, folders and documents go that way, the
+            // rest is shown as text.
+            bool isDirectory = Directory.Exists(e.Path);
+            LocalLinkAction action = LocalLinkPolicy.Decide(e.Path, isDirectory, File.Exists(e.Path));
+            // A device terminal cannot tell this computer from another Windows machine on the other end: a local path is opened
+            // only after the user has said yes (an address goes to the browser without a question).
+            string question = LocalLinkPolicy.ConfirmationText(e.Path, action, isDirectory);
+            if (question != null && !MessageBoxes.Ask(question))
             {
-                Process.Start(new ProcessStartInfo(e.Path)
-                {
-                    UseShellExecute = true
-                });
+                return;
+            }
+            switch (action)
+            {
+                case LocalLinkAction.OpenWithShell:
+                    Process.Start(new ProcessStartInfo(e.Path)
+                    {
+                        UseShellExecute = true
+                    });
+                    break;
+                case LocalLinkAction.OpenInNotepad:
+                    // By the full name, not through the shell: a notepad.exe next to the file or in the current directory is not looked for.
+                    Process.Start(new ProcessStartInfo(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "notepad.exe"), "\"" + e.Path + "\"")
+                    {
+                        UseShellExecute = false
+                    });
+                    break;
             }
         }
         catch (Exception exception)
