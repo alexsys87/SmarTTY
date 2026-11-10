@@ -2350,6 +2350,10 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private readonly StringBuilder _path = new StringBuilder();
 
+        // The word has begun with "http://", "https://" or "ftp://": from there on it is read as an address, up to a blank, a quote or
+        // an angle bracket ("?id=5&x=1#top" is part of it), not only as the characters of a path.
+        private bool _isUrl;
+
         public LocalLinkCandidate(SerialTerminalControl terminal, char firstChar)
         {
             _terminal = terminal;
@@ -2372,7 +2376,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 }
                 if (IsUrl(path))
                 {
-                    return true;
+                    return SmarTTY.Utilities.UrlLinks.IsOpenable(path);
                 }
                 // This is asked for every piece of the line each time it is painted, and when the mouse moves over it: it must
                 // not wait for the disk. The answer is the last one that is known, the check runs in the background and the
@@ -2392,9 +2396,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         private static bool IsUrl(string path)
         {
-            return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase);
+            return SmarTTY.Utilities.UrlLinks.StartsWithOpenableScheme(path);
         }
 
         private string _targetPath;
@@ -2427,7 +2429,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 string path = _path.ToString();
                 if (IsUrl(path))
                 {
-                    return path;
+                    // Without the punctuation of the sentence around it: "see https://example.com/a." opens https://example.com/a.
+                    return SmarTTY.Utilities.UrlLinks.Trim(path);
                 }
                 // The text comes from the device: only a path with a drive letter names this machine (see LocalLinkRules.IsLocalPath).
                 // "/tmp" of a Linux host would be C:\tmp here, and a network path would make Windows connect to its host and offer
@@ -2452,9 +2455,28 @@ public class SerialTerminalControl : TerminalEmulatorControl
             {
                 return false;
             }
+            if (_isUrl)
+            {
+                if (!SmarTTY.Utilities.UrlLinks.EndsUrl(ch))
+                {
+                    // An address far longer than any real one is not followed further.
+                    if (_path.Length < 8192)
+                    {
+                        _path.Append(ch);
+                    }
+                    return true;
+                }
+                Complete();
+                return false;
+            }
             if (PathCharacters.IndexOf(ch) >= 0)
             {
                 _path.Append(ch);
+                // "https://" is the longest scheme that is looked for: after it the word is an address or never becomes one.
+                if (_path.Length <= 8)
+                {
+                    _isUrl = IsUrl(_path.ToString());
+                }
                 return true;
             }
             Complete();
@@ -2474,7 +2496,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private class LocalLinkScanner : ILinkScanner
+    private class LocalLinkScanner : IColumnAwareLinkScanner
     {
         private readonly SerialTerminalControl _terminal;
 
@@ -2504,6 +2526,19 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 _current = null;
             }
             return _current;
+        }
+
+        /// <param name="column">0 when the text starts a new line: what the line before ended with is complete then (an address does not
+        /// go on with the first word of the next line); -1 for a row that only continues a full row above it (auto-wrap).</param>
+        public LinkCell[] Scan(string lineText, int column)
+        {
+            if (column == 0 && _current != null)
+            {
+                _current.Complete();
+                _current = null;
+                _previousChar = '\0';
+            }
+            return Scan(lineText);
         }
 
         public LinkCell[] Scan(string lineText)

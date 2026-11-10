@@ -509,6 +509,12 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         _inputLine.SetText(command);
     }
 
+    /// <summary>An address in the output was clicked: it opens in the browser, not in the editor of the server.</summary>
+    public void RequestOpenUrl(string url)
+    {
+        UrlOpener.Open(url);
+    }
+
     public void RequestOpenFile(string text, int? line, int? column, SmarTTY.CodeEditing.ColumnUnit unit)
     {
         OpenFileRequested?.Invoke(this, new OpenFileEventArgs
@@ -2084,13 +2090,10 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     internal override ILinkScanner CreateLinkScanner()
     {
-        // No extensions means no links; the words of errors and warnings are marked on their own setting.
+        // No extensions means no file links; the words of errors and warnings are marked on their own setting. Addresses are links
+        // in any case (they open in the browser), so there is always a scanner.
         bool links = !string.IsNullOrEmpty(VtSettings.AutoLinkExtensions);
         bool highlight = VtSettings.HighlightDiagnostics;
-        if (!links && !highlight)
-        {
-            return null;
-        }
         return _channel?.Run?.CreateScanner(links, highlight);
     }
 

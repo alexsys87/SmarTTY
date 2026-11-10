@@ -160,13 +160,15 @@ public partial class TerminalEmulatorBase : TextEditorControl
             return new TextDocument.TextPosition(0, textPosition.Line + 1);
         }
 
-        public LinkCell[] Scan(string text, TextDocument.TextPosition textPosition)
+        /// <param name="wrapped">The text goes on in the next row because the one above it was full (auto-wrap), not after a line break.</param>
+        public LinkCell[] Scan(string text, TextDocument.TextPosition textPosition, bool wrapped = false)
         {
             if (!this.IsActive || text == null)
             {
                 return null;
             }
-            if (textPosition != _expectedPosition && textPosition != NextLineStart(_expectedPosition))
+            bool nextLine = textPosition == NextLineStart(_expectedPosition);
+            if (textPosition != _expectedPosition && !nextLine)
             {
                 _scanner?.Finish();
                 this.IsActive = false;
@@ -175,7 +177,8 @@ public partial class TerminalEmulatorBase : TextEditorControl
             _expectedPosition = new TextDocument.TextPosition(textPosition.Column + text.Length, textPosition.Line);
             if (_scanner is IColumnAwareLinkScanner columnAware)
             {
-                return columnAware.Scan(text, textPosition.Column);
+                // A wrapped row is the rest of the same line of output: a long address goes on in it (column -1: "not a new line").
+                return columnAware.Scan(text, wrapped && nextLine ? -1 : textPosition.Column);
             }
             return _scanner.Scan(text);
         }
@@ -1129,10 +1132,12 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     protected Point WriteAt(Point point, string text, CellStyle cellStyle, bool scroll = true, bool insert = false)
     {
+        bool wrapped = false;
         if (_autoWrap && point.X >= _visibleColumns)
         {
             ActiveBuffer.Lines.MarkWrapped(point.Y);
             point = new Point(0, point.Y + 1);
+            wrapped = true;
         }
         if (scroll && point.Y >= ((ReadonlyTextBrowser)this)._visibleRows)
         {
@@ -1169,7 +1174,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 _linkTracker = new LinkTracker(linkScanner, textPosition);
             }
         }
-        LinkCell[] linkCells = _linkTracker?.Scan(text, textPosition);
+        LinkCell[] linkCells = _linkTracker?.Scan(text, textPosition, wrapped);
         if (insert)
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);

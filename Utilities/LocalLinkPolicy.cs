@@ -32,11 +32,10 @@ public static class LocalLinkPolicy
         ".yml", ".yaml", ".toml", ".diff", ".patch", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp"
     };
 
+    /// <summary>An http, https or ftp address (see <see cref="UrlLinks"/>): it goes to the browser.</summary>
     public static bool IsUrl(string path)
     {
-        return path != null && (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase));
+        return UrlLinks.StartsWithOpenableScheme(path);
     }
 
     /// <param name="isDirectory">The path is a folder on this machine.</param>

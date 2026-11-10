@@ -474,8 +474,46 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         SetCaret(new TextDocument.TextPosition(column, line));
     }
 
+    /// <summary>
+    /// Ctrl+click on an http, https or ftp address in the text opens it in the browser; while Ctrl is held over one, the pointer is a
+    /// hand. A plain click places the caret as always, and Ctrl+Shift or Ctrl+Alt keep their own meaning.
+    /// </summary>
+    protected override HoverTarget GetHoverTarget(int line, Point point)
+    {
+        if ((Control.ModifierKeys & (Keys.Control | Keys.Shift | Keys.Alt)) == Keys.Control)
+        {
+            TextDocument.TextPosition position = HitTest(point);
+            string text = position.IsValid ? GetLineOrNull(position.Line) : null;
+            string url = text == null ? null : SmarTTY.Utilities.UrlLinks.FindAt(text, position.Column, out _);
+            if (url != null)
+            {
+                return new HoverTarget
+                {
+                    Cursor = Cursors.Hand,
+                    ClickAction = () => UrlOpener.Open(url)
+                };
+            }
+        }
+        return base.GetHoverTarget(line, point);
+    }
+
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        base.OnKeyUp(e);
+        if (e.KeyCode == Keys.ControlKey)
+        {
+            // Ctrl released over an address: the pointer is an I-beam again and a click places the caret.
+            RefreshHoverTarget();
+        }
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (e.KeyCode == Keys.ControlKey)
+        {
+            // Ctrl pressed while the mouse stands over an address: the pointer becomes a hand without a mouse move.
+            RefreshHoverTarget();
+        }
         if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(e), out var value))
         {
             if (HasMultipleCursors && !IsMultiCursorCommand(value))

@@ -46,6 +46,13 @@ internal static class Program
             Units.Add(unit);
             Opened.Add(path + "|" + (line.HasValue ? line.Value.ToString() : "-") + "|" + (column.HasValue ? column.Value.ToString() : "-"));
         }
+
+        public readonly List<string> Urls = new List<string>();
+
+        public void RequestOpenUrl(string url)
+        {
+            Urls.Add(url);
+        }
     }
 
     // The output of a command as the terminal receives it: pieces of text in order. Returns what each link covers, and clicks
@@ -62,8 +69,13 @@ internal static class Program
         }
 
         public Output(string workingDirectory, string command, bool strictAbsolute, params string[] pieces)
+            : this(workingDirectory, command, strictAbsolute, false, true, pieces)
         {
-            OutputLinkScanner scanner = new OutputLinkScanner(Host, workingDirectory, command, strictAbsolute: strictAbsolute);
+        }
+
+        public Output(string workingDirectory, string command, bool strictAbsolute, bool urls, bool links, params string[] pieces)
+        {
+            OutputLinkScanner scanner = new OutputLinkScanner(Host, workingDirectory, command, links: links, strictAbsolute: strictAbsolute, urls: urls);
             StringBuilder text = new StringBuilder();
             List<TerminalEmulatorBase.LinkCell> cells = new List<TerminalEmulatorBase.LinkCell>();
             foreach (string piece in pieces)
@@ -606,9 +618,79 @@ internal static class Program
         Equal(new Output("/w", "x", "ERROR: //x.c:3:1\n").Covered.Count, 1, "a word and a colon with a blank before the slashes is no address");
     }
 
+    // With addresses as links (Smart Terminal, classic tabs): the whole address is one link that opens in the browser, and still no
+    // file name is looked for in it ("example.com/a.html" is not opened in the editor of the server).
+    private static Output Urls(params string[] pieces) => new Output("/w", "x", false, true, true, pieces);
+
+    private static void UrlLinkChecks()
+    {
+        Output one = Urls("see https://example.com/dir/a.html?id=5&x=1#top now\n");
+        Check(one.Covered.Count == 1 && one.Covered[0] == "https://example.com/dir/a.html?id=5&x=1#top", "an address is one link, with its query and fragment: " + string.Join(" | ", one.Covered));
+        Check(one.Host.Urls.SequenceEqual(new[] { "https://example.com/dir/a.html?id=5&x=1#top" }) && one.Host.Opened.Count == 0, "a click opens it in the browser, nothing in the editor");
+
+        foreach (string url in new[] { "http://example.com/dir/index.html", "HTTPS://EXAMPLE.COM/A.HTML", "ftp://host/pub/readme.txt", "http://user:pass@host:8080/a.c", "http://127.0.0.1:8000/static/app.json" })
+        {
+            Output o = Urls("got " + url + " ok\n");
+            Check(o.Covered.Count == 1 && o.Covered[0] == url && o.Host.Urls.Count == 1 && o.Host.Urls[0] == url && o.Host.Opened.Count == 0, "an address, no file: " + url);
+        }
+        foreach (string other in new[] { "s3://bucket/key.json", "git+ssh://git@host/repo/main.c", "postgres://db/x.sql" })
+        {
+            Output o = Urls("see " + other + " now\n");
+            Check(o.Covered.Count == 0 && o.Host.Opened.Count == 0, "another scheme is no link and no file either: " + other);
+        }
+
+        Output sentence = Urls("Read https://example.com/a. Then (https://example.com/b) and https://example.com/c,\n");
+        Check(sentence.Host.Urls.SequenceEqual(new[] { "https://example.com/a", "https://example.com/b", "https://example.com/c" }), "the punctuation of the sentence is not opened: " + string.Join(" | ", sentence.Host.Urls));
+
+        Output mixed = Urls("main.c:7:1: note: see https://example.com/a.html and b.c:2:1\n");
+        Check(mixed.Host.Opened.SequenceEqual(new[] { "/w/main.c|6|0", "/w/b.c|1|0" }) && mixed.Host.Urls.SequenceEqual(new[] { "https://example.com/a.html" }), "file names around an address stay file links");
+
+        Output quoted = Urls("href=\"https://example.com/x\" <https://example.com/y> 'https://example.com/z'\n");
+        Check(quoted.Host.Urls.SequenceEqual(new[] { "https://example.com/x", "https://example.com/y", "https://example.com/z" }), "quotes and angle brackets end an address");
+
+        Output prefix = Urls("url=https://example.com/a --link:http://example.com/b\n");
+        Check(prefix.Host.Urls.SequenceEqual(new[] { "https://example.com/a", "http://example.com/b" }), "the link starts at the scheme, not at the word in front of it");
+
+        // In pieces: the same link, whole when its pieces come in one write, and the rest of it when the scheme came before.
+        string full = "see https://example.com/dir/a.html and b.c:2:1\n";
+        for (int cut = 1; cut < full.Length; cut++)
+        {
+            Output pieces = Urls(full.Substring(0, cut), full.Substring(cut));
+            if (pieces.Host.Opened.Count != 1 || pieces.Host.Opened[0] != "/w/b.c|1|0" || pieces.Host.Urls.Count != 1 || pieces.Host.Urls[0] != "https://example.com/dir/a.html")
+            {
+                throw new Exception("FAIL: with addresses as links, the output cut after " + cut + " characters gave " + string.Join(" | ", pieces.Covered));
+            }
+        }
+        Check(true, "an address cut into two pieces anywhere still opens whole, and the file name after it is a link");
+
+        // A new line ends an address; a row that only continues a full row above it (auto-wrap, column -1) does not.
+        Host host = new Host();
+        OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", "x", urls: true);
+        TerminalEmulatorBase.LinkCell[] row1 = scanner.Scan("open https://example.com/very/long/pa", 0);
+        TerminalEmulatorBase.LinkCell[] row2 = scanner.Scan("th/to/file.c done", -1);
+        scanner.Finish();
+        Check(ReferenceEquals(row1[10].Target, row2[0].Target) && row2[0].Target.IsActive, "a wrapped row goes on with the address of the row above it");
+        row2[0].Target.Activate();
+        Check(host.Urls.SequenceEqual(new[] { "https://example.com/very/long/path/to/file.c" }) && host.Opened.Count == 0, "the wrapped address opens whole, and its tail is no file name");
+
+        Host host2 = new Host();
+        OutputLinkScanner scanner2 = new OutputLinkScanner(host2, "/w", "x", urls: true);
+        TerminalEmulatorBase.LinkCell[] line1 = scanner2.Scan("https://example.com/a", 0);
+        TerminalEmulatorBase.LinkCell[] line2 = scanner2.Scan("b.c:5:1", 0);
+        scanner2.Finish();
+        Check(line1[0].Target != null && line1[0].Target.IsActive && !ReferenceEquals(line1[0].Target, line2[0].Target), "a new line (column 0) starts without the address of the line above");
+        line2[0].Target.Activate();
+        Check(host2.Opened.SequenceEqual(new[] { "/w/b.c|4|0" }), "and the name at its start is a file link");
+
+        // Addresses without file links (a classic tab of a Windows host).
+        Output onlyUrls = new Output("/w", "x", true, true, false, "C:\\x\\main.c:3:1 https://example.com/a.html /etc/hosts:3\n");
+        Check(onlyUrls.Host.Opened.Count == 0 && onlyUrls.Host.Urls.SequenceEqual(new[] { "https://example.com/a.html" }), "addresses can be links without any file link");
+    }
+
     private static void Main()
     {
         UrlChecks();
+        UrlLinkChecks();
         DiagnosticSpanChecks();
         LogLevelChecks();
         LogLevelCellChecks();
