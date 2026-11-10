@@ -246,6 +246,7 @@ internal static class Program
         _passed += RebootTests.Run();
         _passed += PackageListFixesTests.Run();
         _passed += WingetTests.Run();
+        _passed += UrlDownloadTests.Run();
 
         Console.WriteLine();
         Console.WriteLine(_passed + " checks passed");

@@ -164,6 +164,28 @@ public partial class PackageManagerWindow : Window
             return new LocalPackageInstallRequest(files, installer, new PackageCommitOptions { NoPrompt = Options.NoPrompt }, _IsRoot);
         }
 
+        /// <summary>
+        /// Lets the user paste links of package files, which this computer downloads (the host may have no internet access at all).
+        /// Returns what to upload and install, as for <see cref="PickPackageFiles"/>, or null when the window was cancelled or a
+        /// download failed (the user was told why there).
+        /// </summary>
+        public LocalPackageInstallRequest DownloadPackageFiles(Window owner)
+        {
+            if (!(_Client is ILocalPackageFileInstaller installer) || !IsIdle)
+            {
+                return null;
+            }
+            PackageDownloadWindow window = new PackageDownloadWindow(installer)
+            {
+                Owner = owner
+            };
+            if (window.ShowDialog() != true || window.DownloadedFiles == null || window.DownloadedFiles.Length == 0)
+            {
+                return null;
+            }
+            return new LocalPackageInstallRequest(window.DownloadedFiles, installer, new PackageCommitOptions { NoPrompt = Options.NoPrompt }, _IsRoot, window.DownloadDirectory);
+        }
+
         /// <summary>False while the package manager is being detected, queried or refreshed.</summary>
         public bool IsIdle => _ProgressText == null;
 
@@ -514,7 +536,10 @@ public partial class PackageManagerWindow : Window
 
     public string CommandLine { get; private set; }
 
-    /// <summary>Set when the user chose package files on this computer (instead of marking packages): the caller uploads and installs them.</summary>
+    /// <summary>
+    /// Set when the user chose package files on this computer, or downloaded them from links (instead of marking packages): the caller
+    /// uploads and installs them.
+    /// </summary>
     public LocalPackageInstallRequest LocalInstall { get; private set; }
 
     public PackageManagerWindow(SessionWrapper session)
@@ -542,6 +567,18 @@ public partial class PackageManagerWindow : Window
             return;
         }
         // The window closes without a command line: the caller uploads the files, asks, and types the installation in the terminal.
+        LocalInstall = request;
+        this.DialogResult = true;
+    }
+
+    private void InstallFromUrl_Click(object sender, RoutedEventArgs e)
+    {
+        LocalPackageInstallRequest request = (this.DataContext as ControllerImpl)?.DownloadPackageFiles(this);
+        if (request == null)
+        {
+            return;
+        }
+        // As for a picked file: the window closes, and the caller uploads the downloaded files and types the installation in the terminal.
         LocalInstall = request;
         this.DialogResult = true;
     }

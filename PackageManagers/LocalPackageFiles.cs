@@ -126,16 +126,26 @@ public static class LocalPackageFiles
     }
 }
 
-/// <summary>What the package manager window asks for when the user picks package files from this computer: they are uploaded and installed.</summary>
+/// <summary>
+/// What the package manager window asks for when the user picks package files from this computer, or downloads them from links
+/// ("Install from URL..."): they are uploaded and installed.
+/// </summary>
 public sealed class LocalPackageInstallRequest
 {
-    public LocalPackageInstallRequest(string[] localFiles, ILocalPackageFileInstaller installer, PackageCommitOptions options, bool isRoot)
+    public LocalPackageInstallRequest(string[] localFiles, ILocalPackageFileInstaller installer, PackageCommitOptions options, bool isRoot, string temporaryDirectory = null)
     {
         LocalFiles = localFiles;
         Installer = installer;
         Options = options;
         IsRoot = isRoot;
+        TemporaryDirectory = temporaryDirectory;
     }
+
+    /// <summary>
+    /// The folder of this computer that holds the files when they were downloaded from links (<see cref="PackageUrlDownloader"/>), or null
+    /// for files that the user picked on the disk: it is removed with the files when their upload has ended.
+    /// </summary>
+    public string TemporaryDirectory { get; }
 
     /// <summary>Full paths of the files on this computer.</summary>
     public string[] LocalFiles { get; }

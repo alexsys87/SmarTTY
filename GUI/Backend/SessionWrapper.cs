@@ -1614,7 +1614,13 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             offer.Uploaded.Add(job.RemotePath);
         }
         offer.Pending--;
-        if (offer.Pending > 0 || offer.Uploaded.Count == 0)
+        if (offer.Pending > 0)
+        {
+            return;
+        }
+        // Files downloaded from links are a copy on this computer that nothing reads once they are on the server (or failed to get there).
+        DeleteTempDirectory(offer.LocalInstall?.TemporaryDirectory);
+        if (offer.Uploaded.Count == 0)
         {
             return;
         }
@@ -1629,20 +1635,23 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     }
 
     /// <summary>
-    /// Uploads the package files that the user picked in the package manager window to /tmp of the host (the transfers are in the
-    /// transfer list like any other upload) and, when the last of them has arrived, asks whether to install them and types the
-    /// installation in the terminal, so that its output, questions and the password of sudo are there. The uploaded files are
-    /// removed after the installation (or when the user declines it).
+    /// Uploads the package files that the user picked in the package manager window (or that it downloaded from links to this
+    /// computer) to /tmp of the host (the transfers are in the transfer list like any other upload) and, when the last of them has
+    /// arrived, asks whether to install them and types the installation in the terminal, so that its output, questions and the
+    /// password of sudo are there. The uploaded files are removed after the installation (or when the user declines it), and the
+    /// downloaded ones on this computer when their upload has ended.
     /// </summary>
     internal void UploadAndInstallLocalPackages(LocalPackageInstallRequest request)
     {
         if (IsDevice || request == null || request.Installer == null)
         {
+            DeleteTempDirectory(request?.TemporaryDirectory);
             return;
         }
         string[] files = (request.LocalFiles ?? new string[0]).Where(File.Exists).ToArray();
         if (files.Length == 0)
         {
+            DeleteTempDirectory(request.TemporaryDirectory);
             MessageBoxes.Error("The package files were not found on this computer.");
             return;
         }
@@ -1651,6 +1660,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         string duplicate = files.GroupBy(file => Path.GetFileName(file), StringComparer.OrdinalIgnoreCase).FirstOrDefault(group => group.Count() > 1)?.Key;
         if (duplicate != null)
         {
+            DeleteTempDirectory(request.TemporaryDirectory);
             MessageBoxes.Error("More than one of the chosen files is named " + duplicate + ". Choose them one at a time, or rename one of them.");
             return;
         }
@@ -1667,6 +1677,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         List<FileTransferManager.TransferJob> jobs = UploadFilesToDirectory(files, uploadDirectory);
         if (jobs.Count == 0)
         {
+            DeleteTempDirectory(request.TemporaryDirectory);
             return;
         }
         PackageInstallOffer offer = new PackageInstallOffer

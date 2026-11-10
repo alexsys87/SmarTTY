@@ -12,6 +12,8 @@
     <Compile Include="../../PackageManagers/HomebrewPackageManagerClient.cs" Link="HomebrewPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/OpkgPackageManagerClient.cs" Link="OpkgPackageManagerClient.cs" />
     <Compile Include="../../PackageManagers/LocalPackageFiles.cs" Link="LocalPackageFiles.cs" />
+    <Compile Include="../../PackageManagers/PackageUrlDownload.cs" Link="PackageUrlDownload.cs" />
+    <Compile Include="../../PackageManagers/PackageUrlDownloader.cs" Link="PackageUrlDownloader.cs" />
     <Compile Include="../../PackageManagers/PackageNames.cs" Link="PackageNames.cs" />
     <Compile Include="../../Ssh/RemoteReboot.cs" Link="RemoteReboot.cs" />
     <Compile Include="../../PackageManagers/PackageManagerCatalog.cs" Link="PackageManagerCatalog.cs" />
