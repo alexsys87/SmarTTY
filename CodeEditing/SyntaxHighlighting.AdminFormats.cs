@@ -1456,6 +1456,86 @@ public static partial class SyntaxHighlighting
         return TokenizeConfigCore(PostfixDirectives, startState, text, sink, out endState, valueKeywords: PostfixValues);
     }
 
+    // ---------------------------------------------------------------- OpenVPN
+
+    private static readonly HashSet<string> OpenVpnDirectives = Words(StringComparer.OrdinalIgnoreCase,
+        // the mode, the transport and the device
+        @"
+          client server mode proto dev dev-type topology port local remote remote-random remote-random-hostname
+          nobind resolv-retry float multihome",
+        // the keys and the TLS handshake
+        @"
+          ca cert key dh ecdh-curve pkcs12 secret tls-auth tls-crypt tls-crypt-v2 tls-server tls-client
+          tls-version-min tls-version-max tls-group tls-cipher tls-ciphersuites tls-cert-profile tls-export-cert
+          key-direction auth cipher data-ciphers data-ciphers-fallback ncp-ciphers auth-nocache auth-user-pass
+          auth-retry auth-gen-token auth-token auth-token-user username-as-common-name verify-client-cert
+          verify-x509-name verify-hash remote-cert-tls remote-cert-eku remote-cert-ku ns-cert-type crl-verify
+          x509-username-field pkcs11-providers pkcs11-private-mode pkcs11-cert-private pkcs11-id pkcs11-id-management
+          askpass engine providers provider keystore",
+        // the scripts and the daemon
+        @"
+          plugin script-security up down up-restart up-delay down-pre ipchange route-up route-pre-down learn-address
+          client-connect client-disconnect client-config-dir ccd-exclusive connection config cd chroot user group
+          persist-key persist-tun persist-local-ip persist-remote-ip daemon syslog log log-append verb mute status
+          status-version writepid tmp-dir mlock nice",
+        // the timers, the link and the buffers
+        @"
+          keepalive ping ping-restart ping-exit ping-timer-rem inactive connect-retry connect-retry-max connect-timeout
+          hand-window reneg-sec reneg-bytes reneg-pkts mute-replay-warnings replay-window tcp-nodelay tcp-queue-limit
+          txqueuelen mtu mtu-disc tun-mtu tun-mtu-extra fragment mssfix sndbuf rcvbuf fast-io",
+        // the addresses and the routes
+        @"
+          route route-ipv6 route-gateway route-metric route-delay route-method route-noexec route-nopull
+          redirect-gateway redirect-private pull pull-filter push push-reset push-remove push-peer-info
+          ifconfig ifconfig-ipv6 ifconfig-noexec ifconfig-nowarn server-bridge server-ipv6
+          ifconfig-pool ifconfig-pool-persist ifconfig-pool-linear ifconfig-ipv6-pool
+          client-to-client duplicate-cn max-clients max-routes-per-client",
+        // compression, the proxies and the management interface
+        @"
+          comp-lzo compress allow-compression http-proxy http-proxy-option http-proxy-retry http-proxy-timeout
+          http-proxy-user-pass socks-proxy
+          management management-client management-query-passwords management-hold management-signal
+          management-log-cache management-forget-disconnect management-up-down management-client-auth
+          management-client-pf management-client-user management-client-group management-external-key
+          management-external-cert management-client-connect",
+        // names, options and the Windows client
+        @"
+          setenv setenv-safe setenv-opt opt-verify ignore-unknown-option compat-mode show-ciphers show-digests
+          show-tls show-engines show-gateway show-net-up test-crypto disable-occ
+          block-outside-dns block-ipv6 register-dns windows-driver cryptoapicert dhcp-renew dhcp-release
+          ip-win32 tap-sleep net30 exit-event win-sys
+          dhcp-option dhcp-option-dom dhcp-option-dns dns dns-search dns-domain dns-server dns-fallback
+          explicit-exit-notify");
+
+    private static readonly HashSet<string> OpenVpnValues = Words(StringComparer.OrdinalIgnoreCase,
+        // the directives written without a value
+        @"
+          client nobind persist-key persist-tun persist-local-ip persist-remote-ip pull tls-client tls-server
+          remote-random remote-random-hostname auth-nocache duplicate-cn float multihome up-restart down-pre mlock
+          mute-replay-warnings client-to-client opt-verify disable-occ block-outside-dns block-ipv6 register-dns
+          show-net-up dhcp-renew dhcp-release tap-sleep push-peer-info ccd-exclusive ifconfig-noexec ifconfig-nowarn
+          route-noexec route-nopull management-hold management-query-passwords management-signal
+          management-forget-disconnect management-up-down management-client auth-gen-token explicit-exit-notify",
+        // the transports, the devices and the modes
+        @"udp udp4 udp6 tcp tcp4 tcp6 tcp-server tcp-client tun tap null server client p2p subnet net30",
+        // the words of the usual options
+        @"yes no none default infinite adaptive asym require optional ignore accept nointeract interact stub v2
+          or-highest tap-windows6 wintun",
+        // the ciphers and the digests
+        @"AES-256-GCM AES-192-GCM AES-128-GCM CHACHA20-POLY1305 AES-256-CBC AES-192-CBC AES-128-CBC
+          BF-CBC DES-EDE3-CBC CAMELLIA-256-CBC CAMELLIA-192-CBC CAMELLIA-128-CBC SEED-CBC
+          SHA1 SHA224 SHA256 SHA384 SHA512 SHA3-256 SHA3-512 MD5 BLAKE2b512 BLAKE2s256 whirlpool ripemd160");
+
+    /// <summary>
+    /// OpenVPN: the colours of Config with the options of a client or server profile known; the protocols, devices,
+    /// modes, ciphers and digests are keywords too. The directives written without a value (client, nobind,
+    /// persist-key) are kept in the value set, so they colour as well. Comments are '#' and ';'.
+    /// </summary>
+    private static bool TokenizeOpenVpn(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        return TokenizeConfigCore(OpenVpnDirectives, startState, text, sink, out endState, valueKeywords: OpenVpnValues);
+    }
+
     // -------------------------------------------------------------- Kubernetes
 
     private static readonly HashSet<string> KubernetesKeywords = Words(StringComparer.OrdinalIgnoreCase,
