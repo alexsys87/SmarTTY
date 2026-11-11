@@ -158,6 +158,8 @@ internal static class Program
         Check(Names(L.MongoDb, "", "").Contains("requireTLS"), "the MongoDB TLS mode 'requireTLS' is offered");
         Check(Names(L.Elasticsearch, "", "").Contains("single-node"), "the Elasticsearch discovery mode 'single-node' is offered");
         Check(Names(L.Elasticsearch, "", "").Contains("data_hot"), "the Elasticsearch node role 'data_hot' is offered");
+        Check(Names(L.Meson, "", "").Contains("executable"), "the Meson function 'executable' is offered");
+        Check(Names(L.Meson, "", "").Contains("meson"), "the Meson object 'meson' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

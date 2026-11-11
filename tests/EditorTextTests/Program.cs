@@ -889,7 +889,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2310,6 +2310,63 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Elasticsearch).Toggle(new[] { "network.host: 0.0.0.0" })), "# network.host: 0.0.0.0", "Elasticsearch comment");
     }
 
+    private static void MesonChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meson.build"), L.Meson, "meson.build");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/subdir/meson.build"), L.Meson, "a nested meson.build");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meson.options"), L.Meson, "meson.options");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meson_options.txt"), L.Meson, "the older meson_options.txt");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/Meson.build"), L.Meson, "the name is case-insensitive");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/meson.build.bak"), L.Plain, "a backup of meson.build is not Meson");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/build.ninja"), L.Plain, "the Ninja file is not Meson");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/CMakeLists.txt"), L.CMake, "CMake keeps its own name");
+        Equal(SyntaxHighlighting.DetectLanguage("/src/Makefile"), L.Makefile, "Makefile keeps its own name");
+
+        Highlighted meson = new Highlighted(L.Meson,
+            "# Meson build file\nproject('demo', ['c', 'cpp'],\n  version: '1.2.0',\n" +
+            "  default_options: ['warning_level=3', 'cpp_std=c++17'])\n\n" +
+            "cc = meson.get_compiler('c')\ninc = include_directories('include')\n\n" +
+            "sources = files('main.c', 'util.c')\nlib = static_library('util', sources,\n" +
+            "  include_directories: inc,\n  install: false)\n\n" +
+            "if host_machine.system() == 'linux'\n  add_project_arguments('-D_GNU_SOURCE', language: 'c')\n" +
+            "elif host_machine.system() == 'darwin'\n  add_project_arguments('-D_DARWIN_C_SOURCE', language: 'c')\n" +
+            "else\n  warning('unknown system')\nendif\n\n" +
+            "foreach name : ['a', 'b']\n  message('@0@'.format(name))\nendforeach\n\n" +
+            "executable('demo', sources,\n  link_with: lib,\n  dependencies: [dependency('threads')],\n" +
+            "  install: true)\n\nsummary('build', true)\noption('jobs', type: 'integer', value: 4)\n");
+        Equal(Join(meson.Tokens(0, SyntaxHighlighting.TypeComment)), "# Meson build file", "Meson: a comment");
+        Equal(Join(meson.Tokens(1, SyntaxHighlighting.TypeKeyword)), "project", "Meson: project()");
+        Equal(Join(meson.Tokens(1, SyntaxHighlighting.TypeString)), "'demo'|'c'|'cpp'", "Meson: the project languages");
+        Equal(Join(meson.Tokens(5, SyntaxHighlighting.TypeVariable)), "meson", "Meson: the meson object");
+        Equal(Join(meson.Tokens(5, SyntaxHighlighting.TypeKeyword)), "get_compiler", "Meson: get_compiler()");
+        Equal(Join(meson.Tokens(6, SyntaxHighlighting.TypeKeyword)), "include_directories", "Meson: include_directories()");
+        Equal(Join(meson.Tokens(8, SyntaxHighlighting.TypeKeyword)), "files", "Meson: files()");
+        Equal(Join(meson.Tokens(9, SyntaxHighlighting.TypeKeyword)), "static_library", "Meson: static_library()");
+        Equal(Join(meson.Tokens(10, SyntaxHighlighting.TypeKeyword)), "include_directories", "Meson: a keyword argument");
+        Equal(Join(meson.Tokens(11, SyntaxHighlighting.TypeKeyword)), "false", "Meson: false");
+        Equal(Join(meson.Tokens(13, SyntaxHighlighting.TypeKeyword)), "if|system", "Meson: if and the system method");
+        Equal(Join(meson.Tokens(13, SyntaxHighlighting.TypeVariable)), "host_machine", "Meson: the host machine");
+        Equal(Join(meson.Tokens(14, SyntaxHighlighting.TypeKeyword)), "add_project_arguments", "Meson: add_project_arguments()");
+        Equal(Join(meson.Tokens(15, SyntaxHighlighting.TypeKeyword)), "elif|system", "Meson: elif");
+        Equal(Join(meson.Tokens(17, SyntaxHighlighting.TypeKeyword)), "else", "Meson: else");
+        Equal(Join(meson.Tokens(18, SyntaxHighlighting.TypeKeyword)), "warning", "Meson: warning()");
+        Equal(Join(meson.Tokens(19, SyntaxHighlighting.TypeKeyword)), "endif", "Meson: endif");
+        Equal(Join(meson.Tokens(21, SyntaxHighlighting.TypeKeyword)), "foreach", "Meson: foreach");
+        Equal(Join(meson.Tokens(22, SyntaxHighlighting.TypeKeyword)), "message|format", "Meson: message() and format()");
+        Equal(Join(meson.Tokens(23, SyntaxHighlighting.TypeKeyword)), "endforeach", "Meson: endforeach");
+        Equal(Join(meson.Tokens(25, SyntaxHighlighting.TypeKeyword)), "executable", "Meson: executable()");
+        Equal(Join(meson.Tokens(25, SyntaxHighlighting.TypeString)), "'demo'", "Meson: the target name");
+        Equal(Join(meson.Tokens(27, SyntaxHighlighting.TypeKeyword)), "dependency", "Meson: dependency()");
+        Equal(Join(meson.Tokens(28, SyntaxHighlighting.TypeKeyword)), "true", "Meson: true");
+        Equal(Join(meson.Tokens(30, SyntaxHighlighting.TypeKeyword)), "summary|true", "Meson: summary()");
+        Equal(Join(meson.Tokens(31, SyntaxHighlighting.TypeKeyword)), "option", "Meson: option()");
+        Equal(Join(meson.Tokens(31, SyntaxHighlighting.TypeNumber)), "4", "Meson: the option value");
+        Check(SyntaxHighlighting.GetKeywords(L.Meson).Contains("executable"), "Meson keywords contain 'executable'");
+        Check(SyntaxHighlighting.GetKeywords(L.Meson).Contains("endforeach"), "Meson keywords contain 'endforeach'");
+        Check(SyntaxHighlighting.GetKeywords(L.Meson).Contains("meson"), "Meson keywords contain 'meson'");
+        Equal(Join(CommentStyle.ForLanguage(L.Meson).Toggle(new[] { "project('demo')" })), "# project('demo')", "Meson comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3029,6 +3086,7 @@ internal static class Program
         AlertmanagerChecks();
         MongoDbChecks();
         ElasticsearchChecks();
+        MesonChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

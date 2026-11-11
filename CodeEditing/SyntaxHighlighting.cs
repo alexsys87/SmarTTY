@@ -120,13 +120,14 @@ namespace SmarTTY.CodeEditing
             Prometheus, // prometheus.yml, /etc/prometheus/*.yml: the colors of YAML with the Prometheus settings known
             Alertmanager, // alertmanager.yml, /etc/alertmanager/*.yml: the colors of YAML with the Alertmanager settings known
             MongoDb, // mongod.conf, /etc/mongodb/*.conf: the colors of YAML with the MongoDB settings known
-            Elasticsearch // elasticsearch.yml, /etc/elasticsearch/*.yml: the colors of YAML with the Elasticsearch settings known
+            Elasticsearch, // elasticsearch.yml, /etc/elasticsearch/*.yml: the colors of YAML with the Elasticsearch settings known
+            Meson // meson.build, meson.options: the Meson build language with its functions and # comments
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Json, Language.Config, Language.Toml,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Meson, Language.Json, Language.Config, Language.Toml,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.OpenVpn, Language.Netplan, Language.CloudInit, Language.Prometheus, Language.Alertmanager, Language.MongoDb, Language.Elasticsearch, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -184,6 +185,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Alertmanager: return "Alertmanager";
                 case Language.MongoDb: return "MongoDB";
                 case Language.Elasticsearch: return "Elasticsearch";
+                case Language.Meson: return "Meson";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -585,6 +587,11 @@ namespace SmarTTY.CodeEditing
                 case "gnumakefile":
                 case "bsdmakefile":
                     return Language.Makefile;
+
+                case "meson.build":
+                case "meson.options":
+                case "meson_options.txt":
+                    return Language.Meson;
 
                 case "dockerfile":
                 case "containerfile":
@@ -1212,6 +1219,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Alertmanager: return TokenizeAlertmanager;
                 case Language.MongoDb: return TokenizeMongoDb;
                 case Language.Elasticsearch: return TokenizeElasticsearch;
+                case Language.Meson: return MesonTokenizer;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1384,6 +1392,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(MongoDbKeywords, MongoDbValues);
                 case Language.Elasticsearch:
                     return Combine(ElasticsearchKeywords, ElasticsearchValues);
+                case Language.Meson:
+                    return Combine(MesonKeywords, MesonObjects);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -3120,6 +3130,35 @@ namespace SmarTTY.CodeEditing
             "PRIVATE", "EXISTS", "COMMAND", "TARGET", "POLICY", "VERSION", "STATUS", "FATAL_ERROR", "WARNING"
         };
 
+        private static readonly HashSet<string> MesonKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // The language.
+            "if", "elif", "else", "endif", "foreach", "endforeach", "break", "continue", "and", "or", "not", "in",
+            "true", "false",
+            // The top-level functions.
+            "project", "subproject", "subdir", "subdir_done", "import", "option", "summary", "message", "warning",
+            "error", "debug", "assert", "range", "files", "join_paths", "set_variable", "get_variable", "is_variable",
+            "unset_variable", "get_option", "dependency", "declare_dependency", "disabler", "environment",
+            "find_program", "include_directories", "executable", "library", "shared_library", "static_library",
+            "both_libraries", "shared_module", "build_target", "custom_target", "configure_file", "generator",
+            "run_command", "run_target", "test", "benchmark", "install_data", "install_headers", "install_man",
+            "install_subdir", "install_symlink", "install_emptydir", "add_global_arguments", "add_project_arguments",
+            "add_global_link_arguments", "add_project_link_arguments", "add_test_setup", "alias_target", "vcs_tag",
+            "jar", "structured_sources", "module", "override_dependency", "override_find_program",
+            // The methods of the built-in objects.
+            "found", "full_path", "path", "version", "get", "keys", "length", "contains", "startswith", "endswith",
+            "strip", "split", "join", "to_string", "to_int", "format", "copy", "allowed", "disabled", "is_disabler",
+            "get_id", "compute_int", "cpu_family", "cpu", "system", "endian", "kernel", "subsystem", "get_compiler",
+            "get_linker", "has_function", "has_header", "has_member", "get_supported_arguments",
+            "first_supported_argument", "get_supported_link_arguments", "compiles", "links", "run", "returncode",
+            "stdout", "stderr"
+        };
+
+        private static readonly HashSet<string> MesonObjects = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "meson", "host_machine", "build_machine", "target_machine"
+        };
+
         private static readonly HashSet<string> DockerfileKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "FROM", "RUN", "CMD", "LABEL", "MAINTAINER", "EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME",
@@ -3172,6 +3211,7 @@ namespace SmarTTY.CodeEditing
             public string BlockCommentEnd;
             public HashSet<string> Keywords;
             public HashSet<string> Registers;
+            public HashSet<string> Variables; // built-in objects colored as variables (Meson's meson, host_machine, ...)
             public HashSet<string> PreprocessorWords = PreprocessorDirectives;
 
             private bool IsLineComment(string text, int i)
@@ -3979,6 +4019,12 @@ namespace SmarTTY.CodeEditing
                             sink.AddToken(TypeKeyword, s, i);
                             last = i;
                         }
+                        else if (Variables != null && Variables.Contains(word))
+                        {
+                            Normal(ref last, last, s, sink);
+                            sink.AddToken(TypeVariable, s, i);
+                            last = i;
+                        }
                         continue;
                     }
 
@@ -4190,6 +4236,15 @@ namespace SmarTTY.CodeEditing
             KeywordsAtLineStart = true,
             Brackets = true,
             Keywords = CMakeKeywords
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer MesonTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            Brackets = true,
+            Keywords = MesonKeywords,
+            Variables = MesonObjects
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer DockerfileTokenizer = new GenericSyntax
