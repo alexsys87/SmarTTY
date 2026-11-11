@@ -71,6 +71,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Perl:
                 case SyntaxHighlighting.Language.CMake:
                 case SyntaxHighlighting.Language.Meson:
+                case SyntaxHighlighting.Language.Hcl:
                 case SyntaxHighlighting.Language.Dockerfile:
                     return new CommentStyle("# ");
                 case SyntaxHighlighting.Language.CLike:

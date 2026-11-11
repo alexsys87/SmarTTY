@@ -121,13 +121,14 @@ namespace SmarTTY.CodeEditing
             Alertmanager, // alertmanager.yml, /etc/alertmanager/*.yml: the colors of YAML with the Alertmanager settings known
             MongoDb, // mongod.conf, /etc/mongodb/*.conf: the colors of YAML with the MongoDB settings known
             Elasticsearch, // elasticsearch.yml, /etc/elasticsearch/*.yml: the colors of YAML with the Elasticsearch settings known
-            Meson // meson.build, meson.options: the Meson build language with its functions and # comments
+            Meson, // meson.build, meson.options: the Meson build language with its functions and # comments
+            Hcl // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
         public static readonly Language[] SelectableLanguages =
         {
-            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Meson, Language.Json, Language.Config, Language.Toml,
+            Language.Plain, Language.Bash, Language.Uci, Language.Kconfig, Language.UBoot, Language.Yocto, Language.LinkerScript, Language.Lua, Language.Makefile, Language.Meson, Language.Hcl, Language.Json, Language.Config, Language.Toml,
             Language.Systemd, Language.Nginx, Language.SshConfig, Language.Crontab, Language.Fstab, Language.Sudoers, Language.PostgreSql, Language.MySql, Language.Redis, Language.HAProxy, Language.ApacheHttpd, Language.SystemdNetworkd, Language.Ifupdown, Language.Dnsmasq, Language.Hostapd, Language.Wireguard, Language.Udev, Language.Nftables, Language.Modprobe, Language.Logrotate, Language.Sysctl, Language.Pam, Language.Samba, Language.Postfix, Language.OpenVpn, Language.Netplan, Language.CloudInit, Language.Prometheus, Language.Alertmanager, Language.MongoDb, Language.Elasticsearch, Language.Kubernetes, Language.DockerCompose, Language.Ansible, Language.Log,
             Language.Python, Language.Yaml, Language.CLike, Language.Cpp, Language.CSharp, Language.Java,
             Language.Kotlin, Language.Scala, Language.Groovy, Language.Go, Language.Rust,
@@ -186,6 +187,7 @@ namespace SmarTTY.CodeEditing
                 case Language.MongoDb: return "MongoDB";
                 case Language.Elasticsearch: return "Elasticsearch";
                 case Language.Meson: return "Meson";
+                case Language.Hcl: return "HCL (Terraform, Nomad)";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -807,6 +809,12 @@ namespace SmarTTY.CodeEditing
                 case "toml":
                     return Language.Toml;
 
+                case "tf":
+                case "tfvars":
+                case "hcl":
+                case "nomad":
+                    return Language.Hcl;
+
                 case "network":
                 case "netdev":
                 case "link":
@@ -1220,6 +1228,7 @@ namespace SmarTTY.CodeEditing
                 case Language.MongoDb: return TokenizeMongoDb;
                 case Language.Elasticsearch: return TokenizeElasticsearch;
                 case Language.Meson: return MesonTokenizer;
+                case Language.Hcl: return HclTokenizer;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1394,6 +1403,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(ElasticsearchKeywords, ElasticsearchValues);
                 case Language.Meson:
                     return Combine(MesonKeywords, MesonObjects);
+                case Language.Hcl:
+                    return Combine(HclKeywords, HclVariables);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -2537,6 +2548,12 @@ namespace SmarTTY.CodeEditing
         private const int StPowerShellHereSingle = 0x100;
         private const int StPowerShellDouble = 0x200;
         private const int StPowerShellSingle = 0x400;
+        // HCL here documents: the lines up to the terminator are a string. The state carries a hash of the terminator
+        // word (from bit 13) and whether "<<-" lets the terminator be indented.
+        private const int StHeredoc = 0x800;
+        private const int StHeredocStrip = 0x1000;
+        private const int HeredocHashShift = 13;
+        private const int HeredocHashMask = 0x3FFFF;
 
         /// <summary>The C keywords; the C profile stays separate from the other C-like languages.</summary>
         private static readonly HashSet<string> CKeywords = new HashSet<string>(StringComparer.Ordinal)
@@ -3159,6 +3176,45 @@ namespace SmarTTY.CodeEditing
             "meson", "host_machine", "build_machine", "target_machine"
         };
 
+        private static readonly HashSet<string> HclKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Expressions and type constraints.
+            "for", "in", "if", "true", "false", "null",
+            "string", "number", "bool", "list", "map", "set", "object", "tuple", "any", "optional",
+            // Blocks and meta-arguments of Terraform and Nomad.
+            "terraform", "provider", "resource", "data", "variable", "output", "module", "locals", "moved",
+            "import", "check", "run", "dynamic", "content", "provisioner", "connection", "backend",
+            "required_providers", "required_version", "experiments", "lifecycle", "validation", "assert",
+            "condition", "error_message", "precondition", "postcondition", "ignore_changes",
+            "create_before_destroy", "prevent_destroy", "replace_triggered_by", "timeouts", "for_each",
+            "count", "depends_on", "triggers", "source", "version", "default", "description", "type", "sensitive",
+            "nullable", "ephemeral", "deprecated", "when", "alias",
+            "job", "group", "task", "service", "network", "port", "template", "artifact", "constraint",
+            "affinity", "spread", "update", "migrate", "reschedule", "restart", "vault", "consul", "nomad",
+            "plugin", "volume", "mount", "scaling", "periodic", "parameterized", "dispatch_payload",
+            // The built-in functions.
+            "abs", "ceil", "floor", "log", "max", "min", "parseint", "pow", "signum",
+            "chomp", "format", "formatlist", "indent", "join", "lower", "regex", "regexall", "replace",
+            "split", "strrev", "substr", "title", "trim", "trimprefix", "trimsuffix", "trimspace", "upper",
+            "alltrue", "anytrue", "chunklist", "coalesce", "coalescelist", "compact", "concat", "contains",
+            "distinct", "element", "flatten", "index", "keys", "length", "lookup", "matchkeys", "merge",
+            "one", "range", "reverse", "setintersection", "setproduct", "setsubtract", "setunion", "slice",
+            "sort", "sum", "transpose", "values", "zipmap",
+            "base64decode", "base64encode", "base64gzip", "csvdecode", "jsondecode", "jsonencode",
+            "textdecodebase64", "textencodebase64", "urlencode", "yamldecode", "yamlencode",
+            "abspath", "basename", "dirname", "pathexpand", "file", "fileexists", "fileset", "filebase64",
+            "templatefile", "filemd5", "filesha1", "filesha256", "filesha512", "filebase64sha256",
+            "filebase64sha512", "md5", "sha1", "sha256", "sha512", "bcrypt", "rsadecrypt", "uuid", "uuidv5",
+            "timestamp", "timeadd", "timecmp", "plantimestamp", "formatdate",
+            "cidrhost", "cidrnetmask", "cidrsubnet", "cidrsubnets", "can", "nonsensitive",
+            "tobool", "tolist", "tomap", "tonumber", "toset", "tostring", "try", "issensitive"
+        };
+
+        private static readonly HashSet<string> HclVariables = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "var", "local", "path", "each", "self"
+        };
+
         private static readonly HashSet<string> DockerfileKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "FROM", "RUN", "CMD", "LABEL", "MAINTAINER", "EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME",
@@ -3186,6 +3242,7 @@ namespace SmarTTY.CodeEditing
             public bool HashComments;          // '#' starts a comment at the start of a line or after whitespace
             public bool HashCommentsAnywhere;  // '#' starts a comment even directly after code (Ruby, Perl, CMake)
             public bool HashCommentsAtLineStart; // '#' starts a comment only as the first non-blank character (Assembly)
+            public bool HashHeredocs;          // <<EOF and <<-EOF here documents whose body runs to the terminator line (HCL)
             public bool KeywordsAtLineStart;   // only the first word of a line is a keyword (Dockerfile, CMake)
             public bool SlashComments;         // "//" comments
             public bool DashDashComments;      // "--" comments
@@ -3256,6 +3313,57 @@ namespace SmarTTY.CodeEditing
                         return false;
                     }
                 }
+                return true;
+            }
+
+            /// <summary>A stable hash of a here-document terminator, small enough to live in the line state.</summary>
+            private static int HashHeredoc(string word)
+            {
+                unchecked
+                {
+                    int hash = 17;
+                    foreach (char c in word)
+                    {
+                        hash = hash * 31 + c;
+                    }
+                    return hash & HeredocHashMask;
+                }
+            }
+
+            /// <summary>
+            /// Reads an HCL here-document opener ("&lt;&lt;EOF", "&lt;&lt;-EOF") at <paramref name="start"/>.
+            /// <paramref name="end"/> is the index after the marker; only blanks and a line comment may follow it.
+            /// </summary>
+            private static bool TryParseHeredoc(string text, int start, out int end, out int state)
+            {
+                end = start + 2;
+                state = 0;
+                int j = start + 2;
+                bool strip = false;
+                if (j < text.Length && text[j] == '-')
+                {
+                    strip = true;
+                    j++;
+                }
+                if (j >= text.Length || !IsIdStart(text[j]))
+                {
+                    return false;
+                }
+                int wordStart = j;
+                while (j < text.Length && (IsIdChar(text[j]) || text[j] == '-'))
+                {
+                    j++;
+                }
+                string word = text.Substring(wordStart, j - wordStart);
+                int rest = SkipBlanks(text, j);
+                bool onlyComment = rest == text.Length || text[rest] == '#' ||
+                    (rest + 1 < text.Length && text[rest] == '/' && text[rest + 1] == '/');
+                if (!onlyComment)
+                {
+                    return false;
+                }
+                end = j;
+                state = StHeredoc | (strip ? StHeredocStrip : 0) | (HashHeredoc(word) << HeredocHashShift);
                 return true;
             }
 
@@ -3489,7 +3597,27 @@ namespace SmarTTY.CodeEditing
                 int len = text.Length;
                 int i = 0;
                 int last = 0;
+                int pendingHeredoc = 0;
                 bool inTag = MarkupTags && (startState & StInTag) != 0;
+
+                if (HashHeredocs && (startState & StHeredoc) != 0)
+                {
+                    // The terminator may be indented with "<<-"; trailing blanks are always allowed.
+                    string body = ((startState & StHeredocStrip) != 0) ? text.TrimStart() : text;
+                    body = body.TrimEnd();
+                    if (body.Length > 0 && HashHeredoc(body) == (startState >> HeredocHashShift))
+                    {
+                        sink.AddToken(TypeKeyword, 0, len);
+                        endState = 0;
+                        return true;
+                    }
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = startState;
+                    return true;
+                }
 
                 if (PowerShellSyntax)
                 {
@@ -3624,8 +3752,21 @@ namespace SmarTTY.CodeEditing
                     {
                         Normal(ref last, last, i, sink);
                         sink.AddToken(TypeComment, i, len);
-                        endState = 0;
+                        endState = pendingHeredoc;
                         return true;
+                    }
+
+                    // HCL here documents: "<<EOF" and "<<-EOF". The lines that follow are text up to the terminator.
+                    if (HashHeredocs && c == '<' && i + 1 < len && text[i + 1] == '<')
+                    {
+                        if (TryParseHeredoc(text, i, out int openerEnd, out int heredocState))
+                        {
+                            pendingHeredoc = heredocState;
+                            i = openerEnd;
+                            continue;
+                        }
+                        i += 2;
+                        continue;
                     }
 
                     // Verilog compiler directives: `timescale, `define, `include, `ifdef, ...
@@ -4038,7 +4179,7 @@ namespace SmarTTY.CodeEditing
                 }
 
                 Normal(ref last, last, len, sink);
-                endState = inTag ? StInTag : 0;
+                endState = pendingHeredoc != 0 ? pendingHeredoc : (inTag ? StInTag : 0);
                 return true;
             }
         }
@@ -4245,6 +4386,21 @@ namespace SmarTTY.CodeEditing
             Brackets = true,
             Keywords = MesonKeywords,
             Variables = MesonObjects
+        }.Tokenize;
+
+        private static readonly TokenCache.LineTokenizer HclTokenizer = new GenericSyntax
+        {
+            HashComments = true,
+            HashCommentsAnywhere = true,
+            SlashComments = true,
+            BlockCommentStart = "/*",
+            BlockCommentEnd = "*/",
+            SingleQuoteStrings = false,
+            Brackets = true,
+            FoldCurlyBraces = true,
+            HashHeredocs = true,
+            Keywords = HclKeywords,
+            Variables = HclVariables
         }.Tokenize;
 
         private static readonly TokenCache.LineTokenizer DockerfileTokenizer = new GenericSyntax
