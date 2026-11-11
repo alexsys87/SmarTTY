@@ -2721,6 +2721,54 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Fish).Toggle(new[] { "echo hi" })), "# echo hi", "Fish comment");
     }
 
+    private static void BatchChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/build.bat"), L.Batch, ".bat is Batch");
+        Equal(SyntaxHighlighting.DetectLanguage("C:\\tools\\deploy.cmd"), L.Batch, ".cmd is Batch");
+        Equal(SyntaxHighlighting.DetectLanguage("C:\\tools\\deploy.BAT"), L.Batch, ".BAT is Batch");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/build.bat.bak"), L.Plain, "a backup of a .bat file is plain");
+
+        Highlighted batch = new Highlighted(L.Batch,
+            "@echo off\n" +
+            "REM Build the project\n" +
+            ":: old-style comment\n" +
+            "set \"APP=MyApp\"\n" +
+            "set COUNT=3\n" +
+            "if not defined DEBUG (\n" +
+            "    echo Building %APP% %1\n" +
+            ")\n" +
+            "goto :build\n" +
+            ":build\n" +
+            "for %%i in (*.c) do echo %%~ni\n" +
+            "echo !COUNT! %~dp0\n");
+        Equal(Join(batch.Tokens(0, SyntaxHighlighting.TypeKeyword)), "echo|off", "Batch: @echo off");
+        Equal(Join(batch.Tokens(1, SyntaxHighlighting.TypeComment)), "REM Build the project", "Batch: a REM comment");
+        Equal(Join(batch.Tokens(2, SyntaxHighlighting.TypeComment)), ":: old-style comment", "Batch: a :: comment");
+        Equal(Join(batch.Tokens(3, SyntaxHighlighting.TypeKeyword)), "set", "Batch: set");
+        Equal(Join(batch.Tokens(3, SyntaxHighlighting.TypeString)), "\"APP=MyApp\"", "Batch: a quoted assignment");
+        Equal(Join(batch.Tokens(4, SyntaxHighlighting.TypeNumber)), "3", "Batch: a number");
+        Equal(Join(batch.Tokens(5, SyntaxHighlighting.TypeKeyword)), "if|not|defined", "Batch: if not defined");
+        Equal(Join(batch.Tokens(6, SyntaxHighlighting.TypeKeyword)), "echo", "Batch: echo");
+        Equal(Join(batch.Tokens(6, SyntaxHighlighting.TypeVariable)), "%APP%|%1", "Batch: %NAME% and %1");
+        Equal(Join(batch.Tokens(8, SyntaxHighlighting.TypeKeyword)), "goto", "Batch: goto");
+        Equal(Join(batch.Tokens(8, SyntaxHighlighting.TypeSection)), ":build", "Batch: a goto target");
+        Equal(Join(batch.Tokens(9, SyntaxHighlighting.TypeSection)), ":build", "Batch: a label");
+        Equal(Join(batch.Tokens(10, SyntaxHighlighting.TypeKeyword)), "for|in|do|echo", "Batch: for ... in ... do");
+        Equal(Join(batch.Tokens(10, SyntaxHighlighting.TypeVariable)), "%%i|%%~ni", "Batch: loop variables");
+        Equal(Join(batch.Tokens(11, SyntaxHighlighting.TypeVariable)), "!COUNT!|%~dp0", "Batch: delayed expansion and the script directory");
+        Check(Folds(batch).Length == 0, "Batch does not fold");
+
+        Highlighted words = new Highlighted(L.Batch, "echo REM hello\n");
+        Equal(Join(words.Tokens(0, SyntaxHighlighting.TypeKeyword)), "echo", "Batch: REM after echo is an argument");
+        Equal(Join(words.Tokens(0, SyntaxHighlighting.TypeComment)), "", "Batch: REM after echo is not a comment");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Batch).Contains("echo"), "Batch keywords contain 'echo'");
+        Check(SyntaxHighlighting.GetKeywords(L.Batch).Contains("setlocal"), "Batch keywords contain 'setlocal'");
+        Highlighted upper = new Highlighted(L.Batch, "ECHO OFF\n");
+        Equal(Join(upper.Tokens(0, SyntaxHighlighting.TypeKeyword)), "ECHO|OFF", "Batch keywords are case-insensitive");
+        Equal(Join(CommentStyle.ForLanguage(L.Batch).Toggle(new[] { "echo hi" })), "REM echo hi", "Batch comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3446,6 +3494,7 @@ internal static class Program
         StarlarkChecks();
         NixChecks();
         FishChecks();
+        BatchChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
