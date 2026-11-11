@@ -406,11 +406,21 @@ public static class MtdRestoreJob
         }
         finally
         {
-            phase?.Invoke(MtdRestoreStep.CleaningUp, "Removing the image from RAM...");
-            RemoteCommandResult remove = shell.Run(MtdFlash.BuildRemoveCommand(ramPath, useSudo));
-            if (!remove.Succeeded)
+            // An exception out of this cleanup (the connection just dropped, which is exactly how a write can fail
+            // half way) would replace whatever the try block above is throwing - the one warning the user needs to
+            // see, not to restart the device before the partition is written successfully. Best effort only.
+            try
             {
-                log?.Invoke("Could not remove " + ramPath + ": " + remove.Describe());
+                phase?.Invoke(MtdRestoreStep.CleaningUp, "Removing the image from RAM...");
+                RemoteCommandResult remove = shell.Run(MtdFlash.BuildRemoveCommand(ramPath, useSudo));
+                if (!remove.Succeeded)
+                {
+                    log?.Invoke("Could not remove " + ramPath + ": " + remove.Describe());
+                }
+            }
+            catch (Exception exception)
+            {
+                log?.Invoke("Could not remove " + ramPath + ": " + exception.Message);
             }
         }
     }

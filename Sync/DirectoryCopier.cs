@@ -293,6 +293,11 @@ public class DirectoryCopier
                     shellChannel.Output.ReadFully = true;
                     TarExtractor tarExtractor = new TarExtractor(shellChannel.Output, localPath);
                     tarExtractor.PreserveTimestamps = preserveTimestamps;
+                    if (TarOverwrite != null)
+                    {
+                        tarExtractor.FileOverwriting += TarOverwrite;
+                    }
+                    tarExtractor.Log += this.Log;
                     tarExtractor.Progress = OnTarListProgress;
                     tarExtractor.ExtractAll(ignoreErrors: true, stripFirstDirectory: false);
                     tarExtractor.CreateSymlinks(out symlinkList, remotePath);

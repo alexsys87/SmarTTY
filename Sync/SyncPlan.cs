@@ -454,6 +454,10 @@ internal class SyncPlan
                 }
                 else if (isIncluded)
                 {
+                    if (findData.FileName.EndsWith(QuickSyncRunner.PartialFileSuffix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
                     ISyncCustomization customization = _customization;
                     if ((customization == null || !customization.IsFileIgnored(localPath, findData.FileName)) && IsIncluded(findData.FileName, _settings.FileFilters))
                     {

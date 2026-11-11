@@ -229,9 +229,19 @@ public class TarExtractor
         return false;
     }
 
+    // Windows reserves these names for devices, in any case and whatever extension follows ("aux.c" is still the parallel
+    // port): a file of that name on Linux cannot be created here under its own name.
+    private static readonly HashSet<string> ReservedDeviceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
     /// <summary>
     /// True for a name that exists on Linux but cannot be created on Windows as it is. A ':' would open an NTFS alternate
-    /// data stream or a drive-relative path, a segment made of dots and blanks is normalized away by Windows.
+    /// data stream or a drive-relative path, a segment made of dots and blanks is normalized away by Windows, and CON,
+    /// AUX, COM1 and the other reserved device names are taken whatever follows the first dot.
     /// </summary>
     internal static bool HasInvalidLocalNameCharacters(string entryName)
     {
@@ -242,6 +252,11 @@ public class TarExtractor
                 continue;
             }
             if (segment.TrimEnd('.', ' ').Length == 0)
+            {
+                return true;
+            }
+            int dot = segment.IndexOf('.');
+            if (ReservedDeviceNames.Contains(dot < 0 ? segment : segment.Substring(0, dot)))
             {
                 return true;
             }
@@ -357,6 +372,10 @@ public class TarExtractor
         char lastChar = entryName[entryName.Length - 1];
         bool isDirectory = lastChar == '/' || lastChar == '\\' || typeFlag == 53;
         bool isLink = typeFlag == 49 || typeFlag == 50;
+        // Character device '3', block device '4', FIFO '6': there is nothing on Windows to create them as, and they are not
+        // regular data either, so creating a same-named empty file (what falling through to the regular-file case used to
+        // do) would only litter the download with placeholders that look like empty files but are not.
+        bool isSpecial = typeFlag == 51 || typeFlag == 52 || typeFlag == 54;
         if (longName == null && paxPath == null && headerBuffer[257] == 117 && headerBuffer[258] == 115 && headerBuffer[259] == 116 && headerBuffer[260] == 97 && headerBuffer[261] == 114 && headerBuffer[262] == 0 && headerBuffer[345] != 0)
         {
             string prefix = utf8.GetString(headerBuffer, 345, 155).TrimEnd(default(char));
@@ -493,6 +512,19 @@ public class TarExtractor
                     {
                     }
                 }
+            }
+        }
+        else if (isSpecial)
+        {
+            if (fullPath != null)
+            {
+                Log?.Invoke(this, "Skipped " + fullPath + ": a device or a named pipe cannot be created here as a file");
+            }
+            CopyEntryBody(_stream, null, (long)entrySize);
+            int specialPadLen = 512 - (int)(entrySize % 512);
+            if (specialPadLen != 512)
+            {
+                _stream.Read(headerBuffer, 0, specialPadLen);
             }
         }
         else
