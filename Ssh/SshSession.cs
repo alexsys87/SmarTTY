@@ -418,6 +418,20 @@ public class SshSession : IDisposable
     /// </summary>
     public static bool IsProxyAuthenticationFailure(Exception exception)
     {
+        // ProxyRelay (the SOCKS4 and HTTPS proxies that SSH.NET does not offer) tags its own exceptions explicitly:
+        // ProxyAuthenticationRequiredException for a real 407 or SOCKS4 0x5D, ProxyRelayException for everything
+        // else it throws. Guessing from the text of either would misread a TLS failure whose message happens to
+        // contain "authentication failed" (.NET's own wording for a closed TLS stream) or a host name or port that
+        // happens to contain "407" as a request for credentials. Only SSH.NET's own proxy code (SOCKS5, its built-in
+        // HTTP proxy), whose wording this does not control, is read by substring.
+        if (exception is ProxyAuthenticationRequiredException)
+        {
+            return true;
+        }
+        if (exception is ProxyRelayException)
+        {
+            return false;
+        }
         if (!(exception is ProxyException))
         {
             return false;

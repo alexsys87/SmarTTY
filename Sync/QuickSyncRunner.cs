@@ -599,8 +599,13 @@ public class QuickSyncRunner
         return targetPath.FullPath;
     }
 
-    /// <summary>The end of the name of a file that is being received; it replaces the real one when it is whole.</summary>
-    private const string PartialFileSuffix = ".smartty-part";
+    /// <summary>
+    /// The end of the name of a file that is being received; it replaces the real one when it is whole. Also skipped
+    /// by UploadPlanner.ListDirectory, so a download of this same folder that was killed outright (power loss, the
+    /// process ended) and left one of these behind does not upload it back to the server as if it were a real file
+    /// the next time this folder is synced the other way.
+    /// </summary>
+    internal const string PartialFileSuffix = ".smartty-part";
 
     private void ExecuteLocalActions(LocalPath localPath, SyncPlan syncPlan, IRemoteFileSource remoteFileSource, ISyncEvents syncEvents, ref TransferStatistics transferStatistics, Func<bool> isConnectionClosed = null)
     {

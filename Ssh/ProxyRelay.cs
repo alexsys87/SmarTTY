@@ -11,10 +11,40 @@ using System.Threading;
 namespace SmarTTY.Ssh;
 
 /// <summary>
+/// Any failure of the proxy handshake that <see cref="ProxyRelay"/> itself detects (not SSH.NET's own SOCKS5 or HTTP
+/// proxy code): its message is free text meant for the user, not a signal to search for a word or a number in. See
+/// <see cref="SshSession.IsProxyAuthenticationFailure"/>, which must never guess from it.
+/// </summary>
+internal class ProxyRelayException : ProxyException
+{
+    public ProxyRelayException(string message) : base(message)
+    {
+    }
+
+    public ProxyRelayException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>
+/// The proxy refused the connection for missing or wrong credentials, specifically (an HTTP CONNECT status of 407, or a
+/// SOCKS4 reply code 0x5D): <see cref="SshSession.IsProxyAuthenticationFailure"/> always recognizes this one, whatever
+/// its message says, unlike a plain <see cref="ProxyRelayException"/> that merely mentions a status code or a host name
+/// that happens to look like one.
+/// </summary>
+internal sealed class ProxyAuthenticationRequiredException : ProxyRelayException
+{
+    public ProxyAuthenticationRequiredException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// The proxies SSH.NET does not offer (SOCKS4/4a and HTTPS): SmarTTY opens the connection through the proxy itself and
 /// hands it to SSH.NET through a loopback socket that accepts a single connection, relaying the data in both directions.
 /// <see cref="Open"/> runs the proxy handshake before SSH.NET connects, so a refusal of the proxy is reported as a
-/// <see cref="ProxyException"/> (a 407 answer makes SmarTTY ask for the proxy credentials, as with the built-in proxies).
+/// <see cref="ProxyRelayException"/> (<see cref="ProxyAuthenticationRequiredException"/> for a 407 or a SOCKS4  0x5D,
+/// which makes SmarTTY ask for the proxy credentials, as with the built-in proxies).
 /// </summary>
 internal sealed class ProxyRelay : IDisposable
 {
@@ -65,7 +95,7 @@ internal sealed class ProxyRelay : IDisposable
             }
             catch (System.Security.Authentication.AuthenticationException exception)
             {
-                throw new ProxyException("HTTPS: The TLS connection to the proxy failed: " + exception.Message, exception);
+                throw new ProxyRelayException("HTTPS: The TLS connection to the proxy failed: " + exception.Message, exception);
             }
             HttpConnect(tls);
         }
@@ -146,12 +176,16 @@ internal sealed class ProxyRelay : IDisposable
         string[] parts = statusLine.Split(new[] { ' ' }, 3);
         if (parts.Length < 2 || !parts[0].StartsWith("HTTP/", StringComparison.Ordinal) || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int status))
         {
-            throw new ProxyException("HTTPS: The proxy did not answer with HTTP (\"" + statusLine + "\").");
+            throw new ProxyRelayException("HTTPS: The proxy did not answer with HTTP (\"" + statusLine + "\").");
         }
         if (status < 200 || status > 299)
         {
-            // The same wording as the HTTP proxy of SSH.NET, which SshSession.IsProxyAuthenticationFailure recognizes for 407.
-            throw new ProxyException("HTTPS: Status code " + status + ", \"" + (parts.Length > 2 ? parts[2] : "") + "\"");
+            string detail = "HTTPS: Status code " + status + ", \"" + (parts.Length > 2 ? parts[2] : "") + "\"";
+            if (status == 407)
+            {
+                throw new ProxyAuthenticationRequiredException(detail);
+            }
+            throw new ProxyRelayException(detail);
         }
     }
 
@@ -168,11 +202,11 @@ internal sealed class ProxyRelay : IDisposable
             int value = stream.ReadByte();
             if (value < 0)
             {
-                throw new ProxyException("HTTPS: The proxy closed the connection without an answer.");
+                throw new ProxyRelayException("HTTPS: The proxy closed the connection without an answer.");
             }
             if (headers.Length >= MaxResponseHeaderBytes)
             {
-                throw new ProxyException("HTTPS: The answer of the proxy is too long.");
+                throw new ProxyRelayException("HTTPS: The answer of the proxy is too long.");
             }
             headers.Append((char)value);
             int length = headers.Length;
@@ -197,7 +231,7 @@ internal sealed class ProxyRelay : IDisposable
         {
             if (ip.AddressFamily != AddressFamily.InterNetwork)
             {
-                throw new ProxyException("SOCKS4: The proxy cannot connect to the IPv6 address " + _parameters.Host + "; use SOCKS5.");
+                throw new ProxyRelayException("SOCKS4: The proxy cannot connect to the IPv6 address " + _parameters.Host + "; use SOCKS5.");
             }
             address = ip.GetAddressBytes();
         }
@@ -215,7 +249,7 @@ internal sealed class ProxyRelay : IDisposable
         byte[] userId = Encoding.UTF8.GetBytes(_parameters.ProxyUserName ?? "");
         if (userId.Length > 255)
         {
-            throw new ProxyException("SOCKS4: The proxy user name is longer than 255 bytes.");
+            throw new ProxyRelayException("SOCKS4: The proxy user name is longer than 255 bytes.");
         }
         request.Write(userId, 0, userId.Length);
         request.WriteByte(0);
@@ -224,7 +258,7 @@ internal sealed class ProxyRelay : IDisposable
             byte[] name = Encoding.ASCII.GetBytes(hostName);
             if (name.Length > 255)
             {
-                throw new ProxyException("SOCKS4: The host name is longer than 255 bytes; use an IP address or a SOCKS5 proxy.");
+                throw new ProxyRelayException("SOCKS4: The host name is longer than 255 bytes; use an IP address or a SOCKS5 proxy.");
             }
             request.Write(name, 0, name.Length);
             request.WriteByte(0);
@@ -240,7 +274,7 @@ internal sealed class ProxyRelay : IDisposable
             int read = stream.Read(answer, offset, answer.Length - offset);
             if (read == 0)
             {
-                throw new ProxyException("SOCKS4: The proxy closed the connection without an answer.");
+                throw new ProxyRelayException("SOCKS4: The proxy closed the connection without an answer.");
             }
             offset += read;
         }
@@ -249,13 +283,13 @@ internal sealed class ProxyRelay : IDisposable
             case 0x5A:
                 return;
             case 0x5B:
-                throw new ProxyException("SOCKS4: The proxy rejected the connection to " + _parameters.Host + ":" + _parameters.Port + ".");
+                throw new ProxyRelayException("SOCKS4: The proxy rejected the connection to " + _parameters.Host + ":" + _parameters.Port + ".");
             case 0x5C:
-                throw new ProxyException("SOCKS4: The proxy could not reach identd on this computer to check the user ID.");
+                throw new ProxyRelayException("SOCKS4: The proxy could not reach identd on this computer to check the user ID.");
             case 0x5D:
-                throw new ProxyException("SOCKS4: The proxy did not accept the user ID (authentication failed).");
+                throw new ProxyAuthenticationRequiredException("SOCKS4: The proxy did not accept the user ID (authentication failed).");
             default:
-                throw new ProxyException("SOCKS4: Not a valid answer of a SOCKS4 proxy.");
+                throw new ProxyRelayException("SOCKS4: Not a valid answer of a SOCKS4 proxy.");
         }
     }
 

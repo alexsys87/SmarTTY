@@ -715,7 +715,19 @@ public static class MtdFlash
                 return null;
             }
             tool = "flash_erase + nandwrite";
-            script = "flash_erase " + device + " 0 0 && nandwrite -p " + device + " " + image;
+            if (partition.EraseSize > 0)
+            {
+                // "flash_erase device 0 0" erases to the end of the device, not just what the image needs: a smaller
+                // image then leaves the rest of the partition as 0xFF instead of the untouched data CheckRestore's
+                // warning promises. Erase only as many blocks as the image (read back from the upload, not trusted
+                // from the caller) actually fills, rounded up to a whole erase block, like mtd write and flashcp do.
+                string blocks = "$(( ($(wc -c < " + image + ") + " + partition.EraseSize.ToString(CultureInfo.InvariantCulture) + " - 1) / " + partition.EraseSize.ToString(CultureInfo.InvariantCulture) + " ))";
+                script = "flash_erase " + device + " 0 " + blocks + " && nandwrite -p " + device + " " + image;
+            }
+            else
+            {
+                script = "flash_erase " + device + " 0 0 && nandwrite -p " + device + " " + image;
+            }
         }
         else
         {

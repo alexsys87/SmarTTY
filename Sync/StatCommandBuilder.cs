@@ -79,19 +79,39 @@ public class StatCommandBuilder
     {
         string symlinkFlag = (followSymlinks ? "L" : "");
         string findSymlinkFlag = (followSymlinks ? "-L" : "");
+        // "VAR=value cd ..." sets the variable for that one command only (plain shell semantics): "ls"/"find", "xargs"
+        // and "stat" after the "&&" still run in whatever locale the exec channel started in, often C/POSIX on a
+        // minimal image or a container with no LANG passed to sshd, which makes GNU stat print a non-ASCII name escaped
+        // byte by byte instead of as UTF-8 (TryReadQuotedWord cannot put such a run of bytes back together, since each
+        // one arrives as its own already-decoded character). "export" instead makes it a shell variable that stays set
+        // for the rest of this one command string, and C.UTF-8 (unlike "en_US", which is a locale name with no
+        // encoding and may not even be installed) is the UTF-8 locale glibc ships built in, so it needs no locale-gen.
+        string setLocale = "export LC_ALL=C.UTF-8 2>/dev/null; ";
+        // "cd" only needs to enter the directory (the "x" permission); listing it needs "r" as well, and a directory
+        // that has one without the other (0711, common for a parent kept walkable but not browsable) lets "cd" and
+        // this whole pipeline succeed while "ls"/"find" write "Permission denied" to stderr and nothing to stdout.
+        // "xargs" then still runs its command once on the plain "." argument appended after the (empty) input, which
+        // succeeds and makes the pipe's exit status 0 - the caller's "|| echo ListFailedMarker" never fires, and a
+        // folder that could not be read looks like one that is simply empty. Checking "-r" before the pipe runs makes
+        // the whole "&&" chain fail instead, so the caller is told the listing could not be trusted.
+        string prefix = setLocale + "cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && [ -r . ] && ";
         if (this.Flavor == StatFlavor.Bsd)
         {
-            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" .";
+            // "--" before the names "ls" printed (and the trailing "."): a plain file called "-v" or "--help" would
+            // otherwise be read by stat as one of its own options instead of a name.
+            return prefix + "ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "f \"StatEntryB:|%N|%Dm|%d|%z|%Xp|%Y\" -- .";
         }
         if (this.Flavor == StatFlavor.GnuFindNullSeparated)
         {
-            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && find . " + findSymlinkFlag + " -maxdepth 1 -print0 | xargs -0 stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return prefix + "find . " + findSymlinkFlag + " -maxdepth 1 -print0 | xargs -0 stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
         if (this.Flavor == StatFlavor.GnuFindNewlineSeparated)
         {
-            return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && find . " + findSymlinkFlag + " -maxdepth 1 -print | xargs stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
+            return prefix + "find . " + findSymlinkFlag + " -maxdepth 1 -print | xargs stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\"";
         }
-        return "LANG=en_US cd " + SmarTTY.IO.RemotePathUtils.ShellQuote(dirPath) + " && ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" .";
+        // Same "--" as the BSD case, for the same reason: "ls" (unlike "find .", whose names already start with "./")
+        // prints a plain file called "-v" as just "-v", which stat would otherwise try to read as an option.
+        return prefix + "ls -1A" + symlinkFlag + " | xargs -d \"\\n\" stat -" + symlinkFlag + "c \"StatEntryL:|%N|%Y|%d|%s|%f\" -- .";
     }
 
     public string GetStatCommand(string path, bool followSymlinks)

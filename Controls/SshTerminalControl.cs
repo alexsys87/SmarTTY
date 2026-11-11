@@ -5,6 +5,7 @@ using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -2127,8 +2128,15 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         }
     }
 
+    // A single pass of DrainUiQueue stops after this long and lets the window's message loop run again (repaint,
+    // a typed Ctrl+C, a click) before coming back for what is still queued: a host that writes output faster than
+    // the terminal can draw it (yes, cat of a huge file, a noisy dmesg -w) would otherwise keep this method running
+    // without ever returning to the message loop, freezing the window for as long as the output keeps coming.
+    private static readonly TimeSpan DrainBudget = TimeSpan.FromMilliseconds(25);
+
     private void DrainUiQueue()
     {
+        Stopwatch stopwatch = Stopwatch.StartNew();
         while (true)
         {
             Action action;
@@ -2136,21 +2144,49 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             {
                 if (_uiQueue.Count == 0)
                 {
-                    break;
+                    return;
                 }
                 action = _uiQueue.Dequeue();
             }
-            if (IsDisposed)
+            if (!IsDisposed)
             {
-                continue;
+                try
+                {
+                    action();
+                }
+                catch
+                {
+                }
             }
-            try
+            if (stopwatch.Elapsed >= DrainBudget)
             {
-                action();
+                break;
             }
-            catch
+        }
+        bool hasMore;
+        lock (_uiQueue)
+        {
+            hasMore = _uiQueue.Count != 0;
+        }
+        if (!hasMore)
+        {
+            return;
+        }
+        try
+        {
+            if (!IsDisposed && IsHandleCreated)
             {
+                BeginInvoke(new Action(DrainUiQueue));
+                return;
             }
+        }
+        catch (InvalidOperationException)
+        {
+            // The tab is being closed: late output of its command has nowhere to go.
+        }
+        lock (_uiQueue)
+        {
+            _uiQueue.Clear();
         }
     }
 
