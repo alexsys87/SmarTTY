@@ -126,7 +126,8 @@ namespace SmarTTY.CodeEditing
             Markdown, // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
             Starlark, // .bzl, BUILD, WORKSPACE: the Bazel/Starlark build language, Python-like with # comments
             Nix, // .nix: the Nix expression language with indented strings, paths and { } attrsets
-            Fish // .fish: the fish shell with $variables and if/for/function ... end blocks
+            Fish, // .fish: the fish shell with $variables and if/for/function ... end blocks
+            Batch // .bat, .cmd: Windows batch files with %variables%, labels and REM comments
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -140,7 +141,7 @@ namespace SmarTTY.CodeEditing
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
-            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Nix, Language.Fish, Language.Diff
+            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Nix, Language.Fish, Language.Batch, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -196,6 +197,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Starlark: return "Starlark (Bazel)";
                 case Language.Nix: return "Nix";
                 case Language.Fish: return "Fish";
+                case Language.Batch: return "Batch (cmd)";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -811,6 +813,10 @@ namespace SmarTTY.CodeEditing
                 case "fish":
                     return Language.Fish;
 
+                case "bat":
+                case "cmd":
+                    return Language.Batch;
+
                 case "ini":
                 case "conf":
                 case "cfg":
@@ -1275,6 +1281,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Starlark: return TokenizeStarlark;
                 case Language.Nix: return TokenizeNix;
                 case Language.Fish: return TokenizeFish;
+                case Language.Batch: return TokenizeBatch;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1457,6 +1464,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(NixKeywords, NixVariables);
                 case Language.Fish:
                     return Combine(FishKeywords);
+                case Language.Batch:
+                    return Combine(BatchKeywords);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -2888,6 +2897,229 @@ namespace SmarTTY.CodeEditing
 
             Normal(ref last, last, Math.Min(i, len), sink);
             endState = pendingHeredoc;
+            return true;
+        }
+
+        // ==================================================================
+        // Batch (Windows cmd)
+        // ==================================================================
+
+        private static readonly HashSet<string> BatchKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Flow control and block syntax.
+            "if", "else", "for", "in", "do", "goto", "call", "exit", "set", "setlocal", "endlocal",
+            "shift", "not", "exist", "defined", "errorlevel", "equ", "neq", "lss", "leq", "gtr", "geq",
+            "off", "on", "enabledelayedexpansion", "disabledelayedexpansion",
+            // Commands and builtins.
+            "echo", "pause", "title", "color", "cls", "ver", "vol", "date", "time", "path", "prompt",
+            "break", "verify", "start", "cmd", "cd", "chdir", "pushd", "popd", "dir", "md", "mkdir",
+            "rd", "rmdir", "del", "erase", "copy", "move", "ren", "rename", "type", "more", "sort",
+            "find", "findstr", "attrib", "xcopy", "robocopy", "fc", "comp", "where", "whoami",
+            "choice", "timeout", "ping", "ipconfig", "net", "netstat", "nslookup", "tracert", "route",
+            "arp", "getmac", "sc", "reg", "tasklist", "taskkill", "wmic", "powershell", "schtasks",
+            "shutdown", "systeminfo", "driverquery", "diskpart", "format", "label", "mode", "assoc",
+            "ftype", "openfiles", "explorer", "notepad", "regedit", "msiexec", "curl", "wget"
+        };
+
+        /// <summary>Characters after which a command or a keyword starts in a batch file.</summary>
+        private static bool IsBatchWordBreak(char c)
+        {
+            return c == ' ' || c == '\t' || c == '&' || c == '|' || c == '(' || c == ')' ||
+                c == ';' || c == '=' || c == ',' || c == '@' || c == ':';
+        }
+
+        /// <summary>True when the word at <paramref name="index"/> starts a command (REM is a comment only there).</summary>
+        private static bool IsBatchCommandStart(string text, int index)
+        {
+            int i = index - 1;
+            while (i >= 0 && IsBlank(text[i]))
+            {
+                i--;
+            }
+            return i < 0 || text[i] == '&' || text[i] == '|' || text[i] == '(' || text[i] == ')' || text[i] == '@';
+        }
+
+        private static bool TokenizeBatch(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            int last = 0;
+            endState = 0;
+            int firstNonBlank = SkipBlanks(text, 0);
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                // ^ escapes the next character; at the end of a line it joins the next one.
+                if (c == '^')
+                {
+                    i += 2;
+                    continue;
+                }
+
+                // :: is a comment only at the start of a line.
+                if (c == ':' && i == firstNonBlank && i + 1 < len && text[i + 1] == ':')
+                {
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeComment, i, len);
+                    return true;
+                }
+
+                // Labels: the :name of a label line and the target of goto.
+                if (c == ':' && i + 1 < len && IsIdStart(text[i + 1]) &&
+                    (i == 0 || IsBatchWordBreak(text[i - 1])))
+                {
+                    int s = i;
+                    i++;
+                    while (i < len && (IsIdChar(text[i]) || text[i] == '-' || text[i] == '.'))
+                    {
+                        i++;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeSection, s, i);
+                    last = i;
+                    continue;
+                }
+
+                // "..." strings: the quotes do not continue over lines.
+                if (c == '"')
+                {
+                    int close = text.IndexOf('"', i + 1);
+                    Normal(ref last, last, i, sink);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, close + 1);
+                    i = close + 1;
+                    last = i;
+                    continue;
+                }
+
+                // Variables: %NAME%, %1, %*, %~dp0 and the %%i of a for loop.
+                if (c == '%' && i + 1 < len)
+                {
+                    int e = -1;
+                    char n = text[i + 1];
+                    if (n == '%')
+                    {
+                        e = i + 2;
+                        if (e < len && text[e] == '~')
+                        {
+                            e++;
+                            while (e < len && (char.IsLetter(text[e]) || IsDigit(text[e]) || text[e] == '*' || text[e] == '$'))
+                            {
+                                e++;
+                            }
+                        }
+                        else
+                        {
+                            while (e < len && IsIdChar(text[e]))
+                            {
+                                e++;
+                            }
+                        }
+                    }
+                    else if (n == '~')
+                    {
+                        e = i + 2;
+                        while (e < len && (char.IsLetter(text[e]) || IsDigit(text[e]) || text[e] == '*' || text[e] == '$'))
+                        {
+                            e++;
+                        }
+                    }
+                    else if (IsIdStart(n))
+                    {
+                        int close = text.IndexOf('%', i + 2);
+                        if (close > 0)
+                        {
+                            e = close + 1;
+                        }
+                    }
+                    else if (IsDigit(n) || n == '*')
+                    {
+                        e = i + 2;
+                    }
+                    if (e > i + 1)
+                    {
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeVariable, i, e);
+                        i = e;
+                        last = i;
+                        continue;
+                    }
+                }
+
+                // !NAME! delayed expansion.
+                if (c == '!' && i + 1 < len && IsIdStart(text[i + 1]))
+                {
+                    int close = text.IndexOf('!', i + 2);
+                    if (close > 0)
+                    {
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeVariable, i, close + 1);
+                        i = close + 1;
+                        last = i;
+                        continue;
+                    }
+                }
+
+                if (IsDigit(c))
+                {
+                    int s = i;
+                    while (i < len && IsDigit(text[i]))
+                    {
+                        i++;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                    continue;
+                }
+
+                // Words: REM comments and the keywords/commands.
+                if (IsIdStart(c))
+                {
+                    int s = i;
+                    i++;
+                    while (i < len && IsIdChar(text[i]))
+                    {
+                        i++;
+                    }
+                    bool startsWord = s == 0 || IsBatchWordBreak(text[s - 1]);
+                    if (!startsWord)
+                    {
+                        continue;
+                    }
+                    string word = text.Substring(s, i - s);
+                    if (word.Equals("rem", StringComparison.OrdinalIgnoreCase) && IsBatchCommandStart(text, s))
+                    {
+                        Normal(ref last, last, s, sink);
+                        sink.AddToken(TypeComment, s, len);
+                        return true;
+                    }
+                    if (BatchKeywords.Contains(word))
+                    {
+                        Normal(ref last, last, s, sink);
+                        sink.AddToken(TypeKeyword, s, i);
+                        last = i;
+                    }
+                    continue;
+                }
+
+                if (c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}')
+                {
+                    TryAddBracket(text, i, ref last, sink);
+                    i++;
+                    continue;
+                }
+
+                i++;
+            }
+
+            Normal(ref last, last, len, sink);
             return true;
         }
 
