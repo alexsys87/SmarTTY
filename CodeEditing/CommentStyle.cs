@@ -23,6 +23,7 @@ namespace SmarTTY.CodeEditing
             switch (language)
             {
                 case SyntaxHighlighting.Language.Python:
+                case SyntaxHighlighting.Language.Starlark:
                 case SyntaxHighlighting.Language.Bash:
                 case SyntaxHighlighting.Language.Config:
                 case SyntaxHighlighting.Language.Kconfig:
