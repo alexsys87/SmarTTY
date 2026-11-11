@@ -39,9 +39,9 @@ internal static class Program
         // Every highlighted language offers its words; plain text and diff have none.
         foreach (L language in SyntaxHighlighting.SelectableLanguages)
         {
-            // Plain and Diff have no words of their own; Markup (HTML/XML) has no fixed keyword set either
-            // (its tags are free-form), so it relies on the identifiers found in the document.
-            bool expected = language != L.Plain && language != L.Diff && language != L.Markup;
+            // Plain and Diff have no words of their own; Markup (HTML/XML) and Markdown have no fixed keyword set
+            // either (their tags and constructs are free-form), so they rely on the identifiers found in the document.
+            bool expected = language != L.Plain && language != L.Diff && language != L.Markup && language != L.Markdown;
             bool hasWords = SyntaxHighlighting.GetKeywords(language).Count > 0;
             Equal(hasWords, expected, "GetKeywords(" + language + ") " + (expected ? "is not empty" : "is empty"));
         }
