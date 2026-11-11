@@ -2367,6 +2367,99 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Meson).Toggle(new[] { "project('demo')" })), "# project('demo')", "Meson comment");
     }
 
+    private static void HclChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/main.tf"), L.Hcl, ".tf is HCL");
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/terraform.tfvars"), L.Hcl, ".tfvars is HCL");
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/packer.pkr.hcl"), L.Hcl, ".hcl is HCL");
+        Equal(SyntaxHighlighting.DetectLanguage("/jobs/web.nomad"), L.Hcl, ".nomad is HCL");
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/MAIN.TF"), L.Hcl, "the extension is matched without regard to case");
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/main.tf.bak"), L.Plain, "a backup of a .tf file is not HCL");
+        Equal(SyntaxHighlighting.DetectLanguage("/infra/main.tf.json"), L.Json, ".tf.json stays JSON");
+
+        Highlighted hcl = new Highlighted(L.Hcl,
+            "# Terraform configuration\n" +
+            "// A line comment\n" +
+            "/* A block comment\n" +
+            "   that spans lines */\n" +
+            "terraform {\n" +
+            "  required_version = \">= 1.5.0\"\n" +
+            "}\n" +
+            "\n" +
+            "variable \"region\" {\n" +
+            "  type    = string\n" +
+            "  default = \"eu-west-1\"\n" +
+            "}\n" +
+            "\n" +
+            "resource \"aws_instance\" \"web\" {\n" +
+            "  ami           = \"ami-12345678\"\n" +
+            "  instance_type = \"t3.micro\"\n" +
+            "  count         = 2\n" +
+            "\n" +
+            "  tags = {\n" +
+            "    Name = \"web-${count.index}\"\n" +
+            "  }\n" +
+            "\n" +
+            "  user_data = <<-EOF\n" +
+            "    #!/bin/bash\n" +
+            "    echo \"hello\"\n" +
+            "  EOF\n" +
+            "}\n" +
+            "\n" +
+            "output \"ids\" {\n" +
+            "  value = [for i in aws_instance.web : i.id]\n" +
+            "}\n" +
+            "\n" +
+            "locals {\n" +
+            "  names = [for name in var.names : upper(name)]\n" +
+            "}\n" +
+            "\n" +
+            "resource \"aws_s3_bucket\" \"logs\" {\n" +
+            "  bucket = \"${var.prefix}-logs\"\n" +
+            "  tags   = merge(local.common, { Name = \"logs\" })\n" +
+            "}\n");
+        Equal(Join(hcl.Tokens(0, SyntaxHighlighting.TypeComment)), "# Terraform configuration", "HCL: a # comment");
+        Equal(Join(hcl.Tokens(1, SyntaxHighlighting.TypeComment)), "// A line comment", "HCL: a // comment");
+        Equal(Join(hcl.Tokens(2, SyntaxHighlighting.TypeComment)), "/* A block comment", "HCL: a block comment");
+        Equal(Join(hcl.Tokens(3, SyntaxHighlighting.TypeComment)), "   that spans lines */", "HCL: the second line of a block comment");
+        Equal(Join(hcl.Tokens(4, SyntaxHighlighting.TypeKeyword)), "terraform", "HCL: the terraform block");
+        Equal(Join(hcl.Tokens(5, SyntaxHighlighting.TypeString)), "\">= 1.5.0\"", "HCL: a version string");
+        Equal(Join(hcl.Tokens(8, SyntaxHighlighting.TypeKeyword)), "variable", "HCL: the variable block");
+        Equal(Join(hcl.Tokens(8, SyntaxHighlighting.TypeString)), "\"region\"", "HCL: the variable name");
+        Equal(Join(hcl.Tokens(9, SyntaxHighlighting.TypeKeyword)), "type|string", "HCL: the type constraint");
+        Equal(Join(hcl.Tokens(10, SyntaxHighlighting.TypeKeyword)), "default", "HCL: the default value");
+        Equal(Join(hcl.Tokens(10, SyntaxHighlighting.TypeString)), "\"eu-west-1\"", "HCL: the default string");
+        Equal(Join(hcl.Tokens(13, SyntaxHighlighting.TypeKeyword)), "resource", "HCL: the resource block");
+        Equal(Join(hcl.Tokens(13, SyntaxHighlighting.TypeString)), "\"aws_instance\"|\"web\"", "HCL: the resource labels");
+        Equal(Join(hcl.Tokens(16, SyntaxHighlighting.TypeKeyword)), "count", "HCL: count");
+        Equal(Join(hcl.Tokens(16, SyntaxHighlighting.TypeNumber)), "2", "HCL: the count value");
+        Equal(Join(hcl.Tokens(19, SyntaxHighlighting.TypeString)), "\"web-${count.index}\"", "HCL: interpolation stays inside the string");
+        Equal(Join(hcl.Tokens(23, SyntaxHighlighting.TypeString)), "    #!/bin/bash", "HCL: a heredoc line with a # is not a comment");
+        Equal(Join(hcl.Tokens(24, SyntaxHighlighting.TypeString)), "    echo \"hello\"", "HCL: heredoc quotes stay text");
+        Equal(Join(hcl.Tokens(25, SyntaxHighlighting.TypeKeyword)), "  EOF", "HCL: an indented heredoc terminator");
+        Check(Folds(hcl).Length > 0, "HCL blocks fold");
+        Equal(Join(hcl.Tokens(29, SyntaxHighlighting.TypeKeyword)), "for|in", "HCL: a for expression");
+        Equal(Join(hcl.Tokens(33, SyntaxHighlighting.TypeKeyword)), "for|in|upper", "HCL: functions in a for expression");
+        Equal(Join(hcl.Tokens(33, SyntaxHighlighting.TypeVariable)), "var", "HCL: the var object");
+        Equal(Join(hcl.Tokens(38, SyntaxHighlighting.TypeKeyword)), "merge", "HCL: merge()");
+        Equal(Join(hcl.Tokens(38, SyntaxHighlighting.TypeVariable)), "local", "HCL: the local object");
+        Equal(Join(hcl.Tokens(38, SyntaxHighlighting.TypeString)), "\"logs\"", "HCL: a string inside braces");
+
+        Highlighted heredoc = new Highlighted(L.Hcl, "x = <<EOF\nnot a # comment\nEOF\n");
+        Equal(Join(heredoc.Tokens(1, SyntaxHighlighting.TypeString)), "not a # comment", "HCL: a heredoc body ignores comments");
+        Equal(Join(heredoc.Tokens(2, SyntaxHighlighting.TypeKeyword)), "EOF", "HCL: a heredoc terminator");
+
+        Highlighted heredocComment = new Highlighted(L.Hcl, "x = <<EOF # note\nbody\nEOF\n");
+        Equal(Join(heredocComment.Tokens(0, SyntaxHighlighting.TypeComment)), "# note", "HCL: a comment after a heredoc opener");
+        Equal(Join(heredocComment.Tokens(1, SyntaxHighlighting.TypeString)), "body", "HCL: the body after a commented opener");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Hcl).Contains("resource"), "HCL keywords contain 'resource'");
+        Check(SyntaxHighlighting.GetKeywords(L.Hcl).Contains("jsonencode"), "HCL keywords contain 'jsonencode'");
+        Check(SyntaxHighlighting.GetKeywords(L.Hcl).Contains("for_each"), "HCL keywords contain 'for_each'");
+        Check(SyntaxHighlighting.GetKeywords(L.Hcl).Contains("var"), "HCL keywords contain 'var'");
+        Equal(Join(CommentStyle.ForLanguage(L.Hcl).Toggle(new[] { "resource \"aws_instance\" \"web\" {}" })), "# resource \"aws_instance\" \"web\" {}", "HCL comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3087,6 +3180,7 @@ internal static class Program
         MongoDbChecks();
         ElasticsearchChecks();
         MesonChecks();
+        HclChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
