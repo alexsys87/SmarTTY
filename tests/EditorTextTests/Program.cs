@@ -221,7 +221,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/tools.cmake"), L.CMake, ".cmake is CMake");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/job.r"), L.Script, "R stays in the generic script profile");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/run.awk"), L.Awk, ".awk is AWK");
-        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/default.nix"), L.Script, "Nix stays in the generic script profile");
+        Equal(SyntaxHighlighting.DetectLanguage("/srv/app/default.nix"), L.Nix, ".nix is Nix");
         Equal(SyntaxHighlighting.GetDisplayName(L.Awk), "AWK", "AWK has its own display name");
         Check(SyntaxHighlighting.SelectableLanguages.Contains(L.Awk), "AWK is in the syntax menu");
         Check(SyntaxHighlighting.GetKeywords(L.Awk).Contains("BEGIN"), "AWK keywords contain 'BEGIN'");
@@ -230,7 +230,7 @@ internal static class Program
         Check(!SyntaxHighlighting.GetKeywords(L.Awk).Contains("sizeof"), "AWK keywords do not include the C 'sizeof'");
         Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("BEGIN"), "the generic Script profile no longer carries the AWK 'BEGIN'");
         Check(!SyntaxHighlighting.GetKeywords(L.Script).Contains("getline"), "the generic Script profile no longer carries the AWK 'getline'");
-        Equal(SyntaxHighlighting.GetDisplayName(L.Script), "Script (R, Nix)", "the generic Script profile now covers only R and Nix");
+        Equal(SyntaxHighlighting.GetDisplayName(L.Script), "Script (R)", "the generic Script profile now covers only R");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/deploy.tcl"), L.Tcl, ".tcl is Tcl");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/panel.tk"), L.Tcl, ".tk is Tcl");
         Equal(SyntaxHighlighting.GetDisplayName(L.Tcl), "Tcl", "Tcl has its own display name");
@@ -889,7 +889,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson, L.Markdown
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson, L.Markdown, L.Nix
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2601,6 +2601,72 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Starlark).Toggle(new[] { "fail(\"no\")" })), "# fail(\"no\")", "Starlark comment");
     }
 
+    private static void NixChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/nixos/configuration.nix"), L.Nix, ".nix is Nix");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/flake.nix"), L.Nix, "flake.nix is Nix");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/shell.nix"), L.Nix, "shell.nix is Nix");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/default.nix.bak"), L.Plain, "a backup of a .nix file is not Nix");
+
+        Highlighted nix = new Highlighted(L.Nix,
+            "# A NixOS module\n" +
+            "{ config, pkgs, lib, ... }:\n" +
+            "let\n" +
+            "  inherit (pkgs) hello;\n" +
+            "  name = \"world\";\n" +
+            "  message = \"Hello, ${name}!\";\n" +
+            "in\n" +
+            "{\n" +
+            "  environment.systemPackages = [ pkgs.hello pkgs.git ];\n" +
+            "  services.nginx.enable = true;\n" +
+            "  boot.kernelPackages = pkgs.linuxPackages_latest;\n" +
+            "  text = ''\n" +
+            "    # not a comment\n" +
+            "    echo \"hello\"\n" +
+            "    ''${literal}\n" +
+            "  '';\n" +
+            "  path = ./default.nix;\n" +
+            "  store = /nix/store/abc-source;\n" +
+            "  source = <nixpkgs>;\n" +
+            "  version = 1.5;\n" +
+            "  mapped = builtins.map (x: x.name) [ ];\n" +
+            "  ratio = a / b;\n" +
+            "  /* a block comment\n" +
+            "     still a comment */\n" +
+            "}\n");
+        Equal(Join(nix.Tokens(0, SyntaxHighlighting.TypeComment)), "# A NixOS module", "Nix: a # comment");
+        Equal(Join(nix.Tokens(2, SyntaxHighlighting.TypeKeyword)), "let", "Nix: let");
+        Equal(Join(nix.Tokens(3, SyntaxHighlighting.TypeKeyword)), "inherit", "Nix: inherit");
+        Equal(Join(nix.Tokens(4, SyntaxHighlighting.TypeString)), "\"world\"", "Nix: a string");
+        Equal(Join(nix.Tokens(5, SyntaxHighlighting.TypeString)), "\"Hello, ${name}!\"", "Nix: interpolation stays inside the string");
+        Equal(Join(nix.Tokens(6, SyntaxHighlighting.TypeKeyword)), "in", "Nix: in");
+        Equal(Join(nix.Tokens(9, SyntaxHighlighting.TypeKeyword)), "true", "Nix: true");
+        Equal(Join(nix.Tokens(11, SyntaxHighlighting.TypeString)), "''", "Nix: the start of an indented string");
+        Equal(Join(nix.Tokens(12, SyntaxHighlighting.TypeString)), "    # not a comment", "Nix: a # inside an indented string is text");
+        Equal(Join(nix.Tokens(13, SyntaxHighlighting.TypeString)), "    echo \"hello\"", "Nix: quotes inside an indented string are text");
+        Equal(Join(nix.Tokens(14, SyntaxHighlighting.TypeString)), "    ''${literal}", "Nix: an escaped interpolation stays in the string");
+        Equal(Join(nix.Tokens(15, SyntaxHighlighting.TypeString)), "  ''", "Nix: the end of an indented string");
+        Equal(Join(nix.Tokens(16, SyntaxHighlighting.TypeString)), "./default.nix", "Nix: a relative path");
+        Equal(Join(nix.Tokens(17, SyntaxHighlighting.TypeString)), "/nix/store/abc-source", "Nix: an absolute path");
+        Equal(Join(nix.Tokens(18, SyntaxHighlighting.TypeString)), "<nixpkgs>", "Nix: a search path");
+        Equal(Join(nix.Tokens(19, SyntaxHighlighting.TypeNumber)), "1.5", "Nix: a number");
+        Equal(Join(nix.Tokens(20, SyntaxHighlighting.TypeVariable)), "builtins", "Nix: the builtins object");
+        Equal(Join(nix.Tokens(20, SyntaxHighlighting.TypeKeyword)), "map", "Nix: map()");
+        Equal(Join(nix.Tokens(21, SyntaxHighlighting.TypeString)), "", "Nix: division is not a path");
+        Equal(Join(nix.Tokens(22, SyntaxHighlighting.TypeComment)), "/* a block comment", "Nix: a block comment");
+        Equal(Join(nix.Tokens(23, SyntaxHighlighting.TypeComment)), "     still a comment */", "Nix: the second line of a block comment");
+        Check(Folds(nix).Length > 0, "Nix attrsets fold");
+
+        Highlighted multi = new Highlighted(L.Nix, "x = \"line one\nline two\";\n");
+        Equal(Join(multi.Tokens(1, SyntaxHighlighting.TypeString)), "line two\"", "Nix: a multi-line string");
+        Equal(Join(multi.Tokens(1, SyntaxHighlighting.TypeNormal)), "", "Nix: the string is one token");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Nix).Contains("inherit"), "Nix keywords contain 'inherit'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nix).Contains("derivation"), "Nix keywords contain 'derivation'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nix).Contains("builtins"), "Nix keywords contain 'builtins'");
+        Equal(Join(CommentStyle.ForLanguage(L.Nix).Toggle(new[] { "pkgs.hello" })), "# pkgs.hello", "Nix comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3324,6 +3390,7 @@ internal static class Program
         HclChecks();
         MarkdownChecks();
         StarlarkChecks();
+        NixChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

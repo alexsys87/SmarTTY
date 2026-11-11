@@ -166,6 +166,9 @@ internal static class Program
         Check(Names(L.Starlark, "", "").Contains("load"), "the Starlark keyword 'load' is offered");
         Check(Names(L.Starlark, "", "").Contains("cc_library"), "the Bazel rule 'cc_library' is offered");
         Check(Names(L.Starlark, "", "").Contains("depset"), "the Starlark function 'depset' is offered");
+        Check(Names(L.Nix, "", "").Contains("inherit"), "the Nix keyword 'inherit' is offered");
+        Check(Names(L.Nix, "", "").Contains("derivation"), "the Nix function 'derivation' is offered");
+        Check(Names(L.Nix, "", "").Contains("builtins"), "the Nix object 'builtins' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
