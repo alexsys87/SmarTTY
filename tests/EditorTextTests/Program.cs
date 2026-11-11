@@ -889,7 +889,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson, L.Markdown, L.Nix
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson, L.Markdown, L.Nix, L.Fish
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -2667,6 +2667,60 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Nix).Toggle(new[] { "pkgs.hello" })), "# pkgs.hello", "Nix comment");
     }
 
+    private static void FishChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/.config/fish/config.fish"), L.Fish, ".fish is Fish");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/scripts/deploy.fish"), L.Fish, "a .fish script");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/fish"), L.Fish, "#!/usr/bin/fish is Fish");
+        Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/tool", "#!/usr/bin/env fish"), L.Fish, "env fish is Fish");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/config.fish.bak"), L.Plain, "a backup of a .fish file is plain");
+
+        Highlighted fish = new Highlighted(L.Fish,
+            "# Fish configuration\n" +
+            "set -gx EDITOR vim\n" +
+            "set -l now (date +%s)\n" +
+            "function greet --description \"Say hello\"\n" +
+            "    echo \"Hello, $USER\"\n" +
+            "    for file in $files\n" +
+            "        if test -f $file\n" +
+            "            echo $file\n" +
+            "        else if test -d $file\n" +
+            "            echo \"dir: $file\"\n" +
+            "        end\n" +
+            "    end\n" +
+            "end\n" +
+            "\n" +
+            "switch $argv[1]\n" +
+            "    case start\n" +
+            "        echo start\n" +
+            "    case stop\n" +
+            "        echo stop\n" +
+            "end\n");
+        Equal(Join(fish.Tokens(0, SyntaxHighlighting.TypeComment)), "# Fish configuration", "Fish: a comment");
+        Equal(Join(fish.Tokens(1, SyntaxHighlighting.TypeKeyword)), "set", "Fish: set");
+        Equal(Join(fish.Tokens(2, SyntaxHighlighting.TypeKeyword)), "set|date", "Fish: a command substitution");
+        Equal(Join(fish.Tokens(3, SyntaxHighlighting.TypeKeyword)), "function", "Fish: function");
+        Equal(Join(fish.Tokens(3, SyntaxHighlighting.TypeString)), "\"Say hello\"", "Fish: a quoted description");
+        Equal(Join(fish.Tokens(4, SyntaxHighlighting.TypeString)), "\"Hello, $USER\"", "Fish: a double-quoted string");
+        Equal(Join(fish.Tokens(5, SyntaxHighlighting.TypeKeyword)), "for|in", "Fish: for ... in");
+        Equal(Join(fish.Tokens(5, SyntaxHighlighting.TypeVariable)), "$files", "Fish: a variable");
+        Equal(Join(fish.Tokens(6, SyntaxHighlighting.TypeKeyword)), "if|test", "Fish: if test");
+        Equal(Join(fish.Tokens(6, SyntaxHighlighting.TypeVariable)), "$file", "Fish: the tested variable");
+        Equal(Join(fish.Tokens(8, SyntaxHighlighting.TypeKeyword)), "else|if|test", "Fish: else if");
+        Equal(Join(fish.Tokens(10, SyntaxHighlighting.TypeKeyword)), "end", "Fish: end");
+        Equal(Join(fish.Tokens(14, SyntaxHighlighting.TypeKeyword)), "switch", "Fish: switch");
+        Equal(Join(fish.Tokens(14, SyntaxHighlighting.TypeVariable)), "$argv", "Fish: argv");
+        Equal(Join(fish.Tokens(14, SyntaxHighlighting.TypeNumber)), "1", "Fish: a slice index");
+        Equal(Join(fish.Tokens(15, SyntaxHighlighting.TypeKeyword)), "case", "Fish: case");
+        Equal(Join(fish.Tokens(16, SyntaxHighlighting.TypeKeyword)), "echo", "Fish: echo");
+        Check(Folds(fish).Length > 0, "Fish blocks fold");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Fish).Contains("function"), "Fish keywords contain 'function'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fish).Contains("test"), "Fish keywords contain 'test'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fish).Contains("string"), "Fish keywords contain 'string'");
+        Equal(Join(CommentStyle.ForLanguage(L.Fish).Toggle(new[] { "echo hi" })), "# echo hi", "Fish comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3391,6 +3445,7 @@ internal static class Program
         MarkdownChecks();
         StarlarkChecks();
         NixChecks();
+        FishChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

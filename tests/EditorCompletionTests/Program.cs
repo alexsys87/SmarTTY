@@ -169,6 +169,8 @@ internal static class Program
         Check(Names(L.Nix, "", "").Contains("inherit"), "the Nix keyword 'inherit' is offered");
         Check(Names(L.Nix, "", "").Contains("derivation"), "the Nix function 'derivation' is offered");
         Check(Names(L.Nix, "", "").Contains("builtins"), "the Nix object 'builtins' is offered");
+        Check(Names(L.Fish, "", "").Contains("function"), "the Fish keyword 'function' is offered");
+        Check(Names(L.Fish, "", "").Contains("string"), "the Fish builtin 'string' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
