@@ -124,7 +124,8 @@ namespace SmarTTY.CodeEditing
             Meson, // meson.build, meson.options: the Meson build language with its functions and # comments
             Hcl, // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
             Markdown, // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
-            Starlark // .bzl, BUILD, WORKSPACE: the Bazel/Starlark build language, Python-like with # comments
+            Starlark, // .bzl, BUILD, WORKSPACE: the Bazel/Starlark build language, Python-like with # comments
+            Nix // .nix: the Nix expression language with indented strings, paths and { } attrsets
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -138,7 +139,7 @@ namespace SmarTTY.CodeEditing
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
-            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Diff
+            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Nix, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -192,6 +193,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Hcl: return "HCL (Terraform, Nomad)";
                 case Language.Markdown: return "Markdown";
                 case Language.Starlark: return "Starlark (Bazel)";
+                case Language.Nix: return "Nix";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -218,7 +220,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Css: return "CSS, SCSS, Less";
                 case Language.Protobuf: return "Protocol Buffers";
                 case Language.DeviceTree: return "Device Tree";
-                case Language.Script: return "Script (R, Nix)";
+                case Language.Script: return "Script (R)";
                 case Language.Awk: return "AWK";
                 case Language.Tcl: return "Tcl";
                 case Language.Assembly: return "Assembly";
@@ -970,8 +972,10 @@ namespace SmarTTY.CodeEditing
                     return Language.Dockerfile;
 
                 case "r":
-                case "nix":
                     return Language.Script;
+
+                case "nix":
+                    return Language.Nix;
 
                 case "uboot":
                     return Language.UBoot;
@@ -1256,6 +1260,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Hcl: return HclTokenizer;
                 case Language.Markdown: return TokenizeMarkdown;
                 case Language.Starlark: return TokenizeStarlark;
+                case Language.Nix: return TokenizeNix;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1434,6 +1439,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(HclKeywords, HclVariables);
                 case Language.Starlark:
                     return Combine(StarlarkKeywords);
+                case Language.Nix:
+                    return Combine(NixKeywords, NixVariables);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -1885,6 +1892,337 @@ namespace SmarTTY.CodeEditing
             Normal(ref last, last, len, sink);
             CloseAtEnd();
             endState = Pack(0);
+            return true;
+        }
+
+        // ==================================================================
+        // Nix
+        // ==================================================================
+
+        private const int StNixBlockComment = 0x01;
+        private const int StNixDoubleString = 0x02;
+        private const int StNixIndentedString = 0x04;
+
+        private static int FindNixCommentEnd(string text, int start)
+        {
+            int close = text.IndexOf("*/", start, StringComparison.Ordinal);
+            return (close < 0) ? -1 : (close + 2);
+        }
+
+        /// <summary>The index after the closing quote of a "..." string, honoring backslash escapes, or -1.</summary>
+        private static int FindNixStringEnd(string text, int start)
+        {
+            int i = start;
+            while (i < text.Length)
+            {
+                if (text[i] == '\\')
+                {
+                    i += 2;
+                    continue;
+                }
+                if (text[i] == '"')
+                {
+                    return i + 1;
+                }
+                i++;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// The index after the closing '' of an indented string, or -1. Inside such a string ''' is a literal '',
+        /// ''${ is a literal ${ and ''\ starts an escape, so none of them ends the string.
+        /// </summary>
+        private static int FindNixIndentedStringEnd(string text, int start)
+        {
+            int i = start;
+            while (i + 1 < text.Length)
+            {
+                if (text[i] == '\'' && text[i + 1] == '\'')
+                {
+                    if (i + 2 < text.Length && (text[i + 2] == '\'' || text[i + 2] == '$' || text[i + 2] == '\\'))
+                    {
+                        i += 3;
+                        continue;
+                    }
+                    return i + 2;
+                }
+                i++;
+            }
+            return -1;
+        }
+
+        private static bool IsNixPathChar(char c)
+        {
+            return char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' || c == '+' || c == '%' || c == '@' || c == '~';
+        }
+
+        /// <summary>
+        /// Emits a Nix path literal (&lt;nixpkgs&gt;, ./default.nix, ../lib, ~/x, /nix/store/...) as a string at
+        /// <paramref name="start"/>; <paramref name="last"/> moves past it.
+        /// </summary>
+        private static bool TryAddNixPath(string text, int start, ref int last, TokenCache.ITokenSink sink)
+        {
+            char c = text[start];
+            int i;
+            if (c == '<')
+            {
+                i = start + 1;
+                int wordStart = i;
+                while (i < text.Length && (IsNixPathChar(text[i]) || text[i] == '/'))
+                {
+                    i++;
+                }
+                if (i == wordStart || i >= text.Length || text[i] != '>')
+                {
+                    return false;
+                }
+                Normal(ref last, last, start, sink);
+                sink.AddToken(TypeString, start, i + 1);
+                last = i + 1;
+                return true;
+            }
+
+            if (c == '.' && start + 2 < text.Length && text[start + 1] == '.' && text[start + 2] == '/')
+            {
+                i = start + 3;
+            }
+            else if (c == '.' && start + 1 < text.Length && text[start + 1] == '/')
+            {
+                i = start + 2;
+            }
+            else if (c == '~' && start + 1 < text.Length && text[start + 1] == '/')
+            {
+                i = start + 2;
+            }
+            else if (c == '/' && start + 1 < text.Length && IsNixPathChar(text[start + 1]))
+            {
+                // Division has an expression on the left; an absolute path does not.
+                if (start > 0 && (IsIdChar(text[start - 1]) || text[start - 1] == ')' ||
+                    text[start - 1] == ']' || text[start - 1] == '}'))
+                {
+                    return false;
+                }
+                i = start + 1;
+            }
+            else
+            {
+                return false;
+            }
+
+            while (i < text.Length && (IsNixPathChar(text[i]) || text[i] == '/'))
+            {
+                i++;
+            }
+            if (i == start || text[i - 1] == '/')
+            {
+                return false;
+            }
+            // An absolute path needs a second slash ("/nix/store"); a lone "/name" is the division operator.
+            if (c == '/' && text.IndexOf('/', start + 1, i - start - 1) < 0)
+            {
+                return false;
+            }
+            Normal(ref last, last, start, sink);
+            sink.AddToken(TypeString, start, i);
+            last = i;
+            return true;
+        }
+
+        private static bool TokenizeNix(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            int last = 0;
+            endState = 0;
+
+            if ((startState & StNixBlockComment) != 0)
+            {
+                int close = FindNixCommentEnd(text, 0);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeComment, 0, len);
+                    }
+                    endState = StNixBlockComment;
+                    return true;
+                }
+                sink.AddToken(TypeComment, 0, close);
+                i = close;
+                last = close;
+            }
+            else if ((startState & StNixDoubleString) != 0)
+            {
+                int close = FindNixStringEnd(text, 0);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = StNixDoubleString;
+                    return true;
+                }
+                sink.AddToken(TypeString, 0, close);
+                i = close;
+                last = close;
+            }
+            else if ((startState & StNixIndentedString) != 0)
+            {
+                int close = FindNixIndentedStringEnd(text, 0);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = StNixIndentedString;
+                    return true;
+                }
+                sink.AddToken(TypeString, 0, close);
+                i = close;
+                last = close;
+            }
+            else if (TryAddShebang(text, sink))
+            {
+                endState = 0;
+                return true;
+            }
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                // Comments: # to the end of the line and /* ... */.
+                if (c == '#')
+                {
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeComment, i, len);
+                    endState = 0;
+                    return true;
+                }
+                if (c == '/' && i + 1 < len && text[i + 1] == '*')
+                {
+                    int close = FindNixCommentEnd(text, i + 2);
+                    Normal(ref last, last, i, sink);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeComment, i, len);
+                        endState = StNixBlockComment;
+                        return true;
+                    }
+                    sink.AddToken(TypeComment, i, close);
+                    i = close;
+                    last = close;
+                    continue;
+                }
+
+                // Strings: "..." and the multi-line ''...''.
+                if (c == '"')
+                {
+                    int close = FindNixStringEnd(text, i + 1);
+                    Normal(ref last, last, i, sink);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = StNixDoubleString;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, close);
+                    i = close;
+                    last = close;
+                    continue;
+                }
+                if (c == '\'' && i + 1 < len && text[i + 1] == '\'')
+                {
+                    int close = FindNixIndentedStringEnd(text, i + 2);
+                    Normal(ref last, last, i, sink);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = StNixIndentedString;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, close);
+                    i = close;
+                    last = close;
+                    continue;
+                }
+
+                // Path literals (<nixpkgs>, ./x, /nix/store/...).
+                if ((c == '<' || c == '.' || c == '~' || c == '/') && TryAddNixPath(text, i, ref last, sink))
+                {
+                    i = last;
+                    continue;
+                }
+
+                if (IsDigit(c))
+                {
+                    int s = i;
+                    i++;
+                    while (i < len && (IsDigit(text[i]) || (text[i] == '.' && i + 1 < len && IsDigit(text[i + 1]))))
+                    {
+                        i++;
+                    }
+                    if (i < len && (text[i] == 'e' || text[i] == 'E'))
+                    {
+                        int exponent = i + 1;
+                        if (exponent < len && (text[exponent] == '+' || text[exponent] == '-'))
+                        {
+                            exponent++;
+                        }
+                        if (exponent < len && IsDigit(text[exponent]))
+                        {
+                            i = exponent + 1;
+                            while (i < len && IsDigit(text[i]))
+                            {
+                                i++;
+                            }
+                        }
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                    continue;
+                }
+
+                // Words: identifiers may hold ' and - (foldl', map-attrs), so "foldl'" is one word.
+                if (char.IsLetter(c) || c == '_')
+                {
+                    int s = i;
+                    i++;
+                    while (i < len && (char.IsLetterOrDigit(text[i]) || text[i] == '_' || text[i] == '\'' || text[i] == '-'))
+                    {
+                        i++;
+                    }
+                    string word = text.Substring(s, i - s);
+                    if (NixVariables.Contains(word))
+                    {
+                        Normal(ref last, last, s, sink);
+                        sink.AddToken(TypeVariable, s, i);
+                        last = i;
+                    }
+                    else if (NixKeywords.Contains(word))
+                    {
+                        Normal(ref last, last, s, sink);
+                        sink.AddToken(TypeKeyword, s, i);
+                        last = i;
+                    }
+                    continue;
+                }
+
+                if (TryAddBracket(text, i, ref last, sink, foldCurlyBraces: true))
+                {
+                    i++;
+                    continue;
+                }
+
+                i++;
+            }
+
+            Normal(ref last, last, len, sink);
+            endState = 0;
             return true;
         }
 
@@ -3465,9 +3803,36 @@ namespace SmarTTY.CodeEditing
         {
             // R.
             "if", "else", "repeat", "while", "function", "for", "in", "next", "break", "library", "require",
-            "source", "TRUE", "FALSE", "NULL", "NA", "NaN", "Inf",
-            // Nix.
-            "let", "with", "rec", "inherit", "assert", "or"
+            "source", "TRUE", "FALSE", "NULL", "NA", "NaN", "Inf"
+        };
+
+        // The Nix keywords, literals and built-in functions. Nix is a small expression language: most of what a file
+        // calls is one of these, and a misspelled built-in stays plain.
+        private static readonly HashSet<string> NixKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Keywords and literals.
+            "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit", "or",
+            "true", "false", "null",
+            // The built-in functions of the Nix language.
+            "abort", "addErrorContext", "all", "any", "appendContext", "attrNames", "attrValues", "baseNameOf",
+            "bitAnd", "bitOr", "bitXor", "break", "catAttrs", "ceil", "compareVersions", "concatLists",
+            "concatMap", "concatStringsSep", "currentSystem", "currentTime", "deepSeq", "derivation",
+            "derivationStrict", "dirOf", "div", "elem", "elemAt", "fetchGit", "fetchMercurial", "fetchTarball",
+            "fetchTree", "fetchurl", "filter", "filterSource", "findFile", "floor", "foldl'", "fromJSON",
+            "fromTOML", "functionArgs", "genList", "genericClosure", "getAttr", "getContext", "getEnv",
+            "groupBy", "hasAttr", "hashFile", "hashString", "head", "import", "intersectAttrs", "isAttrs",
+            "isBool", "isFloat", "isFunction", "isInt", "isList", "isNull", "isPath", "isString", "langVersion",
+            "length", "lessThan", "listToAttrs", "map", "mapAttrs", "match", "max", "min", "mod", "mul",
+            "nixPath", "nixVersion", "parseDrvName", "partition", "path", "pathExists", "placeholder",
+            "readDir", "readFile", "removeAttrs", "replaceStrings", "scopedImport", "seq", "sort", "split",
+            "splitVersion", "storeDir", "storePath", "stringLength", "sub", "substring", "tail", "throw",
+            "toFile", "toJSON", "toPath", "toString", "trace", "traceVerbose", "tryEval", "typeOf",
+            "unsafeDiscardStringContext", "unsafeDiscardOutputDependency", "warn", "zipAttrsWith"
+        };
+
+        private static readonly HashSet<string> NixVariables = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "builtins"
         };
 
         /// <summary>The AWK keywords, built-in functions and variables; the language has no API set.</summary>
