@@ -163,6 +163,9 @@ internal static class Program
         Check(Names(L.Hcl, "", "").Contains("resource"), "the HCL block 'resource' is offered");
         Check(Names(L.Hcl, "", "").Contains("jsonencode"), "the HCL function 'jsonencode' is offered");
         Check(Names(L.Hcl, "", "").Contains("var"), "the HCL object 'var' is offered");
+        Check(Names(L.Starlark, "", "").Contains("load"), "the Starlark keyword 'load' is offered");
+        Check(Names(L.Starlark, "", "").Contains("cc_library"), "the Bazel rule 'cc_library' is offered");
+        Check(Names(L.Starlark, "", "").Contains("depset"), "the Starlark function 'depset' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");

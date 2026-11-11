@@ -2533,6 +2533,74 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Markdown).Toggle(new[] { "text" })), "<!-- text -->", "Markdown comment");
     }
 
+    private static void StarlarkChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/BUILD"), L.Starlark, "BUILD is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/BUILD.bazel"), L.Starlark, "BUILD.bazel is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/WORKSPACE"), L.Starlark, "WORKSPACE is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/WORKSPACE.bazel"), L.Starlark, "WORKSPACE.bazel is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/WORKSPACE.bzlmod"), L.Starlark, "WORKSPACE.bzlmod is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/MODULE.bazel"), L.Starlark, "MODULE.bazel is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/REPO.bazel"), L.Starlark, "REPO.bazel is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/tools/build_defs.bzl"), L.Starlark, ".bzl is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/tools/defs.star"), L.Starlark, ".star is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/TARGETS"), L.Starlark, "TARGETS is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/BUCK"), L.Starlark, "BUCK is Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/BUILD.BAK"), L.Plain, "a backup of BUILD is not Starlark");
+        Equal(SyntaxHighlighting.DetectLanguage("/repo/.bazelrc"), L.Plain, ".bazelrc is not Starlark");
+
+        Highlighted starlark = new Highlighted(L.Starlark,
+            "# A Bazel build file\n" +
+            "load(\"@rules_cc//cc:defs.bzl\", \"cc_library\")\n" +
+            "package(default_visibility = [\"//visibility:public\"])\n" +
+            "\n" +
+            "cc_library(\n" +
+            "    name = \"hello\",\n" +
+            "    srcs = glob([\"*.cc\", \"*.h\"]),\n" +
+            "    deps = select({\"//conditions:default\": []}),\n" +
+            ")\n" +
+            "\n" +
+            "def _impl(ctx):\n" +
+            "    \"\"\"Make the outputs.\"\"\"\n" +
+            "    if ctx.attr.enabled:\n" +
+            "        return [DefaultInfo(files = depset([ctx.outputs.out]))]\n" +
+            "    else:\n" +
+            "        fail(\"disabled\")\n" +
+            "\n" +
+            "count = 3\n" +
+            "result = [x * 2 for x in range(count) if x > 0]\n");
+        Equal(Join(starlark.Tokens(0, SyntaxHighlighting.TypeComment)), "# A Bazel build file", "Starlark: a comment");
+        Equal(Join(starlark.Tokens(1, SyntaxHighlighting.TypeKeyword)), "load", "Starlark: load");
+        Equal(Join(starlark.Tokens(1, SyntaxHighlighting.TypeString)), "\"@rules_cc//cc:defs.bzl\"|\"cc_library\"", "Starlark: load strings");
+        Equal(Join(starlark.Tokens(2, SyntaxHighlighting.TypeKeyword)), "package", "Starlark: package()");
+        Equal(Join(starlark.Tokens(4, SyntaxHighlighting.TypeKeyword)), "cc_library", "Starlark: a rule call");
+        Equal(Join(starlark.Tokens(6, SyntaxHighlighting.TypeKeyword)), "glob", "Starlark: glob()");
+        Equal(Join(starlark.Tokens(6, SyntaxHighlighting.TypeString)), "\"*.cc\"|\"*.h\"", "Starlark: glob patterns");
+        Equal(Join(starlark.Tokens(7, SyntaxHighlighting.TypeKeyword)), "select", "Starlark: select()");
+        Equal(Join(starlark.Tokens(7, SyntaxHighlighting.TypeString)), "\"//conditions:default\"", "Starlark: a select key");
+        Equal(Join(starlark.Tokens(10, SyntaxHighlighting.TypeKeyword)), "def", "Starlark: def");
+        Equal(Join(starlark.Tokens(11, SyntaxHighlighting.TypeString)), "\"\"\"Make the outputs.\"\"\"", "Starlark: a docstring");
+        Equal(Join(starlark.Tokens(12, SyntaxHighlighting.TypeKeyword)), "if", "Starlark: if");
+        Equal(Join(starlark.Tokens(13, SyntaxHighlighting.TypeKeyword)), "return|depset", "Starlark: return and depset()");
+        Equal(Join(starlark.Tokens(14, SyntaxHighlighting.TypeKeyword)), "else", "Starlark: else");
+        Equal(Join(starlark.Tokens(15, SyntaxHighlighting.TypeKeyword)), "fail", "Starlark: fail()");
+        Equal(Join(starlark.Tokens(15, SyntaxHighlighting.TypeString)), "\"disabled\"", "Starlark: the failure message");
+        Equal(Join(starlark.Tokens(17, SyntaxHighlighting.TypeNumber)), "3", "Starlark: a number");
+        Equal(Join(starlark.Tokens(18, SyntaxHighlighting.TypeKeyword)), "for|in|range|if", "Starlark: a comprehension");
+        Equal(Join(starlark.Tokens(18, SyntaxHighlighting.TypeNumber)), "2|0", "Starlark: the numbers of a comprehension");
+        Check(Folds(starlark).Length > 0, "Starlark blocks fold");
+
+        Highlighted doc = new Highlighted(L.Starlark, "def f():\n    \"\"\"Line one\n    line two\"\"\"\n    return 1\n");
+        Equal(Join(doc.Tokens(1, SyntaxHighlighting.TypeString)), "\"\"\"Line one", "Starlark: a multi-line string");
+        Equal(Join(doc.Tokens(2, SyntaxHighlighting.TypeString)), "    line two\"\"\"", "Starlark: the second line of a string");
+        Equal(Join(doc.Tokens(3, SyntaxHighlighting.TypeNumber)), "1", "Starlark: code after a string");
+
+        Check(SyntaxHighlighting.GetKeywords(L.Starlark).Contains("load"), "Starlark keywords contain 'load'");
+        Check(SyntaxHighlighting.GetKeywords(L.Starlark).Contains("cc_library"), "Starlark keywords contain 'cc_library'");
+        Check(SyntaxHighlighting.GetKeywords(L.Starlark).Contains("depset"), "Starlark keywords contain 'depset'");
+        Equal(Join(CommentStyle.ForLanguage(L.Starlark).Toggle(new[] { "fail(\"no\")" })), "# fail(\"no\")", "Starlark comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3255,6 +3323,7 @@ internal static class Program
         MesonChecks();
         HclChecks();
         MarkdownChecks();
+        StarlarkChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();

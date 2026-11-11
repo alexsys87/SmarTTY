@@ -123,7 +123,8 @@ namespace SmarTTY.CodeEditing
             Elasticsearch, // elasticsearch.yml, /etc/elasticsearch/*.yml: the colors of YAML with the Elasticsearch settings known
             Meson, // meson.build, meson.options: the Meson build language with its functions and # comments
             Hcl, // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
-            Markdown // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
+            Markdown, // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
+            Starlark // .bzl, BUILD, WORKSPACE: the Bazel/Starlark build language, Python-like with # comments
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -137,7 +138,7 @@ namespace SmarTTY.CodeEditing
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
-            Language.Sql, Language.Markup, Language.Markdown, Language.Diff
+            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -190,6 +191,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Meson: return "Meson";
                 case Language.Hcl: return "HCL (Terraform, Nomad)";
                 case Language.Markdown: return "Markdown";
+                case Language.Starlark: return "Starlark (Bazel)";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -597,6 +599,13 @@ namespace SmarTTY.CodeEditing
                 case "meson_options.txt":
                     return Language.Meson;
 
+                case "build":
+                case "workspace":
+                case "workspace.bzlmod":
+                case "targets":
+                case "buck":
+                    return Language.Starlark;
+
                 case "dockerfile":
                 case "containerfile":
                     return Language.Dockerfile;
@@ -816,6 +825,12 @@ namespace SmarTTY.CodeEditing
                 case "hcl":
                 case "nomad":
                     return Language.Hcl;
+
+                case "bzl":
+                case "star":
+                case "bazel":
+                case "bzlmod":
+                    return Language.Starlark;
 
                 case "network":
                 case "netdev":
@@ -1240,6 +1255,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Meson: return MesonTokenizer;
                 case Language.Hcl: return HclTokenizer;
                 case Language.Markdown: return TokenizeMarkdown;
+                case Language.Starlark: return TokenizeStarlark;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1416,6 +1432,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(MesonKeywords, MesonObjects);
                 case Language.Hcl:
                     return Combine(HclKeywords, HclVariables);
+                case Language.Starlark:
+                    return Combine(StarlarkKeywords);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -1569,7 +1587,7 @@ namespace SmarTTY.CodeEditing
         }
 
         // ==================================================================
-        // Python
+        // Python and Starlark
         // ==================================================================
 
         // Line states:
@@ -1584,6 +1602,36 @@ namespace SmarTTY.CodeEditing
             "def", "del", "elif", "else", "except", "False", "finally", "for", "from",
             "global", "if", "import", "in", "is", "lambda", "None", "nonlocal", "not",
             "or", "pass", "raise", "return", "True", "try", "while", "with", "yield"
+        };
+
+        // The Starlark language keywords and literals, then the functions and rules of Bazel and Buck. A .bzl file
+        // mostly calls these, and coloring them tells a known rule from a misspelled one.
+        private static readonly HashSet<string> StarlarkKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "and", "break", "continue", "def", "elif", "else", "for", "if", "in", "lambda", "load",
+            "not", "or", "pass", "return", "while", "True", "False", "None",
+            // The Bazel and Buck top-level functions.
+            "package", "package_group", "licenses", "exports_files", "glob", "select", "filegroup",
+            "genrule", "alias", "config_setting", "toolchain", "toolchain_type", "platform",
+            "constraint_setting", "constraint_value", "workspace", "register_toolchains",
+            "register_execution_platforms", "rule", "aspect", "provider", "repository_rule",
+            "module_extension", "tag_class", "module", "use_extension", "use_repo",
+            // The common rules of the built-in rule sets.
+            "cc_library", "cc_binary", "cc_test", "cc_import", "cc_shared_library", "cc_toolchain",
+            "py_library", "py_binary", "py_test", "py_runtime",
+            "java_library", "java_binary", "java_test", "java_import", "java_plugin",
+            "sh_binary", "sh_library", "sh_test", "proto_library", "objc_library",
+            "android_library", "android_binary", "aar_import", "go_library", "go_binary", "go_test",
+            "rust_library", "rust_binary", "rust_test",
+            // The Starlark built-in functions.
+            "depset", "struct", "fail", "print", "len", "range", "dict", "list", "tuple", "str",
+            "int", "float", "bool", "type", "hash", "repr", "sorted", "reversed", "enumerate",
+            "zip", "min", "max", "all", "any", "hasattr", "getattr", "dir", "eval", "exec"
+        };
+
+        private static readonly HashSet<string> StarlarkBlockKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "def", "if", "elif", "else", "for"
         };
 
         /// <summary>Returns the index after the closing triple quote (honoring escapes) or -1.</summary>
@@ -1607,6 +1655,17 @@ namespace SmarTTY.CodeEditing
         }
 
         private static bool TokenizePython(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            return TokenizePythonCore(PyKeywords, PyBlockKeywords, startState, text, sink, out endState);
+        }
+
+        private static bool TokenizeStarlark(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            return TokenizePythonCore(StarlarkKeywords, StarlarkBlockKeywords, startState, text, sink, out endState);
+        }
+
+        private static bool TokenizePythonCore(HashSet<string> keywords, HashSet<string> blockKeywords,
+            int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
             int i = 0;
@@ -1698,7 +1757,7 @@ namespace SmarTTY.CodeEditing
                     }
                     if (text[first] != '#')
                     {
-                        header = IsPythonBlockHeader(text, first) ? Math.Min(31, indent + 1) : 0;
+                        header = IsBlockHeader(text, first, blockKeywords) ? Math.Min(31, indent + 1) : 0;
                     }
                 }
             }
@@ -1795,7 +1854,7 @@ namespace SmarTTY.CodeEditing
                     {
                         i++;
                     }
-                    if (PyKeywords.Contains(text.Substring(s, i - s)))
+                    if (keywords.Contains(text.Substring(s, i - s)))
                     {
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeKeyword, s, i);
@@ -5742,14 +5801,14 @@ namespace SmarTTY.CodeEditing
         };
 
         /// <summary>Whether the statement that starts at index starts with a keyword that opens a block.</summary>
-        private static bool IsPythonBlockHeader(string text, int index)
+        private static bool IsBlockHeader(string text, int index, HashSet<string> blockKeywords)
         {
             int end = index;
             while (end < text.Length && IsIdChar(text[end]))
             {
                 end++;
             }
-            return end > index && PyBlockKeywords.Contains(text.Substring(index, end - index));
+            return end > index && blockKeywords.Contains(text.Substring(index, end - index));
         }
 
         // YAML line state: bits 0-2 - open blocks (up to 6), then 4 bits per block:
