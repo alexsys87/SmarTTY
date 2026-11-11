@@ -83,7 +83,16 @@ internal sealed class ProxyRelay : IDisposable
     {
         try
         {
-            _localSocket = _listener.AcceptSocket();
+            // Bounded, not an indefinite AcceptSocket(): if SSH.NET never connects to the loopback end (it threw
+            // before attempting to, or the caller abandoned the connection without disposing this object), this
+            // thread must not block forever with the listener and its port held open.
+            IAsyncResult pending = _listener.BeginAcceptSocket(null, null);
+            if (!pending.AsyncWaitHandle.WaitOne(_parameters.ConnectTimeout))
+            {
+                Dispose();
+                return;
+            }
+            _localSocket = _listener.EndAcceptSocket(pending);
         }
         catch (Exception)
         {
@@ -150,7 +159,11 @@ internal sealed class ProxyRelay : IDisposable
     private static string ReadResponseHeaders(Stream stream)
     {
         StringBuilder headers = new StringBuilder();
-        while (!headers.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal) && !headers.ToString().EndsWith("\n\n", StringComparison.Ordinal))
+        // Checking for the blank line by turning the whole buffer into a string and searching it, on every single
+        // byte, copies everything received so far again and again: quadratic in the size of the answer. Looking only
+        // at the few characters just appended (and the one before them, for a "\r\n" split across two bytes) finds
+        // the same terminator in time proportional to the answer's length.
+        while (true)
         {
             int value = stream.ReadByte();
             if (value < 0)
@@ -162,6 +175,13 @@ internal sealed class ProxyRelay : IDisposable
                 throw new ProxyException("HTTPS: The answer of the proxy is too long.");
             }
             headers.Append((char)value);
+            int length = headers.Length;
+            if (headers[length - 1] == '\n' &&
+                ((length >= 2 && headers[length - 2] == '\n') ||
+                 (length >= 4 && headers[length - 2] == '\r' && headers[length - 3] == '\n' && headers[length - 4] == '\r')))
+            {
+                break;
+            }
         }
         string text = headers.ToString();
         int lineEnd = text.IndexOf('\n');
@@ -193,11 +213,19 @@ internal sealed class ProxyRelay : IDisposable
         request.WriteByte((byte)_parameters.Port);
         request.Write(address, 0, 4);
         byte[] userId = Encoding.UTF8.GetBytes(_parameters.ProxyUserName ?? "");
+        if (userId.Length > 255)
+        {
+            throw new ProxyException("SOCKS4: The proxy user name is longer than 255 bytes.");
+        }
         request.Write(userId, 0, userId.Length);
         request.WriteByte(0);
         if (hostName != null)
         {
             byte[] name = Encoding.ASCII.GetBytes(hostName);
+            if (name.Length > 255)
+            {
+                throw new ProxyException("SOCKS4: The host name is longer than 255 bytes; use an IP address or a SOCKS5 proxy.");
+            }
             request.Write(name, 0, name.Length);
             request.WriteByte(0);
         }

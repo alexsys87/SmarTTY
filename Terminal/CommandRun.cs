@@ -16,8 +16,6 @@ internal class CommandRun
 
     public readonly int StartLine;
 
-    public int UnusedValue { get; private set; }
-
     public CommandRun(SshTerminalControl sshTerminalControl, string commandText, string workingDirectory, int startLine)
     {
         _terminal = sshTerminalControl;

@@ -602,7 +602,6 @@ public partial class DeviceTerminalControl
             this.terminalEmulatorControl1.TerminalMode = true;
             this.terminalEmulatorControl1.Title = null;
             this.terminalEmulatorControl1.TopLine = 0;
-            this.terminalEmulatorControl1.UnusedValue = 0;
             this.terminalEmulatorControl1.VerticalScrollBarVisible = true;
             //
             // Event handlers (YMODEM, ZMODEM and Kermit items are wired in their own partial files)

@@ -170,11 +170,35 @@ public static class ByteColumns
         {
             return new byte[0];
         }
-        int length = (char.IsHighSurrogate(line[column]) && column + 1 < line.Length) ? 2 : 1;
+        // A surrogate pair is one codepoint of 4 UTF-8 bytes shown in two cells of 2 bytes each (see CellByteLength):
+        // the first holds bytes 0-1, the second bytes 2-3. A low surrogate alone is not a valid character, and
+        // UTF8.GetBytes on it would give the replacement character's bytes instead of the real bytes 2-3, so the
+        // low-surrogate cell is read from the full pair (and its own 2 bytes skipped) rather than from itself.
+        int skip = 0;
+        int length;
+        if (char.IsHighSurrogate(line[column]) && column + 1 < line.Length && char.IsLowSurrogate(line[column + 1]))
+        {
+            length = 2;
+        }
+        else if (char.IsLowSurrogate(line[column]) && column > 0 && char.IsHighSurrogate(line[column - 1]))
+        {
+            column -= 1;
+            length = 2;
+            skip = 2;
+        }
+        else
+        {
+            length = 1;
+        }
         byte[] bytes = Encoding.UTF8.GetBytes(line.Substring(column, length));
-        int count = (offset < bytes.Length) ? offset : bytes.Length;
+        int available = bytes.Length - skip;
+        int count = (offset < available) ? offset : available;
+        if (count <= 0)
+        {
+            return new byte[0];
+        }
         byte[] prefix = new byte[count];
-        System.Array.Copy(bytes, prefix, count);
+        System.Array.Copy(bytes, skip, prefix, 0, count);
         return prefix;
     }
 

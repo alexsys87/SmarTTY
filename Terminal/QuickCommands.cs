@@ -52,7 +52,19 @@ public sealed class QuickCommand
         {
             string text = string.IsNullOrWhiteSpace(Name) ? (Kind == QuickCommandKind.Script ? FileName : QuickCommandRules.ToCommandLine(Text)) : Name.Trim();
             text = text ?? "";
-            return text.Length > 60 ? text.Substring(0, 57) + "..." : text;
+            if (text.Length <= 60)
+            {
+                return text;
+            }
+            // Cutting at a fixed character count can land in the middle of a surrogate pair (an emoji in the
+            // command name): drop the lead half too rather than leave it unpaired, which would show as a broken
+            // character in the menu.
+            int cut = 57;
+            if (cut > 0 && cut < text.Length && char.IsHighSurrogate(text[cut - 1]))
+            {
+                cut--;
+            }
+            return text.Substring(0, cut) + "...";
         }
     }
 }

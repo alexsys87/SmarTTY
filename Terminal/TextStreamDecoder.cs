@@ -49,8 +49,13 @@ public sealed class TextStreamDecoder
                 return;
             }
             _escapeInvalidBytes = value;
-            _decoder.Reset();
-            _escapingDecoder = (value && Encoding.CodePage == Encoding.UTF8.CodePage) ? new Utf8StreamDecoder { EscapeInvalidBytes = true } : null;
+            // Switching leaves both decoders as they are (not reset, not recreated): either one may be holding the
+            // lead bytes of a character that started while it was the active one, and dropping that state here would
+            // lose them for good. Only Reset() (a new connection) is allowed to throw away a partial character.
+            if (value && Encoding.CodePage == Encoding.UTF8.CodePage && _escapingDecoder == null)
+            {
+                _escapingDecoder = new Utf8StreamDecoder { EscapeInvalidBytes = true };
+            }
         }
     }
 
@@ -64,7 +69,7 @@ public sealed class TextStreamDecoder
         {
             return string.Empty;
         }
-        if (_escapingDecoder != null)
+        if (_escapeInvalidBytes && _escapingDecoder != null)
         {
             return _escapingDecoder.Decode(buffer, offset, count);
         }
