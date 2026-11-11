@@ -125,7 +125,8 @@ namespace SmarTTY.CodeEditing
             Hcl, // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
             Markdown, // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
             Starlark, // .bzl, BUILD, WORKSPACE: the Bazel/Starlark build language, Python-like with # comments
-            Nix // .nix: the Nix expression language with indented strings, paths and { } attrsets
+            Nix, // .nix: the Nix expression language with indented strings, paths and { } attrsets
+            Fish // .fish: the fish shell with $variables and if/for/function ... end blocks
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -139,7 +140,7 @@ namespace SmarTTY.CodeEditing
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
-            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Nix, Language.Diff
+            Language.Sql, Language.Markup, Language.Markdown, Language.Starlark, Language.Nix, Language.Fish, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -194,6 +195,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Markdown: return "Markdown";
                 case Language.Starlark: return "Starlark (Bazel)";
                 case Language.Nix: return "Nix";
+                case Language.Fish: return "Fish";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -806,6 +808,9 @@ namespace SmarTTY.CodeEditing
                 case "ksh":
                     return Language.Bash;
 
+                case "fish":
+                    return Language.Fish;
+
                 case "ini":
                 case "conf":
                 case "cfg":
@@ -1165,9 +1170,17 @@ namespace SmarTTY.CodeEditing
             {
                 return Language.Awk;
             }
-            if (program == "rscript" || program.StartsWith("nix", StringComparison.Ordinal))
+            if (program == "rscript")
             {
                 return Language.Script;
+            }
+            if (program.StartsWith("nix", StringComparison.Ordinal))
+            {
+                return Language.Nix;
+            }
+            if (program == "fish")
+            {
+                return Language.Fish;
             }
             return Language.Plain;
         }
@@ -1261,6 +1274,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Markdown: return TokenizeMarkdown;
                 case Language.Starlark: return TokenizeStarlark;
                 case Language.Nix: return TokenizeNix;
+                case Language.Fish: return TokenizeFish;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -1441,6 +1455,8 @@ namespace SmarTTY.CodeEditing
                     return Combine(StarlarkKeywords);
                 case Language.Nix:
                     return Combine(NixKeywords, NixVariables);
+                case Language.Fish:
+                    return Combine(FishKeywords);
                 case Language.Kubernetes:
                     return Combine(KubernetesKeywords, KubernetesValues);
                 case Language.DockerCompose:
@@ -2317,6 +2333,270 @@ namespace SmarTTY.CodeEditing
             "unset", "alias", "echo", "printf", "read", "trap", "exec", "exit", "set",
             "let", "eval", "test"
         };
+
+        private static readonly HashSet<string> FishKeywords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Control flow and blocks.
+            "if", "else", "end", "for", "in", "while", "switch", "case", "function", "begin",
+            "and", "or", "not", "return", "break", "continue",
+            // Commands and builtins.
+            "command", "builtin", "exec", "set", "test", "source", "eval", "read", "abbr", "alias",
+            "functions", "emit", "contains", "fish_add_path", "status", "count", "string", "math",
+            "echo", "printf", "true", "false", "cd", "pwd", "exit", "type", "ulimit", "umask",
+            "wait", "jobs", "fg", "bg", "disown", "history", "fish_config", "fish_update_completions",
+            "realpath", "seq", "date", "sleep", "time", "random", "open", "help", "preexec",
+            "funced", "funcsave", "vared", "bind", "complete", "argparse",
+            "fish_vi_key_bindings", "fish_default_key_bindings", "fish_prompt", "fish_right_prompt"
+        };
+
+        private static readonly HashSet<string> FishBlockOpeners = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "if", "for", "while", "switch", "function", "begin"
+        };
+
+        /// <summary>Characters after which a word (a command, a keyword, a '#' comment) starts in fish.</summary>
+        private static bool IsFishWordBreak(char c)
+        {
+            return c == ' ' || c == '\t' || c == ';' || c == '&' || c == '|' || c == '(' || c == ')' || c == '`';
+        }
+
+        private static bool TokenizeFish(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            int last = 0;
+            endState = 0;
+
+            if ((startState & StBashDouble) != 0)
+            {
+                // Continuation of a double-quoted string from the previous line.
+                int end = FindQuoteEnd(text, -1, '"');
+                if (end < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = StBashDouble;
+                    return true;
+                }
+                sink.AddToken(TypeString, 0, end);
+                i = end;
+                last = i;
+            }
+            else if ((startState & StBashSingle) != 0)
+            {
+                // In fish, \\ and \' are the escapes of a single-quoted string.
+                int close = i;
+                while (close < len)
+                {
+                    if (text[close] == '\\' && close + 1 < len)
+                    {
+                        close += 2;
+                        continue;
+                    }
+                    if (text[close] == '\'')
+                    {
+                        break;
+                    }
+                    close++;
+                }
+                if (close >= len)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = StBashSingle;
+                    return true;
+                }
+                sink.AddToken(TypeString, 0, close + 1);
+                i = close + 1;
+                last = i;
+            }
+            else if (TryAddShebang(text, sink))
+            {
+                endState = 0;
+                return true;
+            }
+
+            // "else if" is one branch of the same block, not a nested if.
+            bool afterElse = false;
+            while (i < len)
+            {
+                char c = text[i];
+
+                if (c == '\\')
+                {
+                    i += 2;
+                    continue;
+                }
+
+                // A # comment starts a word and runs to the end of the line.
+                if (c == '#' && (i == 0 || IsFishWordBreak(text[i - 1])))
+                {
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeComment, i, len);
+                    endState = 0;
+                    return true;
+                }
+
+                if (c == '\'')
+                {
+                    int close = i + 1;
+                    while (close < len)
+                    {
+                        if (text[close] == '\\' && close + 1 < len)
+                        {
+                            close += 2;
+                            continue;
+                        }
+                        if (text[close] == '\'')
+                        {
+                            break;
+                        }
+                        close++;
+                    }
+                    Normal(ref last, last, i, sink);
+                    if (close >= len)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = StBashSingle;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, close + 1);
+                    i = close + 1;
+                    last = i;
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    int end = FindQuoteEnd(text, i, '"');
+                    Normal(ref last, last, i, sink);
+                    if (end < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = StBashDouble;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, end);
+                    i = end;
+                    last = i;
+                    continue;
+                }
+
+                // Variables: $name, ${name}, $argv, $status, $?, $last_pid, ... A slice ($files[1]) stays outside.
+                if (c == '$' && i + 1 < len)
+                {
+                    int s = i + 1;
+                    int e = -1;
+                    if (text[s] == '{')
+                    {
+                        int close = text.IndexOf('}', s + 1);
+                        e = (close < 0) ? len : (close + 1);
+                    }
+                    else if (IsIdStart(text[s]))
+                    {
+                        e = s;
+                        while (e < len && IsIdChar(text[e]))
+                        {
+                            e++;
+                        }
+                    }
+                    else if (IsDigit(text[s]) || "@*#?$!-".IndexOf(text[s]) >= 0)
+                    {
+                        e = s + 1;
+                    }
+                    if (e > 0)
+                    {
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeVariable, i, e);
+                        i = e;
+                        last = i;
+                        continue;
+                    }
+                    i++;
+                    continue;
+                }
+
+                if (IsDigit(c))
+                {
+                    int s = i;
+                    while (i < len && IsDigit(text[i]))
+                    {
+                        i++;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeNumber, s, i);
+                    last = i;
+                    continue;
+                }
+
+                // Words: keywords, builtins and the openers and "end" of the foldable blocks.
+                if (IsIdStart(c))
+                {
+                    int s = i;
+                    while (i < len && IsIdChar(text[i]))
+                    {
+                        i++;
+                    }
+                    bool startsWord = s == 0 || IsFishWordBreak(text[s - 1]);
+                    bool endsWord = i == len || IsFishWordBreak(text[i]);
+                    if (!startsWord || !endsWord)
+                    {
+                        continue;
+                    }
+                    string word = text.Substring(s, i - s);
+                    if (!FishKeywords.Contains(word))
+                    {
+                        afterElse = false;
+                        continue;
+                    }
+                    bool opening = FishBlockOpeners.Contains(word) && !(word == "if" && afterElse);
+                    if (word == "else")
+                    {
+                        afterElse = true;
+                    }
+                    else
+                    {
+                        afterElse = false;
+                    }
+                    if (opening)
+                    {
+                        AddKeywordPair(text, s, i, PairThenBlock, true, ref last, sink);
+                        continue;
+                    }
+                    if (word == "end")
+                    {
+                        AddKeywordPair(text, s, i, PairThenBlock, false, ref last, sink);
+                        continue;
+                    }
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeKeyword, s, i);
+                    last = i;
+                    continue;
+                }
+
+                // Parentheses of command substitution and the brackets of test expressions and slices.
+                if (c == '(' || c == ')' || c == '[' || c == ']')
+                {
+                    TryAddBracket(text, i, ref last, sink);
+                    i++;
+                    continue;
+                }
+
+                if (c == ';')
+                {
+                    afterElse = false;
+                }
+                i++;
+            }
+
+            Normal(ref last, last, len, sink);
+            endState = 0;
+            return true;
+        }
 
         /// <summary>Characters after which a word (a command, a keyword, a '#' comment) starts.</summary>
         private static bool IsBashWordBreak(char c)
