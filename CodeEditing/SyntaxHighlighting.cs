@@ -122,7 +122,8 @@ namespace SmarTTY.CodeEditing
             MongoDb, // mongod.conf, /etc/mongodb/*.conf: the colors of YAML with the MongoDB settings known
             Elasticsearch, // elasticsearch.yml, /etc/elasticsearch/*.yml: the colors of YAML with the Elasticsearch settings known
             Meson, // meson.build, meson.options: the Meson build language with its functions and # comments
-            Hcl // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
+            Hcl, // .tf, .tfvars, .hcl, .nomad: the HCL configuration language with heredocs and { } blocks
+            Markdown // .md, .markdown: headings, lists, quotes, links, code fences and HTML comments
         }
 
         /// <summary>The languages offered in the syntax menu, in the order of the menu.</summary>
@@ -136,7 +137,7 @@ namespace SmarTTY.CodeEditing
             Language.Dart, Language.JavaScript, Language.TypeScript, Language.Php, Language.Css, Language.Protobuf,
             Language.DeviceTree, Language.Script, Language.Awk, Language.Tcl, Language.Assembly,
             Language.PowerShell, Language.Ruby, Language.Perl, Language.CMake, Language.Dockerfile,
-            Language.Sql, Language.Markup, Language.Diff
+            Language.Sql, Language.Markup, Language.Markdown, Language.Diff
         };
 
         /// <summary>The name of a language in the syntax menu and the status bar.</summary>
@@ -188,6 +189,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Elasticsearch: return "Elasticsearch";
                 case Language.Meson: return "Meson";
                 case Language.Hcl: return "HCL (Terraform, Nomad)";
+                case Language.Markdown: return "Markdown";
                 case Language.Kubernetes: return "Kubernetes/Helm YAML";
                 case Language.DockerCompose: return "Docker Compose";
                 case Language.Ansible: return "Ansible playbook";
@@ -995,6 +997,14 @@ namespace SmarTTY.CodeEditing
                 case "yaml":
                     return Language.Yaml;
 
+                case "md":
+                case "markdown":
+                case "mdown":
+                case "mkd":
+                case "mkdn":
+                case "mdwn":
+                    return Language.Markdown;
+
                 case "html":
                 case "htm":
                 case "xhtml":
@@ -1009,7 +1019,7 @@ namespace SmarTTY.CodeEditing
                 case "patch":
                     return Language.Diff;
 
-                // Prose (txt, md, csv, keys and certificates) stays plain: apostrophes and
+                // Prose (txt, csv, keys and certificates) stays plain: apostrophes and
                 // "//" in URLs would otherwise be colored as strings and comments. A log is coloured by
                 // its timestamps and levels only, which prose cannot be mistaken for.
                 default:
@@ -1229,6 +1239,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Elasticsearch: return TokenizeElasticsearch;
                 case Language.Meson: return MesonTokenizer;
                 case Language.Hcl: return HclTokenizer;
+                case Language.Markdown: return TokenizeMarkdown;
                 case Language.Kubernetes: return TokenizeKubernetes;
                 case Language.DockerCompose: return TokenizeDockerCompose;
                 case Language.Ansible: return TokenizeAnsible;
@@ -2526,6 +2537,546 @@ namespace SmarTTY.CodeEditing
                 type = TypeNormal;
             }
             sink.AddToken(type, 0, text.Length);
+            return true;
+        }
+
+        // ==================================================================
+        // Markdown
+        // ==================================================================
+
+        // Line state: inside a fenced code block (the fence character is a bit, the length is kept from bit 3)
+        // and inside an HTML comment that started on an earlier line.
+        private const int StMarkdownFence = 0x01;
+        private const int StMarkdownFenceTilde = 0x02;
+        private const int StMarkdownComment = 0x04;
+        private const int MarkdownFenceShift = 3;
+        private const int MarkdownFenceMask = 0x1F;
+
+        /// <summary>True when the rest of the line is a thematic break: ---, *** or ___ (three or more).</summary>
+        private static bool IsMarkdownThematicBreak(string text, int start)
+        {
+            char marker = '\0';
+            int count = 0;
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == ' ' || c == '\t')
+                {
+                    continue;
+                }
+                if (c != '-' && c != '*' && c != '_')
+                {
+                    return false;
+                }
+                if (marker == '\0')
+                {
+                    marker = c;
+                }
+                else if (marker != c)
+                {
+                    return false;
+                }
+                count++;
+            }
+            return count >= 3;
+        }
+
+        /// <summary>True when the rest of the line is a Setext underline of the first level (===).</summary>
+        private static bool IsMarkdownSetextUnderline(string text, int start)
+        {
+            bool any = false;
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == ' ' || c == '\t')
+                {
+                    continue;
+                }
+                if (c != '=')
+                {
+                    return false;
+                }
+                any = true;
+            }
+            return any;
+        }
+
+        /// <summary>True when the line is the separator of a Markdown table: | --- | :---: |.</summary>
+        private static bool IsMarkdownTableSeparator(string text, int start)
+        {
+            bool dash = false;
+            bool pipe = false;
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == ' ' || c == '\t' || c == ':')
+                {
+                    continue;
+                }
+                if (c == '|')
+                {
+                    pipe = true;
+                    continue;
+                }
+                if (c == '-')
+                {
+                    dash = true;
+                    continue;
+                }
+                return false;
+            }
+            return dash && pipe;
+        }
+
+        /// <summary>The index of the "]" that matches the "[" at <paramref name="open"/>, or -1.</summary>
+        private static int FindMarkdownBracketEnd(string text, int open)
+        {
+            int depth = 0;
+            for (int i = open; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (c == '[')
+                {
+                    depth++;
+                }
+                else if (c == ']')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>The index of the ")" that matches the "(" at <paramref name="open"/>, or -1.</summary>
+        private static int FindMarkdownParenEnd(string text, int open)
+        {
+            int depth = 0;
+            for (int i = open; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (c == '(')
+                {
+                    depth++;
+                }
+                else if (c == ')')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Finds the end of a Markdown emphasis span at <paramref name="start"/>: *italic*, **bold**,
+        /// _italic_, __bold__ and ~~strikethrough~~. The whole span gets one color.
+        /// </summary>
+        private static bool TryMarkdownEmphasis(string text, int start, out int end, out int type)
+        {
+            end = start;
+            type = TypeNormal;
+            char c = text[start];
+            int run = 1;
+            if (start + 1 < text.Length && text[start + 1] == c)
+            {
+                run = 2;
+            }
+            if (c == '~' && run != 2)
+            {
+                return false;
+            }
+            if (start + run >= text.Length || IsBlank(text[start + run]))
+            {
+                return false;
+            }
+            // Underscores inside a word (snake_case) are not emphasis.
+            if (c == '_' && start > 0 && IsIdChar(text[start - 1]))
+            {
+                return false;
+            }
+            for (int i = start + run; i < text.Length; i++)
+            {
+                if (text[i] == '\\')
+                {
+                    i++;
+                    continue;
+                }
+                if (text[i] != c)
+                {
+                    continue;
+                }
+                int closeRun = 1;
+                while (i + closeRun < text.Length && text[i + closeRun] == c)
+                {
+                    closeRun++;
+                }
+                if (closeRun < run || i == start + run || IsBlank(text[i - 1]) ||
+                    (c == '_' && i + run < text.Length && IsIdChar(text[i + run])))
+                {
+                    i += closeRun - 1;
+                    continue;
+                }
+                end = i + run;
+                type = (c == '~') ? TypeComment : (run == 2 ? TypeKeyword : TypeVariable);
+                return true;
+            }
+            return false;
+        }
+
+        private static bool TokenizeMarkdown(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int len = text.Length;
+            int i = 0;
+            endState = 0;
+
+            // An HTML comment that began on an earlier line.
+            if ((startState & StMarkdownComment) != 0)
+            {
+                int close = text.IndexOf("-->", StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeComment, 0, len);
+                    }
+                    endState = StMarkdownComment;
+                    return true;
+                }
+                int commentEnd = close + 3;
+                sink.AddToken(TypeComment, 0, commentEnd);
+                i = commentEnd;
+            }
+
+            // A fenced code block that began on an earlier line.
+            if ((startState & StMarkdownFence) != 0)
+            {
+                char fenceChar = ((startState & StMarkdownFenceTilde) != 0) ? '~' : '`';
+                int fenceLength = (startState >> MarkdownFenceShift) & MarkdownFenceMask;
+                int spaces = 0;
+                while (spaces < len && spaces < 4 && text[spaces] == ' ')
+                {
+                    spaces++;
+                }
+                int runEnd = spaces;
+                while (runEnd < len && text[runEnd] == fenceChar)
+                {
+                    runEnd++;
+                }
+                if (runEnd - spaces >= fenceLength && SkipBlanks(text, runEnd) == len)
+                {
+                    sink.AddToken(TypePreprocessor, spaces, len);
+                    endState = 0;
+                    return true;
+                }
+                if (len > 0)
+                {
+                    sink.AddToken(TypeString, 0, len);
+                }
+                endState = startState;
+                return true;
+            }
+
+            int leading = 0;
+            while (leading < len && leading < 4 && text[leading] == ' ')
+            {
+                leading++;
+            }
+
+            // A fence opener: ``` or ~~~, indented by at most three spaces.
+            if (i == 0 && leading < len && (text[leading] == '`' || text[leading] == '~'))
+            {
+                char fenceChar = text[leading];
+                int runEnd = leading;
+                while (runEnd < len && text[runEnd] == fenceChar)
+                {
+                    runEnd++;
+                }
+                int runLength = runEnd - leading;
+                if (runLength >= 3)
+                {
+                    sink.AddToken(TypePreprocessor, leading, runEnd);
+                    int info = SkipBlanks(text, runEnd);
+                    if (info < len)
+                    {
+                        sink.AddToken(TypeString, info, len);
+                    }
+                    endState = StMarkdownFence | (fenceChar == '~' ? StMarkdownFenceTilde : 0) |
+                        (Math.Min(runLength, MarkdownFenceMask) << MarkdownFenceShift);
+                    return true;
+                }
+            }
+
+            // ATX headings: # Heading ... ###### Heading.
+            if (i == 0 && leading < len && text[leading] == '#')
+            {
+                int hashes = leading;
+                while (hashes < len && text[hashes] == '#')
+                {
+                    hashes++;
+                }
+                if (hashes - leading <= 6 && (hashes == len || IsBlank(text[hashes])))
+                {
+                    sink.AddToken(TypeSection, leading, len);
+                    return true;
+                }
+            }
+
+            // Thematic breaks and Setext underlines.
+            if (i == 0 && leading < len &&
+                (IsMarkdownThematicBreak(text, leading) || IsMarkdownSetextUnderline(text, leading) ||
+                 (text[leading] == '|' && IsMarkdownTableSeparator(text, leading))))
+            {
+                sink.AddToken(TypeSection, leading, len);
+                return true;
+            }
+
+            // Blockquote markers and list bullets, including "> - [x] task".
+            while (i < len)
+            {
+                int markerStart = i;
+                while (markerStart < len && text[markerStart] == ' ')
+                {
+                    markerStart++;
+                }
+                if (markerStart < len && text[markerStart] == '>')
+                {
+                    int markerEnd = markerStart + 1;
+                    if (markerEnd < len && IsBlank(text[markerEnd]))
+                    {
+                        markerEnd++;
+                    }
+                    sink.AddToken(TypeComment, markerStart, markerEnd);
+                    i = markerEnd;
+                    continue;
+                }
+                int listEnd = -1;
+                if (markerStart < len &&
+                    (text[markerStart] == '-' || text[markerStart] == '*' || text[markerStart] == '+') &&
+                    (markerStart + 1 == len || IsBlank(text[markerStart + 1])))
+                {
+                    listEnd = markerStart + 1;
+                    sink.AddToken(TypeKeyword, markerStart, listEnd);
+                }
+                else if (markerStart < len && IsDigit(text[markerStart]))
+                {
+                    int digits = markerStart;
+                    while (digits < len && IsDigit(text[digits]))
+                    {
+                        digits++;
+                    }
+                    if (digits - markerStart <= 9 && digits < len && (text[digits] == '.' || text[digits] == ')') &&
+                        (digits + 1 == len || IsBlank(text[digits + 1])))
+                    {
+                        sink.AddToken(TypeNumber, markerStart, digits);
+                        sink.AddToken(TypeKeyword, digits, digits + 1);
+                        listEnd = digits + 1;
+                    }
+                }
+                if (listEnd < 0)
+                {
+                    break;
+                }
+                int content = listEnd;
+                while (content < len && IsBlank(text[content]))
+                {
+                    content++;
+                }
+                if (content + 2 < len && text[content] == '[' &&
+                    (text[content + 1] == ' ' || text[content + 1] == 'x' || text[content + 1] == 'X') &&
+                    text[content + 2] == ']' &&
+                    (content + 3 == len || IsBlank(text[content + 3])))
+                {
+                    sink.AddToken(TypePreprocessor, content, content + 3);
+                    content += 3;
+                }
+                i = content;
+            }
+
+            while (i < len)
+            {
+                char c = text[i];
+
+                if (c == '\\' && i + 1 < len)
+                {
+                    i += 2;
+                    continue;
+                }
+
+                if (StartsWithAt(text, i, "<!--"))
+                {
+                    int close = text.IndexOf("-->", i + 4, StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        sink.AddToken(TypeComment, i, len);
+                        endState = StMarkdownComment;
+                        return true;
+                    }
+                    sink.AddToken(TypeComment, i, close + 3);
+                    i = close + 3;
+                    continue;
+                }
+
+                // An inline code span: `code` or ``code with ` inside``.
+                if (c == '`')
+                {
+                    int run = 1;
+                    while (i + run < len && text[i + run] == '`')
+                    {
+                        run++;
+                    }
+                    int codeEnd = -1;
+                    int j = i + run;
+                    while (j < len)
+                    {
+                        if (text[j] == '`')
+                        {
+                            int closeRun = 1;
+                            while (j + closeRun < len && text[j + closeRun] == '`')
+                            {
+                                closeRun++;
+                            }
+                            if (closeRun == run)
+                            {
+                                codeEnd = j + closeRun;
+                                break;
+                            }
+                            j += closeRun;
+                            continue;
+                        }
+                        j++;
+                    }
+                    if (codeEnd > 0)
+                    {
+                        sink.AddToken(TypeString, i, codeEnd);
+                        i = codeEnd;
+                        continue;
+                    }
+                    i += run;
+                    continue;
+                }
+
+                // Links and images: [text](url), [text][id], ![alt](url), [text].
+                if (c == '[' || (c == '!' && i + 1 < len && text[i + 1] == '['))
+                {
+                    int open = (c == '!') ? i + 1 : i;
+                    int close = FindMarkdownBracketEnd(text, open);
+                    if (close < 0)
+                    {
+                        i += (c == '!') ? 2 : 1;
+                        continue;
+                    }
+                    int urlStart = -1;
+                    int urlEnd = -1;
+                    int refStart = -1;
+                    int refEnd = -1;
+                    int after = close + 1;
+                    if (after < len && text[after] == '(')
+                    {
+                        int paren = FindMarkdownParenEnd(text, after);
+                        if (paren > after)
+                        {
+                            urlStart = after;
+                            urlEnd = paren + 1;
+                        }
+                    }
+                    else if (after < len && text[after] == '[')
+                    {
+                        int reference = FindMarkdownBracketEnd(text, after);
+                        if (reference > after)
+                        {
+                            refStart = after;
+                            refEnd = reference + 1;
+                        }
+                    }
+                    sink.AddToken(TypeKeyword, i, open + 1);
+                    sink.AddToken(TypeKeyword, close, close + 1);
+                    if (urlStart >= 0)
+                    {
+                        sink.AddToken(TypeString, urlStart, urlEnd);
+                    }
+                    else if (refStart >= 0)
+                    {
+                        sink.AddToken(TypeKeyword, refStart, refStart + 1);
+                        sink.AddToken(TypeVariable, refStart + 1, refEnd - 1);
+                        sink.AddToken(TypeKeyword, refEnd - 1, refEnd);
+                    }
+                    i = (urlEnd > 0) ? urlEnd : ((refEnd > 0) ? refEnd : close + 1);
+                    continue;
+                }
+
+                // Inline HTML tags and autolinks: <div>, </p>, <https://...>, <user@example.com>.
+                if (c == '<' && i + 1 < len && (IsIdStart(text[i + 1]) || text[i + 1] == '/' || text[i + 1] == '!'))
+                {
+                    int close = text.IndexOf('>', i + 1);
+                    if (close > i)
+                    {
+                        string inside = text.Substring(i + 1, close - i - 1);
+                        bool autolink = inside.IndexOf("://", StringComparison.Ordinal) >= 0 ||
+                            (inside.IndexOf('@') >= 0 && inside.IndexOf(' ') < 0);
+                        sink.AddToken(autolink ? TypeString : TypeKeyword, i, close + 1);
+                        i = close + 1;
+                        continue;
+                    }
+                }
+
+                if (c == '|')
+                {
+                    sink.AddToken(TypeKeyword, i, i + 1);
+                    i++;
+                    continue;
+                }
+
+                if ((c == '*' || c == '_' || c == '~') &&
+                    TryMarkdownEmphasis(text, i, out int emphasisEnd, out int emphasisType))
+                {
+                    sink.AddToken(emphasisType, i, emphasisEnd);
+                    i = emphasisEnd;
+                    continue;
+                }
+
+                // A bare URL.
+                if ((c == 'h' && (StartsWithAt(text, i, "http://") || StartsWithAt(text, i, "https://"))) ||
+                    (c == 'f' && StartsWithAt(text, i, "ftp://")) ||
+                    (c == 'm' && StartsWithAt(text, i, "mailto:")))
+                {
+                    int urlEnd = i;
+                    while (urlEnd < len && !char.IsWhiteSpace(text[urlEnd]) && "()<>[]\"'".IndexOf(text[urlEnd]) < 0)
+                    {
+                        urlEnd++;
+                    }
+                    while (urlEnd > i && ".,;:!?".IndexOf(text[urlEnd - 1]) >= 0)
+                    {
+                        urlEnd--;
+                    }
+                    if (urlEnd > i)
+                    {
+                        sink.AddToken(TypeString, i, urlEnd);
+                        i = urlEnd;
+                        continue;
+                    }
+                }
+
+                i++;
+            }
+
+            endState = 0;
             return true;
         }
 

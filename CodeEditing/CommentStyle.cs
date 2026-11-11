@@ -101,6 +101,7 @@ namespace SmarTTY.CodeEditing
                 case SyntaxHighlighting.Language.Assembly:
                     return new CommentStyle("; ");
                 case SyntaxHighlighting.Language.Markup:
+                case SyntaxHighlighting.Language.Markdown:
                     return new CommentStyle("<!-- ", " -->");
                 default:
                     return null;

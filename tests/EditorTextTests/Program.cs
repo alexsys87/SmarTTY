@@ -328,7 +328,7 @@ internal static class Program
         }
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/syslog.log"), L.Log, "logs get the colours of their timestamps and levels");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files are not highlighted");
-        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Plain, "markdown is not highlighted");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Markdown, "Markdown is highlighted");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/fix.patch"), L.Diff, "patches are diffs");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/index.html"), L.Markup, "HTML is markup");
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/bin/backup", "#!/bin/bash"), L.Bash, "#!/bin/bash makes a script without an extension bash");
@@ -889,7 +889,7 @@ internal static class Program
         {
             L.Lua, L.Json, L.Makefile, L.Python, L.Sql, L.Diff, L.Plain, L.Ruby, L.Perl, L.CMake,
             L.Dockerfile, L.Java, L.Kotlin, L.Scala, L.Groovy, L.Go, L.Rust, L.Verilog, L.Swift, L.Dart,
-            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson
+            L.JavaScript, L.TypeScript, L.Protobuf, L.Tcl, L.Assembly, L.PowerShell, L.Postfix, L.Netplan, L.Prometheus, L.Alertmanager, L.MongoDb, L.Elasticsearch, L.Meson, L.Markdown
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {
@@ -935,7 +935,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/app.log"), L.Log, ".log anywhere");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/app.log.3"), L.Log, "a rotated .log anywhere");
         Equal(SyntaxHighlighting.DetectLanguage("/var/log/wtmp"), L.Plain, "wtmp is binary");
-        Equal(SyntaxHighlighting.DetectLanguage("/var/log/README.md"), L.Plain, "a markdown file in /var/log is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/var/log/README.md"), L.Markdown, "a Markdown file in /var/log is Markdown");
         Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "prose stays plain");
         Equal(SyntaxHighlighting.DetectLanguage("/tmp/x.1"), L.Plain, "a file called x.1 elsewhere says nothing");
 
@@ -1596,7 +1596,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/usr/local/etc/logrotate.d/app"), L.Logrotate, "a drop-in of a custom prefix");
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/logrotate.conf"), L.Logrotate, "a logrotate.conf outside /etc");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/README"), L.Plain, "the README of logrotate.d is prose");
-        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/README.md"), L.Plain, "a Markdown README of logrotate.d is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/README.md"), L.Markdown, "a Markdown README of logrotate.d is Markdown");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d/notes.ini"), L.Config, "an ini file of logrotate.d is not logrotate");
         Equal(SyntaxHighlighting.DetectLanguage("/etc/logrotate.d-available/app"), L.Plain, "logrotate.d-available is not read by logrotate");
 
@@ -2460,6 +2460,79 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Hcl).Toggle(new[] { "resource \"aws_instance\" \"web\" {}" })), "# resource \"aws_instance\" \"web\" {}", "HCL comment");
     }
 
+    private static void MarkdownChecks()
+    {
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md"), L.Markdown, ".md is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.markdown"), L.Markdown, ".markdown is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.mdown"), L.Markdown, ".mdown is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.mkd"), L.Markdown, ".mkd is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.mkdn"), L.Markdown, ".mkdn is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.mdwn"), L.Markdown, ".mdwn is Markdown");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.MD"), L.Markdown, "the extension is matched without regard to case");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/README.md.bak"), L.Plain, "a backup of a Markdown file is prose");
+        Equal(SyntaxHighlighting.DetectLanguage("/home/u/notes.txt"), L.Plain, "text files stay plain");
+
+        Highlighted md = new Highlighted(L.Markdown,
+            "# Title\n" +
+            "## Section\n" +
+            "\n" +
+            "A paragraph with **bold**, *italic*, `code` and ~~gone~~.\n" +
+            "\n" +
+            "> A quote\n" +
+            "> - [x] done\n" +
+            "\n" +
+            "- item\n" +
+            "- [ ] task\n" +
+            "1. first\n" +
+            "2) second\n" +
+            "\n" +
+            "```c\n" +
+            "int main(void) { return 0; }\n" +
+            "```\n" +
+            "\n" +
+            "[link](https://example.com) ![alt](image.png) <https://example.org>\n" +
+            "\n" +
+            "| Name | Value |\n" +
+            "| --- | ---: |\n" +
+            "| a | 1 |\n" +
+            "\n" +
+            "<!-- a comment\n" +
+            "that spans lines -->\n" +
+            "\n" +
+            "Setext heading\n" +
+            "===\n");
+        Equal(Join(md.Tokens(0, SyntaxHighlighting.TypeSection)), "# Title", "Markdown: a level-one heading");
+        Equal(Join(md.Tokens(1, SyntaxHighlighting.TypeSection)), "## Section", "Markdown: a level-two heading");
+        Equal(Join(md.Tokens(3, SyntaxHighlighting.TypeKeyword)), "**bold**", "Markdown: bold");
+        Equal(Join(md.Tokens(3, SyntaxHighlighting.TypeVariable)), "*italic*", "Markdown: italic");
+        Equal(Join(md.Tokens(3, SyntaxHighlighting.TypeString)), "`code`", "Markdown: inline code");
+        Equal(Join(md.Tokens(3, SyntaxHighlighting.TypeComment)), "~~gone~~", "Markdown: strikethrough");
+        Equal(Join(md.Tokens(5, SyntaxHighlighting.TypeComment)), "> ", "Markdown: a quote marker");
+        Equal(Join(md.Tokens(6, SyntaxHighlighting.TypeComment)), "> ", "Markdown: a quote marker with a list");
+        Equal(Join(md.Tokens(6, SyntaxHighlighting.TypeKeyword)), "-", "Markdown: a task list bullet");
+        Equal(Join(md.Tokens(6, SyntaxHighlighting.TypePreprocessor)), "[x]", "Markdown: a checked task");
+        Equal(Join(md.Tokens(8, SyntaxHighlighting.TypeKeyword)), "-", "Markdown: an unordered list bullet");
+        Equal(Join(md.Tokens(9, SyntaxHighlighting.TypePreprocessor)), "[ ]", "Markdown: an unchecked task");
+        Equal(Join(md.Tokens(10, SyntaxHighlighting.TypeNumber)), "1", "Markdown: an ordered list number");
+        Equal(Join(md.Tokens(10, SyntaxHighlighting.TypeKeyword)), ".", "Markdown: an ordered list dot");
+        Equal(Join(md.Tokens(11, SyntaxHighlighting.TypeNumber)), "2", "Markdown: another ordered list number");
+        Equal(Join(md.Tokens(11, SyntaxHighlighting.TypeKeyword)), ")", "Markdown: an ordered list parenthesis");
+        Equal(Join(md.Tokens(13, SyntaxHighlighting.TypePreprocessor)), "```", "Markdown: a fence");
+        Equal(Join(md.Tokens(13, SyntaxHighlighting.TypeString)), "c", "Markdown: the fence language");
+        Equal(Join(md.Tokens(14, SyntaxHighlighting.TypeString)), "int main(void) { return 0; }", "Markdown: a code line");
+        Equal(Join(md.Tokens(15, SyntaxHighlighting.TypePreprocessor)), "```", "Markdown: the closing fence");
+        Equal(Join(md.Tokens(17, SyntaxHighlighting.TypeKeyword)), "[|]|![|]", "Markdown: link brackets");
+        Equal(Join(md.Tokens(17, SyntaxHighlighting.TypeString)), "(https://example.com)|(image.png)|<https://example.org>", "Markdown: link targets and autolinks");
+        Equal(Join(md.Tokens(19, SyntaxHighlighting.TypeKeyword)), "|||||", "Markdown: three table pipes");
+        Equal(Join(md.Tokens(20, SyntaxHighlighting.TypeSection)), "| --- | ---: |", "Markdown: a table separator");
+        Equal(Join(md.Tokens(23, SyntaxHighlighting.TypeComment)), "<!-- a comment", "Markdown: an HTML comment");
+        Equal(Join(md.Tokens(24, SyntaxHighlighting.TypeComment)), "that spans lines -->", "Markdown: the second line of an HTML comment");
+        Equal(Join(md.Tokens(27, SyntaxHighlighting.TypeSection)), "===", "Markdown: a Setext underline");
+
+        Check(Folds(md).Length == 0, "Markdown does not fold");
+        Equal(Join(CommentStyle.ForLanguage(L.Markdown).Toggle(new[] { "text" })), "<!-- text -->", "Markdown comment");
+    }
+
     private static void KubernetesChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/k8s/deployment.yaml"), L.Kubernetes, "a manifest under /k8s/");
@@ -3181,6 +3254,7 @@ internal static class Program
         ElasticsearchChecks();
         MesonChecks();
         HclChecks();
+        MarkdownChecks();
         KubernetesChecks();
         DockerComposeChecks();
         AnsibleChecks();
