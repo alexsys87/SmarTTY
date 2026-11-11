@@ -840,7 +840,6 @@ public partial class DeviceTerminalControl : DpiAwareControl
             Location = new Point(0, 0),
             SelectionStyle = new HighlightStyle(),
             Margin = new Padding(5, 4, 5, 4),
-            UnusedValue = 0,
             MouseMode = TerminalEmulatorControl.MouseReportingMode.Off,
             Name = "serialTerminalControl1",
             EnterSequence = null,

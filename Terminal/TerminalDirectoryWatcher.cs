@@ -96,7 +96,14 @@ public sealed class TerminalDirectoryWatcher
         }
         foreach (Match match in Osc.Matches(text))
         {
-            string directory = DirectoryOfOsc(int.Parse(match.Groups["code"].Value), match.Groups["text"].Value);
+            // The code has no length limit in the regex (a host can write any number of digits): int.Parse would
+            // throw OverflowException for one too long to fit, which must not take down the caller over a malformed
+            // or hostile escape sequence.
+            if (!int.TryParse(match.Groups["code"].Value, out int code))
+            {
+                continue;
+            }
+            string directory = DirectoryOfOsc(code, match.Groups["text"].Value);
             if (directory != null)
             {
                 Report(directory);

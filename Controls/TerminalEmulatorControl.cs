@@ -504,8 +504,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public bool CaptureDialogKeys { get; set; }
 
-    public int UnusedValue { get; set; }
-
     public event TerminalSizeChangedHandler TerminalSizeChanged;
 
     public event TerminalDataHandler DataEntered;

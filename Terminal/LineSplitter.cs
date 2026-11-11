@@ -1,34 +1,40 @@
 using System.Collections.Generic;
+using System.Text;
 
 namespace SmarTTY.Terminal;
 
 public class LineSplitter
 {
-    private Utf8StreamDecoder _decoder = new Utf8StreamDecoder();
+    private readonly Utf8StreamDecoder _decoder = new Utf8StreamDecoder();
 
-    private string _pending = "";
+    private readonly StringBuilder _pending = new StringBuilder();
 
-    public string PendingText => _pending;
+    // How much of _pending (from the start) has already been searched for a newline and found to have none: a line
+    // that keeps growing without ending is otherwise rescanned from its very first character on every chunk that
+    // arrives for it, which is quadratic in its eventual length. Only the text appended since needs to be searched
+    // again, since a newline cannot have appeared earlier without already being found.
+    private int _scanned;
+
+    public string PendingText => _pending.ToString();
 
     public IEnumerable<string> Feed(byte[] buffer, int offset, int count)
     {
         List<string> lines = new List<string>();
-        this._pending += this._decoder.Decode(buffer, offset, count);
-        int startIndex = 0;
-        while (true)
+        _pending.Append(_decoder.Decode(buffer, offset, count));
+        int lineStart = 0;
+        for (int index = _scanned; index < _pending.Length; index++)
         {
-            int newlineIndex = this._pending.IndexOf('\n', startIndex);
-            if (newlineIndex == -1)
+            if (_pending[index] == '\n')
             {
-                break;
+                lines.Add(_pending.ToString(lineStart, index - lineStart));
+                lineStart = index + 1;
             }
-            lines.Add(this._pending.Substring(startIndex, newlineIndex - startIndex));
-            startIndex = newlineIndex + 1;
         }
-        if (startIndex != 0)
+        if (lineStart != 0)
         {
-            this._pending = this._pending.Substring(startIndex);
+            _pending.Remove(0, lineStart);
         }
+        _scanned = _pending.Length;
         return lines;
     }
 }
