@@ -149,6 +149,12 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private ExtendedDataMode _extendedDataMode;
 
+    // Set by LimitUnprocessedData: holds the receiving thread back while the consumer of DataReceived is far behind.
+    private volatile ReceiveFlowGate _flow;
+
+    // How long the receiving thread waits for a consumer that is behind, before it carries on anyway (see ReceiveFlowGate).
+    private static readonly TimeSpan FlowWaitTimeout = TimeSpan.FromSeconds(2);
+
     private bool _polling;
 
     private bool _eofReceived;
@@ -360,6 +366,24 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     public event ChannelEventHandler Finished;
 
     /// <summary>
+    /// Turns on flow control for the <see cref="DataReceived"/> handlers: while more than <paramref name="maxBytes"/>
+    /// of the data delivered to them is not yet reported by <see cref="MarkProcessed"/>, the channel stops reading
+    /// from the connection, and the server is slowed down by the flow control of TCP. A consumer that turns this on
+    /// must call <see cref="MarkProcessed"/> for every chunk it gets, once it has dealt with it. Without it the data
+    /// that a host writes faster than it is drawn piles up in memory without bound.
+    /// </summary>
+    public void LimitUnprocessedData(long maxBytes)
+    {
+        _flow = new ReceiveFlowGate(maxBytes);
+    }
+
+    /// <summary>Tells the channel that the consumer is done with <paramref name="count"/> bytes it received (see <see cref="LimitUnprocessedData"/>).</summary>
+    public void MarkProcessed(int count)
+    {
+        _flow?.Release(count);
+    }
+
+    /// <summary>
     /// Opens a session channel and starts <paramref name="command"/> (or a shell if it is null),
     /// requesting a PTY of type <paramref name="terminalType"/> if it is not null.
     /// </summary>
@@ -459,6 +483,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
         byte[] chunk = new byte[data.Count];
         Buffer.BlockCopy(data.Array, data.Offset, chunk, 0, data.Count);
         _session.AddReceivedBytes(chunk.Length);
+        ReceiveFlowGate flow = null;
         lock (_sync)
         {
             if (streamId == StderrStreamId)
@@ -475,11 +500,18 @@ public class SshShellChannel : IAsyncChannel, IDisposable
             if (_polling)
             {
                 DispatchData(chunk, streamId);
-                return;
+                flow = _flow;
             }
-            _queues[streamId].Add(chunk);
-            Monitor.PulseAll(_sync);
+            else
+            {
+                _queues[streamId].Add(chunk);
+                Monitor.PulseAll(_sync);
+            }
         }
+        // Outside the lock. This is SSH.NET's receive thread: while it waits here nothing more is read from the
+        // connection (the server is slowed down by TCP), which is the point when the consumer is far behind. The wait
+        // is bounded, so a consumer that waits for this thread itself cannot deadlock with it.
+        flow?.WaitForRoom(FlowWaitTimeout);
     }
 
     private void OnChannelEof()
@@ -540,6 +572,8 @@ public class SshShellChannel : IAsyncChannel, IDisposable
 
     private void MarkClosed()
     {
+        // Nobody is left to report processed data of a closed channel.
+        _flow?.Open();
         lock (_sync)
         {
             _eofReceived = true;
@@ -555,6 +589,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     // Must be called under _sync so that events keep the order in which the data arrived.
     private void DispatchData(byte[] chunk, int streamId)
     {
+        _flow?.Add(chunk.Length);
         _session.Dispatch(() =>
         {
             DataReceived?.Invoke(this, chunk, 0, chunk.Length, streamId);
@@ -756,6 +791,7 @@ public class SshShellChannel : IAsyncChannel, IDisposable
             _disposed = true;
             _polling = false;
         }
+        _flow?.Open();
         _session.UnregisterChannel(this);
         try
         {
