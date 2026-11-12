@@ -2887,10 +2887,8 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                         return;
                     }
                 }
-                session.PtyGate.BeginPlainHelper();
-                try
+                using (SshShellChannel channel = session.OpenPlainChannel(QuickCommandRules.BuildUploadCommand(remotePath)))
                 {
-                    using SshShellChannel channel = session.OpenShellChannel(QuickCommandRules.BuildUploadCommand(remotePath), null, ExtendedDataMode.Normal);
                     channel.Input.Write(data, 0, data.Length);
                     channel.SendEof();
                     string stderr = new StreamReader(channel.Error).ReadToEnd().Trim();
@@ -2900,10 +2898,6 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                         session.ThrowIfConnectionLost();
                         throw new IOException(stderr.Length > 0 ? stderr : "the upload failed (exit status " + (channel.HasExitStatus ? channel.ExitStatus.ToString(System.Globalization.CultureInfo.InvariantCulture) : "unknown") + ")");
                     }
-                }
-                finally
-                {
-                    session.PtyGate.EndPlainHelper();
                 }
                 string invocation = inCurrentFolder ? QuickCommandRules.BuildInvocation(fileName) : QuickCommandRules.BuildInvocation(fileName, directory);
                 _Controller.BeginInvoke(() =>

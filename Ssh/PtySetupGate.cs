@@ -11,7 +11,10 @@ namespace SmarTTY.Ssh;
 ///
 /// The gate keeps the short helper commands without a PTY (<see cref="SshSession.RunCommand"/>) from overlapping
 /// with setting up a PTY channel: the setup waits until the running helpers have finished, and new helpers wait until
-/// the setup is done. A helper that runs for longer (or hangs) delays the setup by at most the timeout.
+/// the setups that are waiting or running are done. A helper that runs for longer (or hangs) delays the setup by at most the
+/// timeout. A long operation (a backup, a restore, an upload of a script) is a helper only while its channel is being opened
+/// (<see cref="SshSession.OpenPlainChannel"/>): holding the gate for the whole run made every new tab wait for the timeout and
+/// then set up its PTY in the very moment that the gate exists to avoid.
 /// </summary>
 internal sealed class PtySetupGate
 {
@@ -21,7 +24,12 @@ internal sealed class PtySetupGate
 
     private int _runningPlainHelpers;
 
-    private bool _ptySetupInProgress;
+    // Setups of a PTY that run now (a number: two that ran out of time together are both in progress, and the first to end must not
+    // open the gate for the helpers while the second still sets up) and that wait for the helpers to end. Both keep new helpers back,
+    // or a steady stream of short helpers would hold a setup for the whole timeout.
+    private int _ptySetupsInProgress;
+
+    private int _ptySetupsWaiting;
 
     public PtySetupGate(TimeSpan timeout)
     {
@@ -33,7 +41,7 @@ internal sealed class PtySetupGate
         lock (_sync)
         {
             DateTime deadline = DateTime.UtcNow + _timeout;
-            while (_ptySetupInProgress && Wait(deadline))
+            while ((_ptySetupsInProgress > 0 || _ptySetupsWaiting > 0) && Wait(deadline))
             {
             }
             _runningPlainHelpers++;
@@ -54,10 +62,18 @@ internal sealed class PtySetupGate
         lock (_sync)
         {
             DateTime deadline = DateTime.UtcNow + _timeout;
-            while ((_ptySetupInProgress || _runningPlainHelpers > 0) && Wait(deadline))
+            _ptySetupsWaiting++;
+            try
             {
+                while ((_ptySetupsInProgress > 0 || _runningPlainHelpers > 0) && Wait(deadline))
+                {
+                }
             }
-            _ptySetupInProgress = true;
+            finally
+            {
+                _ptySetupsWaiting--;
+            }
+            _ptySetupsInProgress++;
         }
     }
 
@@ -65,7 +81,10 @@ internal sealed class PtySetupGate
     {
         lock (_sync)
         {
-            _ptySetupInProgress = false;
+            if (_ptySetupsInProgress > 0)
+            {
+                _ptySetupsInProgress--;
+            }
             Monitor.PulseAll(_sync);
         }
     }

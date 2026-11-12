@@ -1164,6 +1164,24 @@ public class SshSession : IDisposable
     }
 
     /// <summary>
+    /// Opens a channel without a PTY for a long operation (a backup, a restore, an upload of a script) and gives it back at once: the
+    /// operation counts as a helper command of <see cref="PtyGate"/> only while the channel is being opened, not for its whole run
+    /// (see <see cref="PtySetupGate"/>).
+    /// </summary>
+    internal SshShellChannel OpenPlainChannel(string command, ExtendedDataMode extendedDataMode = ExtendedDataMode.Normal)
+    {
+        PtyGate.BeginPlainHelper();
+        try
+        {
+            return OpenShellChannel(command, null, extendedDataMode);
+        }
+        finally
+        {
+            PtyGate.EndPlainHelper();
+        }
+    }
+
+    /// <summary>
     /// Opens a channel running the server's <paramref name="subsystem"/> (e.g. "sftp").
     /// </summary>
     public SshShellChannel OpenSubsystemChannel(string subsystem)

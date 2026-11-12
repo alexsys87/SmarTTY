@@ -504,10 +504,9 @@ public partial class RestoreWindow : Window
     {
         UnpackRun run = new UnpackRun();
         _Clock = Stopwatch.StartNew();
-        session.PtyGate.BeginPlainHelper();
         try
         {
-            using SshShellChannel channel = session.OpenShellChannel(RemoteRestore.BuildExtractCommand(target, gzip, keep, useSudo), null, ExtendedDataMode.Normal);
+            using SshShellChannel channel = session.OpenPlainChannel(RemoteRestore.BuildExtractCommand(target, gzip, keep, useSudo));
             _Channel = channel;
             if (_CancelRequested)
             {
@@ -592,7 +591,6 @@ public partial class RestoreWindow : Window
         finally
         {
             _Channel = null;
-            session.PtyGate.EndPlainHelper();
         }
     }
 
@@ -608,10 +606,9 @@ public partial class RestoreWindow : Window
             return new List<string>();
         }
         List<string> answers = new List<string>();
-        session.PtyGate.BeginPlainHelper();
         try
         {
-            using SshShellChannel channel = session.OpenShellChannel(RemoteRestore.BuildVerifyCommand(target, useSudo), null, ExtendedDataMode.Normal);
+            using SshShellChannel channel = session.OpenPlainChannel(RemoteRestore.BuildVerifyCommand(target, useSudo));
             _Channel = channel;
             Thread reader = new Thread(() => ReadLines(channel.Output, line =>
             {
@@ -648,7 +645,6 @@ public partial class RestoreWindow : Window
         finally
         {
             _Channel = null;
-            session.PtyGate.EndPlainHelper();
         }
         lock (answers)
         {
