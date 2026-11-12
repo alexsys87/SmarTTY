@@ -102,6 +102,8 @@ internal static class Program
         Check(Names(L.Css, "", "").Contains("font-size"), "a hyphenated CSS property is offered");
         Check(Names(L.Kconfig, "", "").Contains("menuconfig"), "the Kconfig directive 'menuconfig' is offered");
         Check(Names(L.Kconfig, "", "").Contains("depends"), "the Kconfig directive 'depends' is offered");
+        Check(Names(L.Kconfig, "", "").Contains("rsource"), "the Kconfig directive 'rsource' is offered");
+        Check(Names(L.Kconfig, "", "").Contains("osource"), "the Kconfig directive 'osource' is offered");
         Check(Names(L.UBoot, "", "").Contains("bootm"), "the U-Boot command 'bootm' is offered");
         Check(Names(L.UBoot, "", "").Contains("setenv"), "the U-Boot command 'setenv' is offered");
         Check(Names(L.Yocto, "", "").Contains("SRC_URI"), "the BitBake variable 'SRC_URI' is offered");

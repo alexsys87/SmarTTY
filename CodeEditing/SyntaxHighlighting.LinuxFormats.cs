@@ -15,7 +15,7 @@ public static partial class SyntaxHighlighting
 
     private static readonly HashSet<string> KconfigKeywords = Words(StringComparer.Ordinal,
         // structure
-        @"config menuconfig menu endmenu choice endchoice comment mainmenu source if endif
+        @"config menuconfig menu endmenu choice endchoice comment mainmenu source rsource osource orsource if endif
           depends select imply default prompt help range visible option optional modules transition
           bool tristate string int hex def_bool def_tristate def_hex def_string def_int");
 
