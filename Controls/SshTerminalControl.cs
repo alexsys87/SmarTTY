@@ -205,6 +205,11 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         }
     }
 
+    // The most output of a command that is received and not yet drawn (the same ceiling as for a device terminal, see
+    // AsyncTransportConnection.MaxPendingReceiveBytes). The chunks of a packet are about 32 KB, so the backlog is a few
+    // hundred chunks at most.
+    internal const int MaxUnprocessedOutputBytes = 4 * 1024 * 1024;
+
     private class CommandChannel : IDisposable
     {
 
@@ -223,30 +228,53 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             _channel = sshShellChannel;
             this._terminal = sshTerminalControl;
             this.Run = commandRun;
+            // The output of a command may come faster than the terminal can draw it: past this much that is not yet drawn
+            // the channel stops reading, and the server is slowed down (see SshShellChannel.LimitUnprocessedData).
+            sshShellChannel.LimitUnprocessedData(MaxUnprocessedOutputBytes);
             sshShellChannel.DataReceived += OnDataReceived;
         }
 
         private void OnDataReceived(object sender, byte[] buffer, int offset, int count, int flags)
         {
-            // In byte mode the terminal needs to see which stray byte arrived (see Utf8StreamDecoder).
-            _decoder.EscapeInvalidBytes = _terminal.ByteOrientedLineEditing;
-            string text = _decoder.Decode(buffer, offset, count);
-            if (!this._outputStarted)
+            bool handedOver = false;
+            try
             {
-                text = text.TrimStart('\r', '\n');
-                if (text == "")
+                // In byte mode the terminal needs to see which stray byte arrived (see Utf8StreamDecoder).
+                _decoder.EscapeInvalidBytes = _terminal.ByteOrientedLineEditing;
+                string text = _decoder.Decode(buffer, offset, count);
+                if (!this._outputStarted)
                 {
-                    return;
+                    text = text.TrimStart('\r', '\n');
+                    if (text == "")
+                    {
+                        return;
+                    }
+                    this._outputStarted = true;
                 }
-                this._outputStarted = true;
+                handedOver = true;
+                this._terminal.PostToUi(() =>
+                {
+                    try
+                    {
+                        if (this._terminal._channel == this)
+                        {
+                            this._terminal.ProcessOutput(text);
+                        }
+                    }
+                    finally
+                    {
+                        // Only now is the chunk off the books: the channel reads on once the backlog is small enough.
+                        _channel.MarkProcessed(count);
+                    }
+                });
             }
-            this._terminal.PostToUi(() =>
+            finally
             {
-                if (this._terminal._channel == this)
+                if (!handedOver)
                 {
-                    this._terminal.ProcessOutput(text);
+                    _channel.MarkProcessed(count);
                 }
-            });
+            }
         }
 
         public void SendInput(byte[] buffer, InputKind inputKind)
@@ -2172,23 +2200,30 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             return;
         }
-        try
+        if (!IsDisposed && IsHandleCreated)
         {
-            if (!IsDisposed && IsHandleCreated)
+            // The next pass is started by a timer, not by BeginInvoke: a posted message is taken from the message queue
+            // before input and before WM_PAINT, so a pass that re-posted itself straight away could keep the window
+            // from repainting for as long as the output kept coming. WM_TIMER is taken last.
+            if (_drainTimer == null)
             {
-                BeginInvoke(new Action(DrainUiQueue));
-                return;
+                _drainTimer = new System.Windows.Forms.Timer { Interval = 1 };
+                _drainTimer.Tick += (object sender, EventArgs e) =>
+                {
+                    _drainTimer.Stop();
+                    DrainUiQueue();
+                };
             }
-        }
-        catch (InvalidOperationException)
-        {
-            // The tab is being closed: late output of its command has nowhere to go.
+            _drainTimer.Start();
+            return;
         }
         lock (_uiQueue)
         {
             _uiQueue.Clear();
         }
     }
+
+    private System.Windows.Forms.Timer _drainTimer;
 
     private void OnCommandFinished(CommandChannel commandChannel, bool connectionLost, int exitStatus, bool statusKnown)
     {
@@ -2296,6 +2331,8 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             // Closing the tab stops the command that is running in it (tail -f, top, ...): its channel used to stay
             // open until the whole session was closed.
             EndLinePaste();
+            _drainTimer?.Dispose();
+            _drainTimer = null;
             CommandChannel channel = _channel;
             _channel = null;
             channel?.DisposeInBackground();
