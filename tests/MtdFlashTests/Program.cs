@@ -263,6 +263,13 @@ internal static class Program
         info.Tools.Add("flash_erase");
         info.Tools.Add("nandwrite");
         Check(MtdFlash.BuildWriteCommand(info, nand, "/tmp/i", true, out tool, out _).StartsWith("sudo -n ") && tool == "flash_erase + nandwrite", "write: flash_erase and nandwrite for NAND, with sudo");
+        // NAND: erase to the end of the partition (0 0), never a block count computed from the image: a bad block that
+        // flash_erase counts but nandwrite skips would push the end of the image onto blocks that were not erased.
+        string nandCommand = Plain(MtdFlash.BuildWriteCommand(info, nand, "/tmp/i", false, out _, out _));
+        Check(nandCommand.Contains("flash_erase '/dev/mtd4' 0 0 && nandwrite -p '/dev/mtd4' '/tmp/i'") && !nandCommand.Contains("$(("), "write: NAND erases to the end of the partition");
+        MtdPartition nandWithErase = new MtdPartition { Index = 4, Name = "ubi", Size = 0x1000, EraseSize = 0x200, Type = "nand", Device = "/dev/mtd4" };
+        string nandCommand2 = Plain(MtdFlash.BuildWriteCommand(info, nandWithErase, "/tmp/i", false, out _, out _));
+        Check(nandCommand2.Contains("flash_erase '/dev/mtd4' 0 0 &&") && !nandCommand2.Contains("$(("), "write: NAND with a known erase size still erases to the end");
         info.Tools.Add("mtd");
         Check(Plain(MtdFlash.BuildWriteCommand(info, nand, "/tmp/i", false, out tool, out _)).Contains("mtd write '/tmp/i' '/dev/mtd4'") && tool == "mtd", "write: mtd of OpenWrt first");
         Check(MtdFlash.BuildWriteCommand(info, new MtdPartition { Index = 5, Name = "b", Device = "/dev/mtdblock5" }, "/tmp/i", false, out _, out reason) == null && reason.Contains("character device"), "write: a block device is not written");
@@ -282,6 +289,20 @@ internal static class Program
         errors.Clear();
         MtdFlash.CheckRestore(new MtdImagePart { Size = 1 }, nor, new MtdHostInfo(), errors, warnings);
         Check(errors.Any(e => e.Contains("sha256sum")) && errors.Any(e => e.Contains("flashcp")), "check: no checksum and no write tool");
+        // A smaller image on NAND written with flash_erase + nandwrite: the rest of the partition is erased, and the warning says so.
+        MtdHostInfo nandTools = new MtdHostInfo();
+        nandTools.Tools.Add("md5sum");
+        nandTools.Tools.Add("flash_erase");
+        nandTools.Tools.Add("nandwrite");
+        errors.Clear();
+        warnings.Clear();
+        MtdFlash.CheckRestore(new MtdImagePart { Size = 0x800, Name = "ubi" }, new MtdPartition { Index = 4, Name = "ubi", Size = 0x1000, Type = "nand", Device = "/dev/mtd4" }, nandTools, errors, warnings);
+        Check(errors.Count == 0 && warnings.Any(w => w.Contains("smaller") && w.Contains("erased") && w.Contains("0xFF")), "check: a smaller image on NAND warns that the rest is erased (" + string.Join("; ", warnings) + ")");
+        warnings.Clear();
+        MtdFlash.CheckRestore(new MtdImagePart { Size = 0x800, Name = "firmware" }, nor, info, errors, warnings);
+        Check(!warnings.Any(w => w.Contains("0xFF")), "check: a smaller image with mtd or flashcp does not claim the rest is erased");
+        errors.Clear();
+        warnings.Clear();
 
         List<MtdPartition> partitions = OpenWrtPartitions(true);
         Equal(MtdFlash.MatchPartition(new MtdImagePart { Name = "firmware", Size = 0xfb0000 }, partitions)?.Index, 3, "match: by name and size");
@@ -453,6 +474,10 @@ internal static class Program
             MtdRestoreJob.Restore(new LocalShell(busybox, bin), () => restoreInfo, imagePart, () => new MemoryStream(newImage), target, false, "t1", (step, text) => steps.Add(step), null, null, restoreLog.Add);
             byte[] after = File.ReadAllBytes(device);
             Check(after.Take(newImage.Length).SequenceEqual(newImage), label + " restore with " + toolSet + ": the partition holds the image");
+            if (toolSet == "nandwrite")
+            {
+                Check(after.Skip(newImage.Length).All(x => x == 0xFF), label + " restore with nandwrite: the rest of the partition is erased");
+            }
             Check(steps.Distinct().SequenceEqual(new[] { MtdRestoreStep.CheckingImage, MtdRestoreStep.CheckingMemory, MtdRestoreStep.Uploading, MtdRestoreStep.CheckingUpload, MtdRestoreStep.Writing, MtdRestoreStep.CheckingFlash, MtdRestoreStep.CleaningUp }), label + " restore with " + toolSet + ": every step in order");
             Check(restoreLog.Any(l => l.Contains("written and read back")) && Directory.GetFiles(ramDir).Length == 0, label + " restore with " + toolSet + ": read back from the flash, the image in RAM removed");
         }

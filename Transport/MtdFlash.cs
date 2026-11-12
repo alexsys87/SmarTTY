@@ -715,19 +715,14 @@ public static class MtdFlash
                 return null;
             }
             tool = "flash_erase + nandwrite";
-            if (partition.EraseSize > 0)
-            {
-                // "flash_erase device 0 0" erases to the end of the device, not just what the image needs: a smaller
-                // image then leaves the rest of the partition as 0xFF instead of the untouched data CheckRestore's
-                // warning promises. Erase only as many blocks as the image (read back from the upload, not trusted
-                // from the caller) actually fills, rounded up to a whole erase block, like mtd write and flashcp do.
-                string blocks = "$(( ($(wc -c < " + image + ") + " + partition.EraseSize.ToString(CultureInfo.InvariantCulture) + " - 1) / " + partition.EraseSize.ToString(CultureInfo.InvariantCulture) + " ))";
-                script = "flash_erase " + device + " 0 " + blocks + " && nandwrite -p " + device + " " + image;
-            }
-            else
-            {
-                script = "flash_erase " + device + " 0 0 && nandwrite -p " + device + " " + image;
-            }
+            // "flash_erase device 0 0" erases to the end of the partition on purpose, not just as many blocks as the image
+            // fills. flash_erase counts the bad blocks of the range it is given (it skips them, but they use up the
+            // count), while nandwrite skips a bad block and writes the data on into the next good one. With a count
+            // computed from the image size, k bad blocks in that range push the last k blocks of the image past the
+            // erased range onto blocks that still hold the old data, and nandwrite does not report it. Erasing the
+            // whole partition leaves nandwrite only erased good blocks to write to; CheckRestore warns that the rest
+            // of the partition is left empty (0xFF).
+            script = "flash_erase " + device + " 0 0 && nandwrite -p " + device + " " + image;
         }
         else
         {
@@ -795,14 +790,16 @@ public static class MtdFlash
         {
             errors.Add("the server has neither sha256sum nor md5sum, so the image in RAM and the flash cannot be checked");
         }
-        BuildWriteCommand(info, partition, "/tmp/x", false, out _, out string reason);
+        BuildWriteCommand(info, partition, "/tmp/x", false, out string writeTool, out string reason);
         if (reason != null)
         {
             errors.Add(reason);
         }
         if (part.Size < partition.Size && part.Size > 0)
         {
-            warnings.Add("the image is smaller than " + partition.Label + ": only its first " + FormatBytes(part.Size) + " are written and checked");
+            // flash_erase + nandwrite erases the whole partition (see BuildWriteCommand), mtd and flashcp only what they write.
+            warnings.Add("the image is smaller than " + partition.Label + ": only its first " + FormatBytes(part.Size) + " are written and checked"
+                + (writeTool == "flash_erase + nandwrite" ? "; the rest of the partition is erased and left empty (0xFF), its old data is lost" : ""));
         }
         if (part.Name != null && !string.Equals(part.Name, partition.Name, StringComparison.Ordinal))
         {
