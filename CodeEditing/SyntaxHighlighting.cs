@@ -1377,7 +1377,7 @@ namespace SmarTTY.CodeEditing
                 case Language.Sql:
                     return Combine(SqlKeywords);
                 case Language.Makefile:
-                    return Combine(MakeDirectives);
+                    return Combine(MakeDirectives, MakeFunctions);
                 case Language.Json:
                     return Combine(JsonLiterals);
                 case Language.Config:
@@ -6436,8 +6436,29 @@ namespace SmarTTY.CodeEditing
             "else", "ifeq", "ifneq", "ifdef", "ifndef", "endif", "define", "endef"
         };
 
+        /// <summary>The built-in functions of GNU make; they are called as "$(name arguments)".</summary>
+        private static readonly HashSet<string> MakeFunctions = new HashSet<string>(StringComparer.Ordinal)
+        {
+            // Text.
+            "subst", "patsubst", "strip", "findstring", "filter", "filter-out", "sort", "word",
+            "wordlist", "words", "firstword", "lastword",
+            // File names.
+            "dir", "notdir", "suffix", "basename", "addsuffix", "addprefix", "join", "wildcard",
+            "realpath", "abspath",
+            // Conditionals and loops.
+            "if", "or", "and", "intcmp", "foreach", "let",
+            // Other.
+            "file", "call", "value", "eval", "origin", "flavor", "shell", "error", "warning", "info", "guile"
+        };
+
         /// <summary>Index after the closing bracket of "$(...)" / "${...}" that starts at index, or the end of the line.</summary>
         private static int FindMakeReferenceEnd(string text, int index)
+        {
+            bool closed;
+            return FindMakeReferenceEnd(text, index, out closed);
+        }
+
+        private static int FindMakeReferenceEnd(string text, int index, out bool closed)
         {
             char open = text[index + 1];
             char close = (open == '(') ? ')' : '}';
@@ -6450,10 +6471,67 @@ namespace SmarTTY.CodeEditing
                 }
                 else if (text[j] == close && --depth == 0)
                 {
+                    closed = true;
                     return j + 1;
                 }
             }
+            closed = false;
             return text.Length;
+        }
+
+        /// <summary>
+        /// Adds the tokens of "$(...)" / "${...}": a built-in function name is a keyword, the rest of the
+        /// reference is a variable. Nested references (and quoted arguments) are recognized in turn.
+        /// </summary>
+        private static void AddMakeReference(string text, int start, int end, bool closed, TokenCache.ITokenSink sink)
+        {
+            int nameStart = start + 2;
+            int limit = closed ? end - 1 : end;
+            int nameEnd = nameStart;
+            while (nameEnd < limit && (char.IsLetter(text[nameEnd]) || text[nameEnd] == '-'))
+            {
+                nameEnd++;
+            }
+            bool isFunction = closed && nameEnd > nameStart && nameEnd < limit && IsBlank(text[nameEnd])
+                && MakeFunctions.Contains(text.Substring(nameStart, nameEnd - nameStart));
+            if (!isFunction)
+            {
+                sink.AddToken(TypeVariable, start, end);
+                return;
+            }
+
+            sink.AddToken(TypeVariable, start, nameStart);
+            sink.AddToken(TypeKeyword, nameStart, nameEnd);
+            int i = nameEnd;
+            while (i < limit)
+            {
+                char c = text[i];
+                if (c == '$' && i + 1 < limit && (text[i + 1] == '(' || text[i + 1] == '{'))
+                {
+                    int nestedEnd = FindMakeReferenceEnd(text, i, out bool nestedClosed);
+                    if (nestedEnd > limit)
+                    {
+                        nestedEnd = limit;
+                        nestedClosed = false;
+                    }
+                    AddMakeReference(text, i, nestedEnd, nestedClosed, sink);
+                    i = nestedEnd;
+                    continue;
+                }
+                if (c == '"' || c == '\'')
+                {
+                    int quoteEnd = FindQuoteEnd(text, i, c);
+                    int stop = (quoteEnd < 0 || quoteEnd > limit) ? limit : quoteEnd;
+                    sink.AddToken(TypeString, i, stop);
+                    i = stop;
+                    continue;
+                }
+                i++;
+            }
+            if (closed)
+            {
+                sink.AddToken(TypeVariable, end - 1, end);
+            }
         }
 
         // Line state: 0x01 - inside a rule (its recipe lines follow), 0x02 - inside "define ... endef".
@@ -6635,14 +6713,15 @@ namespace SmarTTY.CodeEditing
                     int e;
                     if (text[i + 1] == '(' || text[i + 1] == '{')
                     {
-                        e = FindMakeReferenceEnd(text, i);
+                        e = FindMakeReferenceEnd(text, i, out bool closed);
+                        AddMakeReference(text, i, e, closed, sink);
                     }
                     else
                     {
                         e = i + 2;   // $@ $< $^ $* $? $$ $1
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeVariable, i, e);
                     }
-                    Normal(ref last, last, i, sink);
-                    sink.AddToken(TypeVariable, i, e);
                     i = e;
                     last = i;
                     continue;
