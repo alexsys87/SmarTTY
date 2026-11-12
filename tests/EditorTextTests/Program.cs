@@ -3047,7 +3047,7 @@ internal static class Program
         Equal(SyntaxHighlighting.DetectLanguage("/srv/app/foo.config"), L.Config, "a .config extension elsewhere stays a config");
 
         Highlighted kconfig = new Highlighted(L.Kconfig,
-            "config NET\n\tbool \"Networking\"\n\tdefault y\n\tdepends on NET\nmenu \"Drivers\"\nendmenu\nhelp\n\tSay Y here.\n# CONFIG_X is not set\nsource $(ARCH)/Kconfig");
+            "config NET\n\tbool \"Networking\"\n\tdefault y\n\tdepends on NET\nmenu \"Drivers\"\nendmenu\nhelp\n\tSay Y here.\n# CONFIG_X is not set\nsource $(ARCH)/Kconfig\nrsource ../Kconfig.local\nosource $(KCONFIG_DIR)/Kconfig\norsource arch/Kconfig");
         Equal(Join(kconfig.Tokens(0, SyntaxHighlighting.TypeKeyword)), "config", "Kconfig: config");
         Equal(Join(kconfig.Tokens(1, SyntaxHighlighting.TypeKeyword)), "bool", "Kconfig: a type");
         Equal(Join(kconfig.Tokens(2, SyntaxHighlighting.TypeKeyword)), "default|y", "Kconfig: default and its value");
@@ -3059,8 +3059,14 @@ internal static class Program
         Equal(Join(kconfig.Tokens(8, SyntaxHighlighting.TypeComment)), "# CONFIG_X is not set", "Kconfig: comment");
         Equal(Join(kconfig.Tokens(9, SyntaxHighlighting.TypeKeyword)), "source", "Kconfig: source");
         Equal(Join(kconfig.Tokens(9, SyntaxHighlighting.TypeVariable)), "$(ARCH)", "Kconfig: a $(NAME) reference");
+        Equal(Join(kconfig.Tokens(10, SyntaxHighlighting.TypeKeyword)), "rsource", "Kconfig: rsource");
+        Equal(Join(kconfig.Tokens(11, SyntaxHighlighting.TypeKeyword)), "osource", "Kconfig: osource");
+        Equal(Join(kconfig.Tokens(11, SyntaxHighlighting.TypeVariable)), "$(KCONFIG_DIR)", "Kconfig: a $(NAME) reference in osource");
+        Equal(Join(kconfig.Tokens(12, SyntaxHighlighting.TypeKeyword)), "orsource", "Kconfig: orsource");
         Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("menuconfig"), "Kconfig keywords contain 'menuconfig'");
         Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("depends"), "Kconfig keywords contain 'depends'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("rsource"), "Kconfig keywords contain 'rsource'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kconfig).Contains("osource"), "Kconfig keywords contain 'osource'");
         Equal(Join(CommentStyle.ForLanguage(L.Kconfig).Toggle(new[] { "config NET" })), "# config NET", "Kconfig comment");
     }
 
