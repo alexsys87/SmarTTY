@@ -3171,6 +3171,22 @@ internal static class Program
         Equal(Join(mk.Tokens(10, SyntaxHighlighting.TypeSection)), "all", "rule target");
         Equal(Join(mk.Tokens(11, SyntaxHighlighting.TypeVariable)), "$@", "automatic variable");
 
+        // GNU make functions inside "$(...)" and "${...}", including nested calls.
+        Highlighted makeFunctions = new Highlighted(L.Makefile,
+            "SRC := $(wildcard src/*.c)\n" +
+            "OBJ := $(patsubst %.c,%.o,$(SRC))\n" +
+            "$(info building $(OBJ))\n" +
+            "all: $(OBJ)\n" +
+            "\t$(foreach f,$(OBJ),$(call cc,$(f)))\n" +
+            "Q = $(shell)\n");
+        Equal(Join(makeFunctions.Tokens(0, SyntaxHighlighting.TypeKeyword)), "wildcard", "Makefile: wildcard is a function");
+        Equal(Join(makeFunctions.Tokens(1, SyntaxHighlighting.TypeKeyword)), "patsubst", "Makefile: patsubst is a function");
+        Equal(Join(makeFunctions.Tokens(2, SyntaxHighlighting.TypeKeyword)), "info", "Makefile: info is a function");
+        Equal(Join(makeFunctions.Tokens(4, SyntaxHighlighting.TypeKeyword)), "foreach|call", "Makefile: nested function calls are recognized");
+        Equal(Join(makeFunctions.Tokens(1, SyntaxHighlighting.TypeVariable)), "OBJ|$(|$(SRC)|)", "Makefile: the brackets and the nested reference stay variables");
+        Equal(Join(makeFunctions.Tokens(5, SyntaxHighlighting.TypeKeyword)), "", "Makefile: a variable named like a function is not a call");
+        Equal(Join(makeFunctions.Tokens(5, SyntaxHighlighting.TypeVariable)), "Q|$(shell)", "Makefile: a reference without arguments is a variable");
+
         // Makefile rules end at the first blank line or the next line that is not a recipe.
         Highlighted rules = new Highlighted(L.Makefile, "all: build\n\t@echo a\n\t@echo b\nbuild:\n\t@true\n\ndefine X\nfoo: bar\n\tbaz\nendef\nlast:\n\tone\n\ttwo\n");
         Equal(Folds(rules), "0:3,3:5,6:9,10:13", "Makefile rules fold up to the next rule, a blank line or the end of the document");

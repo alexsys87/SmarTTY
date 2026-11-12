@@ -56,6 +56,8 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("mapfile"), "Bash keywords contain the builtin 'mapfile'");
         Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("shopt"), "Bash keywords contain the builtin 'shopt'");
         Check(SyntaxHighlighting.GetKeywords(L.Makefile).Contains("ifeq"), "Makefile keywords contain 'ifeq'");
+        Check(SyntaxHighlighting.GetKeywords(L.Makefile).Contains("wildcard"), "Makefile keywords contain the function 'wildcard'");
+        Check(SyntaxHighlighting.GetKeywords(L.Makefile).Contains("patsubst"), "Makefile keywords contain the function 'patsubst'");
         Check(SyntaxHighlighting.GetKeywords(L.Json).Contains("true"), "JSON literals contain 'true'");
         Check(SyntaxHighlighting.GetKeywords(L.Uci).Contains("config"), "UCI keywords contain 'config'");
         Check(SyntaxHighlighting.GetKeywords(L.Yaml).Contains("true"), "YAML literals contain 'true'");
