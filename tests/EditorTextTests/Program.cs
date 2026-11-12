@@ -440,6 +440,28 @@ internal static class Program
         Equal(Join(shift.Tokens(1, SyntaxHighlighting.TypeString)), "'a'", "a shift in arithmetic is not a here document");
         Highlighted hereString = new Highlighted(L.Bash, "cat <<< word\nx='a'");
         Equal(Join(hereString.Tokens(1, SyntaxHighlighting.TypeString)), "'a'", "a here string is not a here document");
+
+        Highlighted builtins = new Highlighted(L.Bash,
+            "cd /tmp && pwd\n" +
+            "type -a grep\n" +
+            "shopt -s nullglob\n" +
+            "mapfile -t lines < input\n" +
+            "wait $!\n");
+        Equal(Join(builtins.Tokens(0, SyntaxHighlighting.TypeKeyword)), "cd|pwd", "Bash: cd and pwd are builtins");
+        Equal(Join(builtins.Tokens(1, SyntaxHighlighting.TypeKeyword)), "type", "Bash: type is a builtin");
+        Equal(Join(builtins.Tokens(2, SyntaxHighlighting.TypeKeyword)), "shopt", "Bash: shopt is a builtin");
+        Equal(Join(builtins.Tokens(3, SyntaxHighlighting.TypeKeyword)), "mapfile", "Bash: mapfile is a builtin");
+        Equal(Join(builtins.Tokens(4, SyntaxHighlighting.TypeKeyword)), "wait", "Bash: wait is a builtin");
+        Equal(Join(builtins.Tokens(4, SyntaxHighlighting.TypeVariable)), "$!", "Bash: the pid of the last background command");
+
+        Highlighted ansi = new Highlighted(L.Bash, "printf '%s' $'it\\'s'\necho $\"hi\"\n");
+        Equal(Join(ansi.Tokens(0, SyntaxHighlighting.TypeString)), "'%s'|$'it\\'s'", "Bash: ANSI-C quoting with an escaped quote");
+        Equal(Join(ansi.Tokens(1, SyntaxHighlighting.TypeString)), "$\"hi\"", "Bash: a localized string");
+        Equal(Join(ansi.Tokens(1, SyntaxHighlighting.TypeVariable)), "", "Bash: the dollar of a localized string is not a variable");
+
+        Highlighted ansiMulti = new Highlighted(L.Bash, "x=$'one\\\ntwo'\n");
+        Equal(Join(ansiMulti.Tokens(0, SyntaxHighlighting.TypeString)), "$'one\\", "Bash: an ANSI-C string may continue");
+        Equal(Join(ansiMulti.Tokens(1, SyntaxHighlighting.TypeString)), "two'", "Bash: the second line of an ANSI-C string");
     }
 
     private static void PythonChecks()
