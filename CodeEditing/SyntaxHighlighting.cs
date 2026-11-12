@@ -2257,6 +2257,7 @@ namespace SmarTTY.CodeEditing
 
         private const int StBashDouble = 0x01;
         private const int StBashSingle = 0x02;
+        private const int StBashAnsiSingle = 0x10;
 
         // Inside a here document: the lines up to the terminator are text, whatever quotes they hold. The state also
         // carries a hash of the terminator word (from bit 4) and whether "<<-" lets the terminator be indented with tabs.
@@ -2336,11 +2337,17 @@ namespace SmarTTY.CodeEditing
 
         private static readonly HashSet<string> BashKeywords = new HashSet<string>(StringComparer.Ordinal)
         {
+            // Reserved words.
             "if", "then", "elif", "else", "fi", "for", "while", "until", "do", "done",
-            "case", "esac", "in", "function", "select", "time", "coproc", "local", "export",
-            "readonly", "declare", "typeset", "return", "break", "continue", "source", "shift",
-            "unset", "alias", "echo", "printf", "read", "trap", "exec", "exit", "set",
-            "let", "eval", "test"
+            "case", "esac", "in", "function", "select", "time", "coproc",
+            // The shell builtins.
+            "alias", "bg", "bind", "break", "builtin", "caller", "cd", "command", "compgen",
+            "complete", "compopt", "continue", "declare", "dirs", "disown", "echo", "enable",
+            "eval", "exec", "exit", "export", "false", "fc", "fg", "getopts", "hash", "help",
+            "history", "jobs", "kill", "let", "local", "logout", "mapfile", "popd", "printf",
+            "pushd", "pwd", "read", "readarray", "readonly", "return", "set", "shift", "shopt",
+            "source", "suspend", "test", "times", "trap", "true", "type", "typeset", "ulimit",
+            "umask", "unalias", "unset", "wait"
         };
 
         private static readonly HashSet<string> FishKeywords = new HashSet<string>(StringComparer.Ordinal)
@@ -2650,7 +2657,24 @@ namespace SmarTTY.CodeEditing
                 return true;
             }
 
-            if (startState == StBashDouble || startState == StBashSingle)
+            if (startState == StBashAnsiSingle)
+            {
+                // Continuation of an ANSI-C string: \' and \\ are escapes, unlike in an ordinary single-quoted string.
+                int end = FindQuoteEnd(text, -1, '\'');
+                if (end < 0)
+                {
+                    if (len > 0)
+                    {
+                        sink.AddToken(TypeString, 0, len);
+                    }
+                    endState = StBashAnsiSingle;
+                    return true;
+                }
+                sink.AddToken(TypeString, 0, end);
+                i = end;
+                last = i;
+            }
+            else if (startState == StBashDouble || startState == StBashSingle)
             {
                 // Continuation of a quoted string from the previous line.
                 int end;
@@ -2718,6 +2742,24 @@ namespace SmarTTY.CodeEditing
                         continue;
                     }
                     i += 2;
+                    continue;
+                }
+
+                // ANSI-C and localized strings: $'...' and $"...". The dollar sign belongs to the string.
+                if (c == '$' && i + 1 < len && (text[i + 1] == '\'' || text[i + 1] == '"'))
+                {
+                    char quote = text[i + 1];
+                    int end = FindQuoteEnd(text, i + 1, quote);
+                    Normal(ref last, last, i, sink);
+                    if (end < 0)
+                    {
+                        sink.AddToken(TypeString, i, len);
+                        endState = (quote == '\'') ? StBashAnsiSingle : StBashDouble;
+                        return true;
+                    }
+                    sink.AddToken(TypeString, i, end);
+                    i = end;
+                    last = i;
                     continue;
                 }
 

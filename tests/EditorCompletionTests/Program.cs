@@ -53,6 +53,8 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Lua).Contains("elseif"), "Lua keywords contain 'elseif'");
         Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("fi"), "Bash keywords contain 'fi'");
         Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("coproc"), "Bash keywords contain 'coproc'");
+        Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("mapfile"), "Bash keywords contain the builtin 'mapfile'");
+        Check(SyntaxHighlighting.GetKeywords(L.Bash).Contains("shopt"), "Bash keywords contain the builtin 'shopt'");
         Check(SyntaxHighlighting.GetKeywords(L.Makefile).Contains("ifeq"), "Makefile keywords contain 'ifeq'");
         Check(SyntaxHighlighting.GetKeywords(L.Json).Contains("true"), "JSON literals contain 'true'");
         Check(SyntaxHighlighting.GetKeywords(L.Uci).Contains("config"), "UCI keywords contain 'config'");
