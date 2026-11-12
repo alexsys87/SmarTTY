@@ -5935,6 +5935,8 @@ namespace SmarTTY.CodeEditing
         private static readonly TokenCache.LineTokenizer DockerfileTokenizer = new GenericSyntax
         {
             HashComments = true,
+            HashHeredocs = true,
+            ShellVariables = true,
             KeywordsAtLineStart = true,
             Keywords = DockerfileKeywords
         }.Tokenize;

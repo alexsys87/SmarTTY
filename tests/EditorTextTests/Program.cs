@@ -688,6 +688,29 @@ internal static class Program
         Equal(Join(docker.Tokens(2, SyntaxHighlighting.TypeKeyword)), "from", "Dockerfile instructions are case insensitive");
         Equal(Join(docker.Tokens(3, SyntaxHighlighting.TypeKeyword)), "RUN", "only the first word of a line is an instruction");
 
+        Highlighted dockerVars = new Highlighted(L.Dockerfile,
+            "ARG BASE=alpine\n" +
+            "FROM ${BASE} AS build\n" +
+            "ENV PATH=$PATH:/app\n");
+        Equal(Join(dockerVars.Tokens(1, SyntaxHighlighting.TypeVariable)), "${BASE}", "Dockerfile: a braced variable in FROM");
+        Equal(Join(dockerVars.Tokens(1, SyntaxHighlighting.TypeKeyword)), "FROM", "Dockerfile: the instruction stays a keyword");
+        Equal(Join(dockerVars.Tokens(2, SyntaxHighlighting.TypeVariable)), "$PATH", "Dockerfile: a plain variable in ENV");
+
+        Highlighted dockerHeredoc = new Highlighted(L.Dockerfile,
+            "RUN <<EOF\n" +
+            "echo $HOME # not a comment\n" +
+            "EOF\n" +
+            "RUN echo 'done'\n");
+        Equal(Join(dockerHeredoc.Tokens(1, SyntaxHighlighting.TypeString)), "echo $HOME # not a comment", "Dockerfile: a heredoc body is text");
+        Equal(Join(dockerHeredoc.Tokens(1, SyntaxHighlighting.TypeComment)), "", "Dockerfile: '#' in a heredoc body is not a comment");
+        Equal(Join(dockerHeredoc.Tokens(2, SyntaxHighlighting.TypeKeyword)), "EOF", "Dockerfile: the heredoc terminator");
+        Equal(Join(dockerHeredoc.Tokens(3, SyntaxHighlighting.TypeString)), "'done'", "Dockerfile: code after a heredoc");
+
+        Highlighted dockerStrip = new Highlighted(L.Dockerfile, "RUN <<-END\n\t$x\n\tEND\nRUN true\n");
+        Equal(Join(dockerStrip.Tokens(1, SyntaxHighlighting.TypeString)), "\t$x", "Dockerfile: <<- heredoc body");
+        Equal(Join(dockerStrip.Tokens(2, SyntaxHighlighting.TypeKeyword)), "\tEND", "Dockerfile: <<- accepts an indented terminator");
+        Equal(Join(dockerStrip.Tokens(3, SyntaxHighlighting.TypeKeyword)), "RUN", "Dockerfile: the line after the terminator");
+
         Highlighted ruby = new Highlighted(L.Ruby, "class Widget#note\ndef render(item)\n  puts item\nend\nend");
         Equal(Join(ruby.Tokens(0, SyntaxHighlighting.TypeKeyword)), "class", "Ruby class keyword");
         Equal(Join(ruby.Tokens(0, SyntaxHighlighting.TypeComment)), "#note", "Ruby '#' starts a comment after code");
