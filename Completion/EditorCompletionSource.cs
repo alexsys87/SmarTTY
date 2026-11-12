@@ -145,10 +145,21 @@ public static class EditorCompletionSource
             return;
         }
         // A document word may match a name already offered as a keyword or API symbol; the better one stays.
-        if (!seen.Add(word))
+        if (seen.Contains(word))
         {
+            // A builtin that is also a keyword ("shopt" in Bash, "print" in some languages) keeps the
+            // keyword's place in the list but shows the summary and the signature of the API symbol.
+            if (symbol != null)
+            {
+                int index = words.FindIndex(w => string.Equals(w.Text, word, StringComparison.Ordinal));
+                if (index >= 0 && words[index].IsKeyword && words[index].Symbol == null)
+                {
+                    words[index] = new Word(word, 0, symbol);
+                }
+            }
             return;
         }
+        seen.Add(word);
         words.Add(new Word(word, rank, symbol));
     }
 
