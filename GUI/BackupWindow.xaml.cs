@@ -665,10 +665,9 @@ public partial class BackupWindow : Window
         _CompressingLocally = compressLocally;
         _Phase = "Archiving...";
         _Clock = Stopwatch.StartNew();
-        session.PtyGate.BeginPlainHelper();
         try
         {
-            using SshShellChannel channel = session.OpenShellChannel(command, null, ExtendedDataMode.Normal);
+            using SshShellChannel channel = session.OpenPlainChannel(command);
             _Channel = channel;
             if (_CancelRequested)
             {
@@ -722,7 +721,6 @@ public partial class BackupWindow : Window
         finally
         {
             _Channel = null;
-            session.PtyGate.EndPlainHelper();
         }
     }
 

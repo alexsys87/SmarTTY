@@ -20,6 +20,9 @@ internal static class PtySetupGateTests
         HelpersRunTogether();
         SetupsAreSerialized();
         LongHelperDelaysSetupOnlyUntilTimeout();
+        WaitingSetupKeepsNewHelpersBack();
+        SecondSetupAfterTimeoutKeepsGateClosed();
+        HelperStreamDoesNotStarveSetup();
     }
 
     // Starts the action on a thread and returns an event set once it has returned.
@@ -93,5 +96,74 @@ internal static class PtySetupGateTests
         Test.Check(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(400), "the PTY setup did wait for the helper command first");
         gate.EndPtySetup();
         gate.EndPlainHelper();
+    }
+
+    // A setup that waits for the running helpers goes first: a helper that is asked for meanwhile must not start in front of it.
+    private static void WaitingSetupKeepsNewHelpersBack()
+    {
+        PtySetupGate gate = new PtySetupGate(TimeSpan.FromSeconds(30));
+        gate.BeginPlainHelper();
+        ManualResetEventSlim setupStarted = StartWaiting(gate.BeginPtySetup);
+        Test.Check(!setupStarted.Wait(Settle), "the PTY setup waits for the running helper");
+        ManualResetEventSlim lateHelper = StartWaiting(gate.BeginPlainHelper);
+        Test.Check(!lateHelper.Wait(Settle), "a helper that is asked for meanwhile waits behind the waiting PTY setup");
+        gate.EndPlainHelper();
+        Test.Check(setupStarted.Wait(TimeSpan.FromSeconds(5)), "the PTY setup starts when the first helper has ended");
+        Test.Check(!lateHelper.Wait(Settle), "the late helper still waits while the setup runs");
+        gate.EndPtySetup();
+        Test.Check(lateHelper.Wait(TimeSpan.FromSeconds(5)), "the late helper starts when the setup is done");
+        gate.EndPlainHelper();
+    }
+
+    // Two setups that ran out of time together are both in progress: the end of the first must not let helpers in.
+    private static void SecondSetupAfterTimeoutKeepsGateClosed()
+    {
+        PtySetupGate gate = new PtySetupGate(TimeSpan.FromMilliseconds(300));
+        gate.BeginPlainHelper();
+        ManualResetEventSlim first = StartWaiting(gate.BeginPtySetup);
+        ManualResetEventSlim second = StartWaiting(gate.BeginPtySetup);
+        Test.Check(first.Wait(TimeSpan.FromSeconds(5)) && second.Wait(TimeSpan.FromSeconds(5)), "both PTY setups go on after the timeout of the helper");
+        gate.EndPtySetup();
+        ManualResetEventSlim helper = StartWaiting(gate.BeginPlainHelper);
+        Test.Check(!helper.Wait(Settle), "a helper waits while the second setup is still in progress");
+        gate.EndPtySetup();
+        Test.Check(helper.Wait(TimeSpan.FromSeconds(5)), "the helper starts when both setups are done");
+        gate.EndPlainHelper();
+        gate.EndPlainHelper();
+    }
+
+    // Short helpers that keep coming must not hold a PTY setup for the whole timeout.
+    private static void HelperStreamDoesNotStarveSetup()
+    {
+        PtySetupGate gate = new PtySetupGate(TimeSpan.FromSeconds(30));
+        bool stop = false;
+        Thread[] streams = new Thread[4];
+        for (int i = 0; i < streams.Length; i++)
+        {
+            streams[i] = new Thread(() =>
+            {
+                while (!Volatile.Read(ref stop))
+                {
+                    gate.BeginPlainHelper();
+                    Thread.Sleep(20);
+                    gate.EndPlainHelper();
+                }
+            })
+            {
+                IsBackground = true
+            };
+            streams[i].Start();
+        }
+        Thread.Sleep(100);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        gate.BeginPtySetup();
+        long waited = stopwatch.ElapsedMilliseconds;
+        gate.EndPtySetup();
+        Volatile.Write(ref stop, true);
+        foreach (Thread stream in streams)
+        {
+            stream.Join(2000);
+        }
+        Test.Check(waited < 2000, "a stream of short helpers does not hold a PTY setup (" + waited + " ms)");
     }
 }

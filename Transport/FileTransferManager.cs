@@ -746,10 +746,8 @@ public class FileTransferManager : IDisposable
     {
         received = 0;
         job.TransferredBytes = 0;
-        Session.PtyGate.BeginPlainHelper();
-        try
         {
-            using SshShellChannel channel = Session.OpenShellChannel(command, null, ExtendedDataMode.Normal);
+            using SshShellChannel channel = Session.OpenPlainChannel(command);
             using (FileStream fileStream = File.Open(partPath, FileMode.Create, FileAccess.Write, FileShare.Read))
             {
                 Stream destination = fileStream;
@@ -792,10 +790,6 @@ public class FileTransferManager : IDisposable
                 return null;
             }
             return string.IsNullOrEmpty(error) ? "tar failed on the server (exit status " + exitStatus + ")." : error;
-        }
-        finally
-        {
-            Session.PtyGate.EndPlainHelper();
         }
     }
 

@@ -54,10 +54,9 @@ internal sealed class SshRemoteShell : IRemoteShell
     private RemoteCommandResult Execute(string command, Stream input, Stream output, Action<long> progress, Func<bool> isCancelled)
     {
         RemoteCommandResult result = new RemoteCommandResult();
-        _session.PtyGate.BeginPlainHelper();
         try
         {
-            using SshShellChannel channel = _session.OpenShellChannel(command, null, ExtendedDataMode.Normal);
+            using SshShellChannel channel = _session.OpenPlainChannel(command);
             _channel = channel;
             if (input == null)
             {
@@ -159,7 +158,6 @@ internal sealed class SshRemoteShell : IRemoteShell
         finally
         {
             _channel = null;
-            _session.PtyGate.EndPlainHelper();
         }
     }
 
