@@ -3237,9 +3237,10 @@ namespace SmarTTY.CodeEditing
         /// coloured wherever they stand. With <paramref name="phraseDirectives"/> (Samba) a directive may consist of several words
         /// ("map to guest", "server min protocol"): the longest known phrase at the start of a line is coloured as one keyword.
         /// With <paramref name="valueKeywordsInValue"/> (Samba) the value keywords are coloured only in the value part of a line,
-        /// so a directory called "share" inside a path is not mistaken for a value.
+        /// so a directory called "share" inside a path is not mistaken for a value. With <paramref name="yamlAnchors"/> (YAML)
+        /// the anchors "&amp;name", the aliases "*name" and the merge key "&lt;&lt;" are coloured too.
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false, bool yamlAnchors = false)
         {
             int len = text.Length;
             int last = 0;
@@ -3392,6 +3393,35 @@ namespace SmarTTY.CodeEditing
                     i = e;
                     last = i;
                     continue;
+                }
+
+                // YAML anchors "&name" and aliases "*name" stand where a value starts.
+                if (yamlAnchors && IsYamlReference(text, i))
+                {
+                    int e = i + 2;
+                    while (e < len && (IsIdChar(text[e]) || text[e] == '-'))
+                    {
+                        e++;
+                    }
+                    Normal(ref last, last, i, sink);
+                    sink.AddToken(TypeVariable, i, e);
+                    i = e;
+                    last = i;
+                    continue;
+                }
+
+                // The YAML merge key "<<" of "&lt;&lt;: *defaults".
+                if (yamlAnchors && c == '<' && i + 1 < len && text[i + 1] == '<')
+                {
+                    int colon = SkipBlanks(text, i + 2);
+                    if (colon < len && text[colon] == ':' && (colon + 1 == len || IsBlank(text[colon + 1])))
+                    {
+                        Normal(ref last, last, i, sink);
+                        sink.AddToken(TypeKeyword, i, i + 2);
+                        i += 2;
+                        last = i;
+                        continue;
+                    }
                 }
 
                 // Numbers, IP addresses and versions (22, 0.5, 192.168.0.1).
@@ -6901,6 +6931,43 @@ namespace SmarTTY.CodeEditing
             return before.EndsWith(":", StringComparison.Ordinal) || before == "-";
         }
 
+        /// <summary>Whether the character at the index starts a YAML node: it is at the start of the line or follows ":", "-", "[", "{", "," or "?".</summary>
+        private static bool StartsYamlNode(string text, int index)
+        {
+            for (int i = index - 1; i >= 0; i--)
+            {
+                if (IsBlank(text[i]))
+                {
+                    continue;
+                }
+                return text[i] == ':' || text[i] == '-' || text[i] == '[' || text[i] == '{' || text[i] == ',' || text[i] == '?';
+            }
+            return true;
+        }
+
+        /// <summary>YAML anchors "&amp;name" and aliases "*name" stand where a value starts.</summary>
+        private static bool IsYamlReference(string text, int index)
+        {
+            return (text[index] == '&' || text[index] == '*') && index + 1 < text.Length &&
+                IsIdStart(text[index + 1]) && StartsYamlNode(text, index);
+        }
+
+        /// <summary>"key: &amp;name", "- &amp;name", "&amp;name": the node the anchor names follows on the next lines.</summary>
+        private static bool IsYamlAnchorHeader(string code)
+        {
+            int nameStart = code.Length;
+            while (nameStart > 0 && (IsIdChar(code[nameStart - 1]) || code[nameStart - 1] == '-'))
+            {
+                nameStart--;
+            }
+            if (nameStart == code.Length || nameStart == 0 || code[nameStart - 1] != '&')
+            {
+                return false;
+            }
+            int anchor = nameStart - 1;
+            return anchor == 0 || IsBlank(code[anchor - 1]);
+        }
+
         /// <summary>YAML: the colors of the config tokenizer, and a fold for every "key:", "- key: value" and block scalar.</summary>
         private static bool TokenizeYaml(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
@@ -6969,7 +7036,7 @@ namespace SmarTTY.CodeEditing
 
             if (!scalarText)
             {
-                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values);
+                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values, yamlAnchors: true);
             }
 
             if (code)
@@ -6977,13 +7044,16 @@ namespace SmarTTY.CodeEditing
                 codeEnd = YamlCodeEnd(text, first);
                 string statement = text.Substring(first, codeEnd - first);
                 bool endsWithColon = statement.EndsWith(":", StringComparison.Ordinal);
-                bool opensBlock = endsWithColon || IsYamlBlockScalarHeader(statement) || (isItem && HasYamlKey(statement, 1));
+                bool anchorHeader = IsYamlAnchorHeader(statement);
+                bool opensBlock = endsWithColon || IsYamlBlockScalarHeader(statement) ||
+                    (isItem && HasYamlKey(statement, 1)) || anchorHeader;
                 if (opensBlock && depth < YamlMaxLevels)
                 {
                     int indent = IndentColumns(text, first);
                     int cumulative = IndentLevelSum(levels, depth, 0x7);
                     int delta = Math.Max(0, Math.Min(7, indent - cumulative));
-                    int flag = (endsWithColon && !isItem) ? 8 : 0;
+                    // "key:" and "key: &anchor" own a list that sits at the indentation of the key.
+                    int flag = ((endsWithColon || (anchorHeader && HasYamlKey(statement, 0))) && !isItem) ? 8 : 0;
                     levels |= (delta | flag) << (4 * depth);
                     depth++;
                     scalar = IsYamlBlockScalarHeader(statement);

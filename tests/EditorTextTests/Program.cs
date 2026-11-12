@@ -3267,6 +3267,36 @@ internal static class Program
         Equal(Join(scalar.Tokens(4, SyntaxHighlighting.TypeString)), "more", "a blank line does not end the block scalar");
         Equal(Join(scalar.Tokens(5, SyntaxHighlighting.TypeVariable)), "next", "a line that is not indented deeper ends it");
         Equal(Join(scalar.Tokens(5, SyntaxHighlighting.TypeString)), "'v'", "and is YAML again");
+
+        // YAML anchors: definitions, aliases, the merge key and foldable anchor headers.
+        Highlighted yamlAnchors = new Highlighted(L.Yaml,
+            "defaults: &defaults\n" +
+            "  adapter: postgres\n" +
+            "  host: localhost\n" +
+            "development:\n" +
+            "  <<: *defaults\n" +
+            "  database: dev\n" +
+            "list:\n" +
+            "- &first\n" +
+            "  name: one\n" +
+            "- *first\n");
+        Equal(Join(yamlAnchors.Tokens(0, SyntaxHighlighting.TypeVariable)), "defaults|&defaults", "YAML: an anchor after a key");
+        Equal(Join(yamlAnchors.Tokens(4, SyntaxHighlighting.TypeKeyword)), "<<", "YAML: the merge key");
+        Equal(Join(yamlAnchors.Tokens(4, SyntaxHighlighting.TypeVariable)), "*defaults", "YAML: an alias as a value");
+        Equal(Join(yamlAnchors.Tokens(7, SyntaxHighlighting.TypeVariable)), "&first", "YAML: an anchor of a list item");
+        Equal(Join(yamlAnchors.Tokens(9, SyntaxHighlighting.TypeVariable)), "*first", "YAML: an alias of a list item");
+        Equal(Folds(yamlAnchors), "0:3,3:6,6:10,7:9", "YAML: anchor headers fold the nodes they name");
+
+        Highlighted yamlAnchorValue = new Highlighted(L.Yaml, "value: &name text\nother: [one, *name]\nnext: 1\ncommand: echo *branch\n");
+        Equal(Join(yamlAnchorValue.Tokens(0, SyntaxHighlighting.TypeVariable)), "value|&name", "YAML: an anchor before an inline value");
+        Equal(Join(yamlAnchorValue.Tokens(1, SyntaxHighlighting.TypeVariable)), "other|*name", "YAML: an alias in a flow sequence");
+        Equal(Join(yamlAnchorValue.Tokens(3, SyntaxHighlighting.TypeVariable)), "command", "YAML: a '*' inside a plain scalar is not an alias");
+        Equal(Folds(yamlAnchorValue), "", "YAML: an anchor with an inline value does not open a block");
+
+        Highlighted yamlAnchorList = new Highlighted(L.Yaml, "defaults: &defaults\n- a\n- b\nnext: 1\n");
+        Equal(Folds(yamlAnchorList), "0:3", "YAML: a list at the indentation of an anchor key belongs to it");
+        Highlighted yamlRootAnchor = new Highlighted(L.Yaml, "&root\n  a: 1\nb: 2\n");
+        Equal(Folds(yamlRootAnchor), "0:2", "YAML: an anchor alone on its line opens a block");
     }
 
     private static void PairEditingChecks()
