@@ -1137,6 +1137,16 @@ internal static class Program
         Equal(Join(fstab.Tokens(7, SyntaxHighlighting.TypeComment)), "# backup", "fstab: a trailing comment");
         Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("ext4"), "fstab keywords contain 'ext4'");
         Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("noatime"), "fstab keywords contain 'noatime'");
+
+        Highlighted systemd = new Highlighted(L.Fstab,
+            "/dev/sdb2 /mnt/var ext4 defaults,x-systemd.growfs,x-systemd.makefs,x-systemd.mount-timeout=30,comment=backup 0 2");
+        Equal(Join(systemd.Tokens(0, SyntaxHighlighting.TypeKeyword)),
+            "ext4|defaults|x-systemd.growfs|x-systemd.makefs|x-systemd.mount-timeout=30|comment=backup",
+            "fstab: systemd options and a comment option");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("x-systemd.growfs"), "fstab keywords contain 'x-systemd.growfs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("x-systemd.makefs"), "fstab keywords contain 'x-systemd.makefs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("x-systemd.mount-timeout"), "fstab keywords contain 'x-systemd.mount-timeout'");
+        Check(SyntaxHighlighting.GetKeywords(L.Fstab).Contains("comment"), "fstab keywords contain 'comment'");
         Equal(Join(CommentStyle.ForLanguage(L.Fstab).Toggle(new[] { "UUID=1 / ext4 defaults 0 1" })), "# UUID=1 / ext4 defaults 0 1", "fstab comment");
     }
 
