@@ -129,6 +129,7 @@ internal static class Program
         Check(Names(L.Crontab, "", "").Contains("MAILFROM"), "the crontab variable 'MAILFROM' is offered");
         Check(Names(L.Fstab, "", "").Contains("ext4"), "the fstab filesystem 'ext4' is offered");
         Check(Names(L.Fstab, "", "").Contains("noatime"), "the fstab option 'noatime' is offered");
+        Check(Names(L.Fstab, "", "").Contains("comment"), "the fstab option 'comment' is offered");
         Check(Names(L.Sudoers, "", "").Contains("NOPASSWD"), "the sudoers tag 'NOPASSWD' is offered");
         Check(Names(L.Sudoers, "", "").Contains("secure_path"), "the sudoers flag 'secure_path' is offered");
         Check(Names(L.MySql, "", "").Contains("innodb_buffer_pool_size"), "the MySQL option 'innodb_buffer_pool_size' is offered");

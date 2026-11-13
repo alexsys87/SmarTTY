@@ -339,10 +339,11 @@ public static partial class SyntaxHighlighting
           discard nodiscard fail nofail _netdev
           umask dmask fmask uid gid mode acl noacl
           errors x-systemd.automount x-systemd.device-timeout x-systemd.idle-timeout
+          x-systemd.growfs x-systemd.makefs x-systemd.mount-timeout
           x-systemd.required-by x-systemd.wanted-by x-systemd.before x-systemd.after
           soft hard intr nointr timeo retrans rsize wsize nolock lock
           vers proto tcp udp port mountproto mountport
-          credentials guest sec iocharset codepage
+          credentials guest sec iocharset codepage comment
           size nr_inodes bind rbind move remount compress compress-force subvol subvolid");
 
     /// <summary>
