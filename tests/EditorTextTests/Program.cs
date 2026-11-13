@@ -1102,6 +1102,17 @@ internal static class Program
         Equal(Join(cron.Tokens(6, SyntaxHighlighting.TypeComment)), "", "crontab: # without a space is not a comment");
         Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("jan"), "crontab keywords contain 'jan'");
         Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("@reboot"), "crontab keywords contain '@reboot'");
+
+        Highlighted environment = new Highlighted(L.Crontab,
+            "RANDOM_DELAY=10\nMLS_LEVEL=SystemHigh\nCONTENT_TYPE=text/plain\nMAILFROM=cron@example.com");
+        Equal(Join(environment.Tokens(0, SyntaxHighlighting.TypeVariable)), "RANDOM_DELAY", "crontab: RANDOM_DELAY");
+        Equal(Join(environment.Tokens(1, SyntaxHighlighting.TypeVariable)), "MLS_LEVEL", "crontab: MLS_LEVEL");
+        Equal(Join(environment.Tokens(2, SyntaxHighlighting.TypeVariable)), "CONTENT_TYPE", "crontab: CONTENT_TYPE");
+        Equal(Join(environment.Tokens(3, SyntaxHighlighting.TypeVariable)), "MAILFROM", "crontab: MAILFROM");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("RANDOM_DELAY"), "crontab keywords contain 'RANDOM_DELAY'");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("MLS_LEVEL"), "crontab keywords contain 'MLS_LEVEL'");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("CONTENT_TYPE"), "crontab keywords contain 'CONTENT_TYPE'");
+        Check(SyntaxHighlighting.GetKeywords(L.Crontab).Contains("MAILFROM"), "crontab keywords contain 'MAILFROM'");
         Equal(Join(CommentStyle.ForLanguage(L.Crontab).Toggle(new[] { "0 5 * * * /usr/bin/backup" })), "# 0 5 * * * /usr/bin/backup", "crontab comment");
     }
 

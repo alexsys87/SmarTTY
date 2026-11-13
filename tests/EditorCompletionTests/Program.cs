@@ -123,6 +123,10 @@ internal static class Program
         Check(Names(L.LinkerScript, "", "").Contains("NOCROSSREFS_TO"), "the linker command 'NOCROSSREFS_TO' is offered");
         Check(Names(L.Crontab, "", "").Contains("jan"), "the crontab month 'jan' is offered");
         Check(Names(L.Crontab, "", "").Contains("MAILTO"), "the crontab variable 'MAILTO' is offered");
+        Check(Names(L.Crontab, "", "").Contains("RANDOM_DELAY"), "the crontab variable 'RANDOM_DELAY' is offered");
+        Check(Names(L.Crontab, "", "").Contains("MLS_LEVEL"), "the crontab variable 'MLS_LEVEL' is offered");
+        Check(Names(L.Crontab, "", "").Contains("CONTENT_TYPE"), "the crontab variable 'CONTENT_TYPE' is offered");
+        Check(Names(L.Crontab, "", "").Contains("MAILFROM"), "the crontab variable 'MAILFROM' is offered");
         Check(Names(L.Fstab, "", "").Contains("ext4"), "the fstab filesystem 'ext4' is offered");
         Check(Names(L.Fstab, "", "").Contains("noatime"), "the fstab option 'noatime' is offered");
         Check(Names(L.Sudoers, "", "").Contains("NOPASSWD"), "the sudoers tag 'NOPASSWD' is offered");
