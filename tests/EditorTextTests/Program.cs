@@ -1342,6 +1342,20 @@ internal static class Program
         Equal(Join(network.Tokens(18, SyntaxHighlighting.TypeKeyword)), "PreferredLifetime|forever", "networkd: PreferredLifetime");
         Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("DHCP"), "networkd keywords contain 'DHCP'");
         Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("PreferredLifetime"), "networkd keywords contain 'PreferredLifetime'");
+
+        Highlighted wireguard = new Highlighted(L.SystemdNetworkd,
+            "[WireGuard]\nPrivateKey = abc=\nListenPort = 51820\n[WireGuardPeer]\nPublicKey = def=\nPresharedKey = ghi=\nAllowedIPs = 10.0.0.0/24\nEndpoint = 192.168.1.1:51820\nPersistentKeepalive = 25");
+        Equal(Join(wireguard.Tokens(0, SyntaxHighlighting.TypeSection)), "[WireGuard]", "networkd: the WireGuard section");
+        Equal(Join(wireguard.Tokens(1, SyntaxHighlighting.TypeKeyword)), "PrivateKey", "networkd: PrivateKey");
+        Equal(Join(wireguard.Tokens(2, SyntaxHighlighting.TypeKeyword)), "ListenPort", "networkd: ListenPort");
+        Equal(Join(wireguard.Tokens(3, SyntaxHighlighting.TypeSection)), "[WireGuardPeer]", "networkd: the WireGuardPeer section");
+        Equal(Join(wireguard.Tokens(4, SyntaxHighlighting.TypeKeyword)), "PublicKey", "networkd: PublicKey");
+        Equal(Join(wireguard.Tokens(5, SyntaxHighlighting.TypeKeyword)), "PresharedKey", "networkd: PresharedKey");
+        Equal(Join(wireguard.Tokens(6, SyntaxHighlighting.TypeKeyword)), "AllowedIPs", "networkd: AllowedIPs");
+        Equal(Join(wireguard.Tokens(7, SyntaxHighlighting.TypeKeyword)), "Endpoint", "networkd: Endpoint");
+        Equal(Join(wireguard.Tokens(8, SyntaxHighlighting.TypeKeyword)), "PersistentKeepalive", "networkd: PersistentKeepalive");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("PrivateKey"), "networkd keywords contain 'PrivateKey'");
+        Check(SyntaxHighlighting.GetKeywords(L.SystemdNetworkd).Contains("AllowedIPs"), "networkd keywords contain 'AllowedIPs'");
         Equal(Join(CommentStyle.ForLanguage(L.SystemdNetworkd).Toggle(new[] { "DHCP=ipv4" })), "# DHCP=ipv4", "networkd comment");
     }
 
