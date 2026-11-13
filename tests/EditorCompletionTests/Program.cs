@@ -118,6 +118,9 @@ internal static class Program
         Check(Names(L.Yocto, "", "").Contains("OE_FRAGMENTS"), "the BitBake variable 'OE_FRAGMENTS' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("SECTIONS"), "the linker command 'SECTIONS' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("SIZEOF"), "the linker command 'SIZEOF' is offered");
+        Check(Names(L.LinkerScript, "", "").Contains("VERSION"), "the linker command 'VERSION' is offered");
+        Check(Names(L.LinkerScript, "", "").Contains("NOCROSSREFS"), "the linker command 'NOCROSSREFS' is offered");
+        Check(Names(L.LinkerScript, "", "").Contains("NOCROSSREFS_TO"), "the linker command 'NOCROSSREFS_TO' is offered");
         Check(Names(L.Crontab, "", "").Contains("jan"), "the crontab month 'jan' is offered");
         Check(Names(L.Crontab, "", "").Contains("MAILTO"), "the crontab variable 'MAILTO' is offered");
         Check(Names(L.Fstab, "", "").Contains("ext4"), "the fstab filesystem 'ext4' is offered");
