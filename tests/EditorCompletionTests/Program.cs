@@ -140,6 +140,9 @@ internal static class Program
         Check(Names(L.HAProxy, "", "").Contains("roundrobin"), "the HAProxy balance 'roundrobin' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("DocumentRoot"), "the Apache directive 'DocumentRoot' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("FollowSymLinks"), "the Apache option 'FollowSymLinks' is offered");
+        Check(Names(L.ApacheHttpd, "", "").Contains("Define"), "the Apache directive 'Define' is offered");
+        Check(Names(L.ApacheHttpd, "", "").Contains("UnDefine"), "the Apache directive 'UnDefine' is offered");
+        Check(Names(L.ApacheHttpd, "", "").Contains("If"), "the Apache section 'If' is offered");
         Check(Names(L.Nginx, "", "").Contains("proxy_pass"), "the nginx directive 'proxy_pass' is offered");
         Check(Names(L.Nginx, "", "").Contains("js_import"), "the nginx directive 'js_import' is offered");
         Check(Names(L.Nginx, "", "").Contains("js_content"), "the nginx directive 'js_content' is offered");

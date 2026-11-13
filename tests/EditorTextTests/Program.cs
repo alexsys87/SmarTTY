@@ -1314,6 +1314,15 @@ internal static class Program
         Equal(Join(apache.Tokens(18, SyntaxHighlighting.TypeKeyword)), "RewriteEngine|On", "Apache: RewriteEngine");
         Equal(Join(apache.Tokens(19, SyntaxHighlighting.TypeKeyword)), "RewriteRule", "Apache: RewriteRule");
         Equal(Join(apache.Tokens(21, SyntaxHighlighting.TypeKeyword)), "IncludeOptional", "Apache: IncludeOptional");
+        Highlighted define = new Highlighted(L.ApacheHttpd,
+            "Define BACKEND http://127.0.0.1:8080\nUnDefine OLD\n<If \"-R '10.0.0.0/8'\">\n    Require all granted\n</If>");
+        Equal(Join(define.Tokens(0, SyntaxHighlighting.TypeKeyword)), "Define", "Apache: Define");
+        Equal(Join(define.Tokens(1, SyntaxHighlighting.TypeKeyword)), "UnDefine", "Apache: UnDefine");
+        Equal(Join(define.Tokens(2, SyntaxHighlighting.TypeKeyword)), "If", "Apache: an If section");
+        Equal(Join(define.Tokens(4, SyntaxHighlighting.TypeKeyword)), "If", "Apache: the closing If section");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("Define"), "Apache keywords contain 'Define'");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("UnDefine"), "Apache keywords contain 'UnDefine'");
+        Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("If"), "Apache keywords contain 'If'");
         Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("DocumentRoot"), "Apache keywords contain 'DocumentRoot'");
         Check(SyntaxHighlighting.GetKeywords(L.ApacheHttpd).Contains("FollowSymLinks"), "Apache keywords contain 'FollowSymLinks'");
         Equal(Join(CommentStyle.ForLanguage(L.ApacheHttpd).Toggle(new[] { "Listen 80" })), "# Listen 80", "Apache comment");

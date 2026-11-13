@@ -685,6 +685,7 @@ public static partial class SyntaxHighlighting
           TypesConfig AddType AddEncoding AddLanguage AddHandler AddCharset AddDefaultCharset DefaultType
           AccessFileName SetHandler
           Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          Define UnDefine If
           Limit LimitExcept Proxy
           ProxyRequests ProxyPass ProxyPassReverse ProxyPreserveHost ProxyTimeout ProxyBadHeader ProxyVia
           RewriteEngine RewriteBase RewriteCond RewriteRule RewriteMap RewriteOptions
@@ -705,6 +706,7 @@ public static partial class SyntaxHighlighting
           All None
           emerg alert crit error warn notice info debug trace1 trace2 trace3 trace4 trace5 trace6 trace7 trace8
           Directory Files FileMatch Location LocationMatch VirtualHost IfModule IfDefine IfVersion ElseIf Else
+          If
           Limit LimitExcept Proxy
           GET POST HEAD PUT DELETE OPTIONS");
 
