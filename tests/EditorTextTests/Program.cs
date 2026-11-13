@@ -1280,6 +1280,17 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("default_backend"), "HAProxy keywords contain 'default_backend'");
         Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("roundrobin"), "HAProxy keywords contain 'roundrobin'");
         Equal(Join(CommentStyle.ForLanguage(L.HAProxy).Toggle(new[] { "    balance roundrobin" })), "    # balance roundrobin", "HAProxy comment");
+
+        Highlighted sections = new Highlighted(L.HAProxy,
+            "fcgi-app app\n    docroot /var/www\nhttpclient\n    timeout connect 5s\ntraces\n    trace h1 sink buf1 level developer\nacme LE\n    challenge HTTP-01");
+        Equal(Join(sections.Tokens(0, SyntaxHighlighting.TypeKeyword)), "fcgi-app", "HAProxy: the fcgi-app section");
+        Equal(Join(sections.Tokens(2, SyntaxHighlighting.TypeKeyword)), "httpclient", "HAProxy: the httpclient section");
+        Equal(Join(sections.Tokens(4, SyntaxHighlighting.TypeKeyword)), "traces", "HAProxy: the traces section");
+        Equal(Join(sections.Tokens(6, SyntaxHighlighting.TypeKeyword)), "acme", "HAProxy: the acme section");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("fcgi-app"), "HAProxy keywords contain 'fcgi-app'");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("httpclient"), "HAProxy keywords contain 'httpclient'");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("traces"), "HAProxy keywords contain 'traces'");
+        Check(SyntaxHighlighting.GetKeywords(L.HAProxy).Contains("acme"), "HAProxy keywords contain 'acme'");
     }
 
     private static void ApacheChecks()

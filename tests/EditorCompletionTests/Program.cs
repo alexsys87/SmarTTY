@@ -138,6 +138,10 @@ internal static class Program
         Check(Names(L.Redis, "", "").Contains("appendfsync"), "the Redis directive 'appendfsync' is offered");
         Check(Names(L.HAProxy, "", "").Contains("default_backend"), "the HAProxy directive 'default_backend' is offered");
         Check(Names(L.HAProxy, "", "").Contains("roundrobin"), "the HAProxy balance 'roundrobin' is offered");
+        Check(Names(L.HAProxy, "", "").Contains("fcgi-app"), "the HAProxy section 'fcgi-app' is offered");
+        Check(Names(L.HAProxy, "", "").Contains("httpclient"), "the HAProxy section 'httpclient' is offered");
+        Check(Names(L.HAProxy, "", "").Contains("traces"), "the HAProxy section 'traces' is offered");
+        Check(Names(L.HAProxy, "", "").Contains("acme"), "the HAProxy section 'acme' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("DocumentRoot"), "the Apache directive 'DocumentRoot' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("FollowSymLinks"), "the Apache option 'FollowSymLinks' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("Define"), "the Apache directive 'Define' is offered");
