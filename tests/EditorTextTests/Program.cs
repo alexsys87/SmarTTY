@@ -3091,6 +3091,29 @@ internal static class Program
         Equal(Join(uboot.Tokens(5, SyntaxHighlighting.TypeKeyword)), "", "U-Boot: an unknown command is not a keyword");
         Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bootm"), "U-Boot keywords contain 'bootm'");
         Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("setenv"), "U-Boot keywords contain 'setenv'");
+
+        Highlighted ubootCommands = new Highlighted(L.UBoot,
+            "bootefi 0x80000\nbootmenu 3\nbootflow scan\nwget 192.168.1.10/uImage\nnvme scan\npci enum\nping 192.168.1.1\nsntp 192.168.1.1\ncat 0x80000\nbdinfo");
+        Equal(Join(ubootCommands.Tokens(0, SyntaxHighlighting.TypeKeyword)), "bootefi", "U-Boot: bootefi");
+        Equal(Join(ubootCommands.Tokens(1, SyntaxHighlighting.TypeKeyword)), "bootmenu", "U-Boot: bootmenu");
+        Equal(Join(ubootCommands.Tokens(2, SyntaxHighlighting.TypeKeyword)), "bootflow", "U-Boot: bootflow");
+        Equal(Join(ubootCommands.Tokens(3, SyntaxHighlighting.TypeKeyword)), "wget", "U-Boot: wget");
+        Equal(Join(ubootCommands.Tokens(4, SyntaxHighlighting.TypeKeyword)), "nvme", "U-Boot: nvme");
+        Equal(Join(ubootCommands.Tokens(5, SyntaxHighlighting.TypeKeyword)), "pci", "U-Boot: pci");
+        Equal(Join(ubootCommands.Tokens(6, SyntaxHighlighting.TypeKeyword)), "ping", "U-Boot: ping");
+        Equal(Join(ubootCommands.Tokens(7, SyntaxHighlighting.TypeKeyword)), "sntp", "U-Boot: sntp");
+        Equal(Join(ubootCommands.Tokens(8, SyntaxHighlighting.TypeKeyword)), "cat", "U-Boot: cat");
+        Equal(Join(ubootCommands.Tokens(9, SyntaxHighlighting.TypeKeyword)), "bdinfo", "U-Boot: bdinfo");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bootefi"), "U-Boot keywords contain 'bootefi'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bootflow"), "U-Boot keywords contain 'bootflow'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bootmenu"), "U-Boot keywords contain 'bootmenu'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("wget"), "U-Boot keywords contain 'wget'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("nvme"), "U-Boot keywords contain 'nvme'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("pci"), "U-Boot keywords contain 'pci'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("ping"), "U-Boot keywords contain 'ping'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("sntp"), "U-Boot keywords contain 'sntp'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("cat"), "U-Boot keywords contain 'cat'");
+        Check(SyntaxHighlighting.GetKeywords(L.UBoot).Contains("bdinfo"), "U-Boot keywords contain 'bdinfo'");
         Equal(Join(CommentStyle.ForLanguage(L.UBoot).Toggle(new[] { "setenv x 1" })), "# setenv x 1", "U-Boot comment");
     }
 
