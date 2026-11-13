@@ -733,7 +733,8 @@ public static partial class SyntaxHighlighting
           STP Priority ForwardDelay HelloTime MaxAge AgeingTime VLANFiltering
           Id Mode MIIMonitorSec LACPTransmitRate UpDelaySec DownDelaySec
           Local Remote TTL
-          RouterLifetime");
+          RouterLifetime
+          PrivateKey ListenPort PublicKey PresharedKey AllowedIPs Endpoint PersistentKeepalive");
 
     private static readonly HashSet<string> SystemdNetworkdValues = Words(StringComparer.OrdinalIgnoreCase,
         @"yes no on off true false ipv4 ipv6 both none static dhcp routable carrier up down any
