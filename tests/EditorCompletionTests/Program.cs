@@ -136,6 +136,12 @@ internal static class Program
         Check(Names(L.MySql, "", "").Contains("skip-name-resolve"), "the MySQL option 'skip-name-resolve' is offered");
         Check(Names(L.Redis, "", "").Contains("maxmemory-policy"), "the Redis directive 'maxmemory-policy' is offered");
         Check(Names(L.Redis, "", "").Contains("appendfsync"), "the Redis directive 'appendfsync' is offered");
+        Check(Names(L.Redis, "", "").Contains("sentinel"), "the Redis Sentinel directive 'sentinel' is offered");
+        Check(Names(L.Redis, "", "").Contains("monitor"), "the Redis Sentinel command 'monitor' is offered");
+        Check(Names(L.Redis, "", "").Contains("down-after-milliseconds"), "the Redis Sentinel command 'down-after-milliseconds' is offered");
+        Check(Names(L.Redis, "", "").Contains("failover-timeout"), "the Redis Sentinel command 'failover-timeout' is offered");
+        Check(Names(L.Redis, "", "").Contains("parallel-syncs"), "the Redis Sentinel command 'parallel-syncs' is offered");
+        Check(Names(L.Redis, "", "").Contains("auth-pass"), "the Redis Sentinel command 'auth-pass' is offered");
         Check(Names(L.HAProxy, "", "").Contains("default_backend"), "the HAProxy directive 'default_backend' is offered");
         Check(Names(L.HAProxy, "", "").Contains("roundrobin"), "the HAProxy balance 'roundrobin' is offered");
         Check(Names(L.HAProxy, "", "").Contains("fcgi-app"), "the HAProxy section 'fcgi-app' is offered");

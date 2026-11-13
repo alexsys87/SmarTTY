@@ -616,7 +616,38 @@ public static partial class SyntaxHighlighting
           zset-max-listpack-entries zset-max-ziplist-entries zset-max-listpack-value zset-max-ziplist-value
           hll-sparse-max-bytes stream-node-max-bytes stream-node-max-entries
           activerehashing client-output-buffer-limit hz dynamic-hz aof-rewrite-incremental-fsync
-          rdb-save-incremental-fsync jemalloc-bg-thread activedefrag");
+          rdb-save-incremental-fsync jemalloc-bg-thread activedefrag
+          sentinel monitor down-after-milliseconds failover-timeout parallel-syncs auth-pass auth-user
+          resolve-hostnames announce-hostnames announce-ip announce-port deny-scripts-reconfig
+          notification-script client-reconfig-script config-epoch leader-epoch current-epoch
+          known-replica known-sentinel rename-command sentinel-user sentinel-pass myid cluster-name");
+
+    /// <summary>The two-word commands of sentinel.conf: the whole "sentinel monitor" is coloured as one keyword.</summary>
+    private static readonly HashSet<string> RedisSentinelPhrases = Phrases(StringComparer.OrdinalIgnoreCase,
+        @"sentinel
+          sentinel monitor
+          sentinel down-after-milliseconds
+          sentinel failover-timeout
+          sentinel parallel-syncs
+          sentinel auth-pass
+          sentinel auth-user
+          sentinel resolve-hostnames
+          sentinel announce-hostnames
+          sentinel announce-ip
+          sentinel announce-port
+          sentinel deny-scripts-reconfig
+          sentinel notification-script
+          sentinel client-reconfig-script
+          sentinel config-epoch
+          sentinel leader-epoch
+          sentinel current-epoch
+          sentinel known-replica
+          sentinel known-sentinel
+          sentinel rename-command
+          sentinel sentinel-user
+          sentinel sentinel-pass
+          sentinel myid
+          sentinel cluster-name");
 
     private static readonly HashSet<string> RedisValues = Words(StringComparer.OrdinalIgnoreCase,
         @"yes no always everysec debug verbose notice warning
@@ -625,12 +656,13 @@ public static partial class SyntaxHighlighting
           normal slave replica master");
 
     /// <summary>
-    /// Redis: the colours of Config with the directives of redis.conf and sentinel.conf known, and the values of the
-    /// eviction policies, appendfsync and loglevel modes coloured as keywords.
+    /// Redis: the colours of Config with the directives of redis.conf and sentinel.conf known, the "sentinel monitor" commands
+    /// of Sentinel coloured as whole phrases, and the values of the eviction policies, appendfsync and loglevel modes coloured
+    /// as keywords.
     /// </summary>
     private static bool TokenizeRedis(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
-        return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues);
+        return TokenizeConfigCore(RedisDirectives, startState, text, sink, out endState, valueKeywords: RedisValues, phraseDirectives: RedisSentinelPhrases);
     }
 
     // ---------------------------------------------------------------- HAProxy

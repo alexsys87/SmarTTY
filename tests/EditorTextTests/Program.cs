@@ -1247,6 +1247,21 @@ internal static class Program
         Equal(Join(redis.Tokens(13, SyntaxHighlighting.TypeKeyword)), "user|on|nopass|all", "Redis: an ACL user");
         Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("maxmemory-policy"), "Redis keywords contain 'maxmemory-policy'");
         Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("appendfsync"), "Redis keywords contain 'appendfsync'");
+        Highlighted sentinel = new Highlighted(L.Redis,
+            "sentinel monitor mymaster 127.0.0.1 6379 2\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 60000\nsentinel parallel-syncs mymaster 1\nsentinel auth-pass mymaster secret\nsentinel resolve-hostnames yes\nsentinel announce-ip 192.168.1.10\nsentinel myid 1234567890abcdef");
+        Equal(Join(sentinel.Tokens(0, SyntaxHighlighting.TypeKeyword)), "sentinel monitor", "Redis: sentinel monitor");
+        Equal(Join(sentinel.Tokens(1, SyntaxHighlighting.TypeKeyword)), "sentinel down-after-milliseconds", "Redis: sentinel down-after-milliseconds");
+        Equal(Join(sentinel.Tokens(2, SyntaxHighlighting.TypeKeyword)), "sentinel failover-timeout", "Redis: sentinel failover-timeout");
+        Equal(Join(sentinel.Tokens(3, SyntaxHighlighting.TypeKeyword)), "sentinel parallel-syncs", "Redis: sentinel parallel-syncs");
+        Equal(Join(sentinel.Tokens(4, SyntaxHighlighting.TypeKeyword)), "sentinel auth-pass", "Redis: sentinel auth-pass");
+        Equal(Join(sentinel.Tokens(5, SyntaxHighlighting.TypeKeyword)), "sentinel resolve-hostnames|yes", "Redis: sentinel resolve-hostnames");
+        Equal(Join(sentinel.Tokens(6, SyntaxHighlighting.TypeKeyword)), "sentinel announce-ip", "Redis: sentinel announce-ip");
+        Equal(Join(sentinel.Tokens(7, SyntaxHighlighting.TypeKeyword)), "sentinel myid", "Redis: sentinel myid");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("sentinel monitor"), "Redis keywords contain 'sentinel monitor'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("down-after-milliseconds"), "Redis keywords contain 'down-after-milliseconds'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("failover-timeout"), "Redis keywords contain 'failover-timeout'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("parallel-syncs"), "Redis keywords contain 'parallel-syncs'");
+        Check(SyntaxHighlighting.GetKeywords(L.Redis).Contains("auth-pass"), "Redis keywords contain 'auth-pass'");
         Equal(Join(CommentStyle.ForLanguage(L.Redis).Toggle(new[] { "port 6379" })), "# port 6379", "Redis comment");
     }
 
