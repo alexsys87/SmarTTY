@@ -124,6 +124,8 @@ public static partial class SyntaxHighlighting
         @"user worker_processes worker_rlimit_nofile worker_priority worker_cpu_affinity worker_shutdown_timeout daemon master_process
           timer_resolution pcre_jit ssl_engine load_module env thread_pool lock_file pid error_log include events http server location
           upstream stream mail types map geo split_clients limit_except if set break return rewrite
+          // njs
+          js_import js_content js_set js_var js_periodic js_preload_object
           worker_connections use multi_accept accept_mutex accept_mutex_delay
           listen server_name server_name_in_redirect server_names_hash_bucket_size server_names_hash_max_size root alias index try_files
           error_page internal default_type charset charset_types source_charset override_charset
