@@ -3175,6 +3175,15 @@ internal static class Program
         Equal(Join(linker.Tokens(7, SyntaxHighlighting.TypeKeyword)), "AT|ADDR|SIZEOF", "linker: commands in an expression");
         Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("SECTIONS"), "linker keywords contain 'SECTIONS'");
         Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("SIZEOF"), "linker keywords contain 'SIZEOF'");
+        Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("VERSION"), "linker keywords contain 'VERSION'");
+        Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("NOCROSSREFS"), "linker keywords contain 'NOCROSSREFS'");
+        Check(SyntaxHighlighting.GetKeywords(L.LinkerScript).Contains("NOCROSSREFS_TO"), "linker keywords contain 'NOCROSSREFS_TO'");
+
+        Highlighted modern = new Highlighted(L.LinkerScript,
+            "VERSION { global: foo; local: *; }\nNOCROSSREFS(.text .data)\nNOCROSSREFS_TO(.text .rodata)");
+        Equal(Join(modern.Tokens(0, SyntaxHighlighting.TypeKeyword)), "VERSION", "linker: VERSION");
+        Equal(Join(modern.Tokens(1, SyntaxHighlighting.TypeKeyword)), "NOCROSSREFS", "linker: NOCROSSREFS");
+        Equal(Join(modern.Tokens(2, SyntaxHighlighting.TypeKeyword)), "NOCROSSREFS_TO", "linker: NOCROSSREFS_TO");
         Equal(Join(CommentStyle.ForLanguage(L.LinkerScript).Toggle(new[] { "ENTRY(_start)" })), "/* ENTRY(_start) */", "linker comment");
     }
 
