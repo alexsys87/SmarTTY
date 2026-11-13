@@ -140,6 +140,13 @@ internal static class Program
         Check(Names(L.HAProxy, "", "").Contains("roundrobin"), "the HAProxy balance 'roundrobin' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("DocumentRoot"), "the Apache directive 'DocumentRoot' is offered");
         Check(Names(L.ApacheHttpd, "", "").Contains("FollowSymLinks"), "the Apache option 'FollowSymLinks' is offered");
+        Check(Names(L.Nginx, "", "").Contains("proxy_pass"), "the nginx directive 'proxy_pass' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_import"), "the nginx directive 'js_import' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_content"), "the nginx directive 'js_content' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_set"), "the nginx directive 'js_set' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_var"), "the nginx directive 'js_var' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_periodic"), "the nginx directive 'js_periodic' is offered");
+        Check(Names(L.Nginx, "", "").Contains("js_preload_object"), "the nginx directive 'js_preload_object' is offered");
         Check(Names(L.SystemdNetworkd, "", "").Contains("DHCP"), "the systemd-networkd key 'DHCP' is offered");
         Check(Names(L.SystemdNetworkd, "", "").Contains("LinkLocalAddressing"), "the systemd-networkd key 'LinkLocalAddressing' is offered");
         Check(Names(L.SystemdNetworkd, "", "").Contains("PrivateKey"), "the systemd-networkd WireGuard key 'PrivateKey' is offered");

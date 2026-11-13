@@ -1037,6 +1037,17 @@ internal static class Program
         Equal(Join(site.Tokens(6, SyntaxHighlighting.TypeVariable)), "my_unknown_directive", "nginx: ...it is a plain key");
         Equal(Join(site.Tokens(9, SyntaxHighlighting.TypeComment)), "# comment", "nginx: comment");
 
+        Highlighted njs = new Highlighted(L.Nginx,
+            "js_import http.js;\njs_content hello;\njs_set $foo foo;\njs_var $bar value;\njs_periodic main interval=1s;\njs_preload_object config.json;");
+        Equal(Join(njs.Tokens(0, SyntaxHighlighting.TypeKeyword)), "js_import", "nginx: js_import");
+        Equal(Join(njs.Tokens(1, SyntaxHighlighting.TypeKeyword)), "js_content", "nginx: js_content");
+        Equal(Join(njs.Tokens(2, SyntaxHighlighting.TypeKeyword)), "js_set", "nginx: js_set");
+        Equal(Join(njs.Tokens(3, SyntaxHighlighting.TypeKeyword)), "js_var", "nginx: js_var");
+        Equal(Join(njs.Tokens(4, SyntaxHighlighting.TypeKeyword)), "js_periodic", "nginx: js_periodic");
+        Equal(Join(njs.Tokens(5, SyntaxHighlighting.TypeKeyword)), "js_preload_object", "nginx: js_preload_object");
+        Check(SyntaxHighlighting.GetKeywords(L.Nginx).Contains("js_import"), "nginx keywords contain 'js_import'");
+        Check(SyntaxHighlighting.GetKeywords(L.Nginx).Contains("js_periodic"), "nginx keywords contain 'js_periodic'");
+
         // ssh: the options are case insensitive
         Highlighted ssh = new Highlighted(L.SshConfig, "Host *\n    permitrootlogin no\n    PasswordAuthentication no\nPermitRootLogn yes\n# a comment");
         Equal(Join(ssh.Tokens(0, SyntaxHighlighting.TypeKeyword)), "Host", "ssh: Host");
