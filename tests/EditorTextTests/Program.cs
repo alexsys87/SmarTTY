@@ -3139,6 +3139,20 @@ internal static class Program
         Equal(Join(recipe.Tokens(8, SyntaxHighlighting.TypeComment)), "# comment", "Yocto: a comment");
         Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("SRC_URI"), "Yocto keywords contain 'SRC_URI'");
         Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("do_install"), "Yocto keywords contain 'do_install'");
+
+        Highlighted modern = new Highlighted(L.Yocto,
+            "addpylib ${LAYERDIR}/lib\naddfragments conf/fragments OE_FRAGMENTS OE_FRAGMENTS_METADATA_VARS OE_FRAGMENTS_BUILTIN\nBB_NUMBER_THREADS = \"8\"\nBB_CONF_FRAGMENT_SUMMARY = \"1\"\nOE_FRAGMENTS = \"core/base\"");
+        Equal(Join(modern.Tokens(0, SyntaxHighlighting.TypeKeyword)), "addpylib", "Yocto: addpylib");
+        Equal(Join(modern.Tokens(0, SyntaxHighlighting.TypeVariable)), "${LAYERDIR}", "Yocto: a variable in addpylib");
+        Equal(Join(modern.Tokens(1, SyntaxHighlighting.TypeKeyword)), "addfragments", "Yocto: addfragments");
+        Equal(Join(modern.Tokens(2, SyntaxHighlighting.TypeKeyword)), "BB_NUMBER_THREADS", "Yocto: BB_NUMBER_THREADS");
+        Equal(Join(modern.Tokens(3, SyntaxHighlighting.TypeKeyword)), "BB_CONF_FRAGMENT_SUMMARY", "Yocto: BB_CONF_FRAGMENT_SUMMARY");
+        Equal(Join(modern.Tokens(4, SyntaxHighlighting.TypeKeyword)), "OE_FRAGMENTS", "Yocto: OE_FRAGMENTS");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("addpylib"), "Yocto keywords contain 'addpylib'");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("addfragments"), "Yocto keywords contain 'addfragments'");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("BB_NUMBER_THREADS"), "Yocto keywords contain 'BB_NUMBER_THREADS'");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("BB_CONF_FRAGMENT_SUMMARY"), "Yocto keywords contain 'BB_CONF_FRAGMENT_SUMMARY'");
+        Check(SyntaxHighlighting.GetKeywords(L.Yocto).Contains("OE_FRAGMENTS"), "Yocto keywords contain 'OE_FRAGMENTS'");
         Equal(Join(CommentStyle.ForLanguage(L.Yocto).Toggle(new[] { "SUMMARY = \"x\"" })), "# SUMMARY = \"x\"", "Yocto comment");
     }
 

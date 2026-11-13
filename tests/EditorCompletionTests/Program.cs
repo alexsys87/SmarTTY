@@ -111,6 +111,11 @@ internal static class Program
         Check(Names(L.UBoot, "", "").Contains("bdinfo"), "the U-Boot command 'bdinfo' is offered");
         Check(Names(L.Yocto, "", "").Contains("SRC_URI"), "the BitBake variable 'SRC_URI' is offered");
         Check(Names(L.Yocto, "", "").Contains("do_install"), "the BitBake task 'do_install' is offered");
+        Check(Names(L.Yocto, "", "").Contains("addpylib"), "the BitBake directive 'addpylib' is offered");
+        Check(Names(L.Yocto, "", "").Contains("addfragments"), "the BitBake directive 'addfragments' is offered");
+        Check(Names(L.Yocto, "", "").Contains("BB_NUMBER_THREADS"), "the BitBake variable 'BB_NUMBER_THREADS' is offered");
+        Check(Names(L.Yocto, "", "").Contains("BB_CONF_FRAGMENT_SUMMARY"), "the BitBake variable 'BB_CONF_FRAGMENT_SUMMARY' is offered");
+        Check(Names(L.Yocto, "", "").Contains("OE_FRAGMENTS"), "the BitBake variable 'OE_FRAGMENTS' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("SECTIONS"), "the linker command 'SECTIONS' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("SIZEOF"), "the linker command 'SIZEOF' is offered");
         Check(Names(L.Crontab, "", "").Contains("jan"), "the crontab month 'jan' is offered");
