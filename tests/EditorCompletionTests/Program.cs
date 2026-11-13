@@ -106,6 +106,9 @@ internal static class Program
         Check(Names(L.Kconfig, "", "").Contains("osource"), "the Kconfig directive 'osource' is offered");
         Check(Names(L.UBoot, "", "").Contains("bootm"), "the U-Boot command 'bootm' is offered");
         Check(Names(L.UBoot, "", "").Contains("setenv"), "the U-Boot command 'setenv' is offered");
+        Check(Names(L.UBoot, "", "").Contains("bootefi"), "the U-Boot command 'bootefi' is offered");
+        Check(Names(L.UBoot, "", "").Contains("bootflow"), "the U-Boot command 'bootflow' is offered");
+        Check(Names(L.UBoot, "", "").Contains("bdinfo"), "the U-Boot command 'bdinfo' is offered");
         Check(Names(L.Yocto, "", "").Contains("SRC_URI"), "the BitBake variable 'SRC_URI' is offered");
         Check(Names(L.Yocto, "", "").Contains("do_install"), "the BitBake task 'do_install' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("SECTIONS"), "the linker command 'SECTIONS' is offered");

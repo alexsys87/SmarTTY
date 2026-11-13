@@ -65,15 +65,15 @@ public static partial class SyntaxHighlighting
 
     private static readonly HashSet<string> UBootKeywords = Words(StringComparer.Ordinal,
         // commands of the U-Boot shell
-        @"setenv saveenv run bootm bootz booti bootd bootelf bootvx boot go reset
-          tftpboot tftp fatload fatwrite fatls fatmkdir fatrm ext4load ext4write ext4ls ext4size
-          ext2load ext2write ext2ls ext2size mmc nand nor sf usb scsi sata dhcp
+        @"setenv saveenv run bootm bootz booti bootd bootelf bootvx boot bootefi bootflow bootmenu go reset
+          tftpboot tftp wget fatload fatwrite fatls fatmkdir fatrm ext4load ext4write ext4ls ext4size
+          ext2load ext2write ext2ls ext2size mmc nvme nand nor sf usb scsi sata pci dhcp ping sntp
           load loadb loads loadx loady printenv env import export source
           if then else elif fi for while do done until case esac in
-          test echo sleep mw md mm nm cp cmp mv
+          test echo cat sleep mw md mm nm cp cmp mv
           setexpr protect erase
           ubi ubifs mtd ubifsmount ubifsumount ubifswrite ubifsload
-          i2c gpio adc fuse dm part disk ls size
+          i2c gpio adc fuse dm part disk ls size bdinfo
           fdt addr resize move mknode setprop print rm
           fastboot dfu acpi button
           bootargs bootcmd bootdelay baudrate ethaddr eth1addr ipaddr serverip gatewayip netmask
