@@ -229,7 +229,7 @@ public static partial class SyntaxHighlighting
         @"jan feb mar apr may jun jul aug sep oct nov dec
           sun mon tue wed thu fri sat",
         // the environment names a crontab may set
-        @"SHELL PATH MAILTO HOME LOGNAME CRON_TZ");
+        @"SHELL PATH MAILTO HOME LOGNAME CRON_TZ RANDOM_DELAY MLS_LEVEL CONTENT_TYPE MAILFROM");
 
     /// <summary>
     /// cron/crontab: a comment, an environment assignment (SHELL, PATH, MAILTO), a @reboot-style shortcut or the five
