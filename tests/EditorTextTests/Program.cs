@@ -3054,6 +3054,16 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("hosts"), "Ansible keywords contain 'hosts'");
         Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("apt"), "Ansible keywords contain 'apt'");
         Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("become"), "Ansible keywords contain 'become'");
+        Highlighted fqcn = new Highlighted(L.Ansible,
+            "- name: Harden\n  hosts: all\n  tasks:\n    - name: Allow SSH\n      ansible.builtin.ufw:\n        rule: allow\n        port: \"22\"\n    - name: Copy config\n      ansible.builtin.copy:\n        src: app.conf\n        dest: /etc/app.conf\n      vars:\n        checksum: {{ app_conf | community.general.json_query('a.b') }}\n    - name: Unknown collection\n      custom.collection.module:\n        state: present");
+        Equal(Join(fqcn.Tokens(4, SyntaxHighlighting.TypeKeyword)), "ansible.builtin.ufw", "Ansible: ansible.builtin.ufw");
+        Equal(Join(fqcn.Tokens(8, SyntaxHighlighting.TypeKeyword)), "ansible.builtin.copy", "Ansible: ansible.builtin.copy");
+        Equal(Join(fqcn.Tokens(12, SyntaxHighlighting.TypeKeyword)), "community.general.json_query", "Ansible: a community.general filter");
+        Equal(Join(fqcn.Tokens(14, SyntaxHighlighting.TypeKeyword)), "", "Ansible: an unknown collection is not a keyword");
+        Equal(Join(fqcn.Tokens(14, SyntaxHighlighting.TypeVariable)), "custom.collection.module", "Ansible: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("ansible.builtin.apt"), "Ansible keywords contain 'ansible.builtin.apt'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("community.general.ufw"), "Ansible keywords contain 'community.general.ufw'");
+        Check(SyntaxHighlighting.GetKeywords(L.Ansible).Contains("community.general.json_query"), "Ansible keywords contain 'community.general.json_query'");
         Equal(Join(CommentStyle.ForLanguage(L.Ansible).Toggle(new[] { "  become: yes" })), "  # become: yes", "Ansible comment");
     }
 

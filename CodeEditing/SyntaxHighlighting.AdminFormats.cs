@@ -2094,22 +2094,52 @@ public static partial class SyntaxHighlighting
           insertafter insertbefore marker remote_src attributes seuser serole setype selevel unsafe_writes enabled
           docker_container docker_image docker_network docker_volume docker_compose_v2 k8s helm
           mysql_db mysql_user mysql_query postgresql_db postgresql_user postgresql_query redis redis_info
-          pip composer npm yarn gem");
+          pip composer npm yarn gem
+          // fully qualified collection names
+          ansible.builtin.apt ansible.builtin.copy ansible.builtin.template ansible.builtin.file
+          ansible.builtin.service ansible.builtin.systemd ansible.builtin.command ansible.builtin.shell
+          ansible.builtin.lineinfile ansible.builtin.stat ansible.builtin.debug ansible.builtin.set_fact
+          ansible.builtin.user ansible.builtin.group ansible.builtin.get_url ansible.builtin.uri
+          ansible.builtin.git ansible.builtin.cron ansible.builtin.mount ansible.builtin.unarchive
+          ansible.builtin.include_tasks ansible.builtin.import_tasks ansible.builtin.include_role
+          ansible.builtin.import_role
+          community.general.ufw community.general.timezone community.general.parted community.general.lvg
+          community.general.lvol community.general.filesystem community.general.supervisorctl
+          community.general.pip community.general.composer community.general.npm community.general.make
+          community.general.ini_file community.general.xml");
 
     private static readonly HashSet<string> AnsibleValues = Words(StringComparer.OrdinalIgnoreCase,
         // the states and the choices of the play
         @"present absent started stopped restarted reloaded latest enabled disabled mounted unmounted link file directory
           touch yes no true false always never any all first last on_success on_failure
           ssh local docker paramiko_ssh winrm sudo su doas pbrun pfexec runas
-          linear free host_pinned debug");
+          linear free host_pinned debug
+          // the fully qualified filters and lookup plugins
+          ansible.builtin.b64encode ansible.builtin.b64decode ansible.builtin.to_json ansible.builtin.to_yaml
+          ansible.builtin.from_json ansible.builtin.from_yaml ansible.builtin.combine ansible.builtin.dict2items
+          ansible.builtin.items2dict ansible.builtin.flatten ansible.builtin.unique ansible.builtin.intersect
+          ansible.builtin.difference ansible.builtin.union ansible.builtin.zip ansible.builtin.regex_replace
+          ansible.builtin.regex_search ansible.builtin.regex_findall ansible.builtin.split ansible.builtin.basename
+          ansible.builtin.dirname ansible.builtin.expanduser ansible.builtin.realpath ansible.builtin.quote
+          ansible.builtin.default ansible.builtin.file ansible.builtin.template ansible.builtin.env
+          ansible.builtin.pipe ansible.builtin.password ansible.builtin.url ansible.builtin.first_found
+          ansible.builtin.vars
+          community.general.json_query community.general.json_modify community.general.passwordstore
+          community.general.keyring community.general.onepassword community.general.bitwarden
+          community.general.hashi_vault");
+
+    /// <summary>The namespaces of the fully qualified collection names: any word under them is a keyword.</summary>
+    private static readonly HashSet<string> AnsibleFqcnPrefixes = Words(StringComparer.OrdinalIgnoreCase,
+        "ansible.builtin. community.general. ansible.legacy.");
 
     /// <summary>
-    /// Ansible: the colours and the folds of YAML with the keys of the plays, the tasks and the roles known, and the
-    /// modules (apt, copy, service, command, ...) and the common states (present, started, enabled) coloured too.
+    /// Ansible: the colours and the folds of YAML with the keys of the plays, the tasks and the roles known, the
+    /// modules (apt, copy, service, command, ...) and the common states (present, started, enabled) coloured too,
+    /// and the fully qualified collection names such as "ansible.builtin.apt" and "community.general.json_query".
     /// </summary>
     private static bool TokenizeAnsible(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
-        return TokenizeYamlCore(AnsibleKeywords, AnsibleValues, startState, text, sink, out endState);
+        return TokenizeYamlCore(AnsibleKeywords, AnsibleValues, startState, text, sink, out endState, AnsibleFqcnPrefixes);
     }
 
     // ------------------------------------------------------------- PostgreSQL
