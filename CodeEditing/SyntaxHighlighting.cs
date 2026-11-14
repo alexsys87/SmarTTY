@@ -4818,7 +4818,34 @@ namespace SmarTTY.CodeEditing
             "on", "as", "group", "by", "order", "having", "limit", "offset", "union", "all", "distinct", "null",
             "is", "in", "like", "between", "exists", "primary", "key", "foreign", "references", "default",
             "case", "when", "then", "else", "end", "begin", "commit", "rollback", "grant", "revoke", "true", "false",
-            "local", "function", "if", "elseif", "for", "while", "do", "repeat", "until", "return", "break", "nil"
+            "local", "function", "if", "elseif", "for", "while", "do", "repeat", "until", "return", "break", "nil",
+            // the standard clauses and objects
+            "asc", "desc", "constraint", "unique", "check", "cascade", "restrict", "temporary", "truncate",
+            "sequence", "identity", "generated", "always", "stored", "virtual", "returning", "conflict", "nothing",
+            "lateral", "recursive", "fetch", "next", "only", "nowait", "lock", "savepoint", "release", "intersect",
+            "except", "cast", "collate", "using", "window", "partition", "over", "range", "rows", "groups", "filter",
+            "within", "procedure", "trigger", "cursor", "declare", "open", "close", "call",
+            "explain", "analyze", "vacuum", "comment", "replace", "ignore", "merge", "matched", "upsert",
+            // PostgreSQL
+            "serial", "bigserial", "smallserial", "uuid", "jsonb", "json", "bytea", "inet", "cidr", "macaddr",
+            "tsvector", "tsquery", "numeric", "decimal", "real", "double", "precision", "money", "interval",
+            "timestamp", "timestamptz", "date", "time", "boolean", "bool", "char", "varchar", "text",
+            "ilike", "similar", "tablespace", "extension", "language", "plpgsql", "returns", "perform",
+            "raise", "notice", "warning", "info", "debug", "log", "exception", "sqlstate", "sqlerrm",
+            "diagnostics", "found", "foreach", "slice", "strict", "loop", "exit", "continue", "query", "others",
+            "now", "nextval", "currval", "setval", "coalesce", "nullif", "greatest", "least",
+            "array_agg", "string_agg", "jsonb_agg", "json_agg", "generate_series",
+            // MySQL/MariaDB
+            "tinyint", "smallint", "mediumint", "bigint", "int", "integer", "unsigned", "zerofill", "float",
+            "enum", "set", "year", "datetime", "longtext", "mediumtext", "tinytext", "longblob", "mediumblob",
+            "tinyblob", "blob", "varbinary", "binary", "auto_increment", "engine", "charset", "collate",
+            "show", "describe", "use", "straight_join", "force", "duplicate", "delimiter", "high_priority",
+            "low_priority", "delayed", "quick", "change", "modify", "rename", "fulltext", "spatial",
+            "row_format", "ifnull", "isnull", "concat", "group_concat", "date_format", "str_to_date",
+            "unix_timestamp", "from_unixtime", "mod", "sql_calc_found_rows",
+            // SQLite
+            "autoincrement", "rowid", "without", "abort", "fail", "attach", "detach", "pragma", "reindex",
+            "julianday", "strftime", "glob"
         };
 
         private static readonly HashSet<string> PreprocessorDirectives = new HashSet<string>(StringComparer.Ordinal)
