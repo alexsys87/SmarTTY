@@ -241,7 +241,7 @@ public class TarWriter
         return headerBuffer;
     }
 
-    private static void CopyStream(Stream sourceStream, Stream destinationStream, ref int filesDone, ref long bytesDone, byte[] buffer, long length = -1L)
+    internal static void CopyStream(Stream sourceStream, Stream destinationStream, ref int filesDone, ref long bytesDone, byte[] buffer, long length = -1L)
     {
         long totalRead = 0L;
         if (length < 0)
@@ -262,16 +262,25 @@ public class TarWriter
         }
         // The header already announced "length" bytes. If the file got shorter while it was being read, the missing
         // part is zero-filled: otherwise every following header would be read from the wrong place.
-        long missing = length - totalRead;
-        while (missing > 0)
+        WriteZeros(destinationStream, length - totalRead, buffer, ref bytesDone);
+        filesDone++;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="count"/> zero bytes, using <paramref name="buffer"/> as the source of them (its content is lost).
+    /// For the part of a file that a tar header announced but that is no longer there: the entry has to keep its length, or
+    /// the padding and every following header are read from the wrong place.
+    /// </summary>
+    internal static void WriteZeros(Stream destinationStream, long count, byte[] buffer, ref long bytesDone)
+    {
+        while (count > 0)
         {
-            int zeroCount = (int)Math.Min(buffer.LongLength, missing);
+            int zeroCount = (int)Math.Min(buffer.LongLength, count);
             Array.Clear(buffer, 0, zeroCount);
             destinationStream.Write(buffer, 0, zeroCount);
-            missing -= zeroCount;
+            count -= zeroCount;
             bytesDone += zeroCount;
         }
-        filesDone++;
     }
 
     private void WriteDirectory(Stream destinationStream, string localDirPath, string relativePath, ref int filesDone, ref long bytesDone, byte[] paddingBuffer, byte[] copyBuffer, Predicate<string> fileFilter, Predicate<string> dirFilter = null)
