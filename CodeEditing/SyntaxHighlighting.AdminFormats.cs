@@ -2022,7 +2022,8 @@ public static partial class SyntaxHighlighting
           application library Delete Retain Recycle RuntimeDefault Unconfined Localhost
           // Helm template functions
           include template tpl required default quote squote toYaml fromYaml toJson fromJson nindent indent trim upper lower
-          title trunc replace printf range with if else end define block fail lookup semverCompare");
+          title trunc replace printf range with if else end define block fail lookup semverCompare
+          b64enc sha256sum merge coalesce ternary dig toPrettyJson genCA");
 
     /// <summary>
     /// Kubernetes and Helm: the colours and the folds of YAML with the keys of the manifests and the chart metadata
