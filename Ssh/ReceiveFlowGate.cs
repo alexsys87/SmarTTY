@@ -7,9 +7,11 @@ namespace SmarTTY.Ssh;
 /// Counts the bytes that have arrived from the server but are not yet processed by their consumer, and holds the
 /// receiving thread back while there are too many of them. Without it a host that writes faster than the terminal
 /// can draw (yes, cat of a huge file, a noisy dmesg -w) makes the queues between the network and the screen grow
-/// without bound: SSH.NET gives the server a new window as soon as a packet has been read, whether or not anyone
-/// has dealt with its data. Holding the receiving thread back stops the reading from the socket, and the TCP
-/// window then slows the server down.
+/// without bound: the window that SSH.NET gives the server is about 2 GB, and it is refilled whether or not anyone
+/// has dealt with the data, so the SSH window does not slow the server down in time. Holding the receiving thread
+/// back stops the reading from the socket, and the TCP window then slows the server down.
+/// The receiving thread is the one of the whole SSH connection, so every other channel of it waits as well while this
+/// gate holds it (see SshShellChannel.LimitUnprocessedData for why the window of the channel cannot be used instead).
 /// </summary>
 internal sealed class ReceiveFlowGate
 {

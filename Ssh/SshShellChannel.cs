@@ -371,6 +371,20 @@ public class SshShellChannel : IAsyncChannel, IDisposable
     /// from the connection, and the server is slowed down by the flow control of TCP. A consumer that turns this on
     /// must call <see cref="MarkProcessed"/> for every chunk it gets, once it has dealt with it. Without it the data
     /// that a host writes faster than it is drawn piles up in memory without bound.
+    /// <para>
+    /// The price: the thread that waits is the one receive thread of the whole SSH connection, so while this consumer is
+    /// behind (for at most <see cref="FlowWaitTimeout"/> per packet), the other channels of the connection (SFTP, the
+    /// file panel, other tabs, forwarded ports, X11) get their data late as well. It does not touch a consumer that
+    /// keeps up.
+    /// </para>
+    /// <para>
+    /// Holding back the window of this channel (withholding SSH_MSG_CHANNEL_WINDOW_ADJUST) would spare the other channels,
+    /// but it cannot work with SSH.NET 2026.0.0: <c>Session.CreateChannelSession</c> opens the channel with a window of
+    /// 0x7FFFFFFF bytes (about 2 GB, an internal constant that cannot be lowered once CHANNEL_OPEN is sent), and
+    /// <c>Channel.AdjustDataWindow</c> (private, run before the DataReceived event) adds to it only when it has fallen
+    /// below the packet size. The server may therefore send about 2 GB before it needs an adjustment, which bounds
+    /// nothing. Not reading from the connection is the only brake that is left.
+    /// </para>
     /// </summary>
     public void LimitUnprocessedData(long maxBytes)
     {
