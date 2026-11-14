@@ -637,7 +637,8 @@ public static partial class SyntaxHighlighting
 
     private static readonly HashSet<string> HAProxyDirectives = Words(StringComparer.OrdinalIgnoreCase,
         // sections
-        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers",
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers
+          fcgi-app httpclient traces acme",
         // global and defaults
         @"log log-format log-format-sd log-tag maxconn daemon user group uid gid chroot pidfile
           stats nbproc nbthread cpu-map master-worker mworker-max-reloads expose-fd
@@ -653,6 +654,7 @@ public static partial class SyntaxHighlighting
     private static readonly HashSet<string> HAProxyValues = Words(StringComparer.OrdinalIgnoreCase,
         // the words a section may stand alone with, and the choices of the directives
         @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward mailers
+          fcgi-app httpclient traces acme
           daemon master-worker
           http tcp health
           roundrobin static-rr leastconn first source uri url_param rdp-cookie random
