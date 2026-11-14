@@ -2039,6 +2039,7 @@ public static partial class SyntaxHighlighting
     private static readonly HashSet<string> DockerComposeKeywords = Words(StringComparer.OrdinalIgnoreCase,
         // the envelope
         @"version name services networks volumes secrets configs
+          include develop models provider gpus
           // the services
           image build context dockerfile dockerfile_inline additional_contexts args target cache_from cache_to labels
           pull network container_name command entrypoint environment env_file expose ports tmpfs network_mode hostname
