@@ -134,6 +134,8 @@ internal static class Program
         Check(Names(L.Sudoers, "", "").Contains("secure_path"), "the sudoers flag 'secure_path' is offered");
         Check(Names(L.MySql, "", "").Contains("innodb_buffer_pool_size"), "the MySQL option 'innodb_buffer_pool_size' is offered");
         Check(Names(L.MySql, "", "").Contains("skip-name-resolve"), "the MySQL option 'skip-name-resolve' is offered");
+        Check(Names(L.MySql, "", "").Contains("loose-innodb_buffer_pool_size"), "the MySQL loose option 'loose-innodb_buffer_pool_size' is offered");
+        Check(Names(L.MySql, "", "").Contains("loose_max_connections"), "the MySQL loose option 'loose_max_connections' is offered");
         Check(Names(L.Redis, "", "").Contains("maxmemory-policy"), "the Redis directive 'maxmemory-policy' is offered");
         Check(Names(L.Redis, "", "").Contains("appendfsync"), "the Redis directive 'appendfsync' is offered");
         Check(Names(L.Redis, "", "").Contains("sentinel"), "the Redis Sentinel directive 'sentinel' is offered");
