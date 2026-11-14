@@ -237,6 +237,11 @@ internal static class Program
         Check(Names(L.Kubernetes, "", "").Contains("genCA"), "the Helm function 'genCA' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("depends_on"), "the Compose key 'depends_on' is offered");
+        Check(Names(L.DockerCompose, "", "").Contains("include"), "the Compose key 'include' is offered");
+        Check(Names(L.DockerCompose, "", "").Contains("gpus"), "the Compose key 'gpus' is offered");
+        Check(Names(L.DockerCompose, "", "").Contains("develop"), "the Compose key 'develop' is offered");
+        Check(Names(L.DockerCompose, "", "").Contains("models"), "the Compose key 'models' is offered");
+        Check(Names(L.DockerCompose, "", "").Contains("provider"), "the Compose key 'provider' is offered");
         Check(Names(L.Ansible, "", "").Contains("hosts"), "the Ansible key 'hosts' is offered");
         Check(Names(L.Ansible, "", "").Contains("apt"), "the Ansible module 'apt' is offered");
         Check(Names(L.PostgreSql, "", "").Contains("listen_addresses"), "the PostgreSQL setting 'listen_addresses' is offered");

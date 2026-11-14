@@ -3001,6 +3001,19 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("depends_on"), "Compose keywords contain 'depends_on'");
         Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("unless-stopped"), "Compose keywords contain 'unless-stopped'");
         Equal(Join(CommentStyle.ForLanguage(L.DockerCompose).Toggle(new[] { "    image: nginx" })), "    # image: nginx", "Compose comment");
+
+        Highlighted modern = new Highlighted(L.DockerCompose,
+            "include:\n  - common.yaml\nservices:\n  app:\n    image: nginx\n    gpus: all\n    develop:\n      watch:\n        - action: sync\n          path: .\n          target: /app\nmodels:\n  llm:\n    model: ai/model\nprovider:\n  type: docker");
+        Equal(Join(modern.Tokens(0, SyntaxHighlighting.TypeKeyword)), "include", "Compose: include");
+        Equal(Join(modern.Tokens(5, SyntaxHighlighting.TypeKeyword)), "gpus", "Compose: gpus");
+        Equal(Join(modern.Tokens(6, SyntaxHighlighting.TypeKeyword)), "develop", "Compose: develop");
+        Equal(Join(modern.Tokens(11, SyntaxHighlighting.TypeKeyword)), "models", "Compose: models");
+        Equal(Join(modern.Tokens(14, SyntaxHighlighting.TypeKeyword)), "provider", "Compose: provider");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("include"), "Compose keywords contain 'include'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("gpus"), "Compose keywords contain 'gpus'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("develop"), "Compose keywords contain 'develop'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("models"), "Compose keywords contain 'models'");
+        Check(SyntaxHighlighting.GetKeywords(L.DockerCompose).Contains("provider"), "Compose keywords contain 'provider'");
     }
 
     private static void AnsibleChecks()
