@@ -722,6 +722,47 @@ public class KermitTransfer
         return destination;
     }
 
+    /// <summary>
+    /// The name in an F packet: the data field decoded like file data, with the 8-bit prefix and the repeat prefix agreed for the
+    /// data that arrives (a receiver that decoded it without them kept a literal "&amp;" and the byte after it), then read as UTF-8,
+    /// which is what this program sends, or as Latin-1 when the bytes are not valid UTF-8 (a sender that uses an 8-bit character
+    /// set of its own: the letters are wrong, but different names stay different instead of collapsing into one).
+    /// </summary>
+    internal static string DecodeFileName(byte[] data, byte qctl, byte qbin, byte repeat)
+    {
+        byte[] bytes;
+        using (MemoryStream decoded = new MemoryStream())
+        {
+            bytes = TryDecode(data, data.Length, qctl, qbin, repeat, decoded) ? decoded.ToArray() : data;
+        }
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            return Encoding.GetEncoding(28591).GetString(bytes);
+        }
+    }
+
+    /// <summary>
+    /// A file name as UTF-8 in the encoding of file data, with the prefixes agreed for the data that is sent: on a line that
+    /// is not 8-bit clean the bytes of a name outside ASCII need the 8-bit prefix as much as the data does, and a letter of
+    /// the name that is one of the prefix characters has to be quoted.
+    /// </summary>
+    internal static byte[] EncodeFileName(string name, byte qctl, byte qbin, byte repeat, out int length)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(name);
+        byte[] destination = new byte[bytes.Length * 3 + 4]; // 8-bit prefix, quote and the byte itself, at most
+        int pos = 0;
+        foreach (byte b in bytes)
+        {
+            pos = EncodeByte(b, qctl, qbin, repeat, destination, pos);
+        }
+        length = pos;
+        return destination;
+    }
+
     /// <summary>A name that is safe to create on this machine: no directory, no characters Windows forbids.</summary>
     private static string SanitizeFileName(string name)
     {
@@ -1361,7 +1402,7 @@ public class KermitTransfer
             {
                 Report(onProgress, doneBytes, totalBytes, errors, "Sending " + wireName + where);
 
-                byte[] nameData = EncodeText(wireName, session.Qctl, out int nameLength);
+                byte[] nameData = EncodeFileName(wireName, session.Qctl, session.Qbin, session.Repeat, out int nameLength);
                 Exchange result = Send(TypeFile, nameData, nameLength, out Packet reply, out string message);
                 if (Failed(result, message, "file name", doneBytes))
                 {
@@ -1648,7 +1689,7 @@ public class KermitTransfer
                 case TypeFile:
                     {
                         DropCurrent();
-                        string name = SanitizeFileName(DecodeText(packet.Data, session.ReceiveQctl));
+                        string name = SanitizeFileName(DecodeFileName(packet.Data, session.ReceiveQctl, session.ReceiveQbin, session.ReceiveRepeat));
                         fileBytes = 0;
                         fileSize = -1;
                         fileSizeExact = false;
