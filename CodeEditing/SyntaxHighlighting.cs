@@ -3739,6 +3739,9 @@ namespace SmarTTY.CodeEditing
             return false;
         }
 
+        // The longest rest of a line whose emphasis, code spans and links are looked for (see TokenizeMarkdown).
+        private const int MarkdownMaxInlineLength = 20000;
+
         private static bool TokenizeMarkdown(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
             int len = text.Length;
@@ -3808,7 +3811,10 @@ namespace SmarTTY.CodeEditing
                     runEnd++;
                 }
                 int runLength = runEnd - leading;
-                if (runLength >= 3)
+                // The info string of a backtick fence may not hold a backtick (CommonMark): "```code``` and more" at the start of
+                // a line is an inline code span, not the opening of a block, which would turn the text up to the next line of
+                // backticks into code and every real block after it upside down. A tilde fence may hold them.
+                if (runLength >= 3 && !(fenceChar == '`' && text.IndexOf('`', runEnd) >= 0))
                 {
                     sink.AddToken(TypePreprocessor, leading, runEnd);
                     int info = SkipBlanks(text, runEnd);
@@ -3906,6 +3912,13 @@ namespace SmarTTY.CodeEditing
                     content += 3;
                 }
                 i = content;
+            }
+
+            // Every opening mark below (*, _, [, `) looks for its closing one up to the end of the line, so a line of hundreds of
+            // kilobytes with marks that are never closed takes quadratic time. Past this length only the block-level colors stay.
+            if (len - i > MarkdownMaxInlineLength)
+            {
+                return true;
             }
 
             while (i < len)
