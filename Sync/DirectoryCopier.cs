@@ -418,6 +418,8 @@ public class DirectoryCopier
         }
         byte[] buffer = _buffer;
         long totalRead = 0L;
+        // An explicit length is what a tar header (or another header written before the data) has already announced.
+        bool lengthAnnounced = length >= 0;
         if (length < 0)
         {
             length = sourceStream.Length;
@@ -437,6 +439,13 @@ public class DirectoryCopier
             {
                 this.Progress(new CopyProgress(CopyStage.CopyingFile, currentPath, filesDone, _fileCount, bytesDone, _byteCount));
             }
+        }
+        if (lengthAnnounced && totalRead < length)
+        {
+            // The file got shorter while it was being read (a log, a database): the entry still has to be as long as its header
+            // says, or the padding and every following header of the tar stream are read from the wrong place and the device
+            // cannot unpack the rest. A download (no length given) is not padded: a short read there is an error, not data.
+            TarWriter.WriteZeros(destinationStream, length - totalRead, buffer, ref bytesDone);
         }
         filesDone++;
     }
@@ -494,13 +503,20 @@ public class DirectoryCopier
                     }
                     continue;
                 }
-                int colonIdx = line.IndexOf(':');
-                colonIdx = line.IndexOf(' ', colonIdx + 1);
-                if (colonIdx == -1 && Log != null)
+                string entryName = LsLine.NameField(line);
+                int colonIdx;
+                if (entryName == null)
                 {
-                    Log(this, "Cannot parse 'ls' output: " + line);
+                    // A date that LsLine does not know (another language, another format): the name follows the first space after
+                    // the first colon, which is the time of day.
+                    colonIdx = line.IndexOf(':');
+                    colonIdx = line.IndexOf(' ', colonIdx + 1);
+                    if (colonIdx == -1 && Log != null)
+                    {
+                        Log(this, "Cannot parse 'ls' output: " + line);
+                    }
+                    entryName = line.Substring(colonIdx + 1);
                 }
-                string entryName = line.Substring(colonIdx + 1);
                 colonIdx = entryName.IndexOf("->");
                 if (colonIdx != -1)
                 {

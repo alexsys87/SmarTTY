@@ -174,7 +174,68 @@ internal static class Program
         Check(hugeListing.Contains(hugeSize.ToString()), "a size above 8 GiB is listed correctly (" + hugeListing.Trim() + ")");
 
         // --- a file that gets shorter while it is archived keeps the archive readable ---
-        // (the copy loop is private; this is the case of a stream that ends early, built by hand)
+        // The header announces 5000 bytes, the file only has 1200 left when it is read (a log that is rewritten). The missing part is
+        // zero-filled, so the padding and the next entry stay where tar expects them (DirectoryCopier.CopyStream does the same with
+        // TarWriter.WriteZeros, as it cannot run here).
+        const int announced = 5000;
+        const int actual = 1200;
+        byte[] shrunkData = new byte[actual];
+        for (int i = 0; i < actual; i++)
+        {
+            shrunkData[i] = (byte)('a' + i % 26);
+        }
+        string shrunkPath = Path.Combine(workDir, "shrunk.tar");
+        using (FileStream archive = File.Create(shrunkPath))
+        {
+            byte[] shrunkHeader = writer.CreateHeader("log.txt", false, announced, modified, out int shrunkPadding);
+            archive.Write(shrunkHeader, 0, shrunkHeader.Length);
+            int shrunkFiles = 0;
+            long shrunkBytes = 0;
+            TarWriter.CopyStream(new MemoryStream(shrunkData), archive, ref shrunkFiles, ref shrunkBytes, new byte[512], announced);
+            archive.Write(new byte[shrunkPadding], 0, shrunkPadding);
+            Check(shrunkFiles == 1 && shrunkBytes == announced, "shrunk file: the entry is counted with the length of its header (" + shrunkBytes + ")");
+            AddEntry(archive, writer, "after.txt", false, Encoding.UTF8.GetBytes("still here"), modified);
+            archive.Write(new byte[1024], 0, 1024);
+        }
+        string shrunkDir = Path.Combine(workDir, "shrunk-out");
+        Directory.CreateDirectory(shrunkDir);
+        int shrunkExit = Run("tar", "-xf \"" + shrunkPath + "\" -C \"" + shrunkDir + "\"", workDir, out _, out string shrunkError);
+        Check(shrunkExit == 0, "shrunk file: tar reads the archive to the end (" + shrunkError.Trim() + ")");
+        byte[] shrunkResult = File.ReadAllBytes(Path.Combine(shrunkDir, "log.txt"));
+        Check(shrunkResult.Length == announced && shrunkResult.Take(actual).SequenceEqual(shrunkData) && shrunkResult.Skip(actual).All(b => b == 0), "shrunk file: the data is kept and the missing part is zeros");
+        Check(File.ReadAllText(Path.Combine(shrunkDir, "after.txt")) == "still here", "shrunk file: the entry after it is intact");
+
+        // The same stream without the zero-fill is what used to break the upload: the next header is read from the wrong place.
+        string brokenPath = Path.Combine(workDir, "broken.tar");
+        using (FileStream archive = File.Create(brokenPath))
+        {
+            byte[] brokenHeader = writer.CreateHeader("log.txt", false, announced, modified, out int brokenPadding);
+            archive.Write(brokenHeader, 0, brokenHeader.Length);
+            archive.Write(shrunkData, 0, shrunkData.Length);
+            archive.Write(new byte[brokenPadding], 0, brokenPadding);
+            AddEntry(archive, writer, "after.txt", false, Encoding.UTF8.GetBytes("still here"), modified);
+            archive.Write(new byte[1024], 0, 1024);
+        }
+        string brokenDir = Path.Combine(workDir, "broken-out");
+        Directory.CreateDirectory(brokenDir);
+        Run("tar", "-xf \"" + brokenPath + "\" -C \"" + brokenDir + "\"", workDir, out _, out _);
+        Check(!File.Exists(Path.Combine(brokenDir, "after.txt")), "test check: without the zero-fill the next entry is lost, so the test above would catch it");
+
+        // WriteZeros itself: exact count, any buffer size, the buffer's old content is not written.
+        using (MemoryStream zeros = new MemoryStream())
+        {
+            long zeroBytes = 7;
+            byte[] dirty = new byte[16];
+            for (int i = 0; i < dirty.Length; i++)
+            {
+                dirty[i] = 0xAA;
+            }
+            TarWriter.WriteZeros(zeros, 40, dirty, ref zeroBytes);
+            Check(zeros.Length == 40 && zeros.ToArray().All(b => b == 0) && zeroBytes == 47, "WriteZeros: writes exactly the count asked for, all zeros, and adds it to the byte count");
+            TarWriter.WriteZeros(zeros, 0, dirty, ref zeroBytes);
+            TarWriter.WriteZeros(zeros, -5, dirty, ref zeroBytes);
+            Check(zeros.Length == 40 && zeroBytes == 47, "WriteZeros: nothing to write for zero or a negative count");
+        }
         Directory.Delete(workDir, true);
 
         Console.WriteLine();
