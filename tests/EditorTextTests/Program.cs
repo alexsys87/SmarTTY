@@ -2942,6 +2942,19 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("apiVersion"), "Kubernetes keywords contain 'apiVersion'");
         Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("containers"), "Kubernetes keywords contain 'containers'");
         Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("Deployment"), "Kubernetes keywords contain 'Deployment'");
+        Highlighted helm = new Highlighted(L.Kubernetes,
+            "functions: {{ b64enc }} {{ sha256sum }} {{ merge }} {{ coalesce }} {{ ternary }} {{ dig }} {{ toPrettyJson }} {{ genCA }}");
+        Equal(Join(helm.Tokens(0, SyntaxHighlighting.TypeKeyword)),
+            "b64enc|sha256sum|merge|coalesce|ternary|dig|toPrettyJson|genCA",
+            "Kubernetes: the Helm utility functions");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("b64enc"), "Kubernetes keywords contain 'b64enc'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("sha256sum"), "Kubernetes keywords contain 'sha256sum'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("merge"), "Kubernetes keywords contain 'merge'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("coalesce"), "Kubernetes keywords contain 'coalesce'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("ternary"), "Kubernetes keywords contain 'ternary'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("dig"), "Kubernetes keywords contain 'dig'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("toPrettyJson"), "Kubernetes keywords contain 'toPrettyJson'");
+        Check(SyntaxHighlighting.GetKeywords(L.Kubernetes).Contains("genCA"), "Kubernetes keywords contain 'genCA'");
         Equal(Join(CommentStyle.ForLanguage(L.Kubernetes).Toggle(new[] { "kind: Deployment" })), "# kind: Deployment", "Kubernetes comment");
     }
 

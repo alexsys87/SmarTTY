@@ -227,6 +227,14 @@ internal static class Program
         Check(Names(L.Batch, "", "").Contains("robocopy"), "the Batch command 'robocopy' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("apiVersion"), "the Kubernetes key 'apiVersion' is offered");
         Check(Names(L.Kubernetes, "", "").Contains("Deployment"), "the Kubernetes kind 'Deployment' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("b64enc"), "the Helm function 'b64enc' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("sha256sum"), "the Helm function 'sha256sum' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("merge"), "the Helm function 'merge' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("coalesce"), "the Helm function 'coalesce' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("ternary"), "the Helm function 'ternary' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("dig"), "the Helm function 'dig' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("toPrettyJson"), "the Helm function 'toPrettyJson' is offered");
+        Check(Names(L.Kubernetes, "", "").Contains("genCA"), "the Helm function 'genCA' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("services"), "the Compose key 'services' is offered");
         Check(Names(L.DockerCompose, "", "").Contains("depends_on"), "the Compose key 'depends_on' is offered");
         Check(Names(L.Ansible, "", "").Contains("hosts"), "the Ansible key 'hosts' is offered");
