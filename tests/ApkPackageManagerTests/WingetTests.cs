@@ -141,6 +141,36 @@ internal static class WingetTests
             "libfoo/stable,now 1.0 amd64 [installed]"
         });
         Check(multiArch.Length == 2 && multiArch.Single(p => p.ID == "libfoo").State == LinuxPackageInfo.PackageState.Installed, "apt: one row per package name, the installed one wins");
+
+        // The rows keep the order of their first appearance, and the installed one takes the place of the first row of its name.
+        LinuxPackageInfo[] ordered = AptPackageManagerClient.ParsePackageList(new[]
+        {
+            "zlib/stable 1.0 amd64",
+            "libfoo/stable 1.0 i386",
+            "abc/stable 2.0 amd64",
+            "libfoo/stable,now 1.0 amd64 [installed]",
+            "zlib/stable 1.0 i386"
+        });
+        Check(ordered.Select(p => p.ID).SequenceEqual(new[] { "zlib", "libfoo", "abc" }), "apt: the order of the first appearance is kept");
+        Check(ordered[1].State == LinuxPackageInfo.PackageState.Installed && ordered[0].State == LinuxPackageInfo.PackageState.Available, "apt: the installed row replaces the first one of its name, the rest are untouched");
+
+        // A full list of a Debian/Ubuntu machine is 60-100 thousand packages (more with -a): a search through the rows found so far
+        // for every line made this quadratic, billions of comparisons.
+        const int bigCount = 200000;
+        string[] big = new string[bigCount + 1000];
+        for (int i = 0; i < bigCount; i++)
+        {
+            big[i] = "package-" + i + "/stable 1." + i + " amd64" + (i % 7 == 0 ? " [installed]" : "");
+        }
+        for (int i = 0; i < 1000; i++)
+        {
+            big[bigCount + i] = "package-" + i * 11 + "/stable 1." + i * 11 + " i386";
+        }
+        System.Diagnostics.Stopwatch parseWatch = System.Diagnostics.Stopwatch.StartNew();
+        LinuxPackageInfo[] bigResult = AptPackageManagerClient.ParsePackageList(big);
+        parseWatch.Stop();
+        Check(bigResult.Length == bigCount && bigResult[0].ID == "package-0" && bigResult[bigCount - 1].ID == "package-" + (bigCount - 1), "apt: 200000 packages with 1000 repeated names give one row per name");
+        Check(parseWatch.ElapsedMilliseconds < 5000, "apt: 200000 lines are parsed in linear time (" + parseWatch.ElapsedMilliseconds + " ms)");
         return _passed;
     }
 

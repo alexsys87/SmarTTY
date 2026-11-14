@@ -194,6 +194,9 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient, ILocalPackage
     public static LinuxPackageInfo[] ParsePackageList(IEnumerable<string> lines)
     {
         List<LinuxPackageInfo> packagesList = new List<LinuxPackageInfo>();
+        // Name -> position in packagesList. A full "apt list" has 60-100 thousand packages (several times more with -a), and a
+        // search through the list for every line of it took billions of comparisons before the package window opened.
+        Dictionary<string, int> indexByName = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (string line in lines)
         {
             Match match = LineRegex.Match(line);
@@ -231,9 +234,9 @@ public class AptPackageManagerClient : ILinuxPackageManagerClient, ILocalPackage
             }
             // A package of two architectures (libc6 amd64 and i386) is listed twice under one name; one row is enough
             // for apt-get, which takes the name. The installed one wins over the one that is not installed.
-            int sameName = packagesList.FindIndex(existing => existing.ID == linuxPackageInfo.ID);
-            if (sameName < 0)
+            if (!indexByName.TryGetValue(linuxPackageInfo.ID, out int sameName))
             {
+                indexByName.Add(linuxPackageInfo.ID, packagesList.Count);
                 packagesList.Add(linuxPackageInfo);
             }
             else if (packagesList[sameName].State == LinuxPackageInfo.PackageState.Available && linuxPackageInfo.State != LinuxPackageInfo.PackageState.Available)
