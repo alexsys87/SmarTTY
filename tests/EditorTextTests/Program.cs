@@ -1219,6 +1219,15 @@ internal static class Program
         Equal(Join(mysql.Tokens(13, SyntaxHighlighting.TypeComment)), "; semicolon comment", "MySQL: a ; comment");
         Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("innodb_buffer_pool_size"), "MySQL keywords contain 'innodb_buffer_pool_size'");
         Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("skip-name-resolve"), "MySQL keywords contain 'skip-name-resolve'");
+        Highlighted loose = new Highlighted(L.MySql,
+            "[mysqld]\nloose-innodb_buffer_pool_size = 1G\nloose_max_connections = 500\nloose-unknown_option = 1");
+        Equal(Join(loose.Tokens(1, SyntaxHighlighting.TypeKeyword)), "loose-innodb_buffer_pool_size", "MySQL: a loose- option");
+        Equal(Join(loose.Tokens(2, SyntaxHighlighting.TypeKeyword)), "loose_max_connections", "MySQL: a loose_ option");
+        Equal(Join(loose.Tokens(3, SyntaxHighlighting.TypeKeyword)), "", "MySQL: an unknown loose- option is not a keyword");
+        Equal(Join(loose.Tokens(3, SyntaxHighlighting.TypeVariable)), "loose-unknown_option", "MySQL: ...it is a plain key");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("loose-innodb_buffer_pool_size"), "MySQL keywords contain 'loose-innodb_buffer_pool_size'");
+        Check(SyntaxHighlighting.GetKeywords(L.MySql).Contains("loose_max_connections"), "MySQL keywords contain 'loose_max_connections'");
+        Check(!SyntaxHighlighting.GetKeywords(L.MySql).Contains("loose-unknown_option"), "MySQL keywords do not contain 'loose-unknown_option'");
         Equal(Join(CommentStyle.ForLanguage(L.MySql).Toggle(new[] { "max_connections = 200" })), "# max_connections = 200", "MySQL comment");
     }
 

@@ -486,7 +486,7 @@ public static partial class SyntaxHighlighting
 
     // ----------------------------------------------------------- MySQL/MariaDB
 
-    private static readonly HashSet<string> MySqlDirectives = Words(StringComparer.OrdinalIgnoreCase,
+    private static readonly HashSet<string> MySqlOptions = Words(StringComparer.OrdinalIgnoreCase,
         // server, client and replication settings of my.cnf / my.ini
         @"user port socket bind-address admin-address datadir basedir tmpdir pid-file plugin-dir
           log-error log-error-verbosity log-warnings general-log general_log general-log-file general_log_file
@@ -541,10 +541,30 @@ public static partial class SyntaxHighlighting
           super-user super_user max-seeks-for-key max_seeks_for_key
           delayed-insert-timeout delayed_insert_timeout low-priority-updates low_priority_updates
           concurrent-insert concurrent_insert div-precision-increment div_precision_increment
-          group-concat-max-len group_concat_max_len",
-        // the [groups] of the file
+          group-concat-max-len group_concat_max_len");
+
+    private static readonly HashSet<string> MySqlGroups = Words(StringComparer.OrdinalIgnoreCase,
         @"mysqld mysqld_safe mysqldump mysql client server mariadb mariadbd mariadb-client mariadb-server
           embedded client-server client-mariadb galera mariadb-galera");
+
+    /// <summary>The options of my.cnf plus their "loose-" and "loose_" forms: a loose option may be unknown to the server.</summary>
+    private static readonly HashSet<string> MySqlDirectives = WithLoosePrefixes(MySqlOptions, MySqlGroups);
+
+    private static HashSet<string> WithLoosePrefixes(HashSet<string> options, params HashSet<string>[] extra)
+    {
+        HashSet<string> result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (HashSet<string> set in extra)
+        {
+            result.UnionWith(set);
+        }
+        foreach (string option in options)
+        {
+            result.Add(option);
+            result.Add("loose-" + option);
+            result.Add("loose_" + option);
+        }
+        return result;
+    }
 
     private static readonly HashSet<string> MySqlValues = Words(StringComparer.OrdinalIgnoreCase,
         @"innodb myisam csv memory archive blackhole ndb aria tokudb rocksdb mysql mariadb
