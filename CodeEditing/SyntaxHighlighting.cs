@@ -1409,7 +1409,7 @@ namespace SmarTTY.CodeEditing
                 case Language.MySql:
                     return Combine(MySqlDirectives, MySqlValues);
                 case Language.Redis:
-                    return Combine(RedisDirectives, RedisValues);
+                    return Combine(RedisDirectives, RedisValues, RedisSentinelPhrases);
                 case Language.HAProxy:
                     return Combine(HAProxyDirectives, HAProxyValues);
                 case Language.ApacheHttpd:
