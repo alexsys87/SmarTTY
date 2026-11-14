@@ -2664,6 +2664,44 @@ internal static class Program
         Equal(Join(md.Tokens(24, SyntaxHighlighting.TypeComment)), "that spans lines -->", "Markdown: the second line of an HTML comment");
         Equal(Join(md.Tokens(27, SyntaxHighlighting.TypeSection)), "===", "Markdown: a Setext underline");
 
+        // A line that starts with an inline code span is not a fence: the info string of a backtick fence holds no backtick.
+        Highlighted spans = new Highlighted(L.Markdown,
+            "```inline``` and more text\n" +
+            "prose after it\n" +
+            "``` js `x`\n" +
+            "still prose\n" +
+            "```c\n" +
+            "int x;\n" +
+            "```\n" +
+            "prose after the block\n" +
+            "~~~ `tilde`\n" +
+            "tilde code\n" +
+            "~~~\n" +
+            "last line\n");
+        Equal(Join(spans.Tokens(0, SyntaxHighlighting.TypePreprocessor)), "", "Markdown: ```code``` at the start of a line is not a fence");
+        Equal(Join(spans.Tokens(0, SyntaxHighlighting.TypeString)), "```inline```", "Markdown: it is an inline code span");
+        Equal(Join(spans.Tokens(1, SyntaxHighlighting.TypeString)), "", "Markdown: the text after such a line is not code");
+        Equal(Join(spans.Tokens(2, SyntaxHighlighting.TypePreprocessor)), "", "Markdown: a backtick in the info string of a backtick fence: not a fence");
+        Equal(Join(spans.Tokens(3, SyntaxHighlighting.TypeString)), "", "Markdown: and the next line is not code either");
+        Equal(Join(spans.Tokens(4, SyntaxHighlighting.TypePreprocessor)), "```", "Markdown: a real fence after them still opens a block");
+        Equal(Join(spans.Tokens(5, SyntaxHighlighting.TypeString)), "int x;", "Markdown: its code is code");
+        Equal(Join(spans.Tokens(6, SyntaxHighlighting.TypePreprocessor)), "```", "Markdown: and it is closed by the line of backticks");
+        Equal(Join(spans.Tokens(7, SyntaxHighlighting.TypeString)), "", "Markdown: the text after the block is not code (the blocks are not turned upside down)");
+        Equal(Join(spans.Tokens(8, SyntaxHighlighting.TypePreprocessor)), "~~~", "Markdown: a tilde fence may have backticks in its info string");
+        Equal(Join(spans.Tokens(9, SyntaxHighlighting.TypeString)), "tilde code", "Markdown: the code of a tilde fence");
+        Equal(Join(spans.Tokens(11, SyntaxHighlighting.TypeString)), "", "Markdown: the text after the tilde block is not code");
+
+        // A very long line with marks that are never closed ("*a *a *a ...") was scanned to its end for every one of them.
+        string longLine = string.Concat(Enumerable.Repeat("*a ", 70000));
+        System.Diagnostics.Stopwatch longWatch = System.Diagnostics.Stopwatch.StartNew();
+        Highlighted longMd = new Highlighted(L.Markdown, longLine + "\n```\ncode\n```\nprose\n");
+        longWatch.Stop();
+        Check(longWatch.ElapsedMilliseconds < 3000, "Markdown: a line of " + longLine.Length + " characters is highlighted in linear time (" + longWatch.ElapsedMilliseconds + " ms)");
+        Equal(Join(longMd.Tokens(2, SyntaxHighlighting.TypeString)), "code", "Markdown: the lines after a very long one are still highlighted");
+        Equal(Join(longMd.Tokens(4, SyntaxHighlighting.TypeString)), "", "Markdown: and the block after it ends where it should");
+        Highlighted longHeading = new Highlighted(L.Markdown, "# " + longLine + "\n");
+        Equal(longHeading.Tokens(0, SyntaxHighlighting.TypeSection).Count.ToString(), "1", "Markdown: a very long heading keeps its block-level color");
+
         Check(Folds(md).Length == 0, "Markdown does not fold");
         Equal(Join(CommentStyle.ForLanguage(L.Markdown).Toggle(new[] { "text" })), "<!-- text -->", "Markdown comment");
     }
