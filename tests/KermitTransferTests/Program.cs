@@ -449,6 +449,62 @@ internal static class Program
             Check(o.Files.ContainsKey("inner.bin"), "directory part dropped");
         });
 
+        Run("loopback: file names outside ASCII arrive as they were sent", () =>
+        {
+            string[] names = { "отчёт.docx", "файл1.txt", "файл2.txt", "café.txt", "日本語.txt" };
+            List<KermitTransfer.Source> sources = new List<KermitTransfer.Source>();
+            foreach (string name in names) sources.Add(Src(name, Encoding.UTF8.GetBytes("data of " + name)));
+            Outcome o = Transfer(sources);
+            Check(o.SendOk && o.ReceiveOk, "succeeded: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+            Check(o.Files.Count == names.Length && names.All(o.Files.ContainsKey), "every name arrived whole, none collapsed into another: " + string.Join(" | ", o.Files.Keys));
+            Check(names.All(n => Encoding.UTF8.GetString(o.Get(n)) == "data of " + n), "and each holds its own data");
+        });
+
+        Run("loopback: names outside ASCII and with prefix characters survive a line that needs the 8-bit prefix", () =>
+        {
+            // QBIN is negotiated ('&'); the name holds the 8-bit prefix, the control prefix and the repeat prefix as letters.
+            string[] names = { "отчёт & план #1 ~.txt", "файл1.txt", "a&b.txt" };
+            List<KermitTransfer.Source> sources = new List<KermitTransfer.Source>();
+            foreach (string name in names) sources.Add(Src(name, Encoding.UTF8.GetBytes(name)));
+            Outcome o = Transfer(sources, new KermitTransfer.Settings { EightBitPrefix = (byte)'Y' }, new KermitTransfer.Settings { EightBitPrefix = (byte)'&' });
+            Check(o.SendOk && o.ReceiveOk, "succeeded: " + o.SenderProgress.Last() + " / " + o.ReceiverProgress.Last());
+            Check(names.All(o.Files.ContainsKey), "the names arrived whole: " + string.Join(" | ", o.Files.Keys));
+            Check(o.Sender.Sent().All(b => b < 0x80), "the sender sent 7-bit bytes only, its file names included");
+        });
+
+        Run("file name: decoding uses the agreed prefixes, UTF-8 first and Latin-1 when the bytes are not UTF-8", () =>
+        {
+            byte[] Bytes(params int[] values) => values.Select(v => (byte)v).ToArray();
+            // UTF-8 without any prefix ("é" = C3 A9).
+            Check(KermitTransfer.DecodeFileName(Bytes('c', 'a', 'f', 0xC3, 0xA9), (byte)'#', 0, 0) == "café", "UTF-8 name");
+            // The same with the 8-bit prefix: a literal '&' is a prefix, not a letter, and '#&' is a letter.
+            Check(KermitTransfer.DecodeFileName(Bytes('c', 'a', 'f', '&', 0x43, '&', 0x29), (byte)'#', (byte)'&', 0) == "café", "UTF-8 name with the 8-bit prefix");
+            Check(KermitTransfer.DecodeFileName(Bytes('a', '#', '&', 'b'), (byte)'#', (byte)'&', 0) == "a&b", "a quoted '&' is a letter");
+            // A repeat count: "~#a" = three 'a'.
+            Check(KermitTransfer.DecodeFileName(Bytes('x', '~', '#', 'a', 'y'), (byte)'#', 0, (byte)'~') == "xaaay", "the repeat prefix is decoded");
+            // Bytes that are not UTF-8 (Latin-1 "café" = 63 61 66 E9) are read as Latin-1: the letters are right for it, nothing is lost.
+            Check(KermitTransfer.DecodeFileName(Bytes('c', 'a', 'f', 0xE9), (byte)'#', 0, 0) == "café", "Latin-1 name");
+            Check(KermitTransfer.DecodeFileName(Bytes(0xE0, 0xE1, '1'), (byte)'#', 0, 0) != KermitTransfer.DecodeFileName(Bytes(0xE0, 0xE2, '1'), (byte)'#', 0, 0), "different 8-bit names stay different");
+            // A damaged name (the prefix is the last byte) is not thrown away.
+            Check(KermitTransfer.DecodeFileName(Bytes('a', 'b', '#'), (byte)'#', 0, 0).StartsWith("ab", StringComparison.Ordinal), "a name that ends inside a prefix sequence is still read");
+            Check(KermitTransfer.DecodeFileName(new byte[0], (byte)'#', 0, 0) == "", "an empty name");
+
+            // Encoding: what is encoded is decoded back, with and without the prefixes.
+            foreach (string name in new[] { "отчёт.docx", "a&b#c~d.txt", "plain.txt", "файл 1 (копия).txt" })
+            {
+                foreach (byte qbin in new byte[] { 0, (byte)'&' })
+                {
+                    foreach (byte repeat in new byte[] { 0, (byte)'~' })
+                    {
+                        byte[] encoded = KermitTransfer.EncodeFileName(name, (byte)'#', qbin, repeat, out int length);
+                        byte[] exact = encoded.Take(length).ToArray();
+                        Check(KermitTransfer.DecodeFileName(exact, (byte)'#', qbin, repeat) == name, "encoded and decoded back: " + name + " (qbin " + (qbin != 0) + ", repeat " + (repeat != 0) + ")");
+                        Check(qbin == 0 || exact.All(b => b < 0x80), "with the 8-bit prefix the name is 7-bit: " + name);
+                    }
+                }
+            }
+        });
+
         Run("loopback: a line that echoes everything back does not confuse either side", () =>
         {
             byte[] data = RandomData(8000);
