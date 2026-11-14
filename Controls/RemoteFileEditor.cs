@@ -167,8 +167,10 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private const int DraftIntervalMs = 10000;
 
-    // Drafts older than this are removed when an editor starts.
+    // Drafts older than this are removed when an editor starts; a week before that the user is told which ones are about to go.
     private static readonly TimeSpan DraftMaxAge = TimeSpan.FromDays(30);
+
+    private static readonly TimeSpan DraftWarnBefore = TimeSpan.FromDays(7);
 
     private static int _draftCleanupDone;
 
@@ -255,6 +257,14 @@ public partial class RemoteFileEditor : CodeEditorPP
     private volatile bool _draftWritten;
 
     private object _draftVersion;
+
+    private readonly DraftSchedule _draftSchedule = new DraftSchedule();
+
+    // The size of the text as opened or as of the last draft: how large the text is is not known cheaply otherwise.
+    private long _draftSizeEstimate;
+
+    // Said once per run of the program, in the first editor that finishes loading (see the cleanup in the constructor).
+    private static string _pendingDraftNotice;
 
     // Every draft write or removal takes a number; one that is no longer the latest by the time it runs is skipped, so
     // a late write cannot bring back the draft of a text that has been saved meanwhile.
@@ -637,7 +647,11 @@ public partial class RemoteFileEditor : CodeEditorPP
         _draftKey = ClaimDraftKey(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         if (Interlocked.Exchange(ref _draftCleanupDone, 1) == 0)
         {
-            ThreadPool.QueueUserWorkItem((object state) => Drafts.DeleteOlderThan(DraftMaxAge));
+            ThreadPool.QueueUserWorkItem((object state) =>
+            {
+                Drafts.DeleteOlderThan(DraftMaxAge);
+                _pendingDraftNotice = EditorDraftStore.DescribeExpiring(Drafts.FindExpiring(DraftMaxAge, DraftWarnBefore), DateTime.UtcNow);
+            });
         }
         Disposed += (object sender, EventArgs e) =>
         {
@@ -979,6 +993,12 @@ public partial class RemoteFileEditor : CodeEditorPP
             TextFileEncoding encoding = (file == null) ? TextFileEncodings.Utf8 : TextFileEncodings.Detect(file);
             string text = (file == null) ? "" : TextFileEncodings.Decode(file, encoding);
             _baseHash = EditorDraftStore.HashText(text);
+            _draftSizeEstimate = text.Length;
+            string expiryNotice = System.Threading.Interlocked.Exchange(ref _pendingDraftNotice, null);
+            if (expiryNotice != null)
+            {
+                ThemedMessageBox.Show(this, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             EditorDraft restoredDraft = null;
             if (_reloading)
             {
@@ -1108,7 +1128,8 @@ public partial class RemoteFileEditor : CodeEditorPP
         if (ThemedMessageBox.Show(this, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
             + changed
             + "Yes: restore the draft.\n"
-            + "No: discard it and open the file from the server.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            + "No: discard it and open the file from the server.\n\n"
+            + "A draft that is not written to for " + DraftMaxAge.Days + " days is removed automatically.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
         {
             return draft;
         }
@@ -1142,16 +1163,26 @@ public partial class RemoteFileEditor : CodeEditorPP
             {
                 return;
             }
+            // Reading the text takes the UI thread for as long as the text is large: not while the user is typing in it.
+            long size = hex ? _hexDocument.Length : _draftSizeEstimate;
+            if (!_draftSchedule.ShouldCapture(version, size, DateTime.UtcNow))
+            {
+                return;
+            }
             _draftWritten = true;
             _draftVersion = version;
+            string draftText = hex ? null : base.EditableDocument.GetText();
+            byte[] draftBytes = hex ? _hexDocument.ToArray() : null;
+            _draftSizeEstimate = hex ? draftBytes.Length : draftText.Length;
+            _draftSchedule.Captured(DateTime.UtcNow);
             QueueDraft(new EditorDraft
             {
                 RemotePath = RemotePath,
                 SavedUtc = DateTime.UtcNow,
                 BaseHash = _baseHash,
                 IsNewFile = IsNewFile,
-                Text = hex ? null : base.EditableDocument.GetText(),
-                Bytes = hex ? _hexDocument.ToArray() : null
+                Text = draftText,
+                Bytes = draftBytes
             });
         }
         catch
@@ -1942,7 +1973,9 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private ValidationResult RunValidation(SaveJob job)
     {
-        string command = job.Validator.BuildCommand(RemotePathUtils.ShellQuote(job.TemporaryPath));
+        // Through /bin/sh, as the command that replaces the file: the command is POSIX shell ("if command -v x; then ...; fi"),
+        // which fish or tcsh as the login shell of the user cannot read (the check would then never run).
+        string command = PosixShell.Wrap(job.Validator.BuildCommand(RemotePathUtils.ShellQuote(job.TemporaryPath)));
         List<string> output = _context.Session.RunCommand(command, out int? exitStatus, timeout: TimeSpan.FromSeconds(20));
         return job.Validator.Interpret(output, exitStatus, job.TemporaryPath);
     }

@@ -112,6 +112,99 @@ internal static class Program
         Check(store.TryLoad(oldKey) == null && store.TryLoad(newKey) != null, "only the old draft is gone");
         Equal(new EditorDraftStore(Path.Combine(root, "missing")).DeleteOlderThan(TimeSpan.FromDays(1)), 0, "cleaning a missing directory is not an error");
 
+        // B-105 (minor): an encrypted draft is one binary block (format 4), not base64 inside a protected base64 blob.
+        string blockKey = EditorDraftStore.KeyFor("a", "/bin/big");
+        byte[] blob = new byte[300000];
+        new Random(7).NextBytes(blob);
+        EditorDraftStore blockStore = new EditorDraftStore(directory, new ReversingProtector());
+        blockStore.Save(blockKey, new EditorDraft { RemotePath = "/bin/big", SavedUtc = saved, BaseHash = "h", IsNewFile = true, Bytes = blob });
+        byte[] blockFile = File.ReadAllBytes(Path.Combine(directory, blockKey + ".draft"));
+        Check(System.Text.Encoding.ASCII.GetString(blockFile, 0, 16) == "SmarTTY-draft 4\n", "an encrypted draft is written as format 4");
+        Check(blockFile.Length < blob.Length + 400, "an encrypted byte draft is the bytes plus a small header (" + blockFile.Length + " for " + blob.Length + "), not 1.78 times that");
+        EditorDraft block = blockStore.TryLoad(blockKey);
+        Check(block != null && block.Text == null && block.IsNewFile && block.BaseHash == "h" && block.RemotePath == "/bin/big" && block.SavedUtc == saved, "format 4: the header of a byte draft is read back");
+        Check(block != null && Convert.ToBase64String(block.Bytes) == Convert.ToBase64String(blob), "format 4: every byte of a byte draft is read back");
+        Check(store.TryLoad(blockKey) == null, "format 4 is not read without the protector");
+        blockStore.Save(blockKey, new EditorDraft { RemotePath = "/bin/big", SavedUtc = saved, Bytes = Array.Empty<byte>() });
+        block = blockStore.TryLoad(blockKey);
+        Check(block != null && block.Bytes != null && block.Bytes.Length == 0 && block.Text == null, "format 4: an empty byte draft is not a text draft");
+        string unicode = "\n\n  привет, мир \U0001F600\n\r\nпоследняя строка без перевода";
+        blockStore.Save(blockKey, new EditorDraft { RemotePath = "/srv/\u00fcber.txt", SavedUtc = saved, BaseHash = "h2", Text = unicode });
+        block = blockStore.TryLoad(blockKey);
+        Check(block != null && block.Bytes == null && block.Text == unicode && block.RemotePath == "/srv/\u00fcber.txt", "format 4: text with empty lines, non-ASCII and CRLF comes back byte for byte");
+        blockStore.Save(blockKey, new EditorDraft { RemotePath = "/srv/bom.txt", SavedUtc = saved, BaseHash = "", Text = "\uFEFFstarts with a BOM character" });
+        Equal(blockStore.TryLoad(blockKey)?.Text, "\uFEFFstarts with a BOM character", "format 4: a text that starts with U+FEFF is kept as it is");
+        blockStore.Save(blockKey, new EditorDraft { RemotePath = "/srv/empty.txt", SavedUtc = saved, BaseHash = "", Text = "" });
+        Equal(blockStore.TryLoad(blockKey)?.Text, "", "format 4: an empty text");
+        File.WriteAllBytes(Path.Combine(directory, blockKey + ".draft"), System.Text.Encoding.ASCII.GetBytes("SmarTTY-draft 4\nnot a block"));
+        Check(blockStore.TryLoad(blockKey) == null, "format 4: a damaged block is ignored");
+        blockStore.Delete(blockKey);
+
+        // The files of the earlier encrypted format (2: base64 of the protected base64 text) are still read.
+        string legacyKey = EditorDraftStore.KeyFor("a", "/legacy");
+        byte[] legacyPlain = new System.Text.UTF8Encoding(false).GetBytes("SmarTTY-draft 1\npath: " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("/legacy")) + "\nsaved: " + saved.Ticks + "\nbase: b\nnew: 0\n\nlegacy text");
+        Array.Reverse(legacyPlain);
+        File.WriteAllText(Path.Combine(directory, legacyKey + ".draft"), "SmarTTY-draft 2\n" + Convert.ToBase64String(legacyPlain) + "\n");
+        EditorDraft legacy = blockStore.TryLoad(legacyKey);
+        Check(legacy != null && legacy.Text == "legacy text" && legacy.RemotePath == "/legacy" && legacy.BaseHash == "b", "an encrypted draft of the earlier format (2) is still read");
+        blockStore.Delete(legacyKey);
+
+        // B-105 (minor): the temporary files of a write that died are removed too, once they are old enough to be dead.
+        string tmpKey = EditorDraftStore.KeyFor("a", "/tmp-test");
+        string staleTemporary = Path.Combine(directory, tmpKey + ".draft." + Guid.NewGuid().ToString("N") + ".tmp");
+        string freshTemporary = Path.Combine(directory, tmpKey + ".draft." + Guid.NewGuid().ToString("N") + ".tmp");
+        File.WriteAllText(staleTemporary, "half");
+        File.WriteAllText(freshTemporary, "being written right now");
+        File.SetLastWriteTimeUtc(staleTemporary, DateTime.UtcNow - TimeSpan.FromHours(3));
+        store.Save(tmpKey, new EditorDraft { RemotePath = "/tmp-test", SavedUtc = saved, BaseHash = "", Text = "kept" });
+        Equal(store.DeleteOlderThan(TimeSpan.FromDays(30)), 1, "only the dead temporary file is removed (the draft is young, the other temporary file is being written)");
+        Check(!File.Exists(staleTemporary) && File.Exists(freshTemporary) && store.TryLoad(tmpKey)?.Text == "kept", "a stale temporary file goes, a fresh one and the draft stay");
+        File.Delete(freshTemporary);
+        store.Delete(tmpKey);
+
+        // B-105 (minor): the user is told before an unsaved draft is removed.
+        string soonKey = EditorDraftStore.KeyFor("a", "/etc/soon.conf");
+        string laterKey = EditorDraftStore.KeyFor("a", "/etc/later.conf");
+        string youngKey = EditorDraftStore.KeyFor("a", "/etc/young.conf");
+        foreach (string[] item in new[] { new[] { soonKey, "/etc/soon.conf" }, new[] { laterKey, "/etc/later.conf" }, new[] { youngKey, "/etc/young.conf" } })
+        {
+            blockStore.Save(item[0], new EditorDraft { RemotePath = item[1], SavedUtc = saved, BaseHash = "", Text = "x" });
+        }
+        File.SetLastWriteTimeUtc(Path.Combine(directory, soonKey + ".draft"), DateTime.UtcNow - TimeSpan.FromDays(25));
+        File.SetLastWriteTimeUtc(Path.Combine(directory, laterKey + ".draft"), DateTime.UtcNow - TimeSpan.FromDays(28));
+        List<EditorDraftStore.ExpiringDraft> expiring = blockStore.FindExpiring(TimeSpan.FromDays(30), TimeSpan.FromDays(7));
+        Equal(expiring.Count, 2, "two drafts are about to expire (the young one is not)");
+        Equal(expiring[0].RemotePath, "/etc/later.conf", "the one that goes first is listed first");
+        string notice = EditorDraftStore.DescribeExpiring(expiring, DateTime.UtcNow);
+        Check(notice != null && notice.Contains("/etc/later.conf (in 2 days)") && notice.Contains("/etc/soon.conf (in 5 days)"), "the notice names each file and the days left (" + notice + ")");
+        Equal(EditorDraftStore.DescribeExpiring(new List<EditorDraftStore.ExpiringDraft>(), DateTime.UtcNow), null, "no expiring drafts: no notice");
+        Equal(blockStore.FindExpiring(TimeSpan.FromDays(30), TimeSpan.FromDays(7)).Count, 2, "looking does not change the drafts");
+        Equal(blockStore.DeleteOlderThan(TimeSpan.FromDays(26)), 1, "the draft that passed the limit is removed (the one nearer to it is not yet)");
+        blockStore.Delete(soonKey);
+        blockStore.Delete(laterKey);
+        blockStore.Delete(youngKey);
+        Equal(new EditorDraftStore(Path.Combine(root, "missing")).FindExpiring(TimeSpan.FromDays(30), TimeSpan.FromDays(7)).Count, 0, "a missing directory has no expiring drafts");
+
+        // B-105 (minor): a large text is not read on the UI thread while the user types in it.
+        DraftSchedule schedule = new DraftSchedule();
+        DateTime t0 = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        object v1 = new object();
+        object v2 = new object();
+        Check(schedule.ShouldCapture(v1, 1000, t0), "a small text is taken at every tick");
+        schedule.Captured(t0);
+        Check(schedule.ShouldCapture(v2, 1000, t0.AddSeconds(10)), "a small text is taken again 10 s later, typing or not");
+        DraftSchedule large = new DraftSchedule();
+        long big = 20L * 1024 * 1024;
+        Check(!large.ShouldCapture(v1, big, t0), "a large text is not taken at the first tick");
+        Check(!large.ShouldCapture(v1, big, t0.AddSeconds(10)), "a large text is not taken before a minute has passed");
+        Check(!large.ShouldCapture(v2, big, t0.AddSeconds(70)), "a large text that changed since the previous tick (typing) waits");
+        Check(large.ShouldCapture(v2, big, t0.AddSeconds(80)), "a large text that stood still for a tick is taken");
+        large.Captured(t0.AddSeconds(80));
+        Check(!large.ShouldCapture(v1, big, t0.AddSeconds(100)), "after a draft the next waits for the minute");
+        Check(!large.ShouldCapture(new object(), big, t0.AddSeconds(150)), "typing on keeps it waiting");
+        Check(!large.ShouldCapture(new object(), big, t0.AddSeconds(200)), "typing on keeps it waiting (2)");
+        Check(large.ShouldCapture(new object(), big, t0.AddSeconds(80) + DraftSchedule.LargeMaxWait), "typing without a pause does not postpone the draft for ever");
+
         Equal(EditorFilePolicy.Classify(0), LargeFileAction.Normal, "an empty file is opened");
         Equal(EditorFilePolicy.Classify(EditorFilePolicy.WarnBytes - 1), LargeFileAction.Normal, "below the warning limit");
         Equal(EditorFilePolicy.Classify(EditorFilePolicy.WarnBytes), LargeFileAction.Warn, "at the warning limit");

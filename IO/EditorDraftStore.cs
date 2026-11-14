@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
@@ -42,13 +43,65 @@ public interface IDraftProtector
 }
 
 /// <summary>
+/// Decides when the editor takes a draft of a text that has changed. Taking one reads the whole text (or the bytes of the hex
+/// view) on the UI thread, which is a pause the user can feel for a file of tens of megabytes. A small text is taken at every
+/// tick of the timer. A large one is taken at most once a minute, and only when it has stood still since the previous tick (the
+/// user is not typing right now); typing without a pause for minutes does not postpone it for ever.
+/// </summary>
+public sealed class DraftSchedule
+{
+    /// <summary>From this size on a text counts as large (the size at which the editor warns before opening a file).</summary>
+    public const long LargeBytes = 8L * 1024 * 1024;
+
+    public static readonly TimeSpan LargeMinInterval = TimeSpan.FromSeconds(60);
+
+    public static readonly TimeSpan LargeMaxWait = TimeSpan.FromMinutes(3);
+
+    private object _previousVersion;
+
+    private DateTime _lastCaptureUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// Whether to take the draft now. Call it at every tick for a text that has changed since the last draft;
+    /// <paramref name="size"/> is its approximate size in characters or bytes.
+    /// </summary>
+    public bool ShouldCapture(object version, long size, DateTime nowUtc)
+    {
+        bool stable = ReferenceEquals(version, _previousVersion);
+        _previousVersion = version;
+        if (size < LargeBytes)
+        {
+            return true;
+        }
+        if (_lastCaptureUtc == DateTime.MinValue)
+        {
+            // No draft yet: the time counts from the first change that is seen, not from the start of time.
+            _lastCaptureUtc = nowUtc;
+        }
+        TimeSpan sinceLast = nowUtc - _lastCaptureUtc;
+        if (sinceLast < LargeMinInterval)
+        {
+            return false;
+        }
+        return stable || sinceLast >= LargeMaxWait;
+    }
+
+    /// <summary>Records that a draft was taken.</summary>
+    public void Captured(DateTime nowUtc)
+    {
+        _lastCaptureUtc = nowUtc;
+    }
+}
+
+/// <summary>
 /// Drafts of the files that are being edited, one file per remote file. The editor writes a draft while the text has
 /// unsaved changes, so that they survive a lost connection or a closed program, and removes it once the text is saved or
 /// the user chose to discard it. A file is replaced as a whole (written next to it, then swapped in with File.Replace),
 /// so a program that ends in the middle of a write, or a swap that fails, leaves the previous draft, not half of a new
-/// one and not none. With a <see cref="IDraftProtector"/> the text is stored encrypted (format 2); drafts written without
-/// one (format 1, plain text) are still read. The hex view stores the raw bytes (format 3), encrypted like format 2 when
-/// a protector is given.
+/// one and not none. With a <see cref="IDraftProtector"/> a draft is stored encrypted as one binary block (format 4: the
+/// text as UTF-8, the hex view as its raw bytes, so a draft is not made larger by base64 once and again). Drafts written
+/// without a protector are plain text (format 1) or, for the hex view, base64 (format 3); the encrypted base64 files of the
+/// earlier version (format 2) are still read.
 /// </summary>
 public sealed class EditorDraftStore
 {
@@ -57,6 +110,13 @@ public sealed class EditorDraftStore
     private const string ProtectedSignature = "SmarTTY-draft 2";
 
     private const string HexSignature = "SmarTTY-draft 3";
+
+    // An encrypted draft: this line, then the block that the protector made of the header and the payload (see Save).
+    private const string BinarySignature = "SmarTTY-draft 4";
+
+    // The temporary file of a write that was cut short by a crash is "<key>.draft.<guid>.tmp"; a write takes a moment, so a
+    // temporary file this old is dead.
+    private static readonly TimeSpan StaleTemporaryAge = TimeSpan.FromHours(1);
 
     private const string Extension = ".draft";
 
@@ -97,26 +157,50 @@ public sealed class EditorDraftStore
     {
         Directory.CreateDirectory(_directory);
         bool hex = draft.Bytes != null;
-        StringBuilder text = new StringBuilder();
-        text.Append(hex ? HexSignature : Signature).Append('\n');
-        text.Append("path: ").Append(Convert.ToBase64String(new UTF8Encoding(false).GetBytes(draft.RemotePath ?? ""))).Append('\n');
-        text.Append("saved: ").Append(draft.SavedUtc.Ticks.ToString(CultureInfo.InvariantCulture)).Append('\n');
-        text.Append("base: ").Append(draft.BaseHash ?? "").Append('\n');
-        text.Append("new: ").Append(draft.IsNewFile ? "1" : "0").Append('\n');
+        UTF8Encoding utf8 = new UTF8Encoding(false);
+        StringBuilder header = new StringBuilder();
+        header.Append(hex ? HexSignature : Signature).Append('\n');
+        header.Append("path: ").Append(Convert.ToBase64String(utf8.GetBytes(draft.RemotePath ?? ""))).Append('\n');
+        header.Append("saved: ").Append(draft.SavedUtc.Ticks.ToString(CultureInfo.InvariantCulture)).Append('\n');
+        header.Append("base: ").Append(draft.BaseHash ?? "").Append('\n');
+        header.Append("new: ").Append(draft.IsNewFile ? "1" : "0").Append('\n');
         // An empty line ends the header; the text after it is kept byte for byte (it may start with an empty line).
-        text.Append('\n');
-        text.Append(hex ? Convert.ToBase64String(draft.Bytes) : (draft.Text ?? ""));
-        string content = text.ToString();
+        header.Append('\n');
+        byte[] content;
         if (_protector != null)
         {
-            // A failure to protect is an error, not a reason to write the text in the clear: the caller tries again.
-            content = ProtectedSignature + "\n" + Convert.ToBase64String(_protector.Protect(new UTF8Encoding(false).GetBytes(content))) + "\n";
+            // The header and the payload (the UTF-8 text, or the raw bytes of the hex view) in one array that the protector
+            // encrypts as it is: no base64 before it and none after it. A failure to protect is an error, not a reason to write
+            // the text in the clear: the caller tries again.
+            byte[] headerBytes = utf8.GetBytes(header.ToString());
+            string draftText = draft.Text ?? "";
+            int payloadLength = hex ? draft.Bytes.Length : utf8.GetByteCount(draftText);
+            byte[] plain = new byte[headerBytes.Length + payloadLength];
+            Buffer.BlockCopy(headerBytes, 0, plain, 0, headerBytes.Length);
+            if (hex)
+            {
+                Buffer.BlockCopy(draft.Bytes, 0, plain, headerBytes.Length, payloadLength);
+            }
+            else
+            {
+                utf8.GetBytes(draftText, 0, draftText.Length, plain, headerBytes.Length);
+            }
+            byte[] protectedBytes = _protector.Protect(plain);
+            byte[] signature = Encoding.ASCII.GetBytes(BinarySignature + "\n");
+            content = new byte[signature.Length + protectedBytes.Length];
+            Buffer.BlockCopy(signature, 0, content, 0, signature.Length);
+            Buffer.BlockCopy(protectedBytes, 0, content, signature.Length, protectedBytes.Length);
+        }
+        else
+        {
+            header.Append(hex ? Convert.ToBase64String(draft.Bytes) : (draft.Text ?? ""));
+            content = utf8.GetBytes(header.ToString());
         }
         string target = PathFor(key);
         string temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temporary, content, new UTF8Encoding(false));
+            File.WriteAllBytes(temporary, content);
             ReplaceFile(temporary, target);
         }
         finally
@@ -177,7 +261,13 @@ public sealed class EditorDraftStore
             {
                 return null;
             }
-            string content = File.ReadAllText(path, new UTF8Encoding(false));
+            byte[] fileBytes = File.ReadAllBytes(path);
+            byte[] binarySignature = Encoding.ASCII.GetBytes(BinarySignature + "\n");
+            if (StartsWith(fileBytes, binarySignature))
+            {
+                return _protector == null ? null : ParseBinary(_protector.Unprotect(Slice(fileBytes, binarySignature.Length, fileBytes.Length - binarySignature.Length)));
+            }
+            string content = new UTF8Encoding(false).GetString(fileBytes);
             if (content.StartsWith(ProtectedSignature + "\n", StringComparison.Ordinal))
             {
                 if (_protector == null)
@@ -216,6 +306,65 @@ public sealed class EditorDraftStore
         }
     }
 
+    private static bool StartsWith(byte[] data, byte[] prefix)
+    {
+        if (data.Length < prefix.Length)
+        {
+            return false;
+        }
+        for (int i = 0; i < prefix.Length; i++)
+        {
+            if (data[i] != prefix[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static byte[] Slice(byte[] data, int offset, int count)
+    {
+        byte[] part = new byte[count];
+        Buffer.BlockCopy(data, offset, part, 0, count);
+        return part;
+    }
+
+    /// <summary>Reads what <see cref="Save"/> gave the protector: the header, an empty line, then the payload as it is.</summary>
+    private static EditorDraft ParseBinary(byte[] plain)
+    {
+        int headerEnd = -1;
+        for (int i = 0; i + 1 < plain.Length; i++)
+        {
+            if (plain[i] == (byte)'\n' && plain[i + 1] == (byte)'\n')
+            {
+                headerEnd = i;
+                break;
+            }
+        }
+        if (headerEnd < 0)
+        {
+            return null;
+        }
+        UTF8Encoding utf8 = new UTF8Encoding(false);
+        string[] header = utf8.GetString(plain, 0, headerEnd).Split('\n');
+        bool hex = header.Length >= 5 && header[0] == HexSignature;
+        if (header.Length < 5 || (!hex && header[0] != Signature))
+        {
+            return null;
+        }
+        int payloadStart = headerEnd + 2;
+        int payloadLength = plain.Length - payloadStart;
+        return new EditorDraft
+        {
+            RemotePath = utf8.GetString(Convert.FromBase64String(Field(header[1], "path: "))),
+            SavedUtc = new DateTime(long.Parse(Field(header[2], "saved: "), CultureInfo.InvariantCulture), DateTimeKind.Utc),
+            BaseHash = Field(header[3], "base: "),
+            IsNewFile = Field(header[4], "new: ") == "1",
+            Text = hex ? null : utf8.GetString(plain, payloadStart, payloadLength),
+            Bytes = hex ? Slice(plain, payloadStart, payloadLength) : null
+        };
+    }
+
     private static string Field(string line, string prefix)
     {
         if (!line.StartsWith(prefix, StringComparison.Ordinal))
@@ -240,7 +389,11 @@ public sealed class EditorDraftStore
         }
     }
 
-    /// <summary>Removes the drafts that were last written longer ago than <paramref name="age"/>; returns how many.</summary>
+    /// <summary>
+    /// Removes the drafts that were last written longer ago than <paramref name="age"/>, and the temporary files that a write
+    /// cut short by a crash left behind ("*.draft.&lt;guid&gt;.tmp", which are no drafts and so were never cleaned); returns how
+    /// many files were removed.
+    /// </summary>
     public int DeleteOlderThan(TimeSpan age)
     {
         int removed = 0;
@@ -250,15 +403,72 @@ public sealed class EditorDraftStore
             {
                 return 0;
             }
-            DateTime limit = DateTime.UtcNow - age;
+            DateTime now = DateTime.UtcNow;
+            removed += DeleteFilesOlderThan("*" + Extension, now - age);
+            removed += DeleteFilesOlderThan("*" + Extension + ".*.tmp", now - (age < StaleTemporaryAge ? age : StaleTemporaryAge));
+        }
+        catch
+        {
+        }
+        return removed;
+    }
+
+    private int DeleteFilesOlderThan(string pattern, DateTime limit)
+    {
+        int removed = 0;
+        foreach (string file in Directory.GetFiles(_directory, pattern))
+        {
+            try
+            {
+                if (File.GetLastWriteTimeUtc(file) < limit)
+                {
+                    File.Delete(file);
+                    removed++;
+                }
+            }
+            catch
+            {
+            }
+        }
+        return removed;
+    }
+
+    /// <summary>A draft that <see cref="DeleteOlderThan"/> will remove soon.</summary>
+    public sealed class ExpiringDraft
+    {
+        public string RemotePath;
+
+        /// <summary>When the draft will be removed (UTC).</summary>
+        public DateTime ExpiresUtc;
+    }
+
+    /// <summary>
+    /// The drafts that are not yet old enough for <see cref="DeleteOlderThan"/>(<paramref name="age"/>) but will be within
+    /// <paramref name="warnBefore"/>, soonest first, so that the user can be told before their unsaved changes go.
+    /// </summary>
+    public List<ExpiringDraft> FindExpiring(TimeSpan age, TimeSpan warnBefore)
+    {
+        List<ExpiringDraft> result = new List<ExpiringDraft>();
+        try
+        {
+            if (!Directory.Exists(_directory))
+            {
+                return result;
+            }
+            DateTime now = DateTime.UtcNow;
             foreach (string file in Directory.GetFiles(_directory, "*" + Extension))
             {
                 try
                 {
-                    if (File.GetLastWriteTimeUtc(file) < limit)
+                    DateTime expires = File.GetLastWriteTimeUtc(file) + age;
+                    if (expires <= now || expires - now > warnBefore)
                     {
-                        File.Delete(file);
-                        removed++;
+                        continue;
+                    }
+                    EditorDraft draft = TryLoad(Path.GetFileNameWithoutExtension(file));
+                    if (draft != null)
+                    {
+                        result.Add(new ExpiringDraft { RemotePath = draft.RemotePath, ExpiresUtc = expires });
                     }
                 }
                 catch
@@ -269,6 +479,29 @@ public sealed class EditorDraftStore
         catch
         {
         }
-        return removed;
+        result.Sort((ExpiringDraft a, ExpiringDraft b) => a.ExpiresUtc.CompareTo(b.ExpiresUtc));
+        return result;
+    }
+
+    /// <summary>The text that tells the user which drafts are about to be removed, or null when there are none.</summary>
+    public static string DescribeExpiring(List<ExpiringDraft> drafts, DateTime nowUtc, int maxListed = 5)
+    {
+        if (drafts == null || drafts.Count == 0)
+        {
+            return null;
+        }
+        StringBuilder text = new StringBuilder();
+        text.Append("SmarTTY keeps the unsaved changes of an edited file in a draft on this computer, and removes a draft that has not been written to for a long time. These drafts will be removed soon:\n\n");
+        for (int i = 0; i < drafts.Count && i < maxListed; i++)
+        {
+            int days = (int)Math.Ceiling((drafts[i].ExpiresUtc - nowUtc).TotalDays);
+            text.Append("  ").Append(drafts[i].RemotePath).Append(" (in ").Append(Math.Max(days, 1).ToString(CultureInfo.InvariantCulture)).Append(Math.Max(days, 1) == 1 ? " day)" : " days)").Append('\n');
+        }
+        if (drafts.Count > maxListed)
+        {
+            text.Append("  and ").Append((drafts.Count - maxListed).ToString(CultureInfo.InvariantCulture)).Append(" more\n");
+        }
+        text.Append("\nOpen such a file in the editor to restore its draft and save it to the server.");
+        return text.ToString();
     }
 }
