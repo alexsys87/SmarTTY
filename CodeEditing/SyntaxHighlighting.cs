@@ -3179,6 +3179,19 @@ namespace SmarTTY.CodeEditing
             return IsIdChar(c) || c == '.' || c == '-';
         }
 
+        /// <summary>A word that starts with one of the prefixes: an Ansible FQCN under "ansible.builtin." or "community.general.".</summary>
+        private static bool HasKeywordPrefix(string word, HashSet<string> prefixes)
+        {
+            foreach (string prefix in prefixes)
+            {
+                if (word.Length > prefix.Length && word.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>
         /// The end of the longest known directive phrase at the start of a line, or <paramref name="start"/> when none
         /// matches. A phrase consists of whole words separated by blanks ("map to guest", "server min protocol").
@@ -3239,8 +3252,10 @@ namespace SmarTTY.CodeEditing
         /// With <paramref name="valueKeywordsInValue"/> (Samba) the value keywords are coloured only in the value part of a line,
         /// so a directory called "share" inside a path is not mistaken for a value. With <paramref name="yamlAnchors"/> (YAML)
         /// the anchors "&amp;name", the aliases "*name" and the merge key "&lt;&lt;" are coloured too.
+        /// With <paramref name="keywordPrefixes"/> (Ansible) any word that starts with one of the prefixes is a keyword:
+        /// a fully qualified collection name such as "ansible.builtin.apt" or "community.general.json_query".
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false, bool yamlAnchors = false)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false, bool yamlAnchors = false, HashSet<string> keywordPrefixes = null)
         {
             int len = text.Length;
             int last = 0;
@@ -3315,7 +3330,9 @@ namespace SmarTTY.CodeEditing
                             if (isKey)
                             {
                                 Normal(ref last, last, keyStart, sink);
-                                bool known = directives != null && directives.Contains(text.Substring(keyStart, keyEnd - keyStart));
+                                string key = text.Substring(keyStart, keyEnd - keyStart);
+                                bool known = (directives != null && directives.Contains(key)) ||
+                                    (keywordPrefixes != null && HasKeywordPrefix(key, keywordPrefixes));
                                 sink.AddToken(known ? TypeKeyword : TypeVariable, keyStart, keyEnd);
                                 i = keyEnd;
                                 last = i;
@@ -3459,7 +3476,8 @@ namespace SmarTTY.CodeEditing
                     bool inValue = !valueKeywordsInValue ||
                         (valueStart >= 0 && s >= valueStart && (s == valueStart || IsBlank(text[s - 1])));
                     if (ConfigConstants.Contains(word) ||
-                        (valueKeywords != null && valueKeywords.Contains(word) && inValue))
+                        (((valueKeywords != null && valueKeywords.Contains(word)) ||
+                          (keywordPrefixes != null && HasKeywordPrefix(word, keywordPrefixes))) && inValue))
                     {
                         Normal(ref last, last, s, sink);
                         sink.AddToken(TypeKeyword, s, i);
@@ -6979,7 +6997,7 @@ namespace SmarTTY.CodeEditing
         /// is a keyword, an unknown key stays an ordinary key, and the words of <paramref name="values"/> are coloured
         /// wherever they stand. With null sets this is plain YAML.
         /// </summary>
-        private static bool TokenizeYamlCore(HashSet<string> keywords, HashSet<string> values, int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        private static bool TokenizeYamlCore(HashSet<string> keywords, HashSet<string> values, int startState, string text, TokenCache.ITokenSink sink, out int endState, HashSet<string> keywordPrefixes = null)
         {
             int len = text.Length;
             int depth = startState & 7;
@@ -7036,7 +7054,7 @@ namespace SmarTTY.CodeEditing
 
             if (!scalarText)
             {
-                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values, yamlAnchors: true);
+                TokenizeConfigCore(keywords, 0, text, buffer, out int ignored, valueKeywords: values, yamlAnchors: true, keywordPrefixes: keywordPrefixes);
             }
 
             if (code)
