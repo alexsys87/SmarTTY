@@ -161,11 +161,21 @@ public static class ConfigValidators
         new Regex(@"<file>:?\s+line\s+(?<line>\d+):\s*(?<msg>.*)$", RegexOptions.CultureInvariant),
         // <file>: 5: Syntax error (dash)
         new Regex(@"<file>:\s+(?<line>\d+):\s*(?<msg>.*)$", RegexOptions.CultureInvariant),
+    };
+
+    // The forms without the name of the file. They are taken for the file only when the message names no other file: an error in
+    // a file that "#includedir" (sudoers) or "Include" (sshd_config) pulls in comes as "/etc/sudoers.d/x: syntax error near line 2"
+    // or "/etc/ssh/sshd_config.d/x.conf line 3: Bad configuration option", and line 2 or 3 of the edited file is innocent.
+    private static readonly Regex[] GenericLinePatterns =
+    {
         // syntax error near line 5 (old visudo)
         new Regex(@"near line (?<line>\d+)", RegexOptions.CultureInvariant),
         // ... at line 3, column 5 (jq)
         new Regex(@"\bline (?<line>\d+)(?:,? column (?<col>\d+))?", RegexOptions.CultureInvariant)
     };
+
+    // An absolute or relative path in a message: it starts a word and has a name after its last slash.
+    private static readonly Regex OtherFilePath = new Regex(@"(?:^|[\s'""(>:=])(?:/|\./|\.\./|~/)[^\s:'"")<>]*[\w.\-]", RegexOptions.CultureInvariant);
 
     // The checks written in Python print one "line:column: message" line for a problem of the file. Anything else that
     // goes wrong in them (the file cannot be read, the module is missing) ends with the status 127, "not available",
@@ -191,17 +201,21 @@ public static class ConfigValidators
         "    sys.exit(127)";
 
     // compose_all only parses: tags that need a constructor (!Ref, !vault) are not an error.
+    // A file with template actions ({{ .Values.x }} of Helm and Go templates, {% if %} of Jinja) is no YAML until the template
+    // is rendered: when it does not parse and holds such an action (a "{{" that no "$" precedes, which is GitHub's ${{ }}), the
+    // check is "not available" instead of a false error. A quoted "{{ var }}" of Ansible parses, so such a file is still checked.
     private const string PythonYamlCheck =
-        "import sys\n" +
+        "import re,sys\n" +
         "try:\n" +
         "    import yaml\n" +
         "except Exception:\n" +
         "    sys.exit(127)\n" +
         "try:\n" +
-        "    list(yaml.compose_all(open(sys.argv[1],\"rb\")))\n" +
+        "    data = open(sys.argv[1],\"rb\").read()\n" +
+        "    list(yaml.compose_all(data))\n" +
         "except yaml.YAMLError as e:\n" +
         "    m = getattr(e,\"problem_mark\",None)\n" +
-        "    if m is None:\n" +
+        "    if m is None or re.search(rb\"(?<!\\$)\\{\\{|\\{%\", data):\n" +
         "        sys.exit(127)\n" +
         "    print(\"%d:%d: %s\" % (m.line+1,m.column+1,getattr(e,\"problem\",None) or \"invalid YAML\"))\n" +
         "    sys.exit(1)\n" +
@@ -245,6 +259,12 @@ public static class ConfigValidators
             case SyntaxHighlighting.Language.Bash:
                 return ShellCheck(name, firstLine);
             case SyntaxHighlighting.Language.Python:
+                // Python 2 code (print "x", except E, e) is a syntax error for python3: a wrong complaint is worse than no check.
+                string pythonProgram = ShebangProgram(firstLine);
+                if (pythonProgram != null && pythonProgram.StartsWith("python2", StringComparison.Ordinal))
+                {
+                    return null;
+                }
                 return new ConfigValidator("python3 syntax check")
                     .Add("python3", "-c '" + PythonSyntaxCheck + "' {FILE}");
             case SyntaxHighlighting.Language.Json:
@@ -273,59 +293,106 @@ public static class ConfigValidators
 
     private static ConfigValidator ShellCheck(string lowerCaseName, string firstLine)
     {
-        // zsh syntax is not what bash or sh accept: no check is better than a wrong one.
-        if (lowerCaseName.StartsWith(".zsh", StringComparison.Ordinal) || lowerCaseName == ".zprofile")
+        // zsh syntax is not what bash or sh accept (*(.N), =(cmd), ...): no check is better than a wrong one. A zsh file is
+        // told by its name (.zshrc, plugin.zsh, prompt_foo_setup.zsh, agnoster.zsh-theme, /etc/zsh/zshrc) or by its "#!" line.
+        if (IsZshFileName(lowerCaseName))
+        {
+            return null;
+        }
+        IReadOnlyList<string> shells = ShellsFor(firstLine);
+        if (shells.Count == 0)
         {
             return null;
         }
         ConfigValidator validator = new ConfigValidator("shell -n");
-        foreach (string program in ShellsFor(firstLine))
+        foreach (string program in shells)
         {
             validator.Add(program, "-n {FILE}");
         }
         return validator;
     }
 
+    /// <summary>The name (lower case, without the directory) of a file that only zsh reads: its start-up files and its scripts.</summary>
+    private static bool IsZshFileName(string lowerCaseName)
+    {
+        if (lowerCaseName.StartsWith(".zsh", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        switch (lowerCaseName)
+        {
+            case ".zprofile":
+            case ".zlogin":
+            case ".zlogout":
+            case "zshrc":
+            case "zshenv":
+            case "zprofile":
+            case "zlogin":
+            case "zlogout":
+                return true;
+        }
+        return lowerCaseName.EndsWith(".zsh", StringComparison.Ordinal) || lowerCaseName.EndsWith(".zsh-theme", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The program that the "#!" line of a script names, without the directory and with "env" and "busybox" looked through
+    /// ("#!/usr/bin/env -S zsh -f" gives "zsh"); null when the line is no "#!" line, "" when it names nothing.
+    /// </summary>
+    public static string ShebangProgram(string firstLine)
+    {
+        if (string.IsNullOrEmpty(firstLine) || !firstLine.StartsWith("#!", StringComparison.Ordinal))
+        {
+            return null;
+        }
+        // A script saved with CRLF line ends has a \r after the last word of the line.
+        string[] words = firstLine.Substring(2).Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        string program = words.Length > 0 ? ProgramName(words[0]) : "";
+        if (program == "env")
+        {
+            program = "";
+            for (int i = 1; i < words.Length; i++)
+            {
+                if (!words[i].StartsWith("-", StringComparison.Ordinal))
+                {
+                    program = ProgramName(words[i]);
+                    break;
+                }
+            }
+        }
+        if (program == "busybox" && words.Length > 1)
+        {
+            program = ProgramName(words[1]);
+        }
+        return program;
+    }
+
     /// <summary>
     /// The shells that can check a script, from the best to the last resort: the one the "#!" line names (a script for
-    /// sh is checked with sh, which does not know bash's extensions), otherwise bash and then sh.
+    /// sh is checked with sh, which does not know bash's extensions); bash and then sh for a script without a "#!" line.
+    /// The list is empty when the "#!" line names a shell that none of them can read (zsh, fish, csh, ...) or names no
+    /// program at all: <c>bash -n</c> would report the syntax of that shell as errors.
     /// </summary>
     public static IReadOnlyList<string> ShellsFor(string firstLine)
     {
-        if (!string.IsNullOrEmpty(firstLine) && firstLine.StartsWith("#!", StringComparison.Ordinal))
+        string program = ShebangProgram(firstLine);
+        if (program == null)
         {
-            string[] words = firstLine.Substring(2).Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            string program = words.Length > 0 ? ProgramName(words[0]) : "";
-            if (program == "env")
-            {
-                program = "";
-                for (int i = 1; i < words.Length; i++)
-                {
-                    if (!words[i].StartsWith("-", StringComparison.Ordinal))
-                    {
-                        program = ProgramName(words[i]);
-                        break;
-                    }
-                }
-            }
-            if (program == "busybox" && words.Length > 1)
-            {
-                program = ProgramName(words[1]);
-            }
-            switch (program)
-            {
-                case "bash":
-                    return new[] { "bash", "sh" };
-                case "ksh":
-                case "mksh":
-                    return new[] { program, "sh" };
-                case "sh":
-                case "ash":
-                case "dash":
-                    return new[] { "sh" };
-            }
+            return new[] { "bash", "sh" };
         }
-        return new[] { "bash", "sh" };
+        switch (program)
+        {
+            case "bash":
+                return new[] { "bash", "sh" };
+            case "ksh":
+            case "mksh":
+                return new[] { program, "sh" };
+            case "sh":
+            case "ash":
+            case "dash":
+                return new[] { "sh" };
+            default:
+                return new string[0];
+        }
     }
 
     private static string ProgramName(string path)
@@ -346,7 +413,8 @@ public static class ConfigValidators
         }
         string path = remotePath.Replace('\\', '/').ToLowerInvariant();
         string name = path.Substring(path.LastIndexOf('/') + 1);
-        if (name == "sshd_config")
+        // The one that sshd reads: a copy of the file in a home folder or in /tmp is not worth a question about the service.
+        if (name == "sshd_config" && path.EndsWith("/etc/ssh/sshd_config", StringComparison.Ordinal))
         {
             return new ServiceReload
             {
@@ -410,6 +478,18 @@ public static class ConfigValidators
             return MakeIssue(match, line, wholeLineIfNoMessage: true);
         }
         foreach (Regex pattern in LinePatterns)
+        {
+            match = pattern.Match(line);
+            if (match.Success)
+            {
+                return MakeIssue(match, line, wholeLineIfNoMessage: true);
+            }
+        }
+        if (!line.Contains(ConfigValidator.Token) && OtherFilePath.IsMatch(line))
+        {
+            return null;
+        }
+        foreach (Regex pattern in GenericLinePatterns)
         {
             match = pattern.Match(line);
             if (match.Success)

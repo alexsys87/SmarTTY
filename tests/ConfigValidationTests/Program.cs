@@ -68,10 +68,44 @@ internal static class Program
         Equal(string.Join(",", ConfigValidators.ShellsFor("#!/bin/busybox ash")), "sh", "busybox ash");
         Equal(string.Join(",", ConfigValidators.ShellsFor("#!/bin/ksh")), "ksh,sh", "ksh, then sh");
         Equal(string.Join(",", ConfigValidators.ShellsFor("# no shebang here")), "bash,sh", "a comment is not a #! line");
+        Equal(string.Join(",", ConfigValidators.ShellsFor("#!/bin/bash\r")), "bash,sh", "a #! line with a CR from CRLF line ends");
+
+        // B-105: a script of another shell is not checked with bash or sh, by its "#!" line or by its name.
+        Equal(ConfigValidators.ShellsFor("#!/bin/zsh").Count, 0, "#!/bin/zsh: no shell can check it");
+        Equal(ConfigValidators.ShellsFor("#!/usr/bin/env zsh").Count, 0, "env zsh: no shell can check it");
+        Equal(ConfigValidators.ShellsFor("#!/usr/bin/env -S zsh -f").Count, 0, "env -S zsh: no shell can check it");
+        Equal(ConfigValidators.ShellsFor("#!/usr/bin/fish").Count, 0, "fish: no shell can check it");
+        Equal(ConfigValidators.ShellsFor("#!/bin/csh -f").Count, 0, "csh: no shell can check it");
+        Equal(ConfigValidators.ShellsFor("#!").Count, 0, "a #! line that names nothing: no check");
+        Equal(string.Join(",", ConfigValidators.ShellsFor("#!/bin/mksh")), "mksh,sh", "mksh, then sh");
+        Equal(NameOf("/home/u/.zsh/plugin.zsh", L.Bash), null, "plugin.zsh is not checked with bash");
+        Equal(NameOf("/home/u/prompt_foo_setup.zsh", L.Bash), null, "prompt_foo_setup.zsh is not checked with bash");
+        Equal(NameOf("/home/u/PLUGIN.ZSH", L.Bash), null, "the extension is matched without regard to case");
+        Equal(NameOf("/home/u/.oh-my-zsh/themes/agnoster.zsh-theme", L.Bash), null, "a .zsh-theme file is not checked with bash");
+        Equal(NameOf("/etc/zsh/zshrc", L.Bash), null, "/etc/zsh/zshrc is not checked with bash");
+        Equal(NameOf("/home/u/.zprofile", L.Bash), null, ".zprofile is not checked with bash");
+        Equal(NameOf("/home/u/.zlogin", L.Bash), null, ".zlogin is not checked with bash");
+        Equal(NameOf("/home/u/tool", L.Bash, "#!/bin/zsh"), null, "a zsh script without an extension (by its #! line)");
+        Equal(NameOf("/home/u/tool.sh", L.Bash, "#!/usr/bin/env zsh"), null, "a .sh file that says zsh is not checked either");
+        Equal(NameOf("/home/u/tool", L.Bash, "#!/bin/bash"), "shell -n", "a bash script is checked");
+        Equal(NameOf("/home/u/tool", L.Bash, "#!/bin/sh"), "shell -n", "an sh script is checked");
+        Equal(NameOf("/home/u/tool", L.Bash, "#!/bin/ksh"), "shell -n", "a ksh script is checked");
+        Equal(NameOf("/home/u/tool", L.Bash, null), "shell -n", "a script without a #! line is still checked (bash, then sh)");
+        Equal(NameOf("/home/u/tool", L.Bash, "# just a comment"), "shell -n", "a first line that is no #! line: still checked");
+
+        // Python 2 is no python3 syntax.
+        Equal(NameOf("/home/u/old.py", L.Python, "#!/usr/bin/python2"), null, "python2 is not checked with python3");
+        Equal(NameOf("/home/u/old.py", L.Python, "#!/usr/bin/env python2.7"), null, "env python2.7 is not checked with python3");
+        Equal(NameOf("/home/u/new.py", L.Python, "#!/usr/bin/python3"), "python3 syntax check", "python3 is checked");
+        Equal(NameOf("/home/u/new.py", L.Python, "#!/usr/bin/env python"), "python3 syntax check", "plain python is checked");
+        Equal(NameOf("/home/u/new.py", L.Python, null), "python3 syntax check", "no #! line: checked");
 
         Equal(ConfigValidators.FindReload("/etc/ssh/sshd_config")?.Name, "sshd", "sshd_config can be reloaded");
         Equal(ConfigValidators.FindReload("/etc/nginx/conf.d/site.conf")?.Name, "nginx", "a file in /etc/nginx can be reloaded");
         Equal(ConfigValidators.FindReload("/etc/nginx/nginx.conf")?.Name, "nginx", "nginx.conf can be reloaded");
+        Equal(ConfigValidators.FindReload("/usr/local/etc/ssh/sshd_config")?.Name, "sshd", "sshd_config of a /usr/local prefix can be reloaded");
+        Equal(ConfigValidators.FindReload("/home/u/sshd_config")?.Name, null, "a sshd_config in a home folder has no reload");
+        Equal(ConfigValidators.FindReload("/tmp/sshd_config")?.Name, null, "a sshd_config in /tmp has no reload");
         Equal(ConfigValidators.FindReload("/etc/hosts")?.Name, null, "other files have no reload");
         Equal(ConfigValidators.FindReload("/home/u/nginx/site.conf")?.Name, null, "a .conf outside /etc/nginx has no reload");
     }
@@ -137,6 +171,19 @@ internal static class Program
         Equal(visudo[0].Message, "syntax error", "visudo: the message");
         Equal(Parse(">>> " + Temp + ": syntax error near line 8 <<<")[0].Line, 8, "old visudo: near line N");
 
+        // B-105: a problem in a file that the edited one includes is not a problem of the edited file.
+        Equal(Parse(">>> /etc/sudoers.d/extra: syntax error near line 2 <<<").Count, 0, "visudo: an error of an #includedir file names no line of this file");
+        Equal(Parse("visudo: /etc/sudoers.d/extra:2:5: syntax error").Count, 0, "visudo: gcc style error of another file");
+        Equal(Parse("/etc/ssh/sshd_config.d/10-x.conf line 3: Bad configuration option: Foo").Count, 0, "sshd: an error of an Include file names no line of this file");
+        Equal(Parse("/etc/ssh/sshd_config.d/10-x.conf: line 3: Bad configuration option: Foo").Count, 0, "sshd: the colon form of another file");
+        Equal(Parse("keys/x.conf line 3: bad").Count, 1, "a relative name without a slash prefix is still read as before (nothing tells it is a path)");
+        List<ValidationIssue> own = Parse(Temp + " line 4: Bad configuration option: Foo\n/etc/ssh/sshd_config.d/x.conf line 9: Bad option");
+        Equal(own.Count, 1, "sshd: own and foreign problems together: only the own one");
+        Equal(own[0].Line, 4, "sshd: the own problem's line");
+        Equal(Parse(">>> " + Temp + ": syntax error near line 8 <<<").Count, 1, "old visudo: the temporary file is the edited one");
+        Equal(Parse("syntax error near line 5").Count, 1, "no file named at all: the line is the edited file's");
+        Equal(Parse("error at line 5, column 2 (see /usr/share/doc/x)").Count, 0, "a message that points to another path in it is not taken");
+
         // xmllint
         List<ValidationIssue> xml = Parse(Temp + ":4: parser error : Opening and ending tag mismatch: a line 2 and b\n</b>\n    ^");
         Equal(xml.Count, 1, "xmllint: a problem");
@@ -186,6 +233,7 @@ internal static class Program
         Equal(bash.Interpret(new string[0], 1, Temp).Outcome, ValidationOutcome.Inconclusive, "exit 1 without output: Inconclusive");
         Equal(bash.Interpret(new[] { "nginx: [warn] x in " + Temp + ":3", "nginx: [emerg] open() \"/tmp/mime.types\" failed (2: No such file or directory) in " + Temp + ":4" }, 1, Temp).Outcome, ValidationOutcome.Inconclusive, "only warnings and environment failures: Inconclusive, not Failed");
         Equal(bash.Interpret(bad, 2, Temp).Issues.Count, 1, "the issues are returned");
+        Equal(bash.Interpret(new[] { "/etc/ssh/sshd_config.d/x.conf line 3: Bad configuration option: Foo" }, 255, Temp).Outcome, ValidationOutcome.Inconclusive, "an error only in an included file does not block the save");
     }
 
     private static void CommandChecks()
@@ -261,6 +309,20 @@ internal static class Program
             Equal(broken.Outcome, ValidationOutcome.Failed, "live bash: a script with a missing fi fails");
             Check(broken.Issues.Count > 0 && broken.Issues[0].Line >= 4, "live bash: the problem has a line (" + Show(broken.Issues) + ")");
         }
+        if (Has("bash"))
+        {
+            // The case of B-105: typical zsh code is no bash, and bash -n must not be asked about it.
+            string zshCode = "#!/usr/bin/env zsh\nfiles=(*(.N))\ndiff =(print a) =(print b)\n";
+            Check(ConfigValidators.Find("/home/u/plugin.zsh", L.Bash, "#!/usr/bin/env zsh") == null, "live zsh: plugin.zsh has no check");
+            Check(ConfigValidators.Find("/home/u/tool", L.Bash, "#!/usr/bin/env zsh") == null, "live zsh: a zsh shebang has no check");
+            // ... and that really is a bash syntax error, i.e. that the old behaviour was a false report.
+            string zshDirectory = Path.Combine(Path.GetTempPath(), "zshcheck" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(zshDirectory);
+            string zshFile = Path.Combine(zshDirectory, "z.txt");
+            File.WriteAllText(zshFile, zshCode);
+            Check(Execute("bash -n '" + zshFile + "' >/dev/null 2>&1").Status != 0, "live zsh: bash does reject zsh code (so the check had to go)");
+            Directory.Delete(zshDirectory, true);
+        }
         if (Has("python3"))
         {
             Equal(RunValidator("/a.py", L.Python, null, "def f(x):\n    return x + 1\n", out file).Outcome, ValidationOutcome.Passed, "live python3: a good file passes");
@@ -284,6 +346,12 @@ internal static class Program
                 Equal(badYaml.Outcome, ValidationOutcome.Failed, "live yaml: a broken file fails");
                 Check(badYaml.Issues.Count > 0, "live yaml: the problem has a line (" + Show(badYaml.Issues) + ")");
                 Equal(RunValidator("/a.yml", L.Yaml, null, "Resources:\n  Bucket: !Ref MyBucket\n", out file).Outcome, ValidationOutcome.Passed, "live yaml: a custom tag is not an error");
+                // B-105: templates are no YAML until they are rendered.
+                Equal(RunValidator("/chart/templates/deploy.yaml", L.Yaml, null, "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {{ .Release.Name }}\nspec:\n  {{- if .Values.x }}\n  replicas: 2\n  {{- end }}\n", out file).Outcome, ValidationOutcome.Unavailable, "live yaml: a Helm template is not reported as a YAML error");
+                Equal(RunValidator("/a.yaml", L.Yaml, null, "{% if x %}\na: 1\n{% endif %}\n", out file).Outcome, ValidationOutcome.Unavailable, "live yaml: a Jinja block is not reported as a YAML error");
+                Equal(RunValidator("/play.yml", L.Yaml, null, "- hosts: all\n  vars:\n    x: \"{{ y }}\"\n", out file).Outcome, ValidationOutcome.Passed, "live yaml: a quoted Ansible expression is plain YAML and passes");
+                Equal(RunValidator("/play.yml", L.Yaml, null, "- hosts: all\n  vars:\n    x: \"{{ y }}\"\n    z: [1, 2\n", out file).Outcome, ValidationOutcome.Unavailable, "live yaml: a broken file that also holds an expression is not blamed (it may be a template)");
+                Equal(RunValidator("/a.yml", L.Yaml, null, "a: ${{ secrets.X }}\nb: [1, 2\n", out file).Outcome, ValidationOutcome.Failed, "live yaml: GitHub's ${{ }} is no template: a real error is still reported");
             }
             else
             {
