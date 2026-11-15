@@ -38,11 +38,11 @@ public partial class DeviceTerminalControl
     {
         ToolStripMenuItem send = new ToolStripMenuItem("Send file via gzip + base64 (shell)...")
         {
-            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip, typed as base64 text, unpacked there and checked with a checksum. Nothing is needed on the device but busybox tools."
+            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip, typed as base64 text in blocks that the device checks one by one (a damaged block is typed again), unpacked there and checked with a checksum. Nothing is needed on the device but busybox tools."
         };
         ToolStripMenuItem receive = new ToolStripMenuItem("Receive file via gzip + base64 (shell)...")
         {
-            ToolTipText = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip, sent as base64 text, unpacked here and checked with a checksum."
+            ToolTipText = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip, sent as base64 text in blocks that are checked one by one (a damaged block is sent again), unpacked here and checked with a checksum."
         };
         Icons.Apply(send, "upload");
         Icons.Apply(receive, "download");

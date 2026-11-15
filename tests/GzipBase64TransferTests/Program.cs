@@ -536,7 +536,8 @@ internal static class Program
                 Check(device.Run("echo alive8").Contains("alive8"), "the shell is alive and Ctrl-C works again after it (the signals are ignored only while the data is read)");
             }
             {
-                // Noise that contains a line end commits a damaged line: the attempt is given up at once and repeated.
+                // Noise that contains a line end commits a damaged line: the echo cannot take it back, the checksum of its block tells, and
+                // that block is typed again (not the whole file).
                 int hits = 0;
                 device.TxFilter = chunk =>
                 {
@@ -547,17 +548,69 @@ internal static class Program
                     return chunk;
                 };
                 string target = Path.Combine(remoteDir, "committed.bin");
-                Run run = RunSend(device, binary, target, Fast());
+                device.SentBytes = 0;
+                Run run = RunSend(device, binary, target, Fast(attempts: 1));
                 device.TxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged line that got committed makes the attempt start again", Describe(run) + " errors=" + run.Errors);
-                Check(!File.Exists(target + ".smtty~"), "no unfinished file left after it");
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged line that got committed spoils one block, which is typed again in the same attempt", Describe(run) + " errors=" + run.Errors);
+                Check(device.SentBytes < new FileInfo(binary).Length * 4 / 3 + 40_000, "the rest of the file was not typed again", "sent " + device.SentBytes);
+                Check(!File.Exists(target + ".smtty~") && !File.Exists(target + ".smtty~.c"), "no unfinished file left after it");
+            }
+            {
+                // The line with a checksum is damaged on the way here: the device waits for a verdict that cannot come, and is asked where it is.
+                int checksums = 0;
+                device.RxFilter = chunk =>
+                {
+                    string text = Encoding.Latin1.GetString(chunk);
+                    int at = text.IndexOf(":C:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref checksums) == 3)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "deaf.bin");
+                Run run = RunSend(device, binary, target, Fast(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a damaged line of the device (the checksum of a block) is asked for again", Describe(run) + " errors=" + run.Errors);
             }
             {
                 device.Run("stty -echo");
                 string target = Path.Combine(remoteDir, "noecho.bin");
                 Run run = RunSend(device, binary, target, Fast());
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "device without echo: sends at the speed limit", Describe(run));
+
+                // Without echo nothing tells that a line arrived damaged: the checksum of its block does, and the block is typed again.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length > 500 && Interlocked.Increment(ref hits) % 40 == 7)
+                    {
+                        byte[] shorter = new byte[chunk.Length - 1];
+                        Array.Copy(chunk, 0, shorter, 0, 100);
+                        Array.Copy(chunk, 101, shorter, 100, chunk.Length - 101);
+                        return shorter;
+                    }
+                    return chunk;
+                };
+                target = Path.Combine(remoteDir, "noecho-lossy.bin");
+                run = RunSend(device, binary, target, Fast(attempts: 1));
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 2, "device without echo: lost characters cost a block each, the file arrives in one attempt", Describe(run) + " errors=" + run.Errors);
+
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length > 500)
+                    {
+                        chunk[100] = (byte)(chunk[100] == 'A' ? 'B' : 'A');
+                    }
+                    return chunk;
+                };
+                target = Path.Combine(remoteDir, "noecho-bad.bin");
+                run = RunSend(device, binary, target, Fast(attempts: 1));
+                device.TxFilter = null;
+                Check(run.Error is IOException && run.Error.Message.Contains("arrived damaged") && !File.Exists(target) && !File.Exists(target + ".smtty~"), "device without echo: damage in every block fails with a clear message and leaves nothing behind", Describe(run));
                 device.Run("stty echo");
+                Check(device.Run("echo alive10").Contains("alive10"), "the shell is alive after the cases without echo");
             }
         }
         Directory.Delete(dir, true);
@@ -730,9 +783,111 @@ internal static class Program
                     return chunk;
                 };
                 string local = Path.Combine(localDir, "flip.bin");
-                Run run = RunReceive(device, binary, local, Fast());
+                Run run = RunReceive(device, binary, local, Fast(attempts: 1));
                 device.RxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a damaged character is caught and the second attempt succeeds", Describe(run) + " errors=" + run.Errors);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 1, "a damaged character is caught by the checksum of its block, the block is sent again and the file arrives in one attempt", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // A message of the kernel in the middle of a line of the data: the line is no base64 any more, its block comes short.
+                int chunks = 0;
+                byte[] message = Encoding.ASCII.GetBytes("\r\n[ 1234.567890] br-lan: port 1(eth0) entered forwarding state\r\n");
+                device.RxFilter = chunk =>
+                {
+                    if (chunk.Length > 1000 && ++chunks % 6 == 2)
+                    {
+                        List<byte> list = new List<byte>(chunk);
+                        list.InsertRange(list.IndexOf((byte)'\n') + 20, message);
+                        return list.ToArray();
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "kernel.bin");
+                Run run = RunReceive(device, binary, local, Fast(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 2, "messages of the kernel in the middle of a line cost a block each, the file arrives in one attempt", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // The lines of the device itself get lost: the one that starts a block, and the one that ends another.
+                int starts = 0, ends = 0;
+                device.RxFilter = chunk =>
+                {
+                    string text = Encoding.Latin1.GetString(chunk);
+                    int at = text.IndexOf(":D:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref starts) == 3)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    at = text.IndexOf(":E:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref ends) == 7)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "deaf.bin");
+                Run run = RunReceive(device, binary, local, Fast(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "a damaged start or end of a block is asked for again", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // A verdict that never reaches the device: it sends the block once more, which must not get into the file twice.
+                int verdicts = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 8 && chunk[0] == (byte)'K' && Interlocked.Increment(ref verdicts) == 4)
+                    {
+                        return new byte[0];
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "twice.bin");
+                Run run = RunReceive(device, binary, local, Fast(attempts: 1));
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "a lost verdict makes the device repeat a block, which is not taken twice", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // A device that cannot cut the archive into blocks sends it as one stream, as before.
+                device.Run("mktemp() { return 1; }");
+                List<string> log = new List<string>();
+                GzipBase64Transfer.Options options = Fast();
+                options.Log = log.Add;
+                string local = Path.Combine(localDir, "stream.bin");
+                Run run = RunReceive(device, binary, local, options);
+                device.Run("unset -f mktemp");
+                string all = string.Join("\n", log);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && !all.Contains("in blocks of"), "a device without mktemp sends the archive as one stream", Describe(run));
+            }
+            {
+                // This side vanishes without a word: a sender whose read takes a timeout gives up by itself and removes the block in hand.
+                long received = 0;
+                bool cut = false;
+                string local = Path.Combine(localDir, "cut.bin");
+                Exception error = null;
+                try
+                {
+                    GzipBase64Transfer.ReceiveFile(binary, local, Fast(attempts: 1),
+                        (data, offset, length) =>
+                        {
+                            if (cut) throw new IOException("The connection is closed.");
+                            device.Write(data, offset, length);
+                        },
+                        timeout =>
+                        {
+                            if (cut) return null;
+                            byte? b = device.Read(timeout);
+                            if (b != null && ++received > 40_000) { cut = true; return null; }
+                            return b;
+                        }, CancellationToken.None, null);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+                Check(error is IOException && !File.Exists(local) && !File.Exists(local + ".smtty~"), "a lost connection ends the receive and leaves nothing behind", error == null ? "no error" : error.Message);
+                Thread.Sleep(28000); // three blocks that get no verdict, 8 s each
+                device.Drain();
+                Check(device.Run("echo alive11").Contains("alive11"), "the device has given the receive up by itself and its shell answers");
+                Check(!device.Run("echo q=[$q]").Contains("q=[/"), "the block in hand is removed");
             }
             {
                 device.RxFilter = chunk =>
