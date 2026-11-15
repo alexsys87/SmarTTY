@@ -33,6 +33,9 @@ internal sealed class HexDataInspector : Control
     // The value being edited, and the value row chosen with the mouse or the arrow keys (-1: none).
     private HexValueType? _editing;
 
+    // The text the edit box was filled with.
+    private string _editOriginalText;
+
     private int _selectedRow = -1;
 
     private int _hoverRow = -1;
@@ -363,6 +366,9 @@ internal sealed class HexDataInspector : Control
         {
             value = value.Substring(0, value.Length - 4);
         }
+        // What the box starts with: Enter on a value that was not changed writes nothing (a float or a time shown rounded
+        // would be written back rounded, and the bytes would change with nothing typed).
+        _editOriginalText = value;
         Rectangle bounds = ValueBounds(row);
         _editBox.Font = Font;
         _editBox.BackColor = _owner.BackColor;
@@ -391,6 +397,13 @@ internal sealed class HexDataInspector : Control
             e.SuppressKeyPress = true;
             if (_editing == null)
             {
+                return;
+            }
+            if (string.Equals(_editBox.Text, _editOriginalText, StringComparison.Ordinal))
+            {
+                ShowMessage("Unchanged: nothing written.", isError: false);
+                EndEdit();
+                Focus();
                 return;
             }
             if (_owner.WriteValue(_editing.Value, _editBox.Text, out string error))

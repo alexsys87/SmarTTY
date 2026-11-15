@@ -763,6 +763,46 @@ public class KermitTransfer
         return destination;
     }
 
+    /// <summary>
+    /// <see cref="EncodeFileName"/> for a packet that can hold <paramref name="capacity"/> bytes of data: a longer name is
+    /// shortened (the end of the name before its extension goes first) instead of failing in BuildFrame, which a name of
+    /// about 88 bytes or more did in a normal packet.
+    /// </summary>
+    internal static byte[] EncodeFileNameToFit(string name, byte qctl, byte qbin, byte repeat, int capacity, out int length, out bool shortened)
+    {
+        byte[] data = EncodeFileName(name, qctl, qbin, repeat, out length);
+        shortened = false;
+        if (length <= capacity)
+        {
+            return data;
+        }
+        shortened = true;
+        int dot = name.LastIndexOf('.');
+        string extension = (dot > 0 && name.Length - dot <= 9) ? name.Substring(dot) : string.Empty;
+        string stem = extension.Length > 0 ? name.Substring(0, dot) : name;
+        while (length > capacity)
+        {
+            if (stem.Length > 1)
+            {
+                stem = stem.Substring(0, stem.Length - 1);
+                if (stem.Length > 1 && char.IsHighSurrogate(stem[stem.Length - 1]))
+                {
+                    stem = stem.Substring(0, stem.Length - 1); // not half of a surrogate pair
+                }
+            }
+            else if (extension.Length > 0)
+            {
+                extension = string.Empty;
+            }
+            else
+            {
+                break;
+            }
+            data = EncodeFileName(stem + extension, qctl, qbin, repeat, out length);
+        }
+        return data;
+    }
+
     /// <summary>A name that is safe to create on this machine: no directory, no characters Windows forbids.</summary>
     private static string SanitizeFileName(string name)
     {
@@ -1402,7 +1442,11 @@ public class KermitTransfer
             {
                 Report(onProgress, doneBytes, totalBytes, errors, "Sending " + wireName + where);
 
-                byte[] nameData = EncodeFileName(wireName, session.Qctl, session.Qbin, session.Repeat, out int nameLength);
+                byte[] nameData = EncodeFileNameToFit(wireName, session.Qctl, session.Qbin, session.Repeat, capacity, out int nameLength, out bool nameShortened);
+                if (nameShortened)
+                {
+                    Report(onProgress, doneBytes, totalBytes, errors, "The name of " + wireName + " does not fit into the receiver's packets: it is sent shortened.");
+                }
                 Exchange result = Send(TypeFile, nameData, nameLength, out Packet reply, out string message);
                 if (Failed(result, message, "file name", doneBytes))
                 {
