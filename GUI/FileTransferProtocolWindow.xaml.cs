@@ -124,7 +124,7 @@ public partial class FileTransferProtocolWindow : Window
                 HintText.Text = "Needs an idle shell prompt of a Linux device (OpenWrt too) with gzip, base64 and sha256sum; busybox is enough. The next window asks where to put the file on the device.";
                 break;
             case DeviceFileDropProtocol.GzipCat:
-                HintText.Text = "Needs only an idle shell prompt with gunzip, stty, cat and sha256sum (busybox is enough). The archive is sent as it is, without base64, so keep the speed in the next window under what the device can take. The next window also asks where to put the file on the device.";
+                HintText.Text = "Needs only an idle shell prompt with gunzip, stty, cat and sha256sum (busybox is enough). The archive is sent as it is, without base64, in blocks that the device checks one by one (a damaged block is sent again); keep the speed in the next window under what the device can take. The next window also asks where to put the file on the device.";
                 break;
             default:
                 HintText.Text = "The file is sent as it is. Make the device ready to take the data before you drop the file (for example \"cat > file\" in a shell). Nothing checks that the data arrived.";

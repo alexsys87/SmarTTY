@@ -1116,7 +1116,7 @@ internal static class Program
                 Run run = RunSend(device, text, target, options);
                 string all = string.Join("\n", log);
                 Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(text)), "text file, raw", Describe(run));
-                Check(all.Contains("The device has:") && all.Contains("head-c") && all.Contains("The reader on the device: head -c ") && all.Contains(":READY") && all.Contains("All "),
+                Check(all.Contains("The device has:") && all.Contains("head-c") && all.Contains("The reader on the device: head -c, in blocks of ") && all.Contains(":READY") && all.Contains("All "),
                     "the debug log names the reader and the answers", all.Length > 800 ? all.Substring(0, 800) : all);
                 Check(!all.Contains("ECHO MISMATCH"), "no echo check is made (there is no echo in raw mode)");
                 int longest = log.Where(l => l.Contains("] TX ") && l.Contains(" bytes: ")).Select(l => int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3))).DefaultIfEmpty(0).Max();
@@ -1199,7 +1199,9 @@ internal static class Program
                 Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(text)), "text file with a quote in its name", Describe(run));
                 Check(run.ProgressTotal > 0 && run.ProgressDone == run.ProgressTotal || run.LastStatus.StartsWith("Done"), "progress reaches the end", run.ProgressDone + "/" + run.ProgressTotal + " " + run.LastStatus);
                 string all = string.Join("\n", log);
-                Check(all.Contains(":ZSIZE:") && all.Contains(":BEGIN") && all.Contains("The archive has arrived"), "the debug log has the size of the archive and the start of the data", all.Length > 800 ? all.Substring(0, 800) : all);
+                Check(all.Contains(":SIZE:") && all.Contains(":BEGIN") && all.Contains("in blocks of up to ") && all.Contains("The archive has arrived"), "the debug log has the size of the file, the start of the data and the blocks", all.Length > 800 ? all.Substring(0, 800) : all);
+                int longest = log.Where(l => l.Contains("] TX ") && l.Contains(" bytes: ")).Select(l => int.Parse(l.Substring(l.IndexOf("TX ") + 3, l.IndexOf(" bytes") - l.IndexOf("TX ") - 3))).DefaultIfEmpty(0).Max();
+                Check(longest > 100 && longest <= 481, "the typed commands are complete lines of at most 480 characters", "longest " + longest);
                 string settings;
                 Check(TerminalIsNormal(device, out settings), "the terminal of the device is back to normal after the transfer", settings);
             }
@@ -1225,19 +1227,36 @@ internal static class Program
         Directory.Delete(dir, true);
     }
 
+    /// <summary>The length of the archive that a raw send makes of <paramref name="path"/> (the same gzip as the code under test uses).</summary>
+    private static long ArchiveLength(string path)
+    {
+        using (MemoryStream packed = new MemoryStream())
+        {
+            using (System.IO.Compression.GZipStream gzip = new System.IO.Compression.GZipStream(packed, System.IO.Compression.CompressionMode.Compress, leaveOpen: true))
+            {
+                byte[] data = File.ReadAllBytes(path);
+                gzip.Write(data, 0, data.Length);
+            }
+            return packed.Length;
+        }
+    }
+
+    private static bool IsVerdict(byte[] chunk, string verdict) => chunk.Length == 4 && Encoding.ASCII.GetString(chunk) == verdict;
+
     private static void RawFaultCases()
     {
         string dir = NewWorkDir();
         string binary = Path.Combine(dir, "binary.bin");
         File.WriteAllBytes(binary, RandomBytes(60_000, 33));
+        long archive = ArchiveLength(binary);
         string remoteDir = Path.Combine(dir, "remote");
         Directory.CreateDirectory(remoteDir);
 
         using (Device device = Ash())
         {
-            Section("busybox ash: raw send, damaged data (there is no echo: the checksum at the end is the only check)");
+            Section("busybox ash: raw send, damaged data (there is no echo: the device checks the archive block by block)");
             {
-                // One flipped byte in the first attempt only: the device cannot tell while it reads, the end of the transfer does.
+                // One flipped byte: the checksum of that block differs, and only that block is sent again.
                 int hits = 0;
                 device.TxFilter = chunk =>
                 {
@@ -1248,12 +1267,14 @@ internal static class Program
                     return chunk;
                 };
                 string target = Path.Combine(remoteDir, "retry.bin");
-                Run run = RunSend(device, binary, target, FastRaw());
+                device.SentBytes = 0;
+                Run run = RunSend(device, binary, target, FastRaw(attempts: 1));
                 device.TxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a flipped byte is caught at the end, the transfer is repeated and arrives intact", Describe(run) + " errors=" + run.Errors);
-                Check(!File.Exists(target + ".smtty~"), "no unfinished file left");
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 1, "a flipped byte is caught by the checksum of its block, the block is repeated and the file arrives intact", Describe(run) + " errors=" + run.Errors);
+                Check(device.SentBytes < archive + 4000 + 4000, "only the damaged block was sent again, not the whole archive", "sent " + device.SentBytes + ", archive " + archive);
+                Check(!File.Exists(target + ".smtty~") && !File.Exists(target + ".smtty~.c"), "no unfinished file left");
                 string settings;
-                Check(TerminalIsNormal(device, out settings), "the terminal is back to normal after a failed attempt", settings);
+                Check(TerminalIsNormal(device, out settings), "the terminal is back to normal after a repeated block", settings);
             }
             {
                 device.TxFilter = chunk =>
@@ -1267,15 +1288,15 @@ internal static class Program
                 string target = Path.Combine(remoteDir, "always-bad.bin");
                 Run run = RunSend(device, binary, target, FastRaw(attempts: 2));
                 device.TxFilter = null;
-                Check(run.Error is IOException && !File.Exists(target) && !File.Exists(target + ".smtty~"), "damage in every attempt fails and leaves nothing behind", Describe(run));
-                Check(run.Error != null && (run.Error.Message.Contains("could not unpack") || run.Error.Message.Contains("Checksum mismatch")), "the failure says that the data did not arrive intact", Describe(run));
+                Check(run.Error is IOException && !File.Exists(target) && !File.Exists(target + ".smtty~") && !File.Exists(target + ".smtty~.c"), "damage in every block fails and leaves nothing behind", Describe(run));
+                Check(run.Error != null && run.Error.Message.Contains("arrived damaged") && run.Error.Message.Contains("Lower the speed"), "the failure says that the line loses too much", Describe(run));
                 Check(device.Run("echo alive2").Contains("alive2"), "the shell is alive after a failed transfer");
                 string settings;
                 Check(TerminalIsNormal(device, out settings), "the terminal is normal after a failed transfer", settings);
             }
             {
-                // A byte that never arrives: the device waits for it until the line has been quiet for a few seconds, then the check fails and the
-                // transfer is repeated.
+                // A byte that never arrives: the device waits for it until the line has been quiet for a few seconds, then the checksum of the
+                // short block differs and the block is sent again.
                 int hits = 0;
                 device.TxFilter = chunk =>
                 {
@@ -1289,36 +1310,76 @@ internal static class Program
                     return chunk;
                 };
                 string target = Path.Combine(remoteDir, "lost.bin");
-                Run run = RunSend(device, binary, target, FastRaw());
+                Run run = RunSend(device, binary, target, FastRaw(attempts: 1));
                 device.TxFilter = null;
-                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "a lost byte ends the reader by its idle time, the check fails and the repeat arrives intact", Describe(run) + " errors=" + run.Errors);
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 1, "a lost byte ends the block by its idle time, the block is repeated and the file arrives intact", Describe(run) + " errors=" + run.Errors);
                 Check(device.Run("echo alive3").Contains("alive3"), "the shell is alive after a lost byte");
                 string settings;
                 Check(TerminalIsNormal(device, out settings), "the terminal is normal after a lost byte", settings);
             }
             {
-                // The line adds bytes after the archive (noise, a stray keystroke): some in the same burst, some a little later. Once the terminal
-                // is cooked again they are text for the shell, and must never get there.
+                // Bytes that the line adds in the middle of the archive (noise): the block they got into is damaged, what is left of them is
+                // drained before the block is read again.
+                int hits = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 512 && Interlocked.Increment(ref hits) == 20)
+                    {
+                        byte[] more = new byte[chunk.Length + 3];
+                        Array.Copy(chunk, 0, more, 0, 200);
+                        Array.Copy(chunk, 200, more, 203, chunk.Length - 200);
+                        return more;
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "added.bin");
+                Run run = RunSend(device, binary, target, FastRaw(attempts: 1));
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 1, "bytes added in the middle of the archive are repaired", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // The device's own lines get damaged on the way here: the one that asks for a block, and the one with a checksum.
+                int asked = 0, checksums = 0;
+                device.RxFilter = chunk =>
+                {
+                    string text = Encoding.Latin1.GetString(chunk);
+                    int at = text.IndexOf(":G:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref asked) == 3)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    at = text.IndexOf(":C:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref checksums) == 6)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    return chunk;
+                };
+                string target = Path.Combine(remoteDir, "deaf.bin");
+                Run run = RunSend(device, binary, target, FastRaw(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a damaged line of the device (a request for a block, a checksum) is repeated by the device", Describe(run) + " errors=" + run.Errors);
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is normal after damaged lines of the device", settings);
+            }
+            {
+                // The line adds bytes after the archive (noise, a stray keystroke): some in the same burst as the verdict about the last block,
+                // some a little later. Once the terminal is cooked again they are text for the shell, and must never get there.
                 string pwned = Path.Combine(remoteDir, "PWNED");
                 string pwnedLate = Path.Combine(remoteDir, "PWNED-LATE");
-                bool sawFull = false;
+                long blocks = (archive + 3999) / 4000;
+                int accepted = 0;
                 bool injected = false;
                 device.TxFilter = chunk =>
                 {
-                    if (chunk.Length == 512)
+                    if (IsVerdict(chunk, "SMOK") && Interlocked.Increment(ref accepted) == blocks)
                     {
-                        sawFull = true;
-                    }
-                    else if (sawFull && chunk.Length > 0 && !Encoding.ASCII.GetString(chunk).Contains("smtty"))
-                    {
-                        // This is the last, partial block of the archive.
                         byte[] junk = Encoding.ASCII.GetBytes("\necho x > " + pwned + "\n");
                         byte[] more = new byte[chunk.Length + junk.Length];
                         Array.Copy(chunk, more, chunk.Length);
                         Array.Copy(junk, 0, more, chunk.Length, junk.Length);
                         byte[] late = Encoding.ASCII.GetBytes("\necho x > " + pwnedLate + "\n");
                         new Thread(() => { Thread.Sleep(100); device.Write(late, 0, late.Length); }).Start();
-                        sawFull = false;
                         injected = true;
                         return more;
                     }
@@ -1329,8 +1390,263 @@ internal static class Program
                 device.TxFilter = null;
                 Thread.Sleep(1000);
                 Check(injected, "the extra bytes were really added after the archive");
+                Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "the file arrived although bytes followed the archive", Describe(run));
                 Check(!File.Exists(pwned) && !File.Exists(pwnedLate), "bytes added after the archive, at once or a little later, never reach the shell as commands");
                 Check(device.Run("echo alive4").Contains("alive4"), "the shell is alive after extra bytes", Describe(run));
+            }
+        }
+
+        using (Device device = Ash())
+        {
+            // What made big files fail every time: a line that loses a byte now and then (the UART of a small device overruns while its
+            // flash is written). One lost byte used to spoil the whole archive, in every attempt; now it costs one block.
+            Section("busybox ash: raw send of a bigger file over a line that keeps losing and damaging bytes");
+            string big = Path.Combine(dir, "big.bin");
+            File.WriteAllBytes(big, RandomBytes(400_000, 37));
+            long seen = 0, nextFault = 30_000;
+            int faults = 0;
+            device.TxFilter = chunk =>
+            {
+                if (chunk.Length < 400 || Encoding.ASCII.GetString(chunk).Contains("smtty"))
+                {
+                    return chunk;
+                }
+                seen += chunk.Length;
+                if (seen < nextFault)
+                {
+                    return chunk;
+                }
+                nextFault += 45_000;
+                if (++faults % 2 == 0)
+                {
+                    chunk[7] ^= 0x10; // a damaged byte
+                    return chunk;
+                }
+                byte[] shorter = new byte[chunk.Length - 2]; // two bytes lost
+                Array.Copy(chunk, 2, shorter, 0, shorter.Length);
+                return shorter;
+            };
+            string target = Path.Combine(remoteDir, "big.bin");
+            Run run = RunSend(device, big, target, FastRaw(attempts: 1));
+            device.TxFilter = null;
+            Check(faults >= 8, "the line really lost and damaged bytes", "faults " + faults);
+            Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(big)), "the file arrives intact in one attempt", Describe(run) + " errors=" + run.Errors);
+            Check(run.Errors == faults, "each fault cost one block", "errors " + run.Errors + ", faults " + faults);
+            string settings;
+            Check(TerminalIsNormal(device, out settings), "the terminal is normal after the lossy transfer", settings);
+        }
+        Directory.Delete(dir, true);
+    }
+
+    /// <summary>A block read from the device that is the inside of a block of the archive (no line of the device in it): its middle is data for sure.</summary>
+    private static bool IsArchiveData(byte[] chunk) => chunk.Length >= 400 && !Encoding.Latin1.GetString(chunk).Contains("SMTTY:");
+
+    private static void RawReceiveFaultCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(remoteDir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(300_000, 38));
+        string localDir = Path.Combine(dir, "local");
+        Directory.CreateDirectory(localDir);
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw receive, damaged data (the archive is checked block by block)");
+            {
+                int hits = 0;
+                device.RxFilter = chunk =>
+                {
+                    if (IsArchiveData(chunk) && Interlocked.Increment(ref hits) == 6)
+                    {
+                        chunk[chunk.Length / 2] ^= 0x55;
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "flipped.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 1, "a flipped byte is caught by the checksum of its block, the block is sent again and the file arrives intact", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                int hits = 0;
+                device.RxFilter = chunk =>
+                {
+                    if (IsArchiveData(chunk) && Interlocked.Increment(ref hits) == 9)
+                    {
+                        byte[] shorter = new byte[chunk.Length - 2];
+                        Array.Copy(chunk, 0, shorter, 0, 200);
+                        Array.Copy(chunk, 202, shorter, 200, chunk.Length - 202);
+                        return shorter;
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "lost.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 1, "lost bytes leave a block short, it is sent again and the file arrives intact", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // The kernel prints its messages into the same line, in the middle of whatever the console is sending.
+                int hits = 0;
+                byte[] message = Encoding.ASCII.GetBytes("\r\n[ 1234.567890] br-lan: port 1(eth0) entered forwarding state\r\n");
+                device.RxFilter = chunk =>
+                {
+                    if (IsArchiveData(chunk) && Interlocked.Increment(ref hits) % 12 == 0)
+                    {
+                        byte[] more = new byte[chunk.Length + message.Length];
+                        Array.Copy(chunk, 0, more, 0, 200);
+                        Array.Copy(message, 0, more, 200, message.Length);
+                        Array.Copy(chunk, 200, more, 200 + message.Length, chunk.Length - 200);
+                        return more;
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "kernel.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors >= 3, "messages of the kernel in the middle of the archive cost a block each, the file arrives intact in one attempt", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // The line that starts a block is damaged: this side does not know that a block follows, the device gets no verdict and sends it again.
+                int starts = 0;
+                device.RxFilter = chunk =>
+                {
+                    string text = Encoding.Latin1.GetString(chunk);
+                    int at = text.IndexOf(":D:", StringComparison.Ordinal);
+                    if (at >= 0 && Interlocked.Increment(ref starts) == 4)
+                    {
+                        chunk[at + 1] = (byte)'#';
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "deaf.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 1));
+                device.RxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "a damaged start of a block is repeated by the device", Describe(run) + " errors=" + run.Errors);
+            }
+            {
+                // A verdict that never reaches the device: it sends the block once more, which must not get into the file twice.
+                int verdicts = 0;
+                device.TxFilter = chunk =>
+                {
+                    if (chunk.Length == 8 && chunk[0] == (byte)'K' && Interlocked.Increment(ref verdicts) == 5)
+                    {
+                        return new byte[0];
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "twice.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 1));
+                device.TxFilter = null;
+                Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "a lost verdict makes the device repeat a block, which is not taken twice", Describe(run) + " errors=" + run.Errors);
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is normal after the repaired transfers", settings);
+            }
+            {
+                device.RxFilter = chunk =>
+                {
+                    if (IsArchiveData(chunk))
+                    {
+                        chunk[chunk.Length / 2] ^= 0x55;
+                    }
+                    return chunk;
+                };
+                string local = Path.Combine(localDir, "always-bad.bin");
+                Run run = RunReceive(device, binary, local, FastRaw(attempts: 2));
+                device.RxFilter = null;
+                Check(run.Error is IOException && run.Error.Message.Contains("arrived damaged") && !File.Exists(local) && !File.Exists(local + ".smtty~"), "damage in every block fails and leaves nothing behind", Describe(run));
+                Thread.Sleep(500);
+                device.Drain();
+                Check(device.Run("echo alive7").Contains("alive7"), "the shell is alive after a failed receive");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "the terminal is normal after a failed receive", settings);
+                Check(File.ReadAllBytes(binary).SequenceEqual(RandomBytes(300_000, 38)), "the file on the device is untouched");
+            }
+        }
+        Directory.Delete(dir, true);
+    }
+
+    /// <summary>
+    /// This side disappears in the middle of a raw transfer (the program is closed, the cable is pulled) and nobody tells the device: it
+    /// must give up by itself and put its terminal back, or the console would stay raw (no echo, no Ctrl-C) for whoever connects next.
+    /// </summary>
+    private static void RawVanishCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(dir, "binary.bin");
+        File.WriteAllBytes(binary, RandomBytes(200_000, 39));
+        string onDevice = Path.Combine(remoteDir, "big.bin");
+        File.WriteAllBytes(onDevice, RandomBytes(900_000, 40));
+
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw transfer, this side vanishes without a word");
+            {
+                long sent = 0;
+                bool cut = false;
+                string target = Path.Combine(remoteDir, "cut.bin");
+                Exception error = null;
+                try
+                {
+                    GzipBase64Transfer.SendFile(binary, target, FastRaw(attempts: 1),
+                        (data, offset, length) =>
+                        {
+                            if (cut || (sent += length) > 60_000)
+                            {
+                                cut = true;
+                                throw new IOException("The connection is closed.");
+                            }
+                            device.Write(data, offset, length);
+                        },
+                        timeout => cut ? null : device.Read(timeout), CancellationToken.None, null);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+                Check(error is IOException, "a lost connection ends the send", error == null ? "no error" : error.Message);
+                Thread.Sleep(24000); // three rounds of a block and a verdict that do not come
+                device.Drain();
+                Check(device.Run("echo alive8").Contains("alive8"), "the device has given the send up by itself and its shell answers");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "its terminal is back to normal", settings);
+                Check(Directory.GetFiles(remoteDir).All(f => !f.Contains("cut.bin")), "no file, no unfinished file and no block file left", string.Join(" ", Directory.GetFiles(remoteDir)));
+            }
+            {
+                long received = 0;
+                bool cut = false;
+                string local = Path.Combine(dir, "cut-receive.bin");
+                Exception error = null;
+                try
+                {
+                    GzipBase64Transfer.ReceiveFile(onDevice, local, FastRaw(attempts: 1),
+                        (data, offset, length) =>
+                        {
+                            if (cut) throw new IOException("The connection is closed.");
+                            device.Write(data, offset, length);
+                        },
+                        timeout =>
+                        {
+                            if (cut) return null;
+                            byte? b = device.Read(timeout);
+                            if (b != null && ++received > 100_000) { cut = true; return null; }
+                            return b;
+                        }, CancellationToken.None, null);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
+                Check(error is IOException && !File.Exists(local) && !File.Exists(local + ".smtty~"), "a lost connection ends the receive and leaves nothing behind", error == null ? "no error" : error.Message);
+                Thread.Sleep(15000); // three blocks that get no verdict
+                device.Drain();
+                Check(device.Run("echo alive9").Contains("alive9"), "the device has given the receive up by itself and its shell answers");
+                string settings;
+                Check(TerminalIsNormal(device, out settings), "its terminal is back to normal", settings);
             }
         }
         Directory.Delete(dir, true);
@@ -1355,7 +1671,15 @@ internal static class Program
             Run run = RunSend(device, binary, target, options);
             string all = string.Join("\n", log);
             Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "dd bs=1 count= reads the archive", Describe(run));
-            Check(all.Contains("The reader on the device: dd bs=1 count="), "the log names dd as the reader", all.Length > 800 ? all.Substring(0, 800) : all);
+            Check(all.Contains("The reader on the device: dd bs=1 count=, in blocks of "), "the log names dd as the reader, block by block", all.Length > 800 ? all.Substring(0, 800) : all);
+
+            Section("busybox ash: raw send on a device without mktemp");
+            device.Run("unset -f head; mktemp() { return 1; }");
+            target = Path.Combine(remoteDir, "no-mktemp.bin");
+            run = RunSend(device, binary, target, FastRaw());
+            Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "the block in hand is kept next to the destination", Describe(run));
+            Check(Directory.GetFiles(remoteDir).All(f => !f.Contains(".smtty~")), "no unfinished file and no block file left", string.Join(" ", Directory.GetFiles(remoteDir)));
+            device.Run("unset -f mktemp; head() { return 1; }");
 
             Section("busybox ash: raw send on a device with neither head -c nor dd");
             device.Run("dd() { return 1; }");
@@ -1366,6 +1690,16 @@ internal static class Program
             Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)), "a plain cat reads the archive and ends when the line is quiet", Describe(run));
             Check(all.Contains("The reader on the device: cat"), "the log names cat as the reader", all.Length > 800 ? all.Substring(0, 800) : all);
             device.Run("unset -f head dd");
+
+            Section("busybox ash: raw receive from a device without mktemp (the archive comes as one stream)");
+            device.Run("mktemp() { return 1; }");
+            log.Clear();
+            string local = Path.Combine(dir, "stream.bin");
+            run = RunReceive(device, target, local, options);
+            all = string.Join("\n", log);
+            Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "the archive is received as one stream", Describe(run));
+            Check(all.Contains(":ZSIZE:") && !all.Contains("in blocks of"), "the log has the length of the archive, and no blocks", all.Length > 800 ? all.Substring(0, 800) : all);
+            device.Run("unset -f mktemp");
             string settings;
             Check(TerminalIsNormal(device, out settings), "the terminal is normal after the fallbacks", settings);
         }
@@ -1462,6 +1796,28 @@ internal static class Program
         Directory.Delete(dir, true);
     }
 
+    private static void RawBigCases()
+    {
+        string dir = NewWorkDir();
+        string remoteDir = Path.Combine(dir, "remote");
+        Directory.CreateDirectory(remoteDir);
+        string binary = Path.Combine(dir, "big.bin");
+        File.WriteAllBytes(binary, RandomBytes(3_000_000, 41));
+        using (Device device = Ash())
+        {
+            Section("busybox ash: raw, a big file (hundreds of blocks)");
+            string target = Path.Combine(remoteDir, "big.bin");
+            Run run = RunSend(device, binary, target, FastRaw(attempts: 1));
+            Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 0, "3 MB sent raw, no block repeated", Describe(run) + " errors=" + run.Errors);
+            string local = Path.Combine(dir, "back.bin");
+            run = RunReceive(device, target, local, FastRaw(attempts: 1));
+            Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)) && run.Errors == 0, "3 MB received raw, no block repeated", Describe(run) + " errors=" + run.Errors);
+            string settings;
+            Check(TerminalIsNormal(device, out settings), "the terminal is normal after the big file", settings);
+        }
+        Directory.Delete(dir, true);
+    }
+
     private static bool Has(string tool)
     {
         try
@@ -1488,7 +1844,7 @@ internal static class Program
         }
         bool gnuUu = Has("uuencode") && Has("uudecode");
         // Optional first argument: run one group only (units, silent, finalize, recovery, slow, busy, send-ash, receive-ash, fault, receive-fault, cancel, send-bash, receive-bash;
-        // the raw form, gzip + cat: raw-send-ash, raw-receive-ash, raw-fault, raw-fallback, raw-slow, raw-cancel, raw-send-bash, raw-receive-bash).
+        // the raw form, gzip + cat: raw-send-ash, raw-receive-ash, raw-fault, raw-receive-fault, raw-vanish, raw-fallback, raw-slow, raw-cancel, raw-big, raw-send-bash, raw-receive-bash).
         string only = args.Length > 0 ? args[0] : null;
         bool Want(string group) => only == null || only == group;
         if (Want("units")) UnitCases();
@@ -1507,9 +1863,12 @@ internal static class Program
         if (Want("raw-send-ash")) RawSendCases(Ash, cksum: false);
         if (Want("raw-receive-ash")) RawReceiveCases(Ash, cksum: false);
         if (Want("raw-fault")) RawFaultCases();
+        if (Want("raw-receive-fault")) RawReceiveFaultCases();
+        if (Want("raw-vanish")) RawVanishCases();
         if (Want("raw-fallback")) RawFallbackCases();
         if (Want("raw-slow")) RawSlowLineCases();
         if (Want("raw-cancel")) RawCancelCases();
+        if (Want("raw-big")) RawBigCases();
         if (Want("raw-send-bash")) RawSendCases(Bash, cksum: true);
         if (Want("raw-receive-bash")) RawReceiveCases(Bash, cksum: true);
 

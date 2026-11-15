@@ -53,7 +53,7 @@ public partial class DeviceTerminalControl
 
         ToolStripMenuItem sendRaw = new ToolStripMenuItem("Send file via gzip + cat (raw, shell)...")
         {
-            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip and sent as it is, without base64 (a quarter less on the line), read there from the terminal in raw mode, unpacked and checked with a checksum at the end. Nothing can be checked on the way, so keep the speed under what the device can take."
+            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip and sent as it is, without base64 (a quarter less on the line), read there from the terminal in raw mode, unpacked and checked with a checksum at the end. The archive goes in blocks that the device checks one by one, and a damaged block is sent again; still keep the speed under what the device can take."
         };
         ToolStripMenuItem receiveRaw = new ToolStripMenuItem("Receive file via gzip + cat (raw, shell)...")
         {
