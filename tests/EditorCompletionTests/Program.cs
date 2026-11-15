@@ -103,6 +103,9 @@ internal static class Program
             "VHDL keywords are case insensitive");
         Check(Names(L.DeviceTree, "", "").Contains("interrupt-parent"), "a hyphenated Device Tree property is offered");
         Check(Names(L.DeviceTree, "", "").Contains("gpio-controller"), "another hyphenated Device Tree property is offered");
+        Check(Names(L.DeviceTree, "", "").Contains("__overrides__"), "the Device Tree overlay node '__overrides__' is offered");
+        Check(Names(L.DeviceTree, "", "").Contains("__overlay__"), "the Device Tree overlay node '__overlay__' is offered");
+        Check(Names(L.DeviceTree, "", "").Contains("target-path"), "the Device Tree overlay property 'target-path' is offered");
         Check(Names(L.Css, "", "").Contains("font-size"), "a hyphenated CSS property is offered");
         Check(Names(L.Kconfig, "", "").Contains("menuconfig"), "the Kconfig directive 'menuconfig' is offered");
         Check(Names(L.Kconfig, "", "").Contains("depends"), "the Kconfig directive 'depends' is offered");

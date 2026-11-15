@@ -153,7 +153,7 @@ internal static class Program
             ("/src/app.mts", L.TypeScript), ("/src/app.cts", L.TypeScript), ("/src/index.php", L.Php),
             ("/src/page.phtml", L.Php), ("/src/site.css", L.Css), ("/src/site.scss", L.Css),
             ("/src/site.sass", L.Css), ("/src/site.less", L.Css), ("/src/message.proto", L.Protobuf),
-            ("/src/board.dts", L.DeviceTree), ("/src/board.dtsi", L.DeviceTree)
+            ("/src/board.dts", L.DeviceTree), ("/src/board.dtsi", L.DeviceTree), ("/src/overlay.dtso", L.DeviceTree)
         };
         foreach ((string path, L language) in cLikeExtensions)
         {
@@ -193,6 +193,11 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("gpio-controller"), "Device Tree keywords contain 'gpio-controller'");
         Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("pinctrl-names"), "Device Tree keywords contain 'pinctrl-names'");
         Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("address-cells"), "Device Tree keywords contain '#address-cells'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("plugin"), "Device Tree keywords contain '/plugin/'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("bits"), "Device Tree keywords contain '/bits/'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("__overrides__"), "Device Tree keywords contain '__overrides__'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("__overlay__"), "Device Tree keywords contain '__overlay__'");
+        Check(SyntaxHighlighting.GetKeywords(L.DeviceTree).Contains("target-path"), "Device Tree keywords contain 'target-path'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("interface"), "C keywords do not include the C# 'interface'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("fun"), "C keywords do not include the Kotlin 'fun'");
         Check(!SyntaxHighlighting.GetKeywords(L.CLike).Contains("impl"), "C keywords do not include the Rust 'impl'");
@@ -586,6 +591,17 @@ internal static class Program
         Equal(Join(dt.Tokens(10, SyntaxHighlighting.TypeKeyword)), "/delete-property/|status", "a delete-property directive");
         Equal(Join(dt.Tokens(11, SyntaxHighlighting.TypeKeyword)), "&{/soc}", "a path reference");
         Equal(Join(dt.Tokens(13, SyntaxHighlighting.TypeComment)), "// note", "a Device Tree line comment");
+        Highlighted overlay = new Highlighted(L.DeviceTree,
+            "/dts-v1/;\n/plugin/;\n\n&{/} {\n    __overrides__ {\n        model = \"board\";\n    };\n};\n\n" +
+            "fragment@0 {\n    target = <&uart0>;\n    __overlay__ {\n        status = \"okay\";\n" +
+            "        data = /bits/ 8 <0x01 0x02>;\n    };\n};");
+        Equal(Join(overlay.Tokens(1, SyntaxHighlighting.TypeKeyword)), "/plugin/", "a Device Tree overlay directive");
+        Equal(Join(overlay.Tokens(3, SyntaxHighlighting.TypeKeyword)), "&{/}", "a Device Tree overlay root reference");
+        Equal(Join(overlay.Tokens(4, SyntaxHighlighting.TypeKeyword)), "__overrides__", "the __overrides__ node");
+        Equal(Join(overlay.Tokens(9, SyntaxHighlighting.TypeKeyword)), "fragment", "a Device Tree overlay fragment");
+        Equal(Join(overlay.Tokens(10, SyntaxHighlighting.TypeKeyword)), "target|&uart0", "the target of a fragment");
+        Equal(Join(overlay.Tokens(11, SyntaxHighlighting.TypeKeyword)), "__overlay__", "the __overlay__ node");
+        Equal(Join(overlay.Tokens(13, SyntaxHighlighting.TypeKeyword)), "/bits/", "the /bits/ directive of an overlay");
         Highlighted tcl = new Highlighted(L.Tcl,
             "# note\nproc greet {name} {\n    puts \"Hello, $name\"\n" +
             "    if {$name eq \"\"} { return }\n}\nset x 'literal'");
