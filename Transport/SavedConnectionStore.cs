@@ -319,6 +319,9 @@ public class SavedConnectionStore
 
     public void SaveRawConnection(RawConnectionSettings rawConnectionSettings)
     {
+        // The file this profile was saved to before: when the host or the port was edited, the name of the file changes, and the
+        // old file would come back as a second entry at the next start.
+        string previousFileName = rawConnectionSettings.FileName;
         List<RawConnectionSettings> replaced = new List<RawConnectionSettings>();
         for (int i = 0; i < _rawConnections.Count; i++)
         {
@@ -352,6 +355,21 @@ public class SavedConnectionStore
             }
         }
         rawConnectionSettings.Save();
+        if (!string.IsNullOrEmpty(previousFileName) && !string.Equals(previousFileName, newFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            // After the new file is written: when the save fails, the old profile is still there.
+            try
+            {
+                File.Delete(previousFileName);
+                TouchTimestamp(_directory);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
     }
 
     /// <summary>

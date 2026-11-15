@@ -3073,6 +3073,11 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
 
     public void Close()
     {
+        // The close button of the session: the open file editors would be thrown away with their unsaved changes.
+        if (!_Controller.ConfirmCloseUnsavedEditors(this))
+        {
+            return;
+        }
         _Controller.CloseSession(this);
         _Analyzer?.Dispose();
     }

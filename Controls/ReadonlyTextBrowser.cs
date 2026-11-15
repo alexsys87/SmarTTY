@@ -3068,6 +3068,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     public int GetPreviousRealLine(int line)
     {
         int row = LineToRow(line);
+        if (row < 0)
+        {
+            // The line is not on the screen (the view was scrolled with the wheel or the scroll bar): the neighbours of the
+            // rows that are shown say nothing about it, and the caret used to jump to the top of the window.
+            return GetRealLineOffScreen(line, -1);
+        }
         while (--row >= 0)
         {
             if (_displayRows[row].VirtualLine == null)
@@ -3081,14 +3087,46 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     public int GetNextRealLine(int line)
     {
         int row = LineToRow(line);
+        if (row < 0)
+        {
+            return GetRealLineOffScreen(line, 1);
+        }
         while (++row < this._visibleRows)
         {
             if (_displayRows[row].VirtualLine == null)
             {
-                return _displayRows[row].Line;
+                // Rows past the end of the text have no line: the caret stays where it is.
+                return (_displayRows[row].Line >= 0) ? _displayRows[row].Line : line;
             }
         }
-        return _nextRealLine;
+        // Nothing is left after the last row: a fold may hide the rest of the text.
+        return (_nextRealLine < _document.LineCount) ? _nextRealLine : line;
+    }
+
+    /// <summary>
+    /// The line shown before (direction -1) or after (1) <paramref name="line"/> when that line is not on the screen: the one
+    /// next to it, skipping the lines that a fold hides and the rows that a provider adds between lines. The line itself
+    /// when there is no such line.
+    /// </summary>
+    private int GetRealLineOffScreen(int line, int direction)
+    {
+        if (_virtualLines == null)
+        {
+            return Math.Max(0, Math.Min(_document.LineCount - 1, line + direction));
+        }
+        for (int row = LineToRowIndex(line) + direction; row >= 0; row += direction)
+        {
+            int candidate = RowToLine(row, out int remainingRows, out int _);
+            if (candidate >= _document.LineCount)
+            {
+                break;
+            }
+            if (remainingRows == -1)
+            {
+                return candidate;
+            }
+        }
+        return line;
     }
 
     private int RowToLine(int row, out int remainingRows, out int previousLine)

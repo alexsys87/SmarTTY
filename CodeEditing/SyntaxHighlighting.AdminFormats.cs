@@ -749,16 +749,17 @@ public static partial class SyntaxHighlighting
         LineBuffer buffer = new LineBuffer(sink);
         if (section)
         {
-            if (inSection)
-            {
-                // The header of the next section closes the previous one; that line stays visible.
-                buffer.InsertPairedToken(first, PairHAProxySection, false, null);
-            }
             inSection = true;
         }
         bool result = TokenizeConfigCore(HAProxyDirectives, startState, text, buffer, out endState, valueKeywords: HAProxyValues);
         if (section)
         {
+            if ((startState & StHAProxySection) != 0)
+            {
+                // The header of the next section closes the previous one; that line stays visible. Put in after the
+                // tokens exist: in front of them it would break their order when the header is indented.
+                buffer.InsertPairedToken(first, PairHAProxySection, false, null);
+            }
             buffer.InsertPairedToken(len, PairHAProxySection, true, ExclusiveBlockRegion);
         }
         if (buffer.IsLastLine)
@@ -819,8 +820,10 @@ public static partial class SyntaxHighlighting
     private static bool TokenizeApache(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
         LineBuffer buffer = new LineBuffer(sink);
-        AddApacheSectionPair(text, buffer);
         bool result = TokenizeConfigCore(ApacheDirectives, startState, text, buffer, out endState, valueKeywords: ApacheValues);
+        // After the tokens: InsertPairedToken puts the zero-width token among those that exist. In front of them the tag opener
+        // came first and the colours of the whole line were lost (the tokens must be sorted by position).
+        AddApacheSectionPair(text, buffer);
         buffer.Flush(-1, -2);
         return result;
     }
