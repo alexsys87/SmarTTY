@@ -676,7 +676,10 @@ internal static class Program
                     Check(run.Error is IOException && !File.Exists(local), "a local file that cannot be written is an IOException", Describe(run));
                     Check(device.Run("echo alive5b").Contains("alive5b"), "the device was told to stop sending");
                 }
-                File.SetAttributes(part, FileAttributes.Normal);
+                if (File.Exists(part))
+                {
+                    File.SetAttributes(part, FileAttributes.Normal); // the receiver removes its unfinished file when it fails
+                }
             }
             Check(device.Run("echo alive5").Contains("alive5"), "the shell is alive");
         }
