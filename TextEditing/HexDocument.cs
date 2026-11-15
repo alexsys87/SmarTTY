@@ -43,6 +43,29 @@ public sealed class HexHighlight
 /// with the saved ones to show which of them changed. It has no UI and no file access: the editor control draws it and
 /// <see cref="Controls.RemoteFileEditor"/> saves it.
 /// </summary>
+/// <summary>The arithmetic of the scrolling of the hex editor, apart from the control so that it can be tested.</summary>
+public static class HexScroll
+{
+    /// <summary>The horizontal scroll position kept inside the content: not before its start, not past the point where its end is at the right edge.</summary>
+    public static int ClampScrollX(int scrollX, int contentWidth, int visibleWidth)
+    {
+        return Math.Max(0, Math.Min(scrollX, Math.Max(0, contentWidth - visibleWidth)));
+    }
+
+    /// <summary>
+    /// How many rows (or columns) to scroll at a timer tick while a selection is dragged <paramref name="distance"/> pixels beyond the
+    /// edge of the table, where <paramref name="unit"/> pixels are one row (one column): one at the edge, more the farther out the mouse is.
+    /// </summary>
+    public static int AutoScrollSteps(int distance, int unit, int maxSteps = 20)
+    {
+        if (distance <= 0)
+        {
+            return 0;
+        }
+        return Math.Min(Math.Max(1, maxSteps), 1 + distance / Math.Max(1, unit));
+    }
+}
+
 public sealed class HexDocument
 {
     private sealed class Edit
@@ -59,7 +82,62 @@ public sealed class HexDocument
 
     private readonly List<byte> _bytes;
 
-    private readonly Stack<Edit> _undo = new Stack<Edit>();
+    /// <summary>
+    /// The undo steps, the newest on top. Unlike a plain stack it can drop its oldest step, so that the history does not keep
+    /// the bytes of every edit for as long as the tab is open (see <see cref="UndoLimitBytes"/>).
+    /// </summary>
+    private sealed class EditHistory
+    {
+        private readonly LinkedList<Edit> _items = new LinkedList<Edit>();
+
+        public int Count => _items.Count;
+
+        /// <summary>The bytes that the steps hold (those removed and those inserted).</summary>
+        public long Bytes { get; private set; }
+
+        public void Push(Edit edit)
+        {
+            _items.AddLast(edit);
+            Bytes += Size(edit);
+        }
+
+        public Edit Peek()
+        {
+            return _items.Last.Value;
+        }
+
+        public Edit Pop()
+        {
+            Edit edit = _items.Last.Value;
+            _items.RemoveLast();
+            Bytes -= Size(edit);
+            return edit;
+        }
+
+        public Edit RemoveOldest()
+        {
+            Edit edit = _items.First.Value;
+            _items.RemoveFirst();
+            Bytes -= Size(edit);
+            return edit;
+        }
+
+        public void Clear()
+        {
+            _items.Clear();
+            Bytes = 0;
+        }
+
+        private static long Size(Edit edit)
+        {
+            return (long)edit.Removed.Length + edit.Inserted.Length;
+        }
+    }
+
+    /// <summary>What <see cref="UndoLimitBytes"/> is at the start: 64 MB of bytes in the undo steps.</summary>
+    public const long DefaultUndoLimitBytes = 64L * 1024 * 1024;
+
+    private readonly EditHistory _undo = new EditHistory();
 
     private readonly Stack<Edit> _redo = new Stack<Edit>();
 
@@ -68,6 +146,16 @@ public sealed class HexDocument
 
     // The bytes as they were on the server: what the editor highlights as changed.
     private byte[] _savedBytes;
+
+    // Where the bytes differ from the saved ones when their number differs (an insert or a delete moves every byte after it, and
+    // comparing offset by offset would call all of them changed): the first _samePrefix bytes and the last _sameSuffix bytes are
+    // known to equal the saved ones (the same count from the start, from the end), the bytes between them are changed. They are
+    // kept up to date by every edit at no cost and found by a scan after an undo, a redo or a save (_diffStale).
+    private int _samePrefix;
+
+    private int _sameSuffix;
+
+    private bool _diffStale = true;
 
     private bool _lastModified;
 
@@ -95,6 +183,9 @@ public sealed class HexDocument
         _savedBytes = _bytes.ToArray();
         _savedStep = null;
         _lastModified = false;
+        _samePrefix = _bytes.Count;
+        _sameSuffix = _bytes.Count;
+        _diffStale = false;
     }
 
     /// <summary>
@@ -136,14 +227,89 @@ public sealed class HexDocument
 
     public bool CanRedo => _redo.Count > 0;
 
-    /// <summary>The byte at <paramref name="offset"/> differs from the saved version (or lies beyond it).</summary>
+    /// <summary>
+    /// The byte at <paramref name="offset"/> is not in the saved version: it was typed, or replaced. When the length changed, a byte
+    /// that merely moved (the ones after an insert, after a delete) is not changed: the bytes are lined up from the start and from
+    /// the end, and what is left between is the change.
+    /// </summary>
     public bool IsByteChanged(int offset)
     {
-        if (offset < 0 || offset >= _bytes.Count)
+        if (offset < 0 || offset >= _bytes.Count || !IsModified)
         {
             return false;
         }
-        return offset >= _savedBytes.Length || _savedBytes[offset] != _bytes[offset];
+        if (_savedBytes.Length == _bytes.Count)
+        {
+            return _savedBytes[offset] != _bytes[offset];
+        }
+        if (_diffStale)
+        {
+            ScanDifference();
+        }
+        return offset >= _samePrefix && offset < _bytes.Count - _sameSuffix;
+    }
+
+    private void ScanDifference()
+    {
+        int saved = _savedBytes.Length;
+        int current = _bytes.Count;
+        int common = Math.Min(saved, current);
+        int prefix = 0;
+        while (prefix < common && _savedBytes[prefix] == _bytes[prefix])
+        {
+            prefix++;
+        }
+        int suffix = 0;
+        while (suffix < common && _savedBytes[saved - 1 - suffix] == _bytes[current - 1 - suffix])
+        {
+            suffix++;
+        }
+        _samePrefix = prefix;
+        _sameSuffix = suffix;
+        _diffStale = false;
+    }
+
+    // An edit at offset that took out removed bytes and put in inserted ones: what lay before it and what lay after it is still as
+    // it was, what it touched may now differ (it may equal the saved byte again; that is found by the next scan).
+    private void NoteEdit(int offset, int removed, int inserted)
+    {
+        if (_diffStale)
+        {
+            return;
+        }
+        _samePrefix = Math.Min(_samePrefix, offset);
+        int tailAfterEdit = _bytes.Count - (offset + inserted);
+        _sameSuffix = Math.Max(0, Math.Min(_sameSuffix, tailAfterEdit));
+    }
+
+    /// <summary>
+    /// The most that the undo steps may hold, as the bytes that they took out and put in. When the steps hold more, the oldest are
+    /// forgotten (they can no longer be undone); the newest is always kept, however large it is.
+    /// </summary>
+    public long UndoLimitBytes { get; set; } = DefaultUndoLimitBytes;
+
+    /// <summary>The bytes held by the undo steps.</summary>
+    public long UndoBytes => _undo.Bytes;
+
+    /// <summary>How many steps can be undone.</summary>
+    public int UndoSteps => _undo.Count;
+
+    private void TrimUndo()
+    {
+        while (_undo.Count > 1 && _undo.Bytes > UndoLimitBytes)
+        {
+            Edit dropped = _undo.RemoveOldest();
+            if (_savedStep == null)
+            {
+                // The saved bytes were what the history started from: undoing everything left no longer gets back to them.
+                _savedStep = NeverSaved;
+            }
+            else if (ReferenceEquals(_savedStep, dropped))
+            {
+                // The saved bytes are what the history now starts from.
+                _savedStep = null;
+            }
+        }
     }
 
     public byte[] ToArray()
@@ -192,6 +358,7 @@ public sealed class HexDocument
             {
                 last.Inserted = new[] { value };
                 _bytes[offset] = value;
+                NoteEdit(offset, 1, 1);
                 RaiseChanged();
                 return;
             }
@@ -222,8 +389,10 @@ public sealed class HexDocument
             Inserted = (byte[])bytes.Clone()
         };
         Apply(edit);
+        NoteEdit(offset, count, bytes.Length);
         _redo.Clear();
         _undo.Push(edit);
+        TrimUndo();
         RaiseChanged();
     }
 
@@ -235,6 +404,7 @@ public sealed class HexDocument
         }
         Edit edit = _undo.Pop();
         Revert(edit);
+        _diffStale = true;
         _redo.Push(edit);
         RaiseChanged();
     }
@@ -247,7 +417,9 @@ public sealed class HexDocument
         }
         Edit edit = _redo.Pop();
         Apply(edit);
+        _diffStale = true;
         _undo.Push(edit);
+        TrimUndo();
         RaiseChanged();
     }
 
@@ -265,6 +437,7 @@ public sealed class HexDocument
     {
         _savedStep = version;
         _savedBytes = savedBytes ?? Array.Empty<byte>();
+        _diffStale = true;
         RaiseModifiedIfNeeded();
     }
 
@@ -742,6 +915,56 @@ public sealed class HexDocument
         }
         offset = (int)Math.Min(decimalOffset, Math.Max(0, length));
         return true;
+    }
+
+    /// <summary>What the text of the clipboard is when it is pasted into the hex column.</summary>
+    public enum ClipboardKind
+    {
+        /// <summary>Not hexadecimal: it is pasted as text (UTF-8).</summary>
+        Text,
+
+        /// <summary>Hexadecimal bytes that can hardly be anything else ("48 65 6C", "0x48, 0x65", "deadbeef", a hash).</summary>
+        Hex,
+
+        /// <summary>Hexadecimal digits that may as well be a word or a number: "dead", "face", "add1", "FF".</summary>
+        Ambiguous
+    }
+
+    /// <summary>
+    /// Tells hex bytes from text for the paste into the hex column. Digits that parse as hex are not always hex: a short run of them
+    /// that holds a letter (dead, face, add1) is as likely a word. The bytes are certain when they carry a marker (0x, \x, $), come as
+    /// pairs ("DE AD BE EF"), have no letter (a number), or are long (8 digits in one run, 16 digits in all).
+    /// </summary>
+    public static ClipboardKind ClassifyClipboard(string text)
+    {
+        if (!TryParseHexBytes(text, out byte[] bytes, out _))
+        {
+            return ClipboardKind.Text;
+        }
+        if (text.IndexOf("0x", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("\\x", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf('$') >= 0)
+        {
+            return ClipboardKind.Hex;
+        }
+        string[] tokens = text.Split(new[] { ' ', '\t', '\r', '\n', ',', ';', ':', '-' }, StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length >= 2 && Array.TrueForAll(tokens, (string token) => token.Length == 2))
+        {
+            return ClipboardKind.Hex;
+        }
+        bool hasLetter = false;
+        foreach (char ch in text)
+        {
+            if ((ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F'))
+            {
+                hasLetter = true;
+                break;
+            }
+        }
+        int digits = bytes.Length * 2;
+        if (!hasLetter || digits >= 16 || (tokens.Length == 1 && digits >= 8))
+        {
+            return ClipboardKind.Hex;
+        }
+        return ClipboardKind.Ambiguous;
     }
 
     /// <summary>Parses the clipboard: hex bytes when they look like them, otherwise the text as UTF-8.</summary>

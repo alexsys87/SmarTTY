@@ -108,6 +108,9 @@ public sealed class HexEditorControl : Control
 
     private readonly System.Windows.Forms.Timer _caretTimer = new System.Windows.Forms.Timer();
 
+    // Scrolls the table while a selection is dragged beyond its edge, even when the mouse stands still there.
+    private readonly System.Windows.Forms.Timer _autoScrollTimer = new System.Windows.Forms.Timer();
+
     private int _caretOffset;
 
     // The nibble being typed: 0 is the high one, 1 the low one.
@@ -206,6 +209,8 @@ public sealed class HexEditorControl : Control
             _caretVisible = !_caretVisible;
             InvalidateCaretArea();
         };
+        _autoScrollTimer.Interval = 50;
+        _autoScrollTimer.Tick += (sender, e) => OnAutoScrollTick();
         Document = _document;
         UpdateMetrics();
         UpdateInspectorVisibility();
@@ -700,7 +705,40 @@ public sealed class HexEditorControl : Control
             {
                 return;
             }
-            byte[] bytes = (_area == EditArea.Ascii) ? Encoding.UTF8.GetBytes(text) : HexDocument.ParseClipboardBytes(text, preferHex: true);
+            byte[] bytes;
+            if (_area == EditArea.Ascii)
+            {
+                bytes = Encoding.UTF8.GetBytes(text);
+            }
+            else
+            {
+                switch (HexDocument.ClassifyClipboard(text))
+                {
+                    case HexDocument.ClipboardKind.Hex:
+                        bytes = HexDocument.ParseClipboardBytes(text, preferHex: true);
+                        break;
+                    case HexDocument.ClipboardKind.Ambiguous:
+                        // "dead" is DE AD as hex and 64 65 61 64 as text: only the user knows which was copied.
+                        byte[] asHex = HexDocument.ParseClipboardBytes(text, preferHex: true);
+                        byte[] asText = Encoding.UTF8.GetBytes(text);
+                        byte[] textStart = new byte[Math.Min(asText.Length, 8)];
+                        Array.Copy(asText, textStart, textStart.Length);
+                        DialogResult answer = ThemedMessageBox.Show(
+                            "The clipboard holds \"" + (text.Length > 40 ? text.Substring(0, 40) + "..." : text.Trim()) + "\", which can be hexadecimal bytes or text.\n\n"
+                            + "Yes: paste as bytes (" + HexDocument.FormatHex(asHex) + ")\n"
+                            + "No: paste as text (" + HexDocument.FormatHex(textStart) + (asText.Length > textStart.Length ? " ..." : "") + ")",
+                            "Paste", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                        if (answer == DialogResult.Cancel)
+                        {
+                            return;
+                        }
+                        bytes = (answer == DialogResult.Yes) ? asHex : asText;
+                        break;
+                    default:
+                        bytes = Encoding.UTF8.GetBytes(text);
+                        break;
+                }
+            }
             InsertBytes(bytes);
         }
         catch (Exception exception)
@@ -965,9 +1003,9 @@ public sealed class HexEditorControl : Control
         OnStateChanged();
     }
 
-    private void EnterAscii(byte value)
+    private void EnterAscii(byte[] bytes)
     {
-        if (_readOnly)
+        if (_readOnly || bytes == null || bytes.Length == 0)
         {
             return;
         }
@@ -975,13 +1013,13 @@ public sealed class HexEditorControl : Control
         ReplaceSelectionForTyping();
         if (_overwrite && _caretOffset < _document.Length)
         {
-            _document.ReplaceByte(_caretOffset, value);
+            _document.Replace(_caretOffset, Math.Min(bytes.Length, _document.Length - _caretOffset), bytes);
         }
         else
         {
-            _document.Insert(_caretOffset, new[] { value });
+            _document.Insert(_caretOffset, bytes);
         }
-        _caretOffset = Math.Min(_document.Length, _caretOffset + 1);
+        _caretOffset = Math.Min(_document.Length, _caretOffset + bytes.Length);
         _nibble = 0;
         _caretVisible = true;
         EnsureVisible();
@@ -1152,12 +1190,34 @@ public sealed class HexEditorControl : Control
             }
             return;
         }
-        if (e.KeyChar >= 0x20 && e.KeyChar <= 0xFF)
+        // What is typed in the ASCII column is stored as UTF-8, like what is pasted there: "é" is two bytes, a Cyrillic letter is two,
+        // and a character outside the basic plane comes as two events (a surrogate pair), which are joined here. (It used to be one
+        // Latin-1 byte up to U+00FF and nothing at all above it.)
+        char typed = e.KeyChar;
+        e.Handled = true;
+        if (char.IsHighSurrogate(typed))
         {
-            EnterAscii((byte)e.KeyChar);
-            e.Handled = true;
+            _pendingHighSurrogate = typed;
+            return;
         }
+        string text;
+        if (char.IsLowSurrogate(typed))
+        {
+            if (_pendingHighSurrogate == '\0')
+            {
+                return;
+            }
+            text = new string(new[] { _pendingHighSurrogate, typed });
+        }
+        else
+        {
+            text = typed.ToString();
+        }
+        _pendingHighSurrogate = '\0';
+        EnterAscii(Encoding.UTF8.GetBytes(text));
     }
+
+    private char _pendingHighSurrogate;
 
     private void MoveHorizontally(bool left, bool extendSelection)
     {
@@ -1309,6 +1369,7 @@ public sealed class HexEditorControl : Control
             return;
         }
         _dragging = true;
+        _autoScrollTimer.Start();
         // Shift+click extends the selection from its anchor, or from the caret when nothing is selected.
         _dragAnchor = shift ? (_anchor >= 0 ? _anchor : _caretOffset) : offset;
         _anchor = shift ? _dragAnchor : -1;
@@ -1331,7 +1392,15 @@ public sealed class HexEditorControl : Control
             UpdateToolTip(e.Location);
             return;
         }
-        int offset = OffsetFromPoint(e.Location, out EditArea area, out _);
+        // Beyond the table the selection ends at its edge and the timer does the scrolling: the caret is not put where the mouse is
+        // (a long way off) and the table is not thrown there.
+        Point clamped = ClampToTable(e.Location, out bool outside);
+        DragTo(clamped, ensureVisible: !outside);
+    }
+
+    private void DragTo(Point point, bool ensureVisible)
+    {
+        int offset = OffsetFromPoint(point, out EditArea area, out _);
         _anchor = _dragAnchor;
         _caretOffset = offset;
         _area = area;
@@ -1340,15 +1409,80 @@ public sealed class HexEditorControl : Control
             _anchor = -1;
         }
         _caretVisible = true;
-        EnsureVisible();
+        if (ensureVisible)
+        {
+            EnsureVisible();
+        }
         Invalidate();
         OnStateChanged();
+    }
+
+    // The rows of bytes: below the header, above the horizontal scroll bar, left of the vertical one (and of the data inspector).
+    private Rectangle TableBounds()
+    {
+        int bottom = ClientSize.Height - (_horizontalScrollBar.Visible ? _horizontalScrollBar.Height : 0);
+        return new Rectangle(0, _headerHeight, VisibleWidth, Math.Max(1, bottom - _headerHeight));
+    }
+
+    private Point ClampToTable(Point point, out bool outside)
+    {
+        Rectangle table = TableBounds();
+        int x = Math.Max(table.Left, Math.Min(point.X, table.Right - 1));
+        int y = Math.Max(table.Top, Math.Min(point.Y, table.Bottom - 1));
+        outside = x != point.X || y != point.Y;
+        return new Point(x, y);
+    }
+
+    private void OnAutoScrollTick()
+    {
+        if (!_dragging || (Control.MouseButtons & MouseButtons.Left) == 0)
+        {
+            // The button was let go where the control did not see it.
+            _dragging = false;
+            _autoScrollTimer.Stop();
+            return;
+        }
+        Point point = PointToClient(Control.MousePosition);
+        Rectangle table = TableBounds();
+        int rows = 0;
+        int pixels = 0;
+        if (point.Y < table.Top)
+        {
+            rows = -HexScroll.AutoScrollSteps(table.Top - point.Y, _rowHeight);
+        }
+        else if (point.Y >= table.Bottom)
+        {
+            rows = HexScroll.AutoScrollSteps(point.Y - table.Bottom + 1, _rowHeight);
+        }
+        if (point.X < table.Left)
+        {
+            pixels = -HexScroll.AutoScrollSteps(table.Left - point.X, _charWidth) * _charWidth * 3;
+        }
+        else if (point.X >= table.Right)
+        {
+            pixels = HexScroll.AutoScrollSteps(point.X - table.Right + 1, _charWidth) * _charWidth * 3;
+        }
+        if (rows == 0 && pixels == 0)
+        {
+            return;
+        }
+        if (rows != 0)
+        {
+            SetFirstRow(_firstRow + rows);
+        }
+        if (pixels != 0)
+        {
+            _scrollX += pixels;
+            UpdateScrollBarValues();
+        }
+        DragTo(ClampToTable(point, out _), ensureVisible: false);
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
         _dragging = false;
+        _autoScrollTimer.Stop();
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -1418,8 +1552,10 @@ public sealed class HexEditorControl : Control
             int rows = Math.Sign(e.Delta) * Math.Max(1, Math.Abs(e.Delta) / 120) * 3;
             if ((ModifierKeys & Keys.Shift) == Keys.Shift)
             {
-                _scrollX = Math.Max(0, _scrollX - rows * _charWidth * 3);
-                _horizontalScrollBar.Value = Math.Min(_scrollX, Math.Max(0, _horizontalScrollBar.Maximum - _horizontalScrollBar.LargeChange + 1));
+                // Kept inside the content at both ends. The scroll bar alone cannot do that: with no bar (a wide window) or with the
+                // bar at its end its value does not change, so it raises no event that would bring a position past the end back.
+                _scrollX -= rows * _charWidth * 3;
+                UpdateScrollBarValues();
             }
             else
             {
@@ -1866,7 +2002,7 @@ public sealed class HexEditorControl : Control
             _horizontalScrollBar.Maximum = Math.Max(0, _contentWidth - 1);
             _horizontalScrollBar.LargeChange = Math.Max(1, Math.Min(width, Math.Max(1, _contentWidth)));
             _horizontalScrollBar.SmallChange = Math.Max(1, _charWidth);
-            _scrollX = Math.Max(0, Math.Min(_scrollX, Math.Max(0, _contentWidth - width)));
+            _scrollX = HexScroll.ClampScrollX(_scrollX, _contentWidth, width);
             _horizontalScrollBar.Value = _scrollX;
         }
         finally
@@ -1954,6 +2090,8 @@ public sealed class HexEditorControl : Control
         {
             _caretTimer.Stop();
             _caretTimer.Dispose();
+            _autoScrollTimer.Stop();
+            _autoScrollTimer.Dispose();
             _toolTip.Dispose();
             _verticalScrollBar.Dispose();
             _horizontalScrollBar.Dispose();

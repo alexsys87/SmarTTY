@@ -181,6 +181,10 @@ internal static class Program
         Check(HexDocument.ByteArraysEqual(null, null) && HexDocument.ByteArraysEqual(hello, (byte[])hello.Clone()) && !HexDocument.ByteArraysEqual(hello, new byte[] { 1 }), "byte arrays are compared by content");
 
         CheckRelativeOffsets();
+        CheckScrollMath();
+        CheckClipboardKinds();
+        CheckChangedMarks();
+        CheckUndoLimit();
         CheckHighlights();
         CheckValues();
         CheckCopyFormats();
@@ -189,6 +193,175 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " checks passed.");
         return 0;
+    }
+
+    // B-106: Shift+wheel must not scroll the table past its data, whether or not there is a scroll bar.
+    private static void CheckScrollMath()
+    {
+        Equal(HexScroll.ClampScrollX(500, 1000, 400), 500, "a position inside the content is kept");
+        Equal(HexScroll.ClampScrollX(700, 1000, 400), 600, "a position past the end is brought back to the point where the end is at the right edge");
+        Equal(HexScroll.ClampScrollX(-30, 1000, 400), 0, "a position before the start is brought back to 0");
+        Equal(HexScroll.ClampScrollX(120, 640, 900), 0, "a wide window has no bar and nothing to scroll: Shift+wheel down leaves the position at 0");
+        Equal(HexScroll.ClampScrollX(120, 640, 640), 0, "content exactly as wide as the window: nothing to scroll");
+        Equal(HexScroll.ClampScrollX(5, 0, 1), 0, "an empty content is not scrolled");
+        // The wheel of the report: 100 notches down in a window as wide as the table.
+        int scrollX = 0;
+        for (int notch = 0; notch < 100; notch++)
+        {
+            scrollX = HexScroll.ClampScrollX(scrollX + 3 * 8 * 3, 640, 900);
+        }
+        Equal(scrollX, 0, "100 notches down in a wide window never move the table");
+
+        Equal(HexScroll.AutoScrollSteps(0, 16), 0, "at the edge nothing is scrolled");
+        Equal(HexScroll.AutoScrollSteps(-5, 16), 0, "inside the table nothing is scrolled");
+        Equal(HexScroll.AutoScrollSteps(1, 16), 1, "just beyond the edge: one row");
+        Equal(HexScroll.AutoScrollSteps(48, 16), 4, "three rows beyond the edge: four rows a tick");
+        Equal(HexScroll.AutoScrollSteps(100000, 16), 20, "far beyond the edge the speed is capped");
+    }
+
+    // The paste into the hex column: "dead" is a word until it is shown to be bytes.
+    private static void CheckClipboardKinds()
+    {
+        foreach (string word in new[] { "dead", "face", "add1", "FF", "beef", "cafe", "dead face", "dead beef", "DEAD-BEEF", "a1 b2c3" })
+        {
+            Equal(HexDocument.ClassifyClipboard(word), HexDocument.ClipboardKind.Ambiguous, "'" + word + "' may be a word: the user is asked");
+        }
+        foreach (string hex in new[] { "48 65 6C 6C 6F", "DE AD BE EF", "de:ad:be:ef", "0x48, 0x65", "\\x48\\x65", "$FF", "deadbeef", "DEADBEEF", "00ff00ff", "d41d8cd98f00b204e9800998ecf8427e", "1234", "00", "00 01 02", "ad d1", "dead face beef cafe" })
+        {
+            Equal(HexDocument.ClassifyClipboard(hex), HexDocument.ClipboardKind.Hex, "'" + hex + "' is bytes");
+        }
+        foreach (string text in new[] { "Hello", "abc", "dead!", "face book", "", "0xZZ", "привет" })
+        {
+            Equal(HexDocument.ClassifyClipboard(text), HexDocument.ClipboardKind.Text, "'" + text + "' is text");
+        }
+        Equal(HexDocument.ClassifyClipboard(null), HexDocument.ClipboardKind.Text, "no text is text");
+        EqualBytes(HexDocument.ParseClipboardBytes("dead", preferHex: true), new byte[] { 0xDE, 0xAD }, "the answer 'bytes' gives DE AD");
+        EqualBytes(HexDocument.ParseClipboardBytes("dead", preferHex: false), new byte[] { 0x64, 0x65, 0x61, 0x64 }, "the answer 'text' gives the UTF-8 of the word");
+    }
+
+    // The "changed" mark: a byte that only moved is not changed.
+    private static void CheckChangedMarks()
+    {
+        byte[] ten = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+        HexDocument start = new HexDocument(ten);
+        start.Insert(0, new byte[] { 0xAA });
+        string marks = Marks(start);
+        Equal(marks, "#..........", "a byte inserted at the start marks that byte only (not all that moved after it)");
+
+        HexDocument middle = new HexDocument(ten);
+        middle.Insert(5, new byte[] { 0xAA, 0xBB });
+        Equal(Marks(middle), ".....##.....", "two bytes inserted in the middle mark those two");
+
+        HexDocument removed = new HexDocument(ten);
+        removed.Remove(3, 2);
+        Equal(Marks(removed), "........", "bytes taken out leave nothing marked in what remains");
+
+        HexDocument tail = new HexDocument(ten);
+        tail.Insert(10, new byte[] { 1, 2, 3 });
+        Equal(Marks(tail), "..........###", "bytes added at the end are marked");
+
+        HexDocument replacedSame = new HexDocument(ten);
+        replacedSame.ReplaceByte(2, 0x77);
+        replacedSame.ReplaceByte(7, 0x88);
+        Equal(Marks(replacedSame), "..#....#..", "same length: single bytes are marked where they are");
+
+        // Undo and redo, which are found by a scan, and typing after them (which is kept up to date step by step).
+        HexDocument history = new HexDocument(ten);
+        history.Insert(0, new byte[] { 0xAA });
+        history.Insert(6, new byte[] { 0xBB });
+        history.Undo();
+        Equal(Marks(history), "#..........", "after an undo only the byte of the step that remains is marked");
+        history.Redo();
+        Equal(Marks(history), "#######.....", "after a redo both steps are marked, and so is what lies between them (two edits far apart that changed the length)");
+        history.Undo();
+        history.Undo();
+        Check(!history.IsModified, "everything undone is not modified");
+        Equal(Marks(history), "..........", "everything undone marks nothing");
+        history.Insert(9, new byte[] { 0xCC });
+        history.Insert(0, new byte[] { 0xDD });
+        Equal(Marks(history), "###########.", "typing after an undo: from the first change to the last, the byte after the last is as it was");
+
+        HexDocument saved = new HexDocument(ten);
+        saved.Insert(0, new byte[] { 0xAA });
+        saved.MarkSaved();
+        Equal(Marks(saved), "...........", "saved: nothing is marked");
+        saved.Insert(11, new byte[] { 0xEE });
+        Equal(Marks(saved), "...........#", "after the save only the new byte is marked");
+
+        HexDocument empty = new HexDocument();
+        empty.Insert(0, new byte[] { 1, 2 });
+        Equal(Marks(empty), "##", "everything typed into an empty document is changed");
+
+        // A restored draft is compared with the bytes that are on the server.
+        HexDocument restored = new HexDocument(new byte[] { 9, 0, 1, 2, 3 }, new byte[] { 0, 1, 2, 3 });
+        Equal(Marks(restored), "#....", "a restored draft with a byte added in front marks that byte");
+    }
+
+    private static string Marks(HexDocument document)
+    {
+        char[] marks = new char[document.Length];
+        for (int offset = 0; offset < marks.Length; offset++)
+        {
+            marks[offset] = document.IsByteChanged(offset) ? '#' : '.';
+        }
+        return new string(marks);
+    }
+
+    // The undo history is not kept for ever.
+    private static void CheckUndoLimit()
+    {
+        HexDocument document = new HexDocument(new byte[4]);
+        document.UndoLimitBytes = 100;
+        for (int step = 0; step < 50; step++)
+        {
+            document.Insert(document.Length, new byte[10]);
+        }
+        Check(document.UndoBytes <= 100 + 10, "the undo steps hold about the limit (" + document.UndoBytes + " bytes)");
+        Check(document.UndoSteps >= 5 && document.UndoSteps <= 11, "the newest steps are kept (" + document.UndoSteps + ")");
+        int undone = 0;
+        while (document.CanUndo)
+        {
+            document.Undo();
+            undone++;
+        }
+        Equal(undone, document.CanRedo ? undone : -1, "everything that was kept can be undone");
+        Check(document.IsModified, "undoing every step that is left does not claim the document is the saved one (the oldest edits are gone)");
+        Check(document.Length > 4, "the oldest edits stay in the document");
+
+        HexDocument large = new HexDocument(new byte[4]);
+        large.UndoLimitBytes = 100;
+        large.Remove(0, 4);
+        large.Insert(0, new byte[5000]);
+        Equal(large.UndoSteps, 1, "one step larger than the limit is kept: it is the newest");
+        large.Undo();
+        Equal(large.Length, 0, "the step that was kept can be undone");
+
+        // The saved version that the history starts from is the saved one again when everything left is undone.
+        HexDocument savedAtStart = new HexDocument(new byte[2]);
+        savedAtStart.UndoLimitBytes = 50;
+        savedAtStart.Insert(2, new byte[40]);
+        savedAtStart.MarkSaved();
+        savedAtStart.Insert(0, new byte[60]);
+        Equal(savedAtStart.UndoSteps, 1, "the first step was dropped to make room");
+        savedAtStart.Undo();
+        Check(!savedAtStart.IsModified && savedAtStart.Length == 42, "undoing back to the saved bytes is not modified (the saved step became the start of the history)");
+
+        // The start of the history was the saved version, and it can no longer be reached.
+        HexDocument savedBefore = new HexDocument(new byte[2]);
+        savedBefore.UndoLimitBytes = 50;
+        savedBefore.Insert(0, new byte[40]);
+        savedBefore.Insert(0, new byte[40]);
+        Equal(savedBefore.UndoSteps, 1, "the older step was dropped");
+        savedBefore.Undo();
+        Check(savedBefore.IsModified, "the bytes left after the last undo are not the saved ones: still modified");
+
+        // The default is large enough for ordinary work.
+        HexDocument ordinary = new HexDocument(new byte[16]);
+        for (int step = 0; step < 1000; step++)
+        {
+            ordinary.ReplaceByte(step % 16, (byte)step);
+        }
+        Equal(ordinary.UndoSteps, 1000, "ordinary editing keeps every step");
     }
 
     private static void CheckRelativeOffsets()
