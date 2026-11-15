@@ -1234,7 +1234,7 @@ namespace SmarTTY.CodeEditing
                 case Language.CMake: return CMakeTokenizer;
                 case Language.Dockerfile: return DockerfileTokenizer;
                 case Language.Sql: return SqlTokenizer;
-                case Language.Markup: return MarkupTokenizer;
+                case Language.Markup: return TokenizeMarkupWithEmbedded;
                 case Language.Diff: return TokenizeDiff;
                 case Language.Lua: return TokenizeLua;
                 case Language.Json: return TokenizeJson;
@@ -6038,7 +6038,7 @@ namespace SmarTTY.CodeEditing
             Keywords = SqlKeywords
         }.Tokenize;
 
-        private static readonly TokenCache.LineTokenizer MarkupTokenizer = new GenericSyntax
+        private static readonly TokenCache.LineTokenizer MarkupBaseTokenizer = new GenericSyntax
         {
             // Apostrophes are common in text content, so only "..." is a string.
             SingleQuoteStrings = false,
@@ -6046,6 +6046,299 @@ namespace SmarTTY.CodeEditing
             BlockCommentStart = "<!--",
             BlockCommentEnd = "-->"
         }.Tokenize;
+
+        // The state of the markup tokenizer keeps the mode in the low bits and the state of the tokenizer
+        // of the current mode (markup, JavaScript or CSS) above them.
+        private const int MarkupModeMask = 7;
+        private const int MarkupModeShift = 3;
+        private const int MarkupModeText = 0;
+        private const int MarkupModeScript = 1;
+        private const int MarkupModeStyle = 2;
+        private const int MarkupModeScriptTag = 3;
+        private const int MarkupModeStyleTag = 4;
+
+        /// <summary>
+        /// HTML and XML with the JavaScript of &lt;script&gt; and the CSS of &lt;style&gt; highlighted: the text between
+        /// the tags keeps the markup colours, the content of the script and style tags is passed to the JavaScript and
+        /// CSS tokenizers, and the state of those tokenizers (a block comment, a template string) survives line breaks.
+        /// </summary>
+        private static bool TokenizeMarkupWithEmbedded(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+        {
+            int mode = startState & MarkupModeMask;
+            int inner = startState >> MarkupModeShift;
+            int len = text.Length;
+            int pos = 0;
+
+            while (true)
+            {
+                if (mode == MarkupModeText)
+                {
+                    int tag = FindEmbeddedOpenTag(text, pos, inner, out bool script);
+                    if (tag < 0)
+                    {
+                        inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, pos, len, sink);
+                        endState = PackMarkupState(mode, inner);
+                        return true;
+                    }
+                    inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, pos, tag, sink);
+                    int tagEnd = FindTagEnd(text, tag + 1);
+                    if (tagEnd < 0)
+                    {
+                        inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, tag, len, sink);
+                        endState = PackMarkupState(script ? MarkupModeScriptTag : MarkupModeStyleTag, inner);
+                        return true;
+                    }
+                    inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, tag, tagEnd + 1, sink);
+                    pos = tagEnd + 1;
+                    if (tagEnd > tag && text[tagEnd - 1] == '/')
+                    {
+                        // <script src="..." /> has no content.
+                        inner = 0;
+                        continue;
+                    }
+                    mode = script ? MarkupModeScript : MarkupModeStyle;
+                    inner = 0;
+                    continue;
+                }
+
+                if (mode == MarkupModeScriptTag || mode == MarkupModeStyleTag)
+                {
+                    // The opening <script ...> or <style ...> tag started on a previous line.
+                    int tagEnd = FindTagEnd(text, pos);
+                    if (tagEnd < 0)
+                    {
+                        inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, pos, len, sink);
+                        endState = PackMarkupState(mode, inner);
+                        return true;
+                    }
+                    inner = TokenizeMarkupPart(MarkupBaseTokenizer, inner, text, pos, tagEnd + 1, sink);
+                    pos = tagEnd + 1;
+                    if (tagEnd > 0 && text[tagEnd - 1] == '/')
+                    {
+                        mode = MarkupModeText;
+                        inner = 0;
+                        continue;
+                    }
+                    mode = (mode == MarkupModeScriptTag) ? MarkupModeScript : MarkupModeStyle;
+                    inner = 0;
+                    continue;
+                }
+
+                // The content of <script> or <style>.
+                TokenCache.LineTokenizer content = (mode == MarkupModeScript) ? JavaScriptTokenizer : CssTokenizer;
+                int close = FindEmbeddedCloseTag(text, pos, (mode == MarkupModeScript) ? "script" : "style");
+                if (close < 0)
+                {
+                    inner = TokenizeMarkupPart(content, inner, text, pos, len, sink);
+                    endState = PackMarkupState(mode, inner);
+                    return true;
+                }
+                inner = TokenizeMarkupPart(content, inner, text, pos, close, sink);
+                int closeEnd = FindTagEnd(text, close + 1);
+                if (closeEnd < 0)
+                {
+                    inner = TokenizeMarkupPart(MarkupBaseTokenizer, 0, text, close, len, sink);
+                    endState = PackMarkupState(MarkupModeText, inner);
+                    return true;
+                }
+                inner = TokenizeMarkupPart(MarkupBaseTokenizer, 0, text, close, closeEnd + 1, sink);
+                mode = MarkupModeText;
+                pos = closeEnd + 1;
+            }
+        }
+
+        private static int PackMarkupState(int mode, int inner)
+        {
+            return (inner << MarkupModeShift) | mode;
+        }
+
+        private static int TokenizeMarkupPart(TokenCache.LineTokenizer tokenizer, int state, string text,
+            int start, int end, TokenCache.ITokenSink sink)
+        {
+            if (start >= end)
+            {
+                return state;
+            }
+            if (start == 0 && end == text.Length)
+            {
+                tokenizer(state, text, sink, out int wholeState);
+                return wholeState;
+            }
+            tokenizer(state, text.Substring(start, end - start), new OffsetTokenSink(sink, start), out int endState);
+            return endState;
+        }
+
+        /// <summary>The opening &lt;script&gt; or &lt;style&gt; tag of the line, or -1; HTML comments and other tags are skipped.</summary>
+        private static int FindEmbeddedOpenTag(string text, int start, int innerState, out bool script)
+        {
+            script = false;
+            int len = text.Length;
+            int i = start;
+            if ((innerState & StBlockComment) != 0)
+            {
+                int close = text.IndexOf("-->", i, StringComparison.Ordinal);
+                if (close < 0)
+                {
+                    return -1;
+                }
+                i = close + 3;
+            }
+            if ((innerState & StInTag) != 0)
+            {
+                int end = FindTagEnd(text, i);
+                if (end < 0)
+                {
+                    return -1;
+                }
+                i = end + 1;
+            }
+            while (i < len)
+            {
+                if (i + 4 <= len && text[i] == '<' && text[i + 1] == '!' && text[i + 2] == '-' && text[i + 3] == '-')
+                {
+                    int close = text.IndexOf("-->", i + 4, StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        return -1;
+                    }
+                    i = close + 3;
+                    continue;
+                }
+                if (StartsWithAt(text, i, "<![CDATA["))
+                {
+                    int close = text.IndexOf("]]>", i + 9, StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        return -1;
+                    }
+                    i = close + 3;
+                    continue;
+                }
+                if (text[i] != '<')
+                {
+                    i++;
+                    continue;
+                }
+                if (IsOpeningTagNamed(text, i, "script"))
+                {
+                    script = true;
+                    return i;
+                }
+                if (IsOpeningTagNamed(text, i, "style"))
+                {
+                    return i;
+                }
+                if (i + 1 >= len || !(IsIdStart(text[i + 1]) || text[i + 1] == '/' || text[i + 1] == '!' || text[i + 1] == '?'))
+                {
+                    i++;
+                    continue;
+                }
+                int tagEnd = FindTagEnd(text, i + 1);
+                if (tagEnd < 0)
+                {
+                    return -1;
+                }
+                i = tagEnd + 1;
+            }
+            return -1;
+        }
+
+        private static bool IsOpeningTagNamed(string text, int start, string name)
+        {
+            if (start + 1 + name.Length > text.Length || text[start] != '<')
+            {
+                return false;
+            }
+            int first = start + 1;
+            if (text[first] == '/' || text[first] == '!' || text[first] == '?')
+            {
+                return false;
+            }
+            if (string.Compare(text, first, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) != 0)
+            {
+                return false;
+            }
+            int after = first + name.Length;
+            return after >= text.Length || IsBlank(text[after]) || text[after] == '>' || text[after] == '/';
+        }
+
+        private static int FindEmbeddedCloseTag(string text, int start, string name)
+        {
+            int len = text.Length;
+            for (int i = start; i + 2 + name.Length <= len; i++)
+            {
+                if (text[i] != '<' || text[i + 1] != '/')
+                {
+                    continue;
+                }
+                if (string.Compare(text, i + 2, name, 0, name.Length, StringComparison.OrdinalIgnoreCase) != 0)
+                {
+                    continue;
+                }
+                int after = i + 2 + name.Length;
+                if (after < len && (IsIdChar(text[after]) || text[after] == '-' || text[after] == ':'))
+                {
+                    continue;
+                }
+                return i;
+            }
+            return -1;
+        }
+
+        /// <summary>The index of the '&gt;' that closes a tag, skipping quoted attribute values; -1 if it is on a later line.</summary>
+        private static int FindTagEnd(string text, int start)
+        {
+            char quote = '\0';
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (quote != '\0')
+                {
+                    if (c == quote)
+                    {
+                        quote = '\0';
+                    }
+                    continue;
+                }
+                if (c == '"' || c == '\'')
+                {
+                    quote = c;
+                    continue;
+                }
+                if (c == '>')
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>Passes the tokens of a part of the line with the offsets of the whole line.</summary>
+        private sealed class OffsetTokenSink : TokenCache.ITokenSink
+        {
+            private readonly TokenCache.ITokenSink _inner;
+            private readonly int _offset;
+
+            public OffsetTokenSink(TokenCache.ITokenSink inner, int offset)
+            {
+                _inner = inner;
+                _offset = offset;
+            }
+
+            public int CurrentLine => _inner.CurrentLine;
+
+            public bool IsLastLine => _inner.IsLastLine;
+
+            public void AddToken(int type, int start, int end)
+            {
+                _inner.AddToken(type, start + _offset, end + _offset);
+            }
+
+            public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)
+            {
+                _inner.AddPairedToken(type, start + _offset, end + _offset, pairId, isOpening, regionStyle);
+            }
+        }
 
         // ==================================================================
         // Block keywords: fold regions of "then ... fi", "do ... done", "function ... end"
