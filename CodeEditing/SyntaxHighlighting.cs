@@ -945,6 +945,7 @@ namespace SmarTTY.CodeEditing
 
                 case "dts":
                 case "dtsi":
+                case "dtso":
                     return Language.DeviceTree;
 
                 case "cpp":
@@ -4359,6 +4360,9 @@ namespace SmarTTY.CodeEditing
             // Directives.
             "dts-v1", "plugin", "memreserve", "include", "delete-node", "delete-property", "omit-if-no-ref",
             "bits",
+            // Overlay nodes, properties and the metadata that dtc generates.
+            "target", "target-path", "__overlay__", "__overrides__", "__symbols__", "__fixups__",
+            "__local_fixups__", "__dormant__",
             // Core properties and node names.
             "compatible", "model", "status", "reg", "reg-names", "ranges", "dma-ranges", "device_type",
             "phandle", "chosen", "memory", "cpus", "cpu", "soc", "aliases", "reserved-memory", "firmware",
