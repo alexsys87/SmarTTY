@@ -439,6 +439,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private int _ctrlWheelMultiplier = 10;
 
+    // The part of a wheel notch (120) turned so far by deltas that were smaller than a notch.
+    private int _wheelRemainder;
+
     private int _leftPadding = 5;
 
     private bool _groupBinaryDigits;
@@ -3021,10 +3024,22 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             scrollBar = _verticalScrollBar;
             step = _verticalWheelStep;
         }
-        if (e.Delta > 0)
+        // A mouse wheel notch is 120; a precision touchpad sends many small deltas, so the steps are counted up in notches
+        // (only the sign was used, and every small delta scrolled a whole step).
+        if (_wheelRemainder != 0 && Math.Sign(_wheelRemainder) != Math.Sign(e.Delta))
         {
-            step = -step;
+            _wheelRemainder = 0; // the direction changed
         }
+        _wheelRemainder += e.Delta;
+        int notches = _wheelRemainder / 120;
+        if (notches == 0)
+        {
+            Redraw();
+            base.OnMouseWheel(e);
+            return;
+        }
+        _wheelRemainder -= notches * 120;
+        step = -step * notches;
         if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
         {
             step *= _ctrlWheelMultiplier;
