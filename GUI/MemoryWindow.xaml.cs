@@ -206,6 +206,13 @@ public partial class MemoryWindow : Window
     private void ApplyWorkspace(MemoryWorkspace workspace, string what)
     {
         List<MemoryRow> rows = workspace.ToRows(out List<string> skipped);
+        // The list is kept for all hosts: a row of 64 bits from a host with devmem is no row for a host that has devmem2 (8, 16 and 32 only).
+        int[] widths = DevMem.Widths(_Tool);
+        foreach (MemoryRow unsupported in rows.Where(r => !widths.Contains(r.Width)).ToList())
+        {
+            rows.Remove(unsupported);
+            skipped.Add(unsupported.AddressText + " (" + unsupported.Width + " bits, " + (DevMem.ToolName(_Tool) ?? "the tool") + " cannot read that)");
+        }
         _Rows.Clear();
         foreach (MemoryRow row in rows)
         {
@@ -568,39 +575,48 @@ public partial class MemoryWindow : Window
             Stopwatch clock = Stopwatch.StartNew();
             List<(MemoryRow Row, DevMemReading Reading)> results = new List<(MemoryRow, DevMemReading)>();
             string failure = null;
-            lock (_CommandLock)
+            // What goes wrong here is told in the status line: an exception that left this task would skip the BeginInvoke below, and
+            // _Refreshing would stay set for ever (the status "Reading ...", the automatic refresh that reads nothing and says nothing).
+            try
             {
-                foreach (IGrouping<int, MemoryRow> group in rows.GroupBy(r => r.Width))
+                lock (_CommandLock)
                 {
-                    List<MemoryRow> list = group.ToList();
-                    // A command is cut to what the server takes (Dropbear drops a command of more than 9000 bytes without a word), so a
-                    // long list is read in several commands, not in one that never answers.
-                    List<int> sizes = DevMem.SplitReads(_Tool, list.Select(r => r.Address).ToList(), group.Key, useSudo, Batch);
-                    int start = 0;
-                    foreach (int size in sizes)
+                    foreach (IGrouping<int, MemoryRow> group in rows.GroupBy(r => r.Width))
                     {
-                        if (failure != null || _Closed)
+                        List<MemoryRow> list = group.ToList();
+                        // A command is cut to what the server takes (Dropbear drops a command of more than 9000 bytes without a word), so a
+                        // long list is read in several commands, not in one that never answers.
+                        List<int> sizes = DevMem.SplitReads(_Tool, list.Select(r => r.Address).ToList(), group.Key, useSudo, Batch);
+                        int start = 0;
+                        foreach (int size in sizes)
                         {
-                            break;
-                        }
-                        List<MemoryRow> part = list.Skip(start).Take(size).ToList();
-                        start += size;
-                        List<string> lines = session.RunCommand(DevMem.BuildReadCommand(_Tool, part.Select(r => r.Address), group.Key, useSudo), out _, timeout: TimeSpan.FromSeconds(30 + part.Count / 10));
-                        if (lines == null)
-                        {
-                            failure = session.IsConnectionClosed ? "the connection to the server was lost" : "the reading did not finish in time (an address that hangs the bus?)";
-                            break;
-                        }
-                        List<DevMemReading> readings = DevMem.ParseReadOutput(lines);
-                        for (int i = 0; i < part.Count; i++)
-                        {
-                            DevMemReading reading = i < readings.Count && readings[i].Address == part[i].Address
-                                ? readings[i]
-                                : readings.FirstOrDefault(r => r.Address == part[i].Address) ?? new DevMemReading { Address = part[i].Address, Error = "no answer for this address" };
-                            results.Add((part[i], reading));
+                            if (failure != null || _Closed)
+                            {
+                                break;
+                            }
+                            List<MemoryRow> part = list.Skip(start).Take(size).ToList();
+                            start += size;
+                            List<string> lines = session.RunCommand(DevMem.BuildReadCommand(_Tool, part.Select(r => r.Address), group.Key, useSudo), out _, timeout: TimeSpan.FromSeconds(30 + part.Count / 10));
+                            if (lines == null)
+                            {
+                                failure = session.IsConnectionClosed ? "the connection to the server was lost" : "the reading did not finish in time (an address that hangs the bus?)";
+                                break;
+                            }
+                            List<DevMemReading> readings = DevMem.ParseReadOutput(lines);
+                            for (int i = 0; i < part.Count; i++)
+                            {
+                                DevMemReading reading = i < readings.Count && readings[i].Address == part[i].Address
+                                    ? readings[i]
+                                    : readings.FirstOrDefault(r => r.Address == part[i].Address) ?? new DevMemReading { Address = part[i].Address, Error = "no answer for this address" };
+                                results.Add((part[i], reading));
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception exception)
+            {
+                failure = exception.Message;
             }
             long elapsed = clock.ElapsedMilliseconds;
             Dispatcher.BeginInvoke((Action)(() =>
