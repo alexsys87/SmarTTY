@@ -31,6 +31,12 @@ public partial class HexTerminalControl : DpiAwareControl
 
     private int _bytesPerLine = 16;
 
+    // The number of bytes per line the data on the screen was laid out with (0: nothing yet), and whether the data
+    // carries more than one layout: the history is laid out again after a resize only when it does not match.
+    private int _laidOutBytesPerLine;
+
+    private bool _layoutMixed;
+
     private DateTime _lastDataTime;
 
     private bool _lastWasEcho;
@@ -230,6 +236,11 @@ public partial class HexTerminalControl : DpiAwareControl
 
     private void RenderData(byte[] buffer, int count, bool isEcho)
     {
+        if (_laidOutBytesPerLine != 0 && _laidOutBytesPerLine != _bytesPerLine)
+        {
+            _layoutMixed = true;
+        }
+        _laidOutBytesPerLine = _bytesPerLine;
         try
         {
             int currentColumn = (termHex.CursorPosition.X + 1) / 3;
@@ -283,6 +294,8 @@ public partial class HexTerminalControl : DpiAwareControl
         termHex.Reset();
         termText.Reset();
         _lastDataTime = DateTime.MinValue;
+        _laidOutBytesPerLine = 0;
+        _layoutMixed = false;
     }
 
     public void ArchiveScreen()
@@ -457,8 +470,16 @@ public partial class HexTerminalControl : DpiAwareControl
             return;
         }
         _resizeTimer.Enabled = false;
+        if (_chunks.Count == 0 || (!_layoutMixed && _laidOutBytesPerLine == _bytesPerLine))
+        {
+            // The lines are laid out by the number of bytes in them: with the same number nothing changes, and the whole
+            // history (all of it is kept) was laid out again, and the scroll position lost, at every change of the size.
+            return;
+        }
         termHex.Reset();
         termText.Reset();
+        _laidOutBytesPerLine = 0;
+        _layoutMixed = false;
         foreach (DataChunk item in _chunks)
         {
             if (item.IsBreak)
