@@ -651,6 +651,33 @@ internal static class Program
                 run = RunReceive(device, binary, local, Fast(overwrite: true));
                 Check(run.Error == null && run.Result && File.ReadAllBytes(local).SequenceEqual(File.ReadAllBytes(binary)), "Overwrite replaces the existing local file", Describe(run));
             }
+            {
+                // The unfinished file cannot be written: the device is already sending when this is found out, and the failure must reach
+                // the caller as an IOException with the device told to stop (its shell answers afterwards).
+                string local = Path.Combine(localDir, "locked.bin");
+                string part = local + ".smtty~";
+                File.WriteAllBytes(part, new byte[] { 1 });
+                File.SetAttributes(part, FileAttributes.ReadOnly);
+                bool lockable;
+                try
+                {
+                    using (new FileStream(part, FileMode.Create, FileAccess.Write))
+                    {
+                    }
+                    lockable = false; // this system lets the file be written anyway (a superuser): nothing to check
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    lockable = true;
+                }
+                if (lockable)
+                {
+                    Run run = RunReceive(device, binary, local, Fast());
+                    Check(run.Error is IOException && !File.Exists(local), "a local file that cannot be written is an IOException", Describe(run));
+                    Check(device.Run("echo alive5b").Contains("alive5b"), "the device was told to stop sending");
+                }
+                File.SetAttributes(part, FileAttributes.Normal);
+            }
             Check(device.Run("echo alive5").Contains("alive5"), "the shell is alive");
         }
         Directory.Delete(dir, true);
