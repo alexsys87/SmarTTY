@@ -35,7 +35,7 @@ internal static class VirtualRowLayout
                 break;
             }
             previousVisibleLine = line;
-            int nextSpecialLine = virtualLines.GetNextSpecialLine(Math.Min(line, 0));
+            int nextSpecialLine = virtualLines.GetNextSpecialLine(line);
             if (nextSpecialLine == -1)
             {
                 nextSpecialLine = lineCount;
