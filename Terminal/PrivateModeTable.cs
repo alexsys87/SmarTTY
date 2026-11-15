@@ -8,10 +8,11 @@ namespace SmarTTY.Terminal;
 public sealed class PrivateModeTable
 {
     /// <summary>
-    /// The numbers 0 to <c>Size</c> - 1 are kept: the size the emulator always had. A mode from 1100 up (2004, bracketed paste, is one)
-    /// is not recorded, and reads as off.
+    /// The numbers 0 to <c>Size</c> - 1 are kept. The table used to end at 1099, and the modes above it were not recorded and read as off:
+    /// 2004 (bracketed paste, which the paste reads through <see cref="IsSet"/>) never became "on", so a paste was never wrapped in the
+    /// paste markers. It now reaches past the highest private mode that xterm has (2048 and a few more).
     /// </summary>
-    public const int Size = 1100;
+    public const int Size = 2100;
 
     private readonly bool[] _modes = new bool[Size];
 
