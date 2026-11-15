@@ -1345,6 +1345,10 @@ public sealed class HexEditorControl : Control
         {
             return;
         }
+        if (e.Y < _headerHeight)
+        {
+            return; // the column titles are not bytes: a click there used to put the caret on the row above the first visible one
+        }
         int offset = OffsetFromPoint(e.Location, out EditArea area, out int nibble);
         bool shift = (ModifierKeys & Keys.Shift) == Keys.Shift;
         if (e.Button == MouseButtons.Right)
@@ -1544,12 +1548,18 @@ public sealed class HexEditorControl : Control
         }
         return text.ToString();
     }
+    private int _wheelRemainder;
+
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         if (ModifierKeys == Keys.None || ModifierKeys == Keys.Shift)
         {
-            // Positive wheel delta scrolls up (towards the start), negative down.
-            int rows = Math.Sign(e.Delta) * Math.Max(1, Math.Abs(e.Delta) / 120) * 3;
+            // Positive wheel delta scrolls up (towards the start), negative down. A touchpad sends many small deltas: they add up to notches.
+            int rows = HexScroll.WheelNotches(ref _wheelRemainder, e.Delta) * 3;
+            if (rows == 0)
+            {
+                return;
+            }
             if ((ModifierKeys & Keys.Shift) == Keys.Shift)
             {
                 // Kept inside the content at both ends. The scroll bar alone cannot do that: with no bar (a wide window) or with the
