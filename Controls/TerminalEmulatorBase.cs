@@ -867,6 +867,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
         SetCaret(textPosition);
     }
 
+    /// <summary>The line of the text the cursor is in (the rows scrolled off the screen are counted).</summary>
+    public int CursorDocumentLine => ToDocumentPosition(_cursor).Line;
+
     protected TextDocument.TextPosition ToDocumentPosition(Point point)
     {
         TextDocument.TextPosition position = new TextDocument.TextPosition(point.X, point.Y);

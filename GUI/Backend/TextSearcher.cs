@@ -13,6 +13,15 @@ public class TextSearcher : INotifyPropertyChanged
 
     private readonly Func<string, string> _NormalizeQuery;
 
+    // The view that searches its stream of bytes (the HEX terminal; null when the view shown now is not one), and the
+    // bytes the searched text stands for (null when it is not a byte sequence): see IByteSearchTarget.
+    private readonly Func<IByteSearchTarget> _GetByteTarget;
+
+    private readonly Func<string, byte[]> _ParseByteQuery;
+
+    // The view whose matches are marked through IByteSearchTarget.
+    private IByteSearchTarget _highlightedByteTarget;
+
     private bool _IsVisible;
 
     private string _SearchedText;
@@ -236,9 +245,59 @@ public class TextSearcher : INotifyPropertyChanged
     /// expects lowercase byte pairs separated by spaces, e.g. "0A0D" becomes "0a 0d").
     /// </summary>
     public TextSearcher(Func<TextEditorControl> getEditor, Func<string, string> normalizeQuery)
+        : this(getEditor, normalizeQuery, null, null)
+    {
+    }
+
+    /// <summary>
+    /// As above, for a tab whose view may show a stream of bytes in rows (the HEX terminal): when
+    /// <paramref name="getByteTarget"/> gives such a view and <paramref name="parseByteQuery"/> gives the bytes of
+    /// the searched text, the bytes are searched for in the stream, where a sequence that goes on in the next row is
+    /// found too. Any other text is searched for in the lines of the editor, as before.
+    /// </summary>
+    public TextSearcher(Func<TextEditorControl> getEditor, Func<string, string> normalizeQuery, Func<IByteSearchTarget> getByteTarget, Func<string, byte[]> parseByteQuery)
     {
         _GetEditor = getEditor;
         _NormalizeQuery = normalizeQuery;
+        _GetByteTarget = getByteTarget;
+        _ParseByteQuery = parseByteQuery;
+    }
+
+    /// <summary>
+    /// The view to search for bytes and the bytes of the searched text, when the view shown now searches its stream
+    /// of bytes and the searched text is a byte sequence. The options of the bar (case, whole word, regular
+    /// expression) mean nothing for bytes: they are compared as they are.
+    /// </summary>
+    private bool TryGetByteQuery(out IByteSearchTarget target, out byte[] pattern)
+    {
+        target = null;
+        pattern = null;
+        if (_GetByteTarget == null || _ParseByteQuery == null || string.IsNullOrEmpty(SearchedText))
+        {
+            return false;
+        }
+        target = _GetByteTarget();
+        if (target == null)
+        {
+            return false;
+        }
+        pattern = _ParseByteQuery(SearchedText);
+        return pattern != null && pattern.Length > 0;
+    }
+
+    // The bytes as the HEX view shows them: "0a 0d".
+    private static string FormatBytes(byte[] bytes)
+    {
+        System.Text.StringBuilder builder = new System.Text.StringBuilder(bytes.Length * 3);
+        foreach (byte value in bytes)
+        {
+            if (builder.Length > 0)
+            {
+                builder.Append(' ');
+            }
+            builder.Append(value.ToString("x2"));
+        }
+        return builder.ToString();
     }
 
     private void RaiseLater(string propertyName)
@@ -285,6 +344,24 @@ public class TextSearcher : INotifyPropertyChanged
             TextEditorControl editor = (getEditor != null) ? getEditor() : null;
             if (editor == null)
             {
+                return;
+            }
+            if (TryGetByteQuery(out IByteSearchTarget byteTarget, out byte[] pattern))
+            {
+                // Bytes are searched for in the stream of the view, not in the lines of its text: a sequence that goes on in the next row is a match.
+                QueryError = null;
+                if (byteTarget.FindNextBytes(pattern, up, wrapAround: true))
+                {
+                    ResultText = "";
+                }
+                else if (CanReplace)
+                {
+                    ResultText = "Cannot find \"" + FormatBytes(pattern) + "\".";
+                }
+                else
+                {
+                    MessageBoxes.Info("Cannot find \"" + FormatBytes(pattern) + "\"");
+                }
                 return;
             }
             TextMatcher matcher = CreateMatcher();
@@ -504,9 +581,13 @@ public class TextSearcher : INotifyPropertyChanged
 
     // ---- highlighting of the matches
 
-    /// <summary>Marks all matches of the searched text in the editor (file editor tabs only).</summary>
+    /// <summary>
+    /// Marks all matches of the searched text in the editor (file editor tabs only), or the matches of the searched
+    /// bytes in a view that searches its stream of bytes (the HEX terminal).
+    /// </summary>
     private void UpdateHighlight()
     {
+        UpdateByteHighlight();
         if (!CanReplace)
         {
             return;
@@ -519,8 +600,41 @@ public class TextSearcher : INotifyPropertyChanged
         editor.SetMatchHighlight(_IsVisible ? CreateMatcher() : null);
     }
 
+    private void UpdateByteHighlight()
+    {
+        if (_GetByteTarget == null)
+        {
+            return;
+        }
+        try
+        {
+            IByteSearchTarget target = null;
+            byte[] pattern = null;
+            if (_IsVisible)
+            {
+                TryGetByteQuery(out target, out pattern);
+            }
+            if (_highlightedByteTarget != null && _highlightedByteTarget != target)
+            {
+                _highlightedByteTarget.SetByteHighlight(null);
+                _highlightedByteTarget = null;
+            }
+            if (target != null)
+            {
+                target.SetByteHighlight(pattern);
+                _highlightedByteTarget = (pattern != null) ? target : null;
+            }
+        }
+        catch (Exception)
+        {
+            // The marks are a hint: a view that is being closed must not break the typing in the search bar.
+            _highlightedByteTarget = null;
+        }
+    }
+
     private void ClearHighlights()
     {
+        UpdateByteHighlight();
         EndScope();
         _InSelection = false;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("InSelection"));

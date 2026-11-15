@@ -1,5 +1,6 @@
 using SmarTTY.Controls;
 using SmarTTY.Ssh;
+using SmarTTY.TextEditing;
 using SmarTTY.Transport;
 using System;
 using System.ComponentModel;
@@ -78,7 +79,9 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Control = host;
         // Search resolves the current view and query normalization lazily, so one searcher covers the ASCII text
         // view and the HEX dump editor, switching automatically when the user toggles HEX mode.
-        Searcher = new TextSearcher(() => Terminal.SearchTextEditor, q => Terminal.HexMode ? NormalizeHexQuery(q) : q);
+        // In the HEX view a query of HEX bytes is searched for in the stream of the bytes (a sequence may go on in the
+        // next row of the dump); any other query is searched for in the text of the view, as typed.
+        Searcher = new TextSearcher(() => Terminal.SearchTextEditor, q => q, () => Terminal.ByteSearchTarget, q => Terminal.HexMode ? ParseHexQuery(q) : null);
         // The transport is opened when the control gets its window, exactly as the standalone terminal window did
         // in OnShown: output that arrives for a control without a handle is the thing to avoid.
         if (Terminal.IsHandleCreated)
@@ -222,38 +225,12 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Rewrites a HEX search query into the form stored by the HEX dump editor: lowercase byte pairs separated by
-    /// single spaces ("0a 0d"). Returns the query unchanged when it is not a plain HEX byte sequence (an odd number
-    /// of digits, an empty string or any non-HEX character such as a letter beyond a-f) or when it already can be
-    /// matched as typed.
+    /// The bytes a HEX search query stands for ("0A0D", "0a 0d"; the same forms as in the search of the HEX editor:
+    /// HexDocument.TryParseHexBytes), or null when it is not a HEX byte sequence (an odd number of digits, an empty
+    /// string or any non-HEX character such as a letter beyond a-f): that query is searched for as text, as typed.
     /// </summary>
-    private static string NormalizeHexQuery(string query)
+    internal static byte[] ParseHexQuery(string query)
     {
-        if (string.IsNullOrEmpty(query))
-        {
-            return query;
-        }
-        string digits = query.Replace(" ", "").Replace("\t", "");
-        if (digits.Length == 0 || (digits.Length & 1) != 0)
-        {
-            return query;
-        }
-        for (int i = 0; i < digits.Length; i++)
-        {
-            if (!Uri.IsHexDigit(digits[i]))
-            {
-                return query;
-            }
-        }
-        StringBuilder builder = new StringBuilder(digits.Length + digits.Length / 2);
-        for (int i = 0; i < digits.Length; i += 2)
-        {
-            if (i > 0)
-            {
-                builder.Append(' ');
-            }
-            builder.Append(char.ToLowerInvariant(digits[i])).Append(char.ToLowerInvariant(digits[i + 1]));
-        }
-        return builder.ToString();
+        return HexDocument.TryParseHexBytes(query, out byte[] bytes, out _) ? bytes : null;
     }
 }

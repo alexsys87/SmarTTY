@@ -1586,6 +1586,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return _document.IndexToColumn(line, index, TabSize);
     }
 
+    /// <summary>Scrolls the text so that <paramref name="textPosition"/> is on the screen (as a found match is shown).</summary>
+    public void ScrollIntoView(TextDocument.TextPosition textPosition)
+    {
+        EnsureCaretVisible(textPosition);
+    }
+
     private bool EnsureCaretVisible(TextDocument.TextPosition textPosition)
     {
         return EnsureVisible(textPosition, center: false);

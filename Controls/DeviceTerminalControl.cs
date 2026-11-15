@@ -106,6 +106,12 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// </summary>
     public TextEditorControl SearchTextEditor => HexMode ? hexTerminalControl1.SearchTextEditor : _serialTerminalControl;
 
+    /// <summary>
+    /// The HEX dump in HEX and combined modes (null in ASCII mode): the search bar searches its stream of bytes for a
+    /// query of HEX bytes, because a byte sequence may go on in the next row of the dump.
+    /// </summary>
+    public IByteSearchTarget ByteSearchTarget => HexMode ? hexTerminalControl1 : null;
+
     /// <summary>Raised when the user presses Ctrl+W and the shared "Close tab on Ctrl+W" option is on.</summary>
     public event EventHandler CloseTabRequested;
 
