@@ -112,6 +112,26 @@ internal static class Program
         Check(store.TryLoad(oldKey) == null && store.TryLoad(newKey) != null, "only the old draft is gone");
         Equal(new EditorDraftStore(Path.Combine(root, "missing")).DeleteOlderThan(TimeSpan.FromDays(1)), 0, "cleaning a missing directory is not an error");
 
+        // B-103: a worker that asks before the tab has its window handle waits for the handle instead of calling Invoke too early.
+        int polls = 0;
+        int slept = 0;
+        Check(SmarTTY.Utilities.UiHandleWait.Until(() => false, () => ++polls > 3, (int ms) => slept += ms), "the handle that appears after three polls is waited for");
+        Equal(polls, 4, "the wait stops at the first poll that finds the handle");
+        Equal(slept, 3 * SmarTTY.Utilities.UiHandleWait.StepMilliseconds, "it slept between the polls, not after the last");
+        slept = 0;
+        Check(SmarTTY.Utilities.UiHandleWait.Until(() => false, () => true, (int ms) => slept += ms) && slept == 0, "a handle that exists already is not waited for");
+        slept = 0;
+        Check(!SmarTTY.Utilities.UiHandleWait.Until(() => true, () => true, (int ms) => slept += ms) && slept == 0, "a tab that is closed has no handle to wait for (closed is checked first)");
+        polls = 0;
+        Check(!SmarTTY.Utilities.UiHandleWait.Until(() => ++polls > 2, () => false, (int ms) => { }), "a tab that is closed while waiting ends the wait");
+        Equal(polls, 3, "the wait ends at the first poll that finds the tab closed");
+        int tries = 0;
+        slept = 0;
+        Check(!SmarTTY.Utilities.UiHandleWait.Until(() => false, () => { tries++; return false; }, (int ms) => slept += ms), "a handle that never comes ends the wait");
+        Equal(tries, SmarTTY.Utilities.UiHandleWait.Attempts, "it tried 600 times");
+        Equal(slept, 30000, "and waited 30 seconds in all");
+        Check(SmarTTY.Utilities.UiHandleWait.Until(() => false, () => true, null, 1), "the real sleep is used when none is given (a handle that exists is not slept for)");
+
         // B-105 (minor): an encrypted draft is one binary block (format 4), not base64 inside a protected base64 blob.
         string blockKey = EditorDraftStore.KeyFor("a", "/bin/big");
         byte[] blob = new byte[300000];
