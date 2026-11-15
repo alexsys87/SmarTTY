@@ -3132,6 +3132,49 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("lateral"), "SQL keywords contain 'lateral'");
     }
 
+    private static void MarkupEmbeddedChecks()
+    {
+        Highlighted embedded = new Highlighted(L.Markup,
+            "<html>\n<script type=\"module\">\nconst answer = 42; // note\nconst t = `x\nstill`;\n</script>\n<style>\nbody { font-size: 12px; }\n</style>\n<p class=\"x\">text</p>\n</html>");
+        Equal(Join(embedded.Tokens(1, SyntaxHighlighting.TypeKeyword)), "<script", "Markup: the <script> tag");
+        Equal(Join(embedded.Tokens(1, SyntaxHighlighting.TypeString)), "\"module\"", "Markup: the type of the script");
+        Equal(Join(embedded.Tokens(2, SyntaxHighlighting.TypeKeyword)), "const", "Markup: a JavaScript keyword inside <script>");
+        Equal(Join(embedded.Tokens(2, SyntaxHighlighting.TypeNumber)), "42", "Markup: a JavaScript number inside <script>");
+        Equal(Join(embedded.Tokens(2, SyntaxHighlighting.TypeComment)), "// note", "Markup: a JavaScript comment inside <script>");
+        Equal(Join(embedded.Tokens(3, SyntaxHighlighting.TypeKeyword)), "const", "Markup: JavaScript continues after a tag line");
+        Equal(Join(embedded.Tokens(3, SyntaxHighlighting.TypeString)), "`x", "Markup: a template string starts inside <script>");
+        Equal(Join(embedded.Tokens(4, SyntaxHighlighting.TypeString)), "still`", "Markup: the template string survives a line break");
+        Equal(Join(embedded.Tokens(5, SyntaxHighlighting.TypeKeyword)), "</script", "Markup: the closing </script> tag");
+        Equal(Join(embedded.Tokens(7, SyntaxHighlighting.TypeKeyword)), "font-size", "Markup: a CSS property inside <style>");
+        Equal(Join(embedded.Tokens(9, SyntaxHighlighting.TypeKeyword)), "<p|</p", "Markup: the tags after </style>");
+        Equal(Join(embedded.Tokens(9, SyntaxHighlighting.TypeString)), "\"x\"", "Markup: the attribute after </style>");
+
+        Highlighted inline = new Highlighted(L.Markup, "<script>let x = 1;</script><p>ok</p>");
+        Equal(Join(inline.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<script|let|</script|<p|</p", "Markup: an inline script and the markup after it");
+        Equal(Join(inline.Tokens(0, SyntaxHighlighting.TypeNumber)), "1", "Markup: an inline script number");
+        Highlighted inlineStyle = new Highlighted(L.Markup, "<style>.a { color: red; }</style>");
+        Equal(Join(inlineStyle.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<style|color|</style", "Markup: an inline style");
+
+        Highlighted opening = new Highlighted(L.Markup, "<script\n  type=\"module\">\nlet x = 1;\n</script>");
+        Equal(Join(opening.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<script", "Markup: a <script> tag that goes on");
+        Equal(Join(opening.Tokens(1, SyntaxHighlighting.TypeString)), "\"module\"", "Markup: ...to the next line");
+        Equal(Join(opening.Tokens(2, SyntaxHighlighting.TypeKeyword)), "let", "Markup: the script after the multi-line tag");
+
+        Highlighted selfClosing = new Highlighted(L.Markup, "<script src=\"app.js\" />\n<p>text</p>");
+        Equal(Join(selfClosing.Tokens(0, SyntaxHighlighting.TypeKeyword)), "<script", "Markup: a self-closing <script> tag");
+        Equal(Join(selfClosing.Tokens(1, SyntaxHighlighting.TypeKeyword)), "<p|</p", "Markup: a self-closing script does not hide the next line");
+
+        Highlighted comment = new Highlighted(L.Markup, "<!-- <script> -->\n<p>x</p>");
+        Equal(Join(comment.Tokens(0, SyntaxHighlighting.TypeComment)), "<!-- <script> -->", "Markup: a tag inside a comment stays a comment");
+        Equal(Join(comment.Tokens(1, SyntaxHighlighting.TypeKeyword)), "<p|</p", "Markup: the tags after the comment");
+
+        Highlighted block = new Highlighted(L.Markup, "<script>\n/*\nnote\n*/\nconst x = 1;\n</script>");
+        Equal(Join(block.Tokens(1, SyntaxHighlighting.TypeComment)), "/*", "Markup: a JavaScript block comment starts");
+        Equal(Join(block.Tokens(2, SyntaxHighlighting.TypeComment)), "note", "Markup: ...continues");
+        Equal(Join(block.Tokens(3, SyntaxHighlighting.TypeComment)), "*/", "Markup: ...and ends");
+        Equal(Join(block.Tokens(4, SyntaxHighlighting.TypeKeyword)), "const", "Markup: the code after the block comment");
+    }
+
     private static void PostgreSqlChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/etc/postgresql/16/main/postgresql.conf"), L.PostgreSql, "postgresql.conf");
@@ -3834,6 +3877,7 @@ internal static class Program
         AnsibleChecks();
         PostgreSqlChecks();
         SqlChecks();
+        MarkupEmbeddedChecks();
         TomlChecks();
         KconfigChecks();
         UBootChecks();
