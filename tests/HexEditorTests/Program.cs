@@ -203,6 +203,18 @@ internal static class Program
         Equal(HexScroll.ClampScrollX(-30, 1000, 400), 0, "a position before the start is brought back to 0");
         Equal(HexScroll.ClampScrollX(120, 640, 900), 0, "a wide window has no bar and nothing to scroll: Shift+wheel down leaves the position at 0");
         Equal(HexScroll.ClampScrollX(120, 640, 640), 0, "content exactly as wide as the window: nothing to scroll");
+
+        int wheel = 0;
+        Equal(HexScroll.WheelNotches(ref wheel, 120), 1, "one wheel notch scrolls one step");
+        Equal(HexScroll.WheelNotches(ref wheel, -240), -2, "two notches down scroll two steps");
+        wheel = 0;
+        Equal(HexScroll.WheelNotches(ref wheel, 30) + HexScroll.WheelNotches(ref wheel, 30) + HexScroll.WheelNotches(ref wheel, 30), 0, "small touchpad deltas do not scroll before they add up to a notch");
+        Equal(HexScroll.WheelNotches(ref wheel, 30), 1, "the fourth small delta completes the notch");
+        Equal(wheel, 0, "and nothing is left over");
+        wheel = 0;
+        HexScroll.WheelNotches(ref wheel, 90);
+        Equal(HexScroll.WheelNotches(ref wheel, -30), 0, "a change of direction drops the rest of the other one");
+        Equal(wheel, -30, "and counts from the new direction");
         Equal(HexScroll.ClampScrollX(5, 0, 1), 0, "an empty content is not scrolled");
         // The wheel of the report: 100 notches down in a window as wide as the table.
         int scrollX = 0;

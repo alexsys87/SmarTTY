@@ -64,6 +64,27 @@ public static class HexScroll
         }
         return Math.Min(Math.Max(1, maxSteps), 1 + distance / Math.Max(1, unit));
     }
+
+    /// <summary>
+    /// Adds a mouse wheel <paramref name="delta"/> to <paramref name="remainder"/> and returns the whole notches (120 each, the sign of the
+    /// delta) that are due, keeping the rest: a notch of a wheel is 120, but a precision touchpad sends many small deltas, and counting
+    /// each of them as a notch scrolled a whole step per event. A change of direction drops the rest.
+    /// </summary>
+    public static int WheelNotches(ref int remainder, int delta)
+    {
+        if (delta == 0)
+        {
+            return 0;
+        }
+        if (remainder != 0 && Math.Sign(remainder) != Math.Sign(delta))
+        {
+            remainder = 0;
+        }
+        remainder += delta;
+        int notches = remainder / 120;
+        remainder -= notches * 120;
+        return notches;
+    }
 }
 
 public sealed class HexDocument
