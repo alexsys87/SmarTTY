@@ -355,6 +355,90 @@ internal static class Program
                     "Overwrite keeps the permissions of the file", Describe(run));
                 Check(!File.Exists(real + ".smtty~") && !File.Exists(link + ".smtty~"), "no unfinished file is left after an overwrite");
             }
+            if (OperatingSystem.IsLinux())
+            {
+                // A running program cannot be opened for writing (ETXTBSY), so writing through the file fails. The data is checked by then:
+                // a plain file is replaced by a rename after all (the running program is left alone, the executable bit stays), a symbolic
+                // link is not replaced, and the checked copy is kept and its path reported instead of the only copy being deleted.
+                string sleepTool = new[] { "/bin/sleep", "/usr/bin/sleep" }.FirstOrDefault(File.Exists);
+                string busy = Path.Combine(remoteDir, "busy-prog");
+                Process running = null;
+                bool isBusy = false;
+                if (sleepTool != null)
+                {
+                    try
+                    {
+                        File.Copy(sleepTool, busy, true);
+                        File.SetUnixFileMode(busy, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                        running = Process.Start(new ProcessStartInfo(busy, "300") { UseShellExecute = false });
+                        Thread.Sleep(300);
+                        try { File.OpenWrite(busy).Dispose(); }
+                        catch (IOException) { isBusy = true; }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+                if (!isBusy)
+                {
+                    Console.WriteLine("  skip replacing a running program (it cannot be started here)");
+                }
+                else
+                {
+                    try
+                    {
+                        string link = Path.Combine(remoteDir, "link-to-busy");
+                        File.CreateSymbolicLink(link, "busy-prog");
+                        Run linked = RunSend(device, text, link, Fast(overwrite: true));
+                        Check(linked.Error is IOException && linked.Error.Message.Contains("checked copy is kept") && linked.Error.Message.Contains(link + ".smtty~") && linked.Error.Message.Contains("in use"),
+                            "a link to a running program is not replaced: the failure says where the checked copy is", Describe(linked));
+                        Check(File.Exists(link + ".smtty~") && File.ReadAllBytes(link + ".smtty~").SequenceEqual(File.ReadAllBytes(text)), "the checked copy is on the device and complete");
+                        Check(new FileInfo(link).LinkTarget == "busy-prog" && File.ReadAllBytes(busy).SequenceEqual(File.ReadAllBytes(sleepTool)), "the link and the program are as they were");
+                        Check(linked.Errors == 0, "a failure of the writing is not tried again", "errors " + linked.Errors);
+                        File.Delete(link + ".smtty~");
+                        File.Delete(link);
+
+                        Run replaced = RunSend(device, binary, busy, Fast(overwrite: true));
+                        Check(replaced.Error == null && replaced.Result && File.ReadAllBytes(busy).SequenceEqual(File.ReadAllBytes(binary)), "a running program is replaced by a rename", Describe(replaced));
+                        Check((File.GetUnixFileMode(busy) & UnixFileMode.UserExecute) != 0 && !File.Exists(busy + ".smtty~"), "it is still executable and nothing is left over");
+                        Check(!running.HasExited, "the running program was left alone");
+                    }
+                    finally
+                    {
+                        try { running.Kill(); } catch (Exception) { }
+                        running.Dispose();
+                    }
+                }
+            }
+            if (OperatingSystem.IsLinux())
+            {
+                // The file system fills up while the old file is being written over (a router's small overlay): the checked file is already
+                // next to it, and a rename needs no space, so the file ends up complete instead of cut off with the checked copy deleted.
+                string mount = Path.Combine(dir, "small-fs");
+                Directory.CreateDirectory(mount);
+                if (!RunTool("mount", "-t tmpfs -o size=200k tmpfs \"" + mount + "\""))
+                {
+                    Console.WriteLine("  skip a full file system (a small tmpfs cannot be mounted here)");
+                }
+                else
+                {
+                    try
+                    {
+                        string target = Path.Combine(mount, "data.bin");
+                        File.WriteAllBytes(target, RandomBytes(50_000, 61));
+                        byte[] bigger = RandomBytes(120_000, 62);
+                        string biggerPath = Path.Combine(dir, "bigger.bin");
+                        File.WriteAllBytes(biggerPath, bigger);
+                        Run run = RunSend(device, biggerPath, target, Fast(overwrite: true));
+                        Check(run.Error == null && run.Result && File.ReadAllBytes(target).SequenceEqual(bigger), "a file system that fills up while the old file is written over still ends with the new file", Describe(run));
+                        Check(!File.Exists(target + ".smtty~"), "and nothing is left over");
+                    }
+                    finally
+                    {
+                        RunTool("umount", "\"" + mount + "\"");
+                    }
+                }
+            }
             {
                 Run run = RunSend(device, text, Path.Combine(remoteDir, "no-such-dir", "x.txt"), Fast());
                 Check(run.Error != null && run.Error.Message.Contains("cannot write"), "unwritable destination is reported", Describe(run));

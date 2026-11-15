@@ -17,7 +17,8 @@ namespace SmarTTY.IO;
 /// result is compared with the checksum of the original. A transfer from the device runs the same way in reverse.
 /// Only tools that busybox has are used on the device: gzip/gunzip, base64 or uuencode/uudecode, sha256sum/md5sum/cksum
 /// and head (or dd). Nothing is installed on the device and no temporary file is kept on it except the unfinished
-/// "name.smtty~" next to the destination, which is renamed to the real name only after the checksum matched.
+/// "name.smtty~" next to the destination, which is renamed to the real name only after the checksum matched (and kept, with a
+/// message, when it cannot be put in place).
 /// The protocol is the same one the user would type by hand, so it is easy to repeat in any terminal.
 /// The "gzip + cat" form (<see cref="EncodingKind.Raw"/>) sends the gzip archive as it is, without any text form: the device puts its
 /// terminal in raw mode and reads exactly as many bytes as the archive has (head -c, a counted cat), the checksum at the end is the
@@ -877,10 +878,11 @@ public static class GzipBase64Transfer
             string[] script =
             {
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
+                PutFunctionScript(),
                 EndFunctionScript(prepared, sumTool, trim),
                 overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else trap '' INT QUIT TSTP; printf " + Say("READY")
                     + "; sed -n " + ShellQuote("/^" + _endMarker + "$/q;p") + " | ( " + decoder
-                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
+                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; _smtty_end; unset -f _smtty_end _smtty_put 2>/dev/null; fi"
             };
 
             Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
@@ -932,17 +934,33 @@ public static class GzipBase64Transfer
         }
 
         /// <summary>
+        /// The shell function that puts the checked file "$p" in place of "$d" (it is typed as a line of its own, because the line editor of a
+        /// small device takes about 480 characters). Its status is that of the last step: false when the file could not be put in place.
+        /// </summary>
+        private static string PutFunctionScript()
+        {
+            // A file that is there (a symbolic link to one too) is written through, not replaced: mv would put a new file with the
+            // default permissions and owner in its place (a script would lose its executable bit) and would turn a link into a plain
+            // file. When the writing fails (a running program cannot be opened for writing, ETXTBSY; the file system is full), the data is
+            // checked by now, so a plain file that may be written to is replaced after all: a rename needs no space and leaves the
+            // running program alone. The executable bit is carried over; the owner and the links to the old file are not. A link, or a
+            // file that it is not allowed to write to, is left as it is.
+            return "_smtty_put() { if [ -f \"$d\" ]; then if cat \"$p\" >\"$d\"; then rm -f \"$p\"; else [ ! -L \"$d\" ] && [ -w \"$d\" ]"
+                + " && { [ ! -x \"$d\" ] || chmod +x \"$p\"; } && mv -f \"$p\" \"$d\"; fi; else mv -f \"$p\" \"$d\"; fi; }";
+        }
+
+        /// <summary>
         /// The shell function that ends a send on the device: it compares the checksum of what was unpacked into "$p" with the one of the
-        /// original and renames "$p" to "$d" only when they are the same (the unpacker's status is in $r). It prints OK:sum or FAIL:status:sum:size.
+        /// original and puts "$p" in place of "$d" (_smtty_put) only when they are the same (the unpacker's status is in $r). It prints
+        /// OK:sum or FAIL:status:sum:size. When the checked file could not be put in place (the status is then "write"), it is kept, and the
+        /// last field is its path instead of the size: it is the only copy of the data that the device has, and the old file may be gone.
         /// </summary>
         private string EndFunctionScript(Prepared prepared, string sumTool, string trim)
         {
             return "_smtty_end() { s=$(" + sumTool + " <\"$p\");" + trim + " if [ $r -eq 0 ] && [ \"$s\" = " + ShellQuote(prepared.Checksum) + " ]"
-                // A file that is there (a symbolic link to one too) is written through, not replaced: mv would put a new file with the
-                // default permissions and owner in its place (a script would lose its executable bit) and would turn a link into a plain
-                // file. The data is checked by now, and the copy is the only step that can still fail (the status is then "write").
-                + " && { if [ -f \"$d\" ]; then cat \"$p\" >\"$d\" && rm -f \"$p\"; else mv -f \"$p\" \"$d\"; fi || { r=write; false; }; }; then printf "
-                + Say("OK:%s") + " \"$s\"; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; printf " + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }";
+                + " && { _smtty_put || { r=write; false; }; }; then printf " + Say("OK:%s")
+                + " \"$s\"; else if [ \"$r\" = write ]; then z=$p; else z=$(wc -c <\"$p\" 2>/dev/null); rm -f \"$p\"; fi; printf "
+                + Say("FAIL:%s:%s:%s") + " \"$r\" \"$s\" \"$z\"; fi; }";
         }
 
         /// <summary>Reads the device's verdict of a send. Null on success, the reason when the data did not arrive intact; throws for an answer that makes no sense.</summary>
@@ -967,7 +985,10 @@ public static class GzipBase64Transfer
                 Trace("The device refused the data: gunzip status " + code + ", checksum " + deviceSum + ", unpacked " + unpacked + " bytes");
                 if (code == "write")
                 {
-                    return "The data arrived intact, but the device could not write it to the destination (out of space, or no permission).";
+                    // Nothing is tried again: the data is on the device, checked, and it is the writing that fails. The device has kept
+                    // the checked file (its path is in the place of the size), which may be all that is left of the data.
+                    string kept = unpacked.Length > 0 ? " The checked copy is kept on the device as " + unpacked + ": move it in place when the destination can be written." : string.Empty;
+                    throw new IOException("The data arrived intact, but the device could not write it to the destination (out of space, no permission, or the file is in use)." + kept);
                 }
                 if (code == "0")
                 {
@@ -1019,10 +1040,11 @@ public static class GzipBase64Transfer
             string[] script =
             {
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
+                PutFunctionScript(),
                 EndFunctionScript(prepared, sumTool, trim),
                 overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else o=$(stty -g); stty raw -echo min 0 time "
                     + RawIdleDeciseconds.ToString(CultureInfo.InvariantCulture) + "; printf " + Say("READY") + "; " + reader
-                    + " | ( gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; stty min 0 time 3; cat >/dev/null; stty \"$o\"; unset o; _smtty_end; unset -f _smtty_end 2>/dev/null; fi"
+                    + " | ( gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; stty min 0 time 3; cat >/dev/null; stty \"$o\"; unset o; _smtty_end; unset -f _smtty_end _smtty_put 2>/dev/null; fi"
             };
 
             Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
