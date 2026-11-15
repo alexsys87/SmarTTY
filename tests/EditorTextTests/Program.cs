@@ -3105,6 +3105,33 @@ internal static class Program
         Equal(Join(CommentStyle.ForLanguage(L.Ansible).Toggle(new[] { "  become: yes" })), "  # become: yes", "Ansible comment");
     }
 
+    private static void SqlChecks()
+    {
+        Highlighted sql = new Highlighted(L.Sql,
+            "-- PostgreSQL\nCREATE TABLE users (id BIGSERIAL PRIMARY KEY, profile JSONB, created_at TIMESTAMPTZ DEFAULT now());\nSELECT jsonb_agg(name) FILTER (WHERE active) FROM users u LEFT JOIN LATERAL (SELECT 1) p ON TRUE;\nINSERT INTO logs (body) VALUES ('x') ON CONFLICT (id) DO NOTHING RETURNING id;\n-- MySQL\nCREATE TABLE logs (id BIGINT UNSIGNED AUTO_INCREMENT, body LONGTEXT, PRIMARY KEY (id)) ENGINE=InnoDB;\nINSERT IGNORE INTO logs (body) VALUES ('x') ON DUPLICATE KEY UPDATE body = VALUES(body);\n-- SQLite\nPRAGMA journal_mode = WAL;\nINSERT OR REPLACE INTO settings (name, value) VALUES ('a', 'b');\n-- PL/pgSQL\nDECLARE n INT := 0; BEGIN RAISE NOTICE 'done'; EXCEPTION WHEN OTHERS THEN NULL; END;");
+        Equal(Join(sql.Tokens(0, SyntaxHighlighting.TypeComment)), "-- PostgreSQL", "SQL: a PostgreSQL comment");
+        Equal(Join(sql.Tokens(1, SyntaxHighlighting.TypeKeyword)),
+            "CREATE|TABLE|BIGSERIAL|PRIMARY|KEY|JSONB|TIMESTAMPTZ|DEFAULT|now", "SQL: PostgreSQL types and functions");
+        Equal(Join(sql.Tokens(2, SyntaxHighlighting.TypeKeyword)),
+            "SELECT|jsonb_agg|FILTER|WHERE|FROM|LEFT|JOIN|LATERAL|SELECT|ON|TRUE", "SQL: a lateral join with an aggregate");
+        Equal(Join(sql.Tokens(3, SyntaxHighlighting.TypeKeyword)),
+            "INSERT|INTO|VALUES|ON|CONFLICT|DO|NOTHING|RETURNING", "SQL: an upsert with returning");
+        Equal(Join(sql.Tokens(5, SyntaxHighlighting.TypeKeyword)),
+            "CREATE|TABLE|BIGINT|UNSIGNED|AUTO_INCREMENT|LONGTEXT|PRIMARY|KEY|ENGINE", "SQL: MySQL types and table options");
+        Equal(Join(sql.Tokens(6, SyntaxHighlighting.TypeKeyword)),
+            "INSERT|IGNORE|INTO|VALUES|ON|DUPLICATE|KEY|UPDATE|VALUES", "SQL: MySQL insert ignore and duplicate key");
+        Equal(Join(sql.Tokens(8, SyntaxHighlighting.TypeKeyword)), "PRAGMA", "SQL: the SQLite pragma");
+        Equal(Join(sql.Tokens(9, SyntaxHighlighting.TypeKeyword)), "INSERT|OR|REPLACE|INTO|VALUES", "SQL: SQLite insert or replace");
+        Equal(Join(sql.Tokens(11, SyntaxHighlighting.TypeKeyword)),
+            "DECLARE|INT|BEGIN|RAISE|NOTICE|EXCEPTION|WHEN|OTHERS|THEN|NULL|END", "SQL: a PL/pgSQL block");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("jsonb"), "SQL keywords contain 'jsonb'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("auto_increment"), "SQL keywords contain 'auto_increment'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("pragma"), "SQL keywords contain 'pragma'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("raise"), "SQL keywords contain 'raise'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("returning"), "SQL keywords contain 'returning'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("lateral"), "SQL keywords contain 'lateral'");
+    }
+
     private static void PostgreSqlChecks()
     {
         Equal(SyntaxHighlighting.DetectLanguage("/etc/postgresql/16/main/postgresql.conf"), L.PostgreSql, "postgresql.conf");
@@ -3806,6 +3833,7 @@ internal static class Program
         DockerComposeChecks();
         AnsibleChecks();
         PostgreSqlChecks();
+        SqlChecks();
         TomlChecks();
         KconfigChecks();
         UBootChecks();

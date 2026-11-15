@@ -62,6 +62,10 @@ internal static class Program
         Check(SyntaxHighlighting.GetKeywords(L.Uci).Contains("config"), "UCI keywords contain 'config'");
         Check(SyntaxHighlighting.GetKeywords(L.Yaml).Contains("true"), "YAML literals contain 'true'");
         Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("select"), "SQL keywords contain 'select'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("jsonb"), "SQL keywords contain the PostgreSQL type 'jsonb'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("auto_increment"), "SQL keywords contain the MySQL option 'auto_increment'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("pragma"), "SQL keywords contain the SQLite command 'pragma'");
+        Check(SyntaxHighlighting.GetKeywords(L.Sql).Contains("raise"), "SQL keywords contain the PL/pgSQL command 'raise'");
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("constexpr"), "C++ keywords contain 'constexpr'");
         Check(SyntaxHighlighting.GetKeywords(L.Cpp).Contains("nullptr"), "C++ keywords contain 'nullptr'");
         Check(!SyntaxHighlighting.GetKeywords(L.Cpp).Contains("interface"), "C++ keywords do not include the C# 'interface'");
@@ -121,6 +125,11 @@ internal static class Program
         Check(Names(L.LinkerScript, "", "").Contains("VERSION"), "the linker command 'VERSION' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("NOCROSSREFS"), "the linker command 'NOCROSSREFS' is offered");
         Check(Names(L.LinkerScript, "", "").Contains("NOCROSSREFS_TO"), "the linker command 'NOCROSSREFS_TO' is offered");
+        Check(Names(L.Sql, "", "").Contains("jsonb"), "the PostgreSQL type 'jsonb' is offered");
+        Check(Names(L.Sql, "", "").Contains("timestamptz"), "the PostgreSQL type 'timestamptz' is offered");
+        Check(Names(L.Sql, "", "").Contains("auto_increment"), "the MySQL option 'auto_increment' is offered");
+        Check(Names(L.Sql, "", "").Contains("pragma"), "the SQLite command 'pragma' is offered");
+        Check(Names(L.Sql, "", "").Contains("raise"), "the PL/pgSQL command 'raise' is offered");
         Check(Names(L.Crontab, "", "").Contains("jan"), "the crontab month 'jan' is offered");
         Check(Names(L.Crontab, "", "").Contains("MAILTO"), "the crontab variable 'MAILTO' is offered");
         Check(Names(L.Crontab, "", "").Contains("RANDOM_DELAY"), "the crontab variable 'RANDOM_DELAY' is offered");
