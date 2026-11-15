@@ -718,13 +718,60 @@ public static partial class SyntaxHighlighting
           local0 local1 local2 local3 local4 local5 local6 local7
           GET POST HEAD PUT DELETE OPTIONS");
 
+    /// <summary>The words that start a HAProxy section; a section folds up to the next one.</summary>
+    private static readonly HashSet<string> HAProxySections = Words(StringComparer.OrdinalIgnoreCase,
+        @"global defaults frontend backend listen peers resolvers userlist program cache http-errors ring log-forward
+          mailers fcgi-app httpclient traces acme");
+
+    /// <summary>The line state of a HAProxy file inside a section, which folds up to the next header.</summary>
+    private const int StHAProxySection = 0x01;
+
     /// <summary>
     /// HAProxy: the colours of Config with the sections (global, defaults, frontend, backend, listen, ...), the
-    /// directives and their common values known. A section name that stands alone is a keyword too.
+    /// directives and their common values known. A section name that stands alone is a keyword too. A section folds
+    /// up to the header of the next one.
     /// </summary>
     private static bool TokenizeHAProxy(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
-        return TokenizeConfigCore(HAProxyDirectives, startState, text, sink, out endState, valueKeywords: HAProxyValues);
+        int len = text.Length;
+        int first = SkipBlanks(text, 0);
+        int wordEnd = first;
+        if (first < len && text[first] != '#')
+        {
+            while (wordEnd < len && !IsBlank(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+        }
+        bool section = wordEnd > first && HAProxySections.Contains(text.Substring(first, wordEnd - first));
+        bool inSection = (startState & StHAProxySection) != 0;
+
+        LineBuffer buffer = new LineBuffer(sink);
+        if (section)
+        {
+            if (inSection)
+            {
+                // The header of the next section closes the previous one; that line stays visible.
+                buffer.InsertPairedToken(first, PairHAProxySection, false, null);
+            }
+            inSection = true;
+        }
+        bool result = TokenizeConfigCore(HAProxyDirectives, startState, text, buffer, out endState, valueKeywords: HAProxyValues);
+        if (section)
+        {
+            buffer.InsertPairedToken(len, PairHAProxySection, true, ExclusiveBlockRegion);
+        }
+        if (buffer.IsLastLine)
+        {
+            if (inSection)
+            {
+                buffer.AddPairedToken(TypeNormal, len, len, PairHAProxySection, false, null);
+            }
+            inSection = false;
+        }
+        buffer.Flush(-1, -2);
+        endState = inSection ? StHAProxySection : 0;
+        return result;
     }
 
     // ------------------------------------------------------------ Apache httpd
@@ -767,10 +814,86 @@ public static partial class SyntaxHighlighting
     /// <summary>
     /// Apache httpd: the colours of Config with the directives of httpd.conf, apache2.conf and .htaccess known, and
     /// the section names of &lt;Directory&gt;, &lt;VirtualHost&gt; and the other containers highlighted as words too.
+    /// A container folds up to its closing tag; &lt;Else&gt; and &lt;ElseIf&gt; belong to the block that &lt;If&gt; opened.
     /// </summary>
     private static bool TokenizeApache(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
-        return TokenizeConfigCore(ApacheDirectives, startState, text, sink, out endState, valueKeywords: ApacheValues);
+        LineBuffer buffer = new LineBuffer(sink);
+        AddApacheSectionPair(text, buffer);
+        bool result = TokenizeConfigCore(ApacheDirectives, startState, text, buffer, out endState, valueKeywords: ApacheValues);
+        buffer.Flush(-1, -2);
+        return result;
+    }
+
+    /// <summary>Pairs an Apache container tag with its closing tag: "&lt;VirtualHost *:80&gt;...&lt;/VirtualHost&gt;".</summary>
+    private static void AddApacheSectionPair(string text, LineBuffer sink)
+    {
+        int first = SkipBlanks(text, 0);
+        if (first + 1 >= text.Length || text[first] != '<' || text[first + 1] == '!')
+        {
+            return;
+        }
+        bool closing = text[first + 1] == '/';
+        int nameStart = first + (closing ? 2 : 1);
+        int nameEnd = nameStart;
+        while (nameEnd < text.Length && IsIdChar(text[nameEnd]))
+        {
+            nameEnd++;
+        }
+        int tagEnd = FindApacheTagEnd(text, first);
+        if (nameEnd == nameStart || tagEnd < 0)
+        {
+            return;
+        }
+        if (closing)
+        {
+            // The closing tag stays visible at the end of the folded region.
+            sink.InsertPairedToken(first, PairApacheBlock, false, null);
+            return;
+        }
+        string name = text.Substring(nameStart, nameEnd - nameStart);
+        if (name.Equals("Else", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("ElseIf", StringComparison.OrdinalIgnoreCase))
+        {
+            // These tags are part of the "If" block, not containers of their own.
+            return;
+        }
+        sink.InsertPairedToken(tagEnd + 1, PairApacheBlock, true, KeywordBlockRegion);
+    }
+
+    /// <summary>The index of the '&gt;' that ends a tag, skipping quoted values; -1 when the line has no end of tag.</summary>
+    private static int FindApacheTagEnd(string text, int start)
+    {
+        char quote = '\0';
+        for (int i = start + 1; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (quote != '\0')
+            {
+                if (c == '\\')
+                {
+                    i++;
+                }
+                else if (c == quote)
+                {
+                    quote = '\0';
+                }
+                continue;
+            }
+            if (c == '"' || c == '\'')
+            {
+                quote = c;
+            }
+            else if (c == '#' && IsBlank(text[i - 1]))
+            {
+                return -1;
+            }
+            else if (c == '>')
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     // -------------------------------------------------------- systemd-networkd

@@ -3240,7 +3240,7 @@ namespace SmarTTY.CodeEditing
 
         private static bool TokenizeConfig(int startState, string text, TokenCache.ITokenSink sink, out int endState)
         {
-            return TokenizeConfigCore(null, startState, text, sink, out endState);
+            return TokenizeConfigCore(null, startState, text, sink, out endState, foldSections: true);
         }
 
         /// <summary>
@@ -3255,14 +3255,17 @@ namespace SmarTTY.CodeEditing
         /// the anchors "&amp;name", the aliases "*name" and the merge key "&lt;&lt;" are coloured too.
         /// With <paramref name="keywordPrefixes"/> (Ansible) any word that starts with one of the prefixes is a keyword:
         /// a fully qualified collection name such as "ansible.builtin.apt" or "community.general.json_query".
+        /// With <paramref name="foldSections"/> (INI) a "[section]" header opens a block that folds up to the next header.
         /// </summary>
-        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false, bool yamlAnchors = false, HashSet<string> keywordPrefixes = null)
+        private static bool TokenizeConfigCore(HashSet<string> directives, int startState, string text, TokenCache.ITokenSink sink, out int endState, bool foldBraces = false, bool dollarParentheses = false, HashSet<string> valueKeywords = null, HashSet<string> phraseDirectives = null, bool valueKeywordsInValue = false, bool yamlAnchors = false, HashSet<string> keywordPrefixes = null, bool foldSections = false)
         {
             int len = text.Length;
             int last = 0;
             int i = SkipBlanks(text, 0);
             int valueStart = -1;
             endState = 0;
+            bool sectionOpen = foldSections && (startState & StConfigSection) != 0;
+            bool opensSection = false;
 
             if (i < len)
             {
@@ -3273,7 +3276,7 @@ namespace SmarTTY.CodeEditing
                 {
                     Normal(ref last, last, i, sink);
                     sink.AddToken(TypeComment, i, len);
-                    return true;
+                    return FinishConfigLine(sectionOpen, len, sink, out endState);
                 }
 
                 if (first == '[')
@@ -3282,10 +3285,17 @@ namespace SmarTTY.CodeEditing
                     int close = text.LastIndexOf(']');
                     if (close > i)
                     {
+                        if (sectionOpen)
+                        {
+                            // The header that starts here ends the section that is open; its line stays visible.
+                            sink.AddPairedToken(TypeNormal, 0, 0, PairConfigSection, false, null);
+                            sectionOpen = false;
+                        }
                         Normal(ref last, last, i, sink);
                         sink.AddToken(TypeSection, i, close + 1);
                         i = close + 1;
                         last = i;
+                        opensSection = foldSections;
                     }
                 }
                 else if ((StartsWithAt(text, i, "---") || StartsWithAt(text, i, "...")) && SkipBlanks(text, i + 3) == len)
@@ -3352,7 +3362,8 @@ namespace SmarTTY.CodeEditing
                 {
                     Normal(ref last, last, i, sink);
                     sink.AddToken(TypeComment, i, len);
-                    return true;
+                    AddConfigSectionOpener(opensSection, len, sink, ref sectionOpen);
+                    return FinishConfigLine(sectionOpen, len, sink, out endState);
                 }
 
                 // The separator of a key and its value; the value words of some formats are coloured only after it.
@@ -3500,6 +3511,31 @@ namespace SmarTTY.CodeEditing
             }
 
             Normal(ref last, last, len, sink);
+            AddConfigSectionOpener(opensSection, len, sink, ref sectionOpen);
+            return FinishConfigLine(sectionOpen, len, sink, out endState);
+        }
+
+        /// <summary>The state bit of a Config line inside an INI section that folds up to the next header.</summary>
+        private const int StConfigSection = 0x01;
+
+        /// <summary>Opens a folding INI section at the end of its header line.</summary>
+        private static void AddConfigSectionOpener(bool opensSection, int len, TokenCache.ITokenSink sink, ref bool sectionOpen)
+        {
+            if (opensSection)
+            {
+                sink.AddPairedToken(TypeNormal, len, len, PairConfigSection, true, ExclusiveBlockRegion);
+                sectionOpen = true;
+            }
+        }
+
+        /// <summary>Keeps the section state across lines and closes the last section at the end of the document.</summary>
+        private static bool FinishConfigLine(bool sectionOpen, int len, TokenCache.ITokenSink sink, out int endState)
+        {
+            if (sectionOpen && sink.IsLastLine)
+            {
+                sink.AddPairedToken(TypeNormal, len, len, PairConfigSection, false, null);
+            }
+            endState = sectionOpen ? StConfigSection : 0;
             return true;
         }
 
@@ -6356,6 +6392,11 @@ namespace SmarTTY.CodeEditing
         private const int PairConditional = 8;   // Makefile ifeq...endif
         private const int PairDefineBlock = 9;   // Makefile define...endef
         private const int PairConfigBlock = 10;  // UCI "config" block up to the blank line
+        private const int PairConfigSection = 13; // INI [section] up to the next header
+        private const int PairHAProxySection = 14; // HAProxy global/defaults/frontend... sections
+        private const int PairApacheBlock = 15;  // Apache <VirtualHost>...</VirtualHost>
+        private const int PairKconfigBlock = 16; // Kconfig menu/choice/if...endmenu/endchoice/endif
+        private const int PairUBootIf = 17;      // U-Boot if...fi
 
         /// <summary>The fold of a keyword block: "if x; then...fi". The text after the closing keyword stays visible.</summary>
         private static readonly TokenCache.RegionStyle KeywordBlockRegion = new TokenCache.RegionStyle(
@@ -6420,6 +6461,18 @@ namespace SmarTTY.CodeEditing
                     index++;
                 }
                 _items.Insert(index, new Item { Type = TypeNormal, Start = position, End = position, PairId = pairId, IsPaired = true, IsOpening = isOpening, Style = regionStyle, Keep = true });
+            }
+
+            /// <summary>Runs the action for every ordinary token, in the order they will be sent.</summary>
+            public void ForEachToken(Action<int, int, int> action)
+            {
+                foreach (Item item in _items)
+                {
+                    if (!item.IsPaired)
+                    {
+                        action(item.Type, item.Start, item.End);
+                    }
+                }
             }
 
             public void AddPairedToken(int type, int start, int end, int pairId, bool isOpening, TokenCache.RegionStyle regionStyle)

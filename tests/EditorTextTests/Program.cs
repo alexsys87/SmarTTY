@@ -3599,6 +3599,46 @@ internal static class Program
         Equal(Folds(yamlAnchorList), "0:3", "YAML: a list at the indentation of an anchor key belongs to it");
         Highlighted yamlRootAnchor = new Highlighted(L.Yaml, "&root\n  a: 1\nb: 2\n");
         Equal(Folds(yamlRootAnchor), "0:2", "YAML: an anchor alone on its line opens a block");
+
+        // INI sections: a header folds up to the next one, the blank lines before it stay visible.
+        Highlighted ini = new Highlighted(L.Config,
+            "[server]\nhost = 1\nport = 22\n\n[client]\nmode = fast");
+        Equal(Folds(ini), "0:4", "INI sections fold up to the next header");
+        Highlighted iniOpen = new Highlighted(L.Config, "[server]\nhost = 1\nport = 22");
+        Equal(Folds(iniOpen), "0:2", "the last line of an INI section stays visible");
+
+        // Apache: a container tag folds up to its closing tag.
+        Highlighted apacheBlocks = new Highlighted(L.ApacheHttpd,
+            "<VirtualHost *:80>\n    ServerName example.com\n</VirtualHost>\n<Directory \"/srv\">\n    Require all granted\n</Directory>");
+        Equal(Folds(apacheBlocks), "0:2,3:5", "Apache sections fold on their tags");
+        Highlighted apacheNested = new Highlighted(L.ApacheHttpd,
+            "<IfModule mpm_event_module>\n<VirtualHost *:80>\n    ServerName example.com\n</VirtualHost>\n</IfModule>");
+        Equal(Folds(apacheNested), "0:4,1:3", "nested Apache sections fold");
+        Highlighted apacheElse = new Highlighted(L.ApacheHttpd,
+            "<If \"-R '10.0.0.0/8'\">\n    Require all granted\n</If>\n<If \"-R '192.168.0.0/16'\">\n    Require all denied\n<Else>\n    Require all granted\n</If>");
+        Equal(Folds(apacheElse), "0:2,3:7", "an Apache <Else> stays inside the block of its <If>");
+
+        // HAProxy: every section folds up to the next section header.
+        Highlighted haproxyBlocks = new Highlighted(L.HAProxy,
+            "global\n    maxconn 4096\n\ndefaults\n    mode http\n\nfrontend http-in\n    bind *:80\n    default_backend servers");
+        Equal(Folds(haproxyBlocks), "0:3,3:6,6:8", "HAProxy sections fold up to the next section");
+
+        // Kconfig: menu/choice/if blocks fold up to their closing word.
+        Highlighted kconfigBlocks = new Highlighted(L.Kconfig,
+            "menu \"Networking\"\nconfig NET\n\tbool \"Networking support\"\nendmenu\nchoice\n\tprompt \"Mode\"\nendchoice");
+        Equal(Folds(kconfigBlocks), "0:3,4:6", "Kconfig menu and choice blocks fold");
+        Highlighted kconfigIf = new Highlighted(L.Kconfig, "if NET\nconfig A\n\tbool \"A\"\nendif");
+        Equal(Folds(kconfigIf), "0:3", "a Kconfig if block folds");
+
+        // U-Boot: "if ...; then" folds up to "fi"; the "then" of an "elif" continues the same block.
+        Highlighted ubootIf = new Highlighted(L.UBoot,
+            "if test ${bootcount} -gt 3; then\n\trun bootcmd\nfi\necho done");
+        Equal(Folds(ubootIf), "0:2", "a U-Boot if block folds up to fi");
+        Highlighted ubootElif = new Highlighted(L.UBoot,
+            "if test a; then\n\trun first\nelif test b; then\n\trun second\nfi");
+        Equal(Folds(ubootElif), "0:4", "the then of an elif does not open a second block");
+        Highlighted ubootOneLine = new Highlighted(L.UBoot, "if test a; then run x; fi\necho done");
+        Equal(Folds(ubootOneLine), "", "a one-line U-Boot if does not fold");
     }
 
     private static void PairEditingChecks()
