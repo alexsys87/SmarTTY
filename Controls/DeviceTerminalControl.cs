@@ -1779,8 +1779,66 @@ public partial class DeviceTerminalControl : DpiAwareControl
             return;
         }
 
-        // See the send handler: only the name is needed here; the worker thread opens the file.
-        StartXModemTransfer("XMODEM Receive", "receive", fileStream: () => File.Create(fileName), isSend: false);
+        StartXModemReceive(fileName);
+    }
+
+    /// <summary>
+    /// Receives into a temporary file next to <paramref name="fileName"/> and puts it in place only when the transfer has
+    /// succeeded. The chosen file used to be created (and an existing one emptied) before the sender had answered, so a
+    /// transfer that failed or was cancelled left an empty or cut file under the real name.
+    /// </summary>
+    private void StartXModemReceive(string fileName)
+    {
+        StartLineTransfer("XMODEM Receive", "XMODEM", "receive", (sendData, progress, token) =>
+        {
+            string fullName = Path.GetFullPath(fileName);
+            string temporary = Path.Combine(Path.GetDirectoryName(fullName), Path.GetFileName(fullName) + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".part");
+            bool keepTemporary = false;
+            try
+            {
+                bool success;
+                using (FileStream stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    success = SmarTTY.IO.XModemTransfer.ReceiveFile(stream, sendData, ReadXModemByte, token, progress);
+                }
+                if (!success)
+                {
+                    return false;
+                }
+                try
+                {
+                    if (File.Exists(fullName))
+                    {
+                        File.Replace(temporary, fullName, null);
+                    }
+                    else
+                    {
+                        File.Move(temporary, fullName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Everything arrived: the data must not be thrown away because the chosen name cannot be written.
+                    keepTemporary = true;
+                    throw new IOException("The file was received but could not be saved as " + fullName + " (" + ex.Message + "). It is kept as " + temporary + ".");
+                }
+                return true;
+            }
+            finally
+            {
+                if (!keepTemporary)
+                {
+                    try
+                    {
+                        File.Delete(temporary);
+                    }
+                    catch (Exception)
+                    {
+                        // A temporary file that cannot be removed is left; the chosen file is intact.
+                    }
+                }
+            }
+        });
     }
 
     /// <summary>
