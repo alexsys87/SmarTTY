@@ -26,7 +26,8 @@ public static partial class SyntaxHighlighting
     /// <summary>
     /// Kconfig: the colours of Config with the Kconfig words as keywords. A directive that stands alone ("endmenu",
     /// "help", "choice") is a keyword too, which the Config tokenizer cannot tell without a value after it. The text
-    /// of a help block is left plain.
+    /// of a help block is left plain. "menu", "choice" and "if" open blocks that fold up to "endmenu", "endchoice"
+    /// and "endif"; the closing keyword stays visible.
     /// </summary>
     private static bool TokenizeKconfig(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
@@ -35,6 +36,25 @@ public static partial class SyntaxHighlighting
         {
             endState = StKconfigHelp;
             return true;
+        }
+
+        bool closesBlock = false;
+        bool opensBlock = false;
+        if (first < text.Length && text[first] != '#' && text[first] != ';' && IsIdStart(text[first]))
+        {
+            int wordEnd = first;
+            while (wordEnd < text.Length && IsIdChar(text[wordEnd]))
+            {
+                wordEnd++;
+            }
+            string word = text.Substring(first, wordEnd - first);
+            closesBlock = word == "endmenu" || word == "endchoice" || word == "endif";
+            opensBlock = word == "menu" || word == "choice" || word == "if";
+            if (closesBlock)
+            {
+                // The zero-width token in front of the keyword keeps that keyword visible at the end of the fold.
+                sink.AddPairedToken(TypeNormal, first, first, PairKconfigBlock, false, null);
+            }
         }
 
         if (first < text.Length && text[first] != '#' && text[first] != ';')
@@ -54,11 +74,20 @@ public static partial class SyntaxHighlighting
                 KconfigKeywords.Contains(text.Substring(first, end - first)))
             {
                 sink.AddToken(TypeKeyword, first, end);
+                if (opensBlock)
+                {
+                    AddEndOfLineOpener(text, text.Length, PairKconfigBlock, sink);
+                }
                 endState = (text.Substring(first, end - first) == "help") ? StKconfigHelp : 0;
                 return true;
             }
         }
-        return TokenizeConfigCore(KconfigKeywords, startState, text, sink, out endState, dollarParentheses: true, valueKeywords: KconfigValues);
+        bool result = TokenizeConfigCore(KconfigKeywords, startState, text, sink, out endState, dollarParentheses: true, valueKeywords: KconfigValues);
+        if (opensBlock)
+        {
+            AddEndOfLineOpener(text, text.Length, PairKconfigBlock, sink);
+        }
+        return result;
     }
 
     // ---------------------------------------------------------------- U-Boot
@@ -82,12 +111,70 @@ public static partial class SyntaxHighlighting
           boot_targets distro_bootcmd boot_scripts prefix fdtfile board board_name soc vendor ver
           serial# ethact netretry tftpblocksize");
 
-    private static readonly TokenCache.LineTokenizer UBootTokenizer = new GenericSyntax
+    private static readonly GenericSyntax UBootSyntax = new GenericSyntax
     {
         HashComments = true,
         ShellVariables = true,
         Keywords = UBootKeywords
-    }.Tokenize;
+    };
+
+    private static readonly TokenCache.LineTokenizer UBootTokenizer = TokenizeUBoot;
+
+    /// <summary>
+    /// U-Boot: the words of the hush shell with its variables. The "then" of an "if" opens a block that folds up to
+    /// "fi"; the "then" of an "elif" continues the block that is already open.
+    /// </summary>
+    private static bool TokenizeUBoot(int startState, string text, TokenCache.ITokenSink sink, out int endState)
+    {
+        LineBuffer buffer = new LineBuffer(sink);
+        bool result = UBootSyntax.Tokenize(startState, text, buffer, out endState);
+        int openers = 0;
+        bool sawElif = false;
+        List<int> closers = new List<int>();
+        buffer.ForEachToken((type, start, end) =>
+        {
+            if (type != TypeKeyword || end <= start)
+            {
+                return;
+            }
+            switch (text.Substring(start, end - start))
+            {
+                case "elif":
+                    sawElif = true;
+                    break;
+                case "then":
+                    if (sawElif)
+                    {
+                        sawElif = false;
+                    }
+                    else
+                    {
+                        openers++;
+                    }
+                    break;
+                case "fi":
+                    if (openers > 0)
+                    {
+                        openers--;
+                    }
+                    else
+                    {
+                        closers.Add(start);
+                    }
+                    break;
+            }
+        });
+        foreach (int position in closers)
+        {
+            buffer.InsertPairedToken(position, PairUBootIf, false, null);
+        }
+        for (; openers > 0; openers--)
+        {
+            buffer.InsertPairedToken(text.Length, PairUBootIf, true, KeywordBlockRegion);
+        }
+        buffer.Flush(-1, -2);
+        return result;
+    }
 
     // ----------------------------------------------------------------- Yocto
 
