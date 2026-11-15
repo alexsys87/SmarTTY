@@ -845,7 +845,10 @@ internal static class Program
         {
             "", " ", "\t#", "'", "\"", "\\", "$", "${", "$(", "#!", "@", "@x", "/*", "*/", "<!--", "<", "</", "<?", "--", "---",
             "[", "]", "[a", "a = [1, {2: (3)}]", "x = \"unterminated", "y = 'a\\'b' # c", "0x1F + 1e-5 - .5j",
-            "echo \"$HOME\" 'x' # y", "key: \"v\" # c", "#include <a.h> // x /* y", "}{)(][", "function f() end", "then do end", "[==[", "--[[", "config a", "ifeq (a,b)", "$(", "a\\", "\"\\", "'''", "\"\"\"x\"\"\""
+            "echo \"$HOME\" 'x' # y", "key: \"v\" # c", "#include <a.h> // x /* y", "}{)(][", "function f() end", "then do end", "[==[", "--[[", "config a", "ifeq (a,b)", "$(", "a\\", "\"\\", "'''", "\"\"\"x\"\"\"",
+            // Containers and sections of the admin formats, also indented and with a trailing comment.
+            "<VirtualHost *:80>", "  <Directory \"/var/www\"> # a", "\t</Directory>", "  </IfModule> # b", "  frontend web", "backend app # c",
+            "  endif # d", "\tendmenu", "  menu \"X\" # e", "if (A && B)"
         };
         foreach (L language in Enum.GetValues(typeof(L)))
         {

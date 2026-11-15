@@ -50,20 +50,19 @@ public static partial class SyntaxHighlighting
             string word = text.Substring(first, wordEnd - first);
             closesBlock = word == "endmenu" || word == "endchoice" || word == "endif";
             opensBlock = word == "menu" || word == "choice" || word == "if";
-            if (closesBlock)
-            {
-                // The zero-width token in front of the keyword keeps that keyword visible at the end of the fold.
-                sink.AddPairedToken(TypeNormal, first, first, PairKconfigBlock, false, null);
-            }
         }
 
+        // The tokens are collected so that the zero-width token in front of a closing keyword can be put among them in the
+        // right place (it keeps that keyword visible at the end of the fold); added first, it broke the order of the tokens
+        // of an indented line.
+        LineBuffer buffer = new LineBuffer(sink);
         if (first < text.Length && text[first] != '#' && text[first] != ';')
         {
             if (StartsWithAt(text, first, "---help---") && SkipBlanks(text, first + 10) == text.Length)
             {
-                sink.AddToken(TypeKeyword, first, first + 10);
+                buffer.AddToken(TypeKeyword, first, first + 10);
                 endState = StKconfigHelp;
-                return true;
+                return FinishKconfigLine(buffer, closesBlock, first);
             }
             int end = first;
             while (end < text.Length && IsIdChar(text[end]))
@@ -73,21 +72,32 @@ public static partial class SyntaxHighlighting
             if (end > first && SkipBlanks(text, end) == text.Length &&
                 KconfigKeywords.Contains(text.Substring(first, end - first)))
             {
-                sink.AddToken(TypeKeyword, first, end);
+                buffer.AddToken(TypeKeyword, first, end);
                 if (opensBlock)
                 {
-                    AddEndOfLineOpener(text, text.Length, PairKconfigBlock, sink);
+                    AddEndOfLineOpener(text, text.Length, PairKconfigBlock, buffer);
                 }
                 endState = (text.Substring(first, end - first) == "help") ? StKconfigHelp : 0;
-                return true;
+                return FinishKconfigLine(buffer, closesBlock, first);
             }
         }
-        bool result = TokenizeConfigCore(KconfigKeywords, startState, text, sink, out endState, dollarParentheses: true, valueKeywords: KconfigValues);
+        bool result = TokenizeConfigCore(KconfigKeywords, startState, text, buffer, out endState, dollarParentheses: true, valueKeywords: KconfigValues);
         if (opensBlock)
         {
-            AddEndOfLineOpener(text, text.Length, PairKconfigBlock, sink);
+            AddEndOfLineOpener(text, text.Length, PairKconfigBlock, buffer);
         }
+        FinishKconfigLine(buffer, closesBlock, first);
         return result;
+    }
+
+    private static bool FinishKconfigLine(LineBuffer buffer, bool closesBlock, int first)
+    {
+        if (closesBlock)
+        {
+            buffer.InsertPairedToken(first, PairKconfigBlock, false, null);
+        }
+        buffer.Flush(-1, -2);
+        return true;
     }
 
     // ---------------------------------------------------------------- U-Boot

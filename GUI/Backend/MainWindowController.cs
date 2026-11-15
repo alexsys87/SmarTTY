@@ -1536,27 +1536,40 @@ public class MainWindowController : INotifyPropertyChanged
     {
         foreach (SessionWrapper session in AllSessions.ToList())
         {
-            foreach (EditorTabContext editorTab in session.Tabs.OfType<EditorTabContext>().ToList())
+            if (!ConfirmCloseUnsavedEditors(session))
             {
-                if (!editorTab.Editor.IsModified)
-                {
-                    continue;
-                }
-                switch (MessageBoxes.YesNoCancel("Save " + editorTab.FilePath + "?"))
-                {
-                    case System.Windows.MessageBoxResult.Yes:
-                        if (!editorTab.Editor.TrySave())
-                        {
-                            return false;
-                        }
-                        break;
-                    case System.Windows.MessageBoxResult.No:
-                        // The changes are given up on purpose: no draft of them is kept.
-                        editorTab.Editor.DiscardDraft();
-                        break;
-                    case System.Windows.MessageBoxResult.Cancel:
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The same question for the editors of one session, asked before the session is closed (its close button): the
+    /// editors went away with it and the unsaved changes with them.
+    /// </summary>
+    public bool ConfirmCloseUnsavedEditors(SessionWrapper session)
+    {
+        foreach (EditorTabContext editorTab in session.Tabs.OfType<EditorTabContext>().ToList())
+        {
+            if (!editorTab.Editor.IsModified)
+            {
+                continue;
+            }
+            switch (MessageBoxes.YesNoCancel("Save " + editorTab.FilePath + "?"))
+            {
+                case System.Windows.MessageBoxResult.Yes:
+                    if (!editorTab.Editor.TrySave())
+                    {
                         return false;
-                }
+                    }
+                    break;
+                case System.Windows.MessageBoxResult.No:
+                    // The changes are given up on purpose: no draft of them is kept.
+                    editorTab.Editor.DiscardDraft();
+                    break;
+                case System.Windows.MessageBoxResult.Cancel:
+                    return false;
             }
         }
         return true;
@@ -2534,6 +2547,12 @@ public class MainWindowController : INotifyPropertyChanged
             }, suppressUpdateThread: false);
             NewConnectionController.SessionCreated += NewConnectionController_SessionCreated;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("NewConnectionController"));
+        }
+        else
+        {
+            // The list is built once, when the controller is created: a connection saved or deleted since (in this window, in the
+            // start window or by another copy of the program) was missing from the popup until the program was restarted.
+            NewConnectionController.RefreshAll();
         }
     }
 
