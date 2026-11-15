@@ -275,7 +275,13 @@ public static class UBootFirmwareScript
         "Error:",
         "error -",
         "failed",
-        "Bad ",
+        // Not just "Bad ": a NAND with bad blocks prints "Skipping bad block at 0x..." while it erases and writes, which is normal.
+        "Bad Magic",
+        "Bad Data CRC",
+        "Bad Header",
+        "Bad Image",
+        "Bad Linux",
+        "Bad gzipped",
         "Wrong ",
         "Invalid",
         "not found",
@@ -441,7 +447,19 @@ public sealed class ConsoleOutputWatcher
         string custom = customPrompt == null ? string.Empty : customPrompt.Trim();
         if (custom.Length > 0)
         {
-            return line.TrimEnd().EndsWith(custom, StringComparison.Ordinal);
+            string trimmed = line.TrimEnd();
+            if (!trimmed.EndsWith(custom, StringComparison.Ordinal))
+            {
+                return false;
+            }
+            if (custom[custom.Length - 1] == '#')
+            {
+                // The download's progress bar ("Loading: #####") ends with "#" as well, and a pause in the download made it look like the
+                // prompt. As in the automatic mode, a prompt of "#" is followed by its space, and the bar's "#" has none after it.
+                int matchStart = trimmed.Length - custom.Length;
+                return line.Length > trimmed.Length && (matchStart == 0 || trimmed[matchStart - 1] != '#');
+            }
+            return true;
         }
         // "=> ", "U-Boot> ", "ath>", "MT7621 # ": a "#" needs its space, because the download's progress bar is made of "#".
         return line.EndsWith(">", StringComparison.Ordinal)
