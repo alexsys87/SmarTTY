@@ -840,6 +840,13 @@ public static class GzipBase64Transfer
                 AbortDevice();
                 throw;
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                // The local file cannot be read: an IOException like every other failure, and the device is told to stop.
+                Trace("FAILED: " + ex.Message);
+                AbortDevice();
+                throw new IOException(ex.Message, ex);
+            }
             finally
             {
                 prepared?.Dispose();
@@ -1579,6 +1586,14 @@ public static class GzipBase64Transfer
                 AbortDevice();
                 throw;
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                // The unfinished file cannot be created or written (a read-only folder, a lock): the device is already sending, so it
+                // has to be told to stop, and the caller gets the IOException that every other failure is.
+                Trace("FAILED: " + ex.Message);
+                AbortDevice();
+                throw new IOException("The received data cannot be saved to " + partPath + ": " + ex.Message, ex);
+            }
             finally
             {
                 if (!done && !keepPart)
@@ -1650,7 +1665,7 @@ public static class GzipBase64Transfer
             using (BlockingPipe pipe = new BlockingPipe())
             using (FileStream output = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.Read))
             {
-                Exception inflateError = null;
+                Exception inflateError = null; // written by the inflater thread, read after it has been joined
                 Thread inflater = new Thread(() =>
                 {
                     try
@@ -1744,6 +1759,7 @@ public static class GzipBase64Transfer
                 }
                 if (inflateError != null)
                 {
+                    ThrowIfLocalFailure(inflateError, partPath);
                     decodeError = "The data could not be unpacked (" + inflateError.Message + "): it was damaged on the way.";
                 }
                 else
@@ -1866,6 +1882,7 @@ public static class GzipBase64Transfer
                 Trace("The archive has arrived: " + received + " bytes, " + unpacker.Produced + " bytes unpacked so far");
                 string mine;
                 string unpackError = unpacker.Finish(out mine);
+                Exception localError = unpacker.Error;
 
                 // After the archive the device restores its terminal and reads the whole file once more for its checksum.
                 string end = WaitForMarker((int)Math.Min(int.MaxValue / 4, 30000L + Math.Max(0, originalLength) / 500), "the checksum of the file");
@@ -1876,6 +1893,10 @@ public static class GzipBase64Transfer
                     throw new IOException("Unexpected answer of the device: " + end);
                 }
                 string deviceSum = end.Substring(4).Trim();
+                if (localError != null)
+                {
+                    ThrowIfLocalFailure(localError, partPath);
+                }
                 if (unpackError != null)
                 {
                     failure = "The data could not be unpacked (" + unpackError + "): it was damaged on the way.";
@@ -1919,6 +1940,23 @@ public static class GzipBase64Transfer
                 {
                     return null;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Damaged data makes the unpacker fail with InvalidDataException (or run out of data); anything else (the disk is full, the file is
+        /// locked) is a failure of this computer: repeating the whole transfer would not help and "damaged on the way" would be a wrong reason.
+        /// </summary>
+        private static bool IsDataError(Exception error)
+        {
+            return error is InvalidDataException || error is EndOfStreamException;
+        }
+
+        private static void ThrowIfLocalFailure(Exception error, string path)
+        {
+            if (!IsDataError(error))
+            {
+                throw new IOException("The received data could not be written to " + path + ": " + error.Message, error);
             }
         }
 
@@ -2122,6 +2160,9 @@ public static class GzipBase64Transfer
 
         /// <summary>Bytes unpacked so far.</summary>
         public long Produced => Interlocked.Read(ref _produced);
+
+        /// <summary>What stopped the unpacking, once <see cref="Finish"/> has returned (null when nothing did).</summary>
+        public Exception Error => _error;
 
         private void Inflate()
         {
