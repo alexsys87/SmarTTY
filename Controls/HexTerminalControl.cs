@@ -9,7 +9,7 @@ using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
 
-public partial class HexTerminalControl : DpiAwareControl
+public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 {
     private class DataChunk
     {
@@ -17,7 +17,10 @@ public partial class HexTerminalControl : DpiAwareControl
 
         public bool IsEcho;
 
-        public List<byte> Bytes = new List<byte>();
+        // The bytes of the chunk are the bytes [Start, Start + Count) of the stream.
+        public int Start;
+
+        public int Count;
 
         internal bool CanAppend(bool isEcho)
         {
@@ -42,6 +45,38 @@ public partial class HexTerminalControl : DpiAwareControl
     private bool _lastWasEcho;
 
     private List<DataChunk> _chunks = new List<DataChunk>();
+
+    // All bytes on the screen (the echo too) in the order they are shown, with the row and the column of each: the
+    // search for a byte sequence runs over it, because a sequence may go on in the next row (see HexStreamMap).
+    private readonly HexStreamMap _stream = new HexStreamMap();
+
+    // The match found last (-1: none), and the selection that shows it: while the selection is still that one, the
+    // next search goes on from the match, one byte further.
+    private int _matchOffset = -1;
+
+    private int _matchLength;
+
+    private TextDocument.TextPosition _matchSelectionStart;
+
+    private TextDocument.TextPosition _matchSelectionEnd;
+
+    // The byte sequence whose matches are marked while the search bar is open (null: none), the marks, and what they
+    // were made for: the first row on the screen, the number of rows and the number of bytes.
+    private byte[] _highlightPattern;
+
+    private readonly List<int> _hexHighlightIds = new List<int>();
+
+    private readonly List<int> _textHighlightIds = new List<int>();
+
+    private int _highlightTopLine = -1;
+
+    private int _highlightRows;
+
+    private int _highlightLength;
+
+    private bool _highlightRefreshPending;
+
+    private static readonly HighlightStyle MatchStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(95, 255, 190, 0)), null, null);
 
     public Brush EchoBrush;
 
@@ -161,9 +196,9 @@ public partial class HexTerminalControl : DpiAwareControl
             List<byte> list = new List<byte>();
             foreach (DataChunk item in _chunks)
             {
-                if (!item.IsBreak && !item.IsEcho && item.Bytes != null)
+                if (!item.IsBreak && !item.IsEcho && item.Count > 0)
                 {
-                    list.AddRange(item.Bytes);
+                    list.AddRange(_stream.GetRange(item.Start, item.Count));
                 }
             }
             return list.ToArray();
@@ -174,7 +209,8 @@ public partial class HexTerminalControl : DpiAwareControl
 
     /// <summary>
     /// The HEX dump editor. Its displayed text is lowercase HEX byte pairs separated by single spaces
-    /// (e.g. "0a 0d"), so the shared search bar finds byte sequences by a case-insensitive string search.
+    /// (e.g. "0a 0d"). The shared search bar searches it for text that is not a byte sequence; byte sequences are
+    /// searched for in the stream of the bytes (<see cref="FindBytes"/>), not in the rows of this text.
     /// </summary>
     public TextEditorControl SearchTextEditor => termHex;
 
@@ -193,6 +229,7 @@ public partial class HexTerminalControl : DpiAwareControl
     public HexTerminalControl()
     {
         InitializeComponent();
+        termHex.Paint += OnHexPaint;
     }
 
     public void AppendData(byte[] buffer, int count, bool isEcho = false)
@@ -207,28 +244,26 @@ public partial class HexTerminalControl : DpiAwareControl
             termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
             _chunks.Add(new DataChunk
             {
-                IsBreak = true
+                IsBreak = true,
+                Start = _stream.Length
             });
+            _stream.AddBreak();
         }
+        count = Math.Max(0, Math.Min(count, buffer.Length));
         if (_chunks.Count > 0 && _chunks[_chunks.Count - 1].CanAppend(isEcho))
         {
-            for (int byteIndex = 0; byteIndex < count; byteIndex++)
-            {
-                _chunks[_chunks.Count - 1].Bytes.Add(buffer[byteIndex]);
-            }
+            _chunks[_chunks.Count - 1].Count += count;
         }
         else
         {
-            DataChunk dataChunk = new DataChunk
+            _chunks.Add(new DataChunk
             {
-                IsEcho = isEcho
-            };
-            for (int chunkByteIndex = 0; chunkByteIndex < count; chunkByteIndex++)
-            {
-                dataChunk.Bytes.Add(buffer[chunkByteIndex]);
-            }
-            _chunks.Add(dataChunk);
+                IsEcho = isEcho,
+                Start = _stream.Length,
+                Count = count
+            });
         }
+        _stream.Append(buffer, count);
         _lastDataTime = DateTime.Now;
         _lastWasEcho = isEcho;
         RenderData(buffer, count, isEcho);
@@ -246,6 +281,8 @@ public partial class HexTerminalControl : DpiAwareControl
             int currentColumn = (termHex.CursorPosition.X + 1) / 3;
             StringBuilder stringBuilder = new StringBuilder(_bytesPerLine * 4);
             StringBuilder hexTextBuilder = new StringBuilder(_bytesPerLine * 2);
+            // The bytes that go to the row the cursor is in, for the map from a byte to its row and column.
+            int pendingBytes = 0;
             if (isEcho)
             {
                 termText.CurrentStyle = (termHex.CurrentStyle = new TerminalEmulatorBase.CellStyle
@@ -261,6 +298,8 @@ public partial class HexTerminalControl : DpiAwareControl
                 byte currentByte = buffer[byteIndex];
                 if (currentColumn >= _bytesPerLine)
                 {
+                    _stream.MapBytes(termHex.CursorDocumentLine, pendingBytes);
+                    pendingBytes = 0;
                     termHex.WriteText(stringBuilder.ToString());
                     termText.WriteText(hexTextBuilder.ToString());
                     termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
@@ -274,11 +313,13 @@ public partial class HexTerminalControl : DpiAwareControl
                     stringBuilder.Append(" ");
                 }
                 currentColumn++;
+                pendingBytes++;
                 stringBuilder.AppendFormat("{0:x2}", currentByte);
                 // Only the printable ASCII range is shown as it is. Encoding.ASCII turned every byte above 0x7F into "?" (the same as a real
                 // 0x3F), and 0x7F went to the screen as a control character.
                 hexTextBuilder.Append(HexDocument.IsPrintable(currentByte) ? (char)currentByte : '.');
             }
+            _stream.MapBytes(termHex.CursorDocumentLine, pendingBytes);
             termHex.WriteText(stringBuilder.ToString());
             termText.WriteText(hexTextBuilder.ToString());
         }
@@ -291,6 +332,9 @@ public partial class HexTerminalControl : DpiAwareControl
     public void Clear()
     {
         _chunks.Clear();
+        _stream.Clear();
+        _matchOffset = -1;
+        RemoveMatchHighlights();
         termHex.Reset();
         termText.Reset();
         _lastDataTime = DateTime.MinValue;
@@ -476,8 +520,14 @@ public partial class HexTerminalControl : DpiAwareControl
             // history (all of it is kept) was laid out again, and the scroll position lost, at every change of the size.
             return;
         }
+        // The match that is selected is the same bytes in the new rows: it is selected again there.
+        int matchOffset = IsMatchSelected() ? _matchOffset : -1;
+        int matchLength = _matchLength;
+        _matchOffset = -1;
+        RemoveMatchHighlights();
         termHex.Reset();
         termText.Reset();
+        _stream.ClearRows();
         _laidOutBytesPerLine = 0;
         _layoutMixed = false;
         foreach (DataChunk item in _chunks)
@@ -489,8 +539,171 @@ public partial class HexTerminalControl : DpiAwareControl
             }
             else
             {
-                RenderData(item.Bytes.ToArray(), item.Bytes.Count, item.IsEcho);
+                RenderData(_stream.GetRange(item.Start, item.Count), item.Count, item.IsEcho);
             }
         }
+        if (matchOffset >= 0)
+        {
+            SelectBytes(matchOffset, matchLength);
+        }
+        RefreshMatchHighlights();
+    }
+
+    // ---- the search for a byte sequence (it does not stop at the end of a row) and the marks of its matches
+
+    /// <summary>
+    /// Finds <paramref name="pattern"/> in the bytes on the screen (the echo too), whatever rows they are in.
+    /// Forward: the first match that begins at or after <paramref name="startOffset"/>; backward: the last one that
+    /// begins at or before it. A match does not go across a break (an echo, a pause in the data: another message).
+    /// Returns the offset of the match in the stream, or -1. Nothing is selected.
+    /// </summary>
+    public int FindBytes(byte[] pattern, int startOffset, bool backward, bool wrap)
+    {
+        return _stream.Find(pattern, startOffset, backward, wrap);
+    }
+
+    public bool FindNextBytes(byte[] pattern, bool backward, bool wrapAround)
+    {
+        int found = FindBytes(pattern, GetSearchStart(backward), backward, wrapAround);
+        if (found < 0 || !SelectBytes(found, pattern.Length))
+        {
+            // As the search in the text of a terminal does when it finds nothing.
+            _matchOffset = -1;
+            termHex.SetSelection(select: false, TextDocument.TextPosition.Invalid);
+            return false;
+        }
+        return true;
+    }
+
+    public void SetByteHighlight(byte[] pattern)
+    {
+        _highlightPattern = (pattern != null && pattern.Length > 0) ? pattern : null;
+        RefreshMatchHighlights();
+    }
+
+    private bool IsMatchSelected()
+    {
+        return _matchOffset >= 0 && ((ReadonlyTextBrowser)termHex).HasSelection && termHex.SelectionStart == _matchSelectionStart && termHex.SelectionEnd == _matchSelectionEnd;
+    }
+
+    // Where the search begins: one byte behind (or before) the start of the match found last, so that overlapping
+    // matches are found one by one; otherwise behind the selection or the caret (before it, backward).
+    private int GetSearchStart(bool backward)
+    {
+        if (IsMatchSelected())
+        {
+            return backward ? (_matchOffset - 1) : (_matchOffset + 1);
+        }
+        TextDocument.TextPosition position = new TextDocument.TextPosition(0, 0);
+        if (termHex.SelectionStart.IsValid)
+        {
+            position = termHex.SelectionStart;
+        }
+        TextDocument.TextPosition end = termHex.SelectionEnd;
+        if (end.IsValid && (backward ? (end < position) : (end > position)))
+        {
+            position = end;
+        }
+        int offset = _stream.OffsetAtOrAfter(position.Line, position.Column);
+        return backward ? (offset - 1) : offset;
+    }
+
+    // Selects the bytes in the HEX view, from the first digit of the first one to the last digit of the last one (in
+    // as many rows as they take), and in the text view, and scrolls them into view.
+    private bool SelectBytes(int offset, int length)
+    {
+        if (!_stream.TryLocate(offset, out int firstLine, out int firstIndex) || !_stream.TryLocate(offset + length - 1, out int lastLine, out int lastIndex))
+        {
+            return false;
+        }
+        TextDocument.TextPosition start = new TextDocument.TextPosition(3 * firstIndex, firstLine);
+        TextDocument.TextPosition end = new TextDocument.TextPosition(3 * lastIndex + 2, lastLine);
+        // The same order as the search in the text of a terminal: the selection begins behind the match and ends at its start.
+        termHex.SetSelectionEnd(start);
+        termHex.SetSelection(select: true, end);
+        // The text view follows when the start of the selection changes; a match that ends where the last one did changes only the end.
+        SyncSelectionToText(termHex, start, start, select: true);
+        termHex.Redraw();
+        termText.Redraw();
+        termHex.ScrollIntoView(start);
+        termText.TopLine = termHex.TopLine;
+        _matchOffset = offset;
+        _matchLength = length;
+        _matchSelectionStart = termHex.SelectionStart;
+        _matchSelectionEnd = termHex.SelectionEnd;
+        return true;
+    }
+
+    private void RemoveMatchHighlights()
+    {
+        RemoveHighlights(termHex, _hexHighlightIds);
+        RemoveHighlights(termText, _textHighlightIds);
+        _highlightTopLine = -1;
+    }
+
+    private static void RemoveHighlights(TerminalEmulatorBase view, List<int> ids)
+    {
+        foreach (int id in ids)
+        {
+            try
+            {
+                view.RemoveHighlight(id);
+            }
+            catch (Exception)
+            {
+                // The view dropped it already.
+            }
+        }
+        ids.Clear();
+    }
+
+    // Marks the matches in the rows on the screen (and one row around them). Only these rows are searched: the history
+    // has no limit.
+    private void RefreshMatchHighlights()
+    {
+        RemoveMatchHighlights();
+        if (_highlightPattern == null)
+        {
+            return;
+        }
+        _highlightTopLine = termHex.TopLine;
+        _highlightRows = termHex.VisibleRowCount;
+        _highlightLength = _stream.Length;
+        int from = _stream.OffsetAtOrAfter(_highlightTopLine - 1, 0);
+        int to = _stream.OffsetAtOrAfter(_highlightTopLine + _highlightRows + 1, 0);
+        List<int> ranges = new List<int>();
+        _stream.CollectMatchRanges(_highlightPattern, from, to, ranges, 10000);
+        for (int index = 0; index < ranges.Count; index += 2)
+        {
+            if (!_stream.TryLocate(ranges[index], out int firstLine, out int firstIndex) || !_stream.TryLocate(ranges[index + 1] - 1, out int lastLine, out int lastIndex))
+            {
+                continue;
+            }
+            _hexHighlightIds.Add(termHex.AddHighlight(new TextDocument.TextPosition(3 * firstIndex, firstLine), new TextDocument.TextPosition(3 * lastIndex + 2, lastLine), MatchStyle));
+            _textHighlightIds.Add(termText.AddHighlight(new TextDocument.TextPosition(firstIndex, firstLine), new TextDocument.TextPosition(lastIndex + 1, lastLine), MatchStyle));
+        }
+    }
+
+    // The view was scrolled, resized or got new bytes since the matches were marked: they are marked again, once the
+    // painting is over (the marks belong to the rows on the screen).
+    private void OnHexPaint(object sender, PaintEventArgs e)
+    {
+        if (_highlightPattern == null || _highlightRefreshPending || !IsHandleCreated)
+        {
+            return;
+        }
+        if (_highlightTopLine == termHex.TopLine && _highlightRows == termHex.VisibleRowCount && _highlightLength == _stream.Length)
+        {
+            return;
+        }
+        _highlightRefreshPending = true;
+        BeginInvoke(new Action(() =>
+        {
+            _highlightRefreshPending = false;
+            if (!IsDisposed)
+            {
+                RefreshMatchHighlights();
+            }
+        }));
     }
 }
