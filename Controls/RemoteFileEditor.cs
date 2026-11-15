@@ -684,35 +684,36 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private bool PostToUi(Action action)
     {
-        // The worker can be faster than the creation of the window handle of a tab that has just been opened.
-        for (int attempt = 0; attempt < 600; attempt++)
+        if (!WaitForHandle())
         {
-            try
-            {
-                if (IsDisposed || Disposing)
-                {
-                    return false;
-                }
-                if (IsHandleCreated)
-                {
-                    BeginInvoke((ThreadStart)(() =>
-                    {
-                        if (!IsDisposed)
-                        {
-                            action();
-                        }
-                    }));
-                    return true;
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // The handle was destroyed between the check and the call (ObjectDisposedException is one of these too): the tab is closing.
-                return false;
-            }
-            Thread.Sleep(50);
+            return false;
         }
-        return false;
+        try
+        {
+            BeginInvoke((ThreadStart)(() =>
+            {
+                if (!IsDisposed)
+                {
+                    action();
+                }
+            }));
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // The handle was destroyed between the check and the call (ObjectDisposedException is one of these too): the tab is closing.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// For a worker thread: waits (30 seconds at the most) until the tab has its window handle. The loading thread is started in the
+    /// constructor and can be faster than the creation of the handle of a tab that has just been opened, and Invoke and BeginInvoke
+    /// throw before that. False when the tab was closed meanwhile or the handle did not come.
+    /// </summary>
+    private bool WaitForHandle()
+    {
+        return UiHandleWait.Until(() => IsDisposed || Disposing, () => IsHandleCreated);
     }
 
     /// <summary>Shows a loading error; a failed reload keeps the tab with the text of the user.</summary>
@@ -861,14 +862,27 @@ public partial class RemoteFileEditor : CodeEditorPP
         return stream;
     }
 
-    /// <summary>Shows a question from the loading thread; the answer of a closed editor is "cancel".</summary>
+    /// <summary>
+    /// Shows a question from the loading thread; the answer of an editor that was closed (before or while the question is asked) is "cancel".
+    /// The first question can come before the tab has its window handle (a file that cannot be written, a large file: two to four calls to the
+    /// server after the thread was started), so the handle is waited for like in <see cref="PostToUi"/>: Invoke would throw, LoadFile would show
+    /// the user that technical message and the tab would close without the question.
+    /// </summary>
     private DialogResult Ask(string text, MessageBoxButtons buttons)
     {
-        if (IsDisposed)
+        if (!WaitForHandle())
         {
             return DialogResult.Cancel;
         }
-        return (DialogResult)Invoke((Func<DialogResult>)(() => ThemedMessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
+        try
+        {
+            return (DialogResult)Invoke((Func<DialogResult>)(() => ThemedMessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
+        }
+        catch (InvalidOperationException)
+        {
+            // The tab was closed between the wait and the call, or while the question was open (ObjectDisposedException is one of these too).
+            return DialogResult.Cancel;
+        }
     }
 
     /// <summary>

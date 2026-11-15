@@ -17,5 +17,6 @@
     <Compile Include="../../IO/RemoteProcessList.cs" Link="RemoteProcessList.cs" />
     <Compile Include="../../IO/EditorDraftStore.cs" Link="EditorDraftStore.cs" />
     <Compile Include="../../IO/EditorFilePolicy.cs" Link="EditorFilePolicy.cs" />
+    <Compile Include="../../Utilities/UiHandleWait.cs" Link="UiHandleWait.cs" />
   </ItemGroup>
 </Project>
