@@ -223,23 +223,50 @@ public class SavedConnectionStore
         if (replaces != null && !ReferenceEquals(replaces, sshConnectionSettings) && !string.IsNullOrEmpty(replaces.FileName)
             && StringComparer.InvariantCultureIgnoreCase.Compare(replaces.FileName, sshConnectionSettings.FileName) != 0)
         {
-            DeleteSshConnection(replaces);
+            try
+            {
+                DeleteSshConnection(replaces);
+            }
+            catch (IOException)
+            {
+                // The edited connection is saved; the old profile stays in the list (and can be deleted from there, with the reason
+                // shown), so a save that worked is not reported as a failure.
+            }
         }
     }
 
+    /// <summary>
+    /// Deletes a saved connection. Throws <see cref="IOException"/> (the reason in its message) when the file cannot be deleted; the
+    /// connection then stays in the list, as it would come back from the file at the next start in any case.
+    /// </summary>
     public void DeleteSshConnection(SSHConnectionSettings sshConnectionSettings)
     {
+        DeleteProfileFile(sshConnectionSettings.FileName, "connection");
         _sshConnections.Remove(sshConnectionSettings);
-        if (sshConnectionSettings.FileName != null)
+    }
+
+    private void DeleteProfileFile(string fileName, string what)
+    {
+        if (fileName == null)
         {
-            try
-            {
-                File.Delete(sshConnectionSettings.FileName);
-                TouchTimestamp(_directory);
-            }
-            catch
-            {
-            }
+            return;
+        }
+        try
+        {
+            File.Delete(fileName);
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            // Used to be swallowed: the connection vanished from the list and came back at the next start.
+            throw new IOException("The saved " + what + " cannot be deleted (" + fileName + "): " + exception.Message, exception);
+        }
+        try
+        {
+            TouchTimestamp(_directory);
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            // The file is gone; the time stamp only tells other windows to reload.
         }
     }
 
@@ -386,19 +413,10 @@ public class SavedConnectionStore
         return name;
     }
 
+    /// <summary>The same as <see cref="DeleteSshConnection"/> for a raw (telnet, TCP, serial) connection.</summary>
     public void DeleteRawConnection(RawConnectionSettings rawConnectionSettings)
     {
+        DeleteProfileFile(rawConnectionSettings.FileName, "connection");
         _rawConnections.Remove(rawConnectionSettings);
-        if (rawConnectionSettings.FileName != null)
-        {
-            try
-            {
-                File.Delete(rawConnectionSettings.FileName);
-                TouchTimestamp(_directory);
-            }
-            catch
-            {
-            }
-        }
     }
 }
