@@ -1586,6 +1586,12 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         return _document.IndexToColumn(line, index, TabSize);
     }
 
+    /// <summary>Scrolls the text so that <paramref name="textPosition"/> is on the screen (as a found match is shown).</summary>
+    public void ScrollIntoView(TextDocument.TextPosition textPosition)
+    {
+        EnsureCaretVisible(textPosition);
+    }
+
     private bool EnsureCaretVisible(TextDocument.TextPosition textPosition)
     {
         return EnsureVisible(textPosition, center: false);
@@ -1684,9 +1690,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 }
                 else
                 {
-                    TextDocument.TextPosition wordLeft = GetMovedPosition(CaretMove.WordLeft);
-                    TextDocument.TextPosition wordRight = GetMovedPosition(CaretMove.WordRight);
-                    if (wordLeft.Line == CaretPosition.Line && wordRight.Line == CaretPosition.Line)
+                    // The word under the click, not the word movements of the caret: those start by stepping one character away,
+                    // which took in the space before a word (a click on the left half of its first letter) or after it.
+                    if (TryGetWordBounds(CaretPosition, out TextDocument.TextPosition wordLeft, out TextDocument.TextPosition wordRight))
                     {
                         bool invalidateCurrentLine = true;
                         if (_hasSelection && _selectionStart.Line != CaretPosition.Line)
@@ -1961,6 +1967,55 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     protected TextDocument.TextPosition GetMovedPosition(CaretMove caretMove, bool extendSelection = false)
     {
         return ComputeMovedPosition(caretMove, Control.ModifierKeys, CaretPosition, extendSelection);
+    }
+
+    /// <summary>
+    /// The word the caret stands in or at the edge of (the one to its right first, as a click on the left half of a letter puts the
+    /// caret in front of it), or the single character at it when that is not part of a word. False on an empty line.
+    /// </summary>
+    private bool TryGetWordBounds(TextDocument.TextPosition caret, out TextDocument.TextPosition start, out TextDocument.TextPosition end)
+    {
+        start = caret;
+        end = caret;
+        if (caret.Line < 0 || caret.Column < 0)
+        {
+            return false;
+        }
+        string text = _document.GetLineText(caret.Line);
+        if (text.Length == 0)
+        {
+            return false;
+        }
+        int column = Math.Min(caret.Column, text.Length);
+        int anchor;
+        if (column < text.Length && IsWordChar(text[column]))
+        {
+            anchor = column;
+        }
+        else if (column > 0 && IsWordChar(text[column - 1]))
+        {
+            anchor = column - 1;
+        }
+        else
+        {
+            int single = column < text.Length ? column : column - 1;
+            start.Column = single;
+            end.Column = single + 1;
+            return true;
+        }
+        int from = anchor;
+        while (from > 0 && IsWordChar(text[from - 1]))
+        {
+            from--;
+        }
+        int to = anchor + 1;
+        while (to < text.Length && IsWordChar(text[to]))
+        {
+            to++;
+        }
+        start.Column = from;
+        end.Column = to;
+        return true;
     }
 
     protected virtual bool IsWordChar(char ch)
@@ -3435,6 +3490,22 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         Redraw();
     }
 
+    // A line longer than this is searched for matches only where it is on the screen, with this margin on each side.
+    private const int LongLineChars = 4096;
+
+    private const int LongLineMargin = 2048;
+
+    /// <summary>The column of <paramref name="target"/>, going on from <paramref name="index"/> and <paramref name="column"/> (as IndexToColumn counts: a tab goes to the next tab stop).</summary>
+    private int AdvanceColumn(string text, ref int index, ref int column, int target)
+    {
+        while (index < target && index < text.Length)
+        {
+            column = (text[index] != '\t') ? (column + 1) : (column + (TabSize - column % TabSize));
+            index++;
+        }
+        return column;
+    }
+
     private void PaintMatches(Graphics graphics)
     {
         TextMatcher matcher = _matchHighlighter;
@@ -3461,14 +3532,28 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     continue;
                 }
                 int y = Round(RowToY(row));
-                int from = 0;
                 int rowFirst = IsWrapping ? _displayRows[row].SegStart : ScrollColumn;
                 int rowEnd = IsWrapping ? _displayRows[row].SegEnd : int.MaxValue;
-                // A line of a minified file may hold thousands of matches; the first ones are enough to show.
-                for (int shown = 0; shown < 500 && from <= text.Length && matcher.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length); shown++)
+                // The part of the line to look at: all of it, or, in a long line (a minified file), what is on the screen with a margin.
+                // Looking at the whole of a line of megabytes on every paint, and counting its columns from its start for every match,
+                // took seconds.
+                int from = 0;
+                int scanEnd = text.Length;
+                if (text.Length > LongLineChars)
                 {
-                    int matchStart = _document.IndexToColumn(line, index, TabSize);
-                    int matchEnd = _document.IndexToColumn(line, index + length, TabSize);
+                    int firstIndex = _document.ColumnToIndex(line, rowFirst, TabSize);
+                    int lastIndex = _document.ColumnToIndex(line, IsWrapping ? rowEnd : rowFirst + _visibleColumns + 1, TabSize);
+                    from = Math.Max(0, firstIndex - LongLineMargin);
+                    scanEnd = Math.Min(text.Length, lastIndex + LongLineMargin);
+                }
+                // The column of an index, counted on from the last one asked for (the matches come in order).
+                int countedIndex = from;
+                int countedColumn = (from == 0) ? 0 : _document.IndexToColumn(line, from, TabSize);
+                // A line of a minified file may hold thousands of matches; the first ones are enough to show.
+                for (int shown = 0; shown < 500 && from <= scanEnd && matcher.Match(text, from, scanEnd, backward: false, allowEmpty: false, out int index, out int length); shown++)
+                {
+                    int matchStart = AdvanceColumn(text, ref countedIndex, ref countedColumn, index);
+                    int matchEnd = AdvanceColumn(text, ref countedIndex, ref countedColumn, index + length);
                     int startX = Round(ColumnToXFrom(matchStart, rowFirst));
                     int endX = Round(ColumnToXFrom(Math.Min(matchEnd, rowEnd), rowFirst));
                     if (matchStart >= rowEnd || matchEnd <= rowFirst)

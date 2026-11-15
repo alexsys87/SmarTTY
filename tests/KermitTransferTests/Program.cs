@@ -808,6 +808,40 @@ internal static class Program
             tx.Wait(10000);
         });
 
+        Run("receiver: a sender that vanishes with a gap in the window does not keep the receiver asking for ever", () =>
+        {
+            NewLink(out End s, out End r);
+            Progress progress = new Progress();
+            Task<bool> rx = Task.Run(() => KermitTransfer.ReceiveFiles(name => new MemoryStream(), null, r.Send, r.Read, default, progress.Handler,
+                new KermitTransfer.Settings(), Fast()));
+            // A Send-Init that offers sliding windows (a window of 4), then the file name and a data packet beyond a gap (packet 2 never comes).
+            string init = new string(new[] { (char)(32 + 94), (char)(32 + 5), ' ', '@', (char)(32 + 13), '#', 'N', '1', ' ', (char)(32 + 4), (char)(32 + 4) });
+            s.Send(Frame(0, 'S', init));
+            s.Send(Frame(1, 'F', "gap.bin"));
+            s.Send(Frame(3, 'D', "abc"));
+            bool finished = rx.Wait(20000);
+            Check(finished && !rx.Result, "the receiver gives up");
+            Check(progress.Last().Contains("stopped responding"), "and says why: " + progress.Last());
+        });
+
+        Run("receiver: a transfer ended without the end of the last file removes that file and says so", () =>
+        {
+            NewLink(out End s, out End r);
+            Progress progress = new Progress();
+            List<string> discarded = new List<string>();
+            List<bool> closed = new List<bool>();
+            Task<bool> rx = Task.Run(() => KermitTransfer.ReceiveFiles(name => new TrackedStream(closed), name => { lock (discarded) { discarded.Add(name); } },
+                r.Send, r.Read, default, progress.Handler, new KermitTransfer.Settings(), Fast()));
+            s.Send(Frame(0, 'S', "~% @-#N1 "));
+            s.Send(Frame(1, 'F', "half.bin"));
+            s.Send(Frame(2, 'D', "abc"));
+            s.Send(Frame(3, 'B', ""));
+            Check(rx.Wait(10000) && rx.Result, "the transfer is over");
+            lock (discarded) { Check(discarded.Contains("half.bin"), "the unfinished file is discarded"); }
+            lock (closed) { Check(closed.Count == 1, "and its stream is closed"); }
+            Check(progress.Last().Contains("was removed"), "and the user is told: " + progress.Last());
+        });
+
         Run("sender: silence from the receiver ends with a handshake timeout", () =>
         {
             NewLink(out End s, out End peer);

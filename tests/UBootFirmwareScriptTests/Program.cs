@@ -147,6 +147,8 @@ internal static class Program
         Check("no flash is recognized", UBootFirmwareScript.FindCommandProblem("\r\nNo SPI flash selected. Please run `sf probe'\r\n=> ") != null);
         Check("usage text is recognized", UBootFirmwareScript.FindCommandProblem("\r\nsf - SPI flash sub-system\r\n\r\nUsage:\r\nsf probe\r\n=> ") == "Usage:");
         Check("an unknown command is recognized", UBootFirmwareScript.FindCommandProblem("\r\nUnknown command 'sf' - try 'help'\r\n=> ") != null);
+        Check("a bad block that is skipped is not a problem", UBootFirmwareScript.FindCommandProblem("\r\nSkipping bad block at 0x00020000\r\nSkip bad block 0x00040000\r\nNAND write: 4194304 bytes written: OK\r\n=> ") == null);
+        Check("a bad image is a problem", UBootFirmwareScript.FindCommandProblem("\r\nBad Magic Number\r\n=> ") == "Bad Magic Number" && UBootFirmwareScript.FindCommandProblem("\r\nBad Data CRC\r\n=> ") == "Bad Data CRC");
         Check("a good write is not a problem", UBootFirmwareScript.FindCommandProblem("\r\nSF: 8388608 bytes @ 0x0 Erased: OK\r\nSF: 8388608 bytes @ 0x0 Written: OK\r\n=> ") == null);
         Check("a probe is not a problem", UBootFirmwareScript.FindCommandProblem("\r\nSF: Detected w25q128 with page size 256 Bytes, erase size 4 KiB, total 16 MiB\r\n=> ") == null);
         Check("empty output is not a problem", UBootFirmwareScript.FindCommandProblem("") == null && UBootFirmwareScript.FindCommandProblem(null) == null);
@@ -174,6 +176,8 @@ internal static class Program
         }
 
         Check("a custom prompt is matched at the end", ConsoleOutputWatcher.EndsWithPrompt("x\r\nMyBoard> ", "MyBoard>") && ConsoleOutputWatcher.EndsWithPrompt("=> ", " => "));
+        Check("a \"#\" prompt is matched with its space", ConsoleOutputWatcher.EndsWithPrompt("x\r\nMT7621 # ", "#") && ConsoleOutputWatcher.EndsWithPrompt("# ", "#"));
+        Check("the progress bar is not a \"#\" prompt", !ConsoleOutputWatcher.EndsWithPrompt("Loading: #####", "#") && !ConsoleOutputWatcher.EndsWithPrompt("Loading: ##\bT #", "#") && !ConsoleOutputWatcher.EndsWithPrompt("Loading: # ##", "#") && !ConsoleOutputWatcher.EndsWithPrompt("#### ", "#"));
         Check("a custom prompt does not match other prompts", !ConsoleOutputWatcher.EndsWithPrompt("U-Boot> ", "MyBoard>") && !ConsoleOutputWatcher.EndsWithPrompt("=> \r\n", "=>"));
 
         ConsoleOutputWatcher watcher = new ConsoleOutputWatcher();

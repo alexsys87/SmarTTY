@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.Text;
 using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
@@ -646,6 +647,73 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
     }
 
+    /// <summary>
+    /// The most text the completion list and the parameter hint read at a time. They went through a copy of the whole
+    /// document on every trigger and typed bracket, which for a file of tens of megabytes (the editor opens up to 64 MB) took
+    /// seconds each time and used up the address space of a 32-bit process.
+    /// </summary>
+    private const int AnalysisBudgetChars = 500000;
+
+    /// <summary>
+    /// The text the completion and the parameter hint work on, and where the caret is in it. A document up to
+    /// <see cref="AnalysisBudgetChars"/> is given whole; a larger one as the lines around the caret (the words and the
+    /// functions of the rest are then not offered).
+    /// </summary>
+    private string GetAnalysisText(out int caretLine, out int caretColumn)
+    {
+        TextDocument document = base.EditableDocument;
+        caretLine = CaretPosition.Line;
+        caretColumn = CaretPosition.Column;
+        int count = document.LineCount;
+        long total = 0;
+        for (int i = 0; i < count && total <= AnalysisBudgetChars; i++)
+        {
+            total += document.GetLineLengthWithTerminator(i);
+        }
+        if (total <= AnalysisBudgetChars)
+        {
+            return document.GetText();
+        }
+
+        int line = Math.Max(0, Math.Min(caretLine, count - 1));
+        string lineText = document.GetLineText(line);
+        if (lineText.Length > AnalysisBudgetChars)
+        {
+            // One huge line (a minified file): the part of it around the caret.
+            int start = Math.Max(0, Math.Min(caretColumn - AnalysisBudgetChars / 2, lineText.Length - AnalysisBudgetChars));
+            caretLine = 0;
+            caretColumn = caretColumn - start;
+            return lineText.Substring(start, AnalysisBudgetChars);
+        }
+        int first = line;
+        int last = line;
+        long size = lineText.Length;
+        while (size < AnalysisBudgetChars && (first > 0 || last < count - 1))
+        {
+            if (first > 0 && (last >= count - 1 || line - first <= last - line))
+            {
+                first--;
+                size += document.GetLineLengthWithTerminator(first);
+            }
+            else
+            {
+                last++;
+                size += document.GetLineLengthWithTerminator(last);
+            }
+        }
+        StringBuilder window = new StringBuilder((int)Math.Min(size + 16, int.MaxValue));
+        for (int i = first; i <= last; i++)
+        {
+            window.Append(document.GetLineText(i));
+            if (i < last)
+            {
+                window.Append('\n');
+            }
+        }
+        caretLine = line - first;
+        return window.ToString();
+    }
+
     /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
     public void ShowCompletion()
     {
@@ -655,7 +723,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         }
         // The whole list is passed to the popup: it narrows itself down to the typed prefix, and can widen
         // again when letters are deleted, which a list filtered here could not.
-        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, base.EditableDocument.GetText(), "", _apiSymbols);
+        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, GetAnalysisText(out _, out _), "", _apiSymbols);
         if (items.Count == 0)
         {
             return;
@@ -778,8 +846,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             HideSignatureHint();
             return;
         }
+        string analysisText = GetAnalysisText(out int analysisLine, out int analysisColumn);
         ParameterSignature signature = EditorSignatureSource.FindSignature(
-            _completionLanguage, base.EditableDocument.GetText(), CaretPosition.Line, CaretPosition.Column, _apiSymbols, out int activeParameter);
+            _completionLanguage, analysisText, analysisLine, analysisColumn, _apiSymbols, out int activeParameter);
         if (signature == null)
         {
             HideSignatureHint();

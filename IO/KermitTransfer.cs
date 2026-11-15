@@ -763,6 +763,46 @@ public class KermitTransfer
         return destination;
     }
 
+    /// <summary>
+    /// <see cref="EncodeFileName"/> for a packet that can hold <paramref name="capacity"/> bytes of data: a longer name is
+    /// shortened (the end of the name before its extension goes first) instead of failing in BuildFrame, which a name of
+    /// about 88 bytes or more did in a normal packet.
+    /// </summary>
+    internal static byte[] EncodeFileNameToFit(string name, byte qctl, byte qbin, byte repeat, int capacity, out int length, out bool shortened)
+    {
+        byte[] data = EncodeFileName(name, qctl, qbin, repeat, out length);
+        shortened = false;
+        if (length <= capacity)
+        {
+            return data;
+        }
+        shortened = true;
+        int dot = name.LastIndexOf('.');
+        string extension = (dot > 0 && name.Length - dot <= 9) ? name.Substring(dot) : string.Empty;
+        string stem = extension.Length > 0 ? name.Substring(0, dot) : name;
+        while (length > capacity)
+        {
+            if (stem.Length > 1)
+            {
+                stem = stem.Substring(0, stem.Length - 1);
+                if (stem.Length > 1 && char.IsHighSurrogate(stem[stem.Length - 1]))
+                {
+                    stem = stem.Substring(0, stem.Length - 1); // not half of a surrogate pair
+                }
+            }
+            else if (extension.Length > 0)
+            {
+                extension = string.Empty;
+            }
+            else
+            {
+                break;
+            }
+            data = EncodeFileName(stem + extension, qctl, qbin, repeat, out length);
+        }
+        return data;
+    }
+
     /// <summary>A name that is safe to create on this machine: no directory, no characters Windows forbids.</summary>
     private static string SanitizeFileName(string name)
     {
@@ -1402,7 +1442,11 @@ public class KermitTransfer
             {
                 Report(onProgress, doneBytes, totalBytes, errors, "Sending " + wireName + where);
 
-                byte[] nameData = EncodeFileName(wireName, session.Qctl, session.Qbin, session.Repeat, out int nameLength);
+                byte[] nameData = EncodeFileNameToFit(wireName, session.Qctl, session.Qbin, session.Repeat, capacity, out int nameLength, out bool nameShortened);
+                if (nameShortened)
+                {
+                    Report(onProgress, doneBytes, totalBytes, errors, "The name of " + wireName + " does not fit into the receiver's packets: it is sent shortened.");
+                }
                 Exchange result = Send(TypeFile, nameData, nameLength, out Packet reply, out string message);
                 if (Failed(result, message, "file name", doneBytes))
                 {
@@ -1625,6 +1669,7 @@ public class KermitTransfer
         long fileSize = -1;
         bool fileSizeExact = false; // fileSize is in bytes (not the rounded kilobytes of the '!' attribute)
         int sizeMismatches = 0; // files that ended with another size than announced: kept, and the user is told at the end
+        bool droppedUnfinished = false; // the sender ended the transfer (B) without finishing the last file (Z): the file was removed
         DateTime? fileDate = null;
         int consecutiveErrors = 0;
         int consecutiveDamaged = 0;
@@ -1771,10 +1816,17 @@ public class KermitTransfer
                     }
                     return true;
                 case TypeBreak:
+                    if (fileName != null)
+                    {
+                        // No end-of-file for the last file: it is not complete, and its stream must not stay open.
+                        droppedUnfinished = true;
+                        DropCurrent();
+                    }
                     completed = true;
                     Report(onProgress, received, 0, errors, (filesDone == 1 ? "File received successfully." : filesDone + " files received successfully.")
                         + (sizeMismatches == 0 ? string.Empty : " WARNING: " + sizeMismatches + (sizeMismatches == 1 ? " file has" : " files have")
-                            + " another size than the sender announced and may be incomplete."));
+                            + " another size than the sender announced and may be incomplete.")
+                        + (droppedUnfinished ? " WARNING: the sender ended the transfer before the last file was finished; that file was removed." : string.Empty));
                     return false;
                 default:
                     return true; // 'X': text the sender wants shown; nothing to do with it here
@@ -1814,6 +1866,13 @@ public class KermitTransfer
                 }
                 if (status == ReadStatus.Timeout && quick)
                 {
+                    // These quiet spells are short and do not count as consecutive errors, so a sender that has vanished with a gap in the
+                    // window would be asked for the missing packet for ever: the same silence that ends the slow path ends this one.
+                    if (lastPacketAt != 0 && ElapsedMs(lastPacketAt) > timeouts.PacketMs * MaxRetries)
+                    {
+                        errors++;
+                        return Abort("Too many errors", "Transfer failed: the sender stopped responding.");
+                    }
                     afterDamage = false;
                     errors++;
                     asked.Clear();

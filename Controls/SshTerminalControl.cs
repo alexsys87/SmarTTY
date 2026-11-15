@@ -592,7 +592,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             target = trimmedPath;
         }
-        List<string> output = _context.Session.RunCommand("cd " + RemotePathUtils.ShellQuote(target), out int? exitCode);
+        string command = "cd " + RemotePathUtils.ShellQuote(target);
+        List<string> output = _context.Session.RunCommand(command, out int? exitCode);
+        if (!exitCode.HasValue && (output == null || output.Count == 0) && !_context.Session.IsConnectionClosed)
+        {
+            // The channel was closed without an exit status (see RunChangeDirectoryCommand): "cd" is safe to repeat.
+            output = _context.Session.RunCommand(command, out exitCode);
+        }
         if (exitCode != 0)
         {
             string message = string.Join(Environment.NewLine, (output ?? new List<string>()).Where((string line) => line.Trim() != ""));
@@ -642,7 +648,14 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             }
             resolvedArguments = RemotePathUtils.ShellQuote(_previousDirectory);
         }
-        List<string> output = _context.Session.RunCommand(BuildRemoteCommand("cd " + resolvedArguments + " >/dev/null && pwd", interactive: false), out int? exitCode);
+        string remoteCommand = BuildRemoteCommand("cd " + resolvedArguments + " >/dev/null && pwd", interactive: false);
+        List<string> output = _context.Session.RunCommand(remoteCommand, out int? exitCode);
+        if (!exitCode.HasValue && (output == null || output.Count == 0) && !_context.Session.IsConnectionClosed)
+        {
+            // Some servers (Dropbear) now and then close the exec channel without an exit status and without output, so
+            // the command is not known to have run. "cd" followed by "pwd" changes nothing on the server, so ask once more.
+            output = _context.Session.RunCommand(remoteCommand, out exitCode);
+        }
         string newDirectory = (exitCode == 0) ? output?.LastOrDefault((string line) => line.StartsWith("/")) : null;
         if (newDirectory == null)
         {

@@ -24,9 +24,16 @@ internal static class Program
 
     private static int Main()
     {
-        int[] outside = { -1, -2, -1100, -1101, int.MinValue, int.MinValue + 1, 1100, 1101, int.MaxValue - 1, int.MaxValue };
-        Check(outside.All(mode => !PrivateModeTable.IsKept(mode)), "kept: a negative number and a number from 1100 up are not kept");
-        Check(PrivateModeTable.IsKept(0) && PrivateModeTable.IsKept(1) && PrivateModeTable.IsKept(1049) && PrivateModeTable.IsKept(1099), "kept: 0 to 1099 are kept");
+        int[] outside = { -1, -2, -1100, -1101, int.MinValue, int.MinValue + 1, 2100, 2101, int.MaxValue - 1, int.MaxValue };
+        Check(outside.All(mode => !PrivateModeTable.IsKept(mode)), "kept: a negative number and a number from 2100 up are not kept");
+        Check(PrivateModeTable.IsKept(0) && PrivateModeTable.IsKept(1) && PrivateModeTable.IsKept(1049) && PrivateModeTable.IsKept(2004) && PrivateModeTable.IsKept(2099), "kept: 0 to 2099 are kept, bracketed paste (2004) among them");
+
+        PrivateModeTable paste = new PrivateModeTable();
+        Check(!paste.IsSet(2004), "bracketed paste: off in a new table");
+        paste.Set(2004, true);
+        Check(paste.IsSet(2004), "bracketed paste: CSI ? 2004 h is remembered, the paste is wrapped in the markers");
+        paste.Set(2004, false);
+        Check(!paste.IsSet(2004), "bracketed paste: CSI ? 2004 l turns it off");
 
         PrivateModeTable table = new PrivateModeTable();
         Check(!table.IsSet(25) && !table.IsSet(1049) && !table.IsSet(0), "a new table has no mode set");
@@ -56,7 +63,7 @@ internal static class Program
                 throw new Exception("FAIL: mode " + mode + " is a number outside the table and threw IndexOutOfRangeException");
             }
         }
-        Check(true, "a number outside the table (negative, 1100, int.MinValue, int.MaxValue) is ignored by Set, Save, TryGetSaved and IsSet");
+        Check(true, "a number outside the table (negative, 2100, int.MinValue, int.MaxValue) is ignored by Set, Save, TryGetSaved and IsSet");
         Check(Enumerable.Range(0, PrivateModeTable.Size).Where(table.IsSet).SequenceEqual(new[] { 25 }), "the numbers outside the table changed none of the kept ones (only 25 is set)");
 
         // Save and restore (CSI ? Pn s and CSI ? Pn r).
@@ -71,7 +78,7 @@ internal static class Program
         Check(modes.TryGetSaved(25, out saved) && !saved, "save: saving again takes the present value");
         modes.Set(1000, true);
         modes.Save(-1);
-        modes.Save(1100);
+        modes.Save(2100);
         Check(modes.IsSet(1000) && modes.TryGetSaved(1000, out saved) && !saved, "save: a number outside the table saves nothing and changes nothing");
 
         // A reset of the terminal.
