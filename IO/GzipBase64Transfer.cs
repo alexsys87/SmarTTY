@@ -15,14 +15,18 @@ namespace SmarTTY.IO;
 /// no sz/rz, no sftp. The file is packed with gzip, the archive is turned into text (base64, or uuencode when the
 /// device has no base64) and typed into the device's shell; the device decodes and unpacks it and the checksum of the
 /// result is compared with the checksum of the original. A transfer from the device runs the same way in reverse.
+/// The archive goes block by block in both directions: the receiving side compares the checksum of each block at once and a
+/// damaged block is sent again, so that a character lost on a long way costs a block and not the whole file.
 /// Only tools that busybox has are used on the device: gzip/gunzip, base64 or uuencode/uudecode, sha256sum/md5sum/cksum
 /// and head (or dd). Nothing is installed on the device and no temporary file is kept on it except the unfinished
 /// "name.smtty~" next to the destination, which is renamed to the real name only after the checksum matched (and kept, with a
 /// message, when it cannot be put in place).
 /// The protocol is the same one the user would type by hand, so it is easy to repeat in any terminal.
 /// The "gzip + cat" form (<see cref="EncodingKind.Raw"/>) sends the gzip archive as it is, without any text form: the device puts its
-/// terminal in raw mode and reads exactly as many bytes as the archive has (head -c, a counted cat), the checksum at the end is the
-/// only check. It is 1:1 on the line instead of 4:3, but nothing can be checked on the way (the device does not echo in raw mode).
+/// terminal in raw mode and takes the archive in blocks that it asks for one by one (head -c, or dd); the checksum of each block is
+/// compared at once and a damaged block is sent again, the checksum of the whole file is compared at the end. It is 1:1 on the line
+/// instead of 4:3; there is no echo to check against (the device does not echo in raw mode), the blocks are what keeps a big file from
+/// failing on a line that loses a byte now and then. A receive goes the same way, the other way round.
 /// </summary>
 public static class GzipBase64Transfer
 {
@@ -33,10 +37,11 @@ public static class GzipBase64Transfer
         Base64,
         UuEncode,
         /// <summary>
-        /// No text form ("gzip + cat"): the archive goes to the device as it is, to a reader that runs on its terminal in raw mode:
-        /// head -c with the length of the archive (dd bs=1 count= when head has no -c, a plain cat that ends when the line has been
-        /// quiet for a few seconds when there is no dd either). Raw mode has no echo, so nothing is checked per line: the checksum at the
-        /// end is the check, and a transfer that fails it is repeated. Auto never picks this form.
+        /// No text form ("gzip + cat"): the archive goes to the device as it is, to a reader that runs on its terminal in raw mode
+        /// and takes it block by block: head -c (dd bs=1 count= when head has no -c) reads a block, its checksum is compared, and a
+        /// damaged block is sent again. A device with neither gets the archive as one stream, read by a plain cat that ends when the
+        /// line has been quiet for a few seconds; the checksum at the end is then the only check, and a transfer that fails it is
+        /// repeated. Auto never picks this form.
         /// </summary>
         Raw
     }
@@ -66,7 +71,7 @@ public static class GzipBase64Transfer
         public EncodingKind Encoding = EncodingKind.Auto;
         public ChecksumKind Checksum = ChecksumKind.Auto;
 
-        /// <summary>How many times the whole transfer is tried when the checksum does not match (1 = no repeat).</summary>
+        /// <summary>How many times the whole transfer is tried when it could not be repaired block by block or the checksum of the file does not match (1 = no repeat).</summary>
         public int Attempts = 2;
 
         /// <summary>Replace the destination when it exists. Otherwise an existing destination stops the transfer.</summary>
@@ -80,8 +85,9 @@ public static class GzipBase64Transfer
         public int WindowBytes = 1024;
 
         /// <summary>
-        /// The speed limit used when the device does not echo (the echo is what tells that a line has arrived undamaged), and the speed
-        /// of the raw "gzip + cat" stream, which has no echo to wait for: too fast for the device and the tty buffer on it overflows.
+        /// The speed limit used when the device does not echo (the echo is what tells at once that a line has arrived undamaged), and the speed
+        /// of the raw "gzip + cat" blocks, which have no echo to wait for: too fast for the device and its UART loses bytes, which costs
+        /// a repeated block each time.
         /// </summary>
         public int NoEchoBytesPerSecond = 6000;
 
@@ -305,6 +311,14 @@ public static class GzipBase64Transfer
         // followed by the restore.
         private bool _rawSend;
         private bool _rawReceive;
+
+        // True when the raw send goes block by block (the device asks for each block and waits for a verdict about it): a verdict ends its reader.
+        private bool _rawBlocks;
+
+        // The text forms go block by block: true while a script that does so is on the device. While it reads a block, the end marker ends the
+        // block; while it waits for a verdict (_verdictWanted), a verdict line is what it reads.
+        private bool _textBlocks;
+        private bool _verdictWanted;
 
         // For the debug log and for the error texts: when did the transfer start, what did the device print last.
         private readonly int _startedAt = Environment.TickCount;
@@ -599,11 +613,16 @@ public static class GzipBase64Transfer
             };
             if (raw)
             {
-                // The raw reader has to count: whether head takes -c and dd takes bs=/count= is tried, not assumed (a busybox built without
-                // FEATURE_FANCY_HEAD has a head that does not know -c). \"head-c\" and \"dd-c\" in the answer say that the try worked.
+                // The raw reader has to count: whether head takes -c is tried, not assumed (a busybox built without FEATURE_FANCY_HEAD has a
+                // head that does not know -c). \"head-c\" in the answer says that the try worked.
                 lines.Add("[ \"$(printf ab | head -c 1 2>/dev/null)\" = a ] && c=\"$c head-c\"");
-                lines.Add("[ \"$(printf ab | dd bs=1 count=1 2>/dev/null)\" = a ] && c=\"$c dd-c\"");
             }
+            // A receive cuts the archive into blocks with dd (\"dd-c\": it takes bs= and count=) and keeps the block in hand in a temporary
+            // file (mktemp puts it in /tmp, which is RAM on a router). \"read-t\": the shell's read takes a timeout (not every shell's does), so a
+            // sender that gets no verdict gives up by itself.
+            lines.Add("[ \"$(printf ab | dd bs=1 count=1 2>/dev/null)\" = a ] && c=\"$c dd-c\"");
+            lines.Add("t=$(mktemp 2>/dev/null) && rm -f \"$t\" && c=\"$c mktemp\"; unset t");
+            lines.Add("( read -t 1 t </dev/null ) 2>/dev/null; [ $? = 1 ] && c=\"$c read-t\"");
             lines.Add("printf " + Say("CAPS:%s") + " \"$c\"");
             TypeLines(lines.ToArray());
             string answer = WaitForMarker(15000, "tool check");
@@ -870,15 +889,25 @@ public static class GzipBase64Transfer
             string decoder = encoding == EncodingKind.Base64 ? "base64 -d" : "uudecode -o /dev/stdout";
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            ChecksumKind blockSum = BlockChecksum(caps, checksum);
+            string blockTrim = blockSum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            List<TextBlock> blocks = IndexTextBlocks(prepared.EncodedPath);
+            string count = blocks.Count.ToString(CultureInfo.InvariantCulture);
 
-            // The script is typed as three lines, and each of them is a complete command (a one-line "if", a function
-            // definition): the shell never answers with its continuation prompt "> " in the middle of the script, which is
-            // the fragile part of typing into a console, and no line is longer than the line editor of a small
-            // busybox takes (OpenWrt builds it with 512 characters).
-            // The data is read by sed up to its end marker line, so that nothing depends on counting bytes that a noisy
-            // line may lose, the shell never gets a line of the data (a uuencoded line can hold anything) whatever fails on
-            // the way, and no Ctrl-D is needed (it would log a shell out). Ctrl-C, Ctrl-\ and Ctrl-Z are ignored while the
-            // data is read: they are what the noise of a bad line is made of now and then, and they would stop the reader.
+            // The script is typed as complete commands, one per line (a one-line "if", a function definition): the shell never
+            // answers with its continuation prompt "> " in the middle of the script, which is the fragile part of typing into a
+            // console, and no line is longer than the line editor of a small busybox takes (OpenWrt builds it with 512 characters).
+            // The text of the archive is taken block by block: the device prints "G:number" when it is ready for a block, sed reads
+            // the lines of the block up to the end marker line into a temporary file (so that nothing depends on counting bytes that
+            // a noisy line may lose, the shell never gets a line of the data whatever fails on the way, and no Ctrl-D is needed: it
+            // would log a shell out), the device prints "C:number:checksum" and reads a verdict: SMOK puts the block into the pipe of
+            // the decoder, SMEX ends the transfer, anything else makes it read the same block again (empty lines before the verdict
+            // are skipped: busybox sed takes the line after the end marker with it, GNU sed leaves it). A line is checked against its
+            // echo before it is committed, as before; the checksum of the block catches what the echo cannot (a line that the noise
+            // committed by itself, a device that does not echo), so that it costs one block and not the whole transfer. When the
+            // reader gives up it adds a line that is no archive, so that the unpacker fails whatever it has been given so far.
+            // Ctrl-C, Ctrl-\ and Ctrl-Z are ignored while the data is read: they are what the noise of a bad line is made of now and
+            // then, and they would stop the reader.
             string overwriteCheck = _options.Overwrite
                 ? "if false; then :; "
                 : "if [ -e \"$d\" ]; then printf " + Say("EXISTS") + "; ";
@@ -887,14 +916,20 @@ public static class GzipBase64Transfer
                 DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
                 PutFunctionScript(),
                 EndFunctionScript(prepared, sumTool, trim),
-                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else trap '' INT QUIT TSTP; printf " + Say("READY")
-                    + "; sed -n " + ShellQuote("/^" + _endMarker + "$/q;p") + " | ( " + decoder
-                    + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; _smtty_end; unset -f _smtty_end _smtty_put 2>/dev/null; fi"
+                "_smtty_rd() { i=0; e=0; while [ $i -lt " + count + " ]; do printf " + Say("G:%s") + " $i >&2; sed -n " + ShellQuote("/^" + _endMarker + "$/q;p")
+                    + " >\"$c\"; s=$(" + ChecksumTool(blockSum) + " <\"$c\");" + blockTrim + " printf " + Say("C:%s:%s") + " $i \"$s\" >&2; a=; while [ -z \"$a\" ] && IFS= read -r a; do :; done;"
+                    + " case $a in SMOK) cat \"$c\"; i=$((i+1)); e=0;; SMEX) break;; *) e=$((e+1));; esac; [ $e -gt "
+                    + RawBlockDeviceRetries.ToString(CultureInfo.InvariantCulture) + " ] && break; done; [ $i -ge " + count + " ] || echo eA==; }",
+                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else c=$(mktemp 2>/dev/null) || c=\"$p.c\"; trap '' INT QUIT TSTP; printf "
+                    + Say("READY") + "; _smtty_rd | ( " + decoder + " | gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; trap - INT QUIT TSTP; rm -f \"$c\"; unset c;"
+                    + " _smtty_end; unset -f _smtty_end _smtty_put _smtty_rd 2>/dev/null; fi"
             };
 
             Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
             _pendingCleanup = DestinationScript(remotePath, name);
             _readerWaiting = false;
+            _textBlocks = true;
+            _verdictWanted = false;
             TypeLines(script);
             string answer = WaitForMarker(20000, "receiver start");
             if (answer == "EXISTS" || answer == "NOWRITE")
@@ -914,28 +949,19 @@ public static class GzipBase64Transfer
             {
                 throw new IOException("Unexpected answer of the device: " + answer);
             }
-            Pause(250);
 
-            bool intact = SendData(prepared, summary + attemptText);
-            if (!intact)
-            {
-                // A line that came back damaged was committed (the device took a line end out of the noise): the data that the
-                // device has is spoiled. End its reader so that it removes the partial file and answers, then try again.
-                Trace("Ending the device's reader after a damaged line");
-                EndReader();
-            }
-            else
-            {
-                _readerWaiting = false; // the end marker has been typed: the reader is over
-            }
+            string failure = SendTextBlocks(prepared, blocks, blockSum, summary + attemptText, out string result);
 
             Report(prepared.EncodedLength, prepared.EncodedLength, "Unpacking and checking on the device...");
-            string result = WaitForResult(prepared);
+            if (result == null)
+            {
+                result = WaitForResult(prepared);
+            }
             _readerWaiting = false;
             _pendingCleanup = null; // the script is over, and it has removed its partial file itself when it failed
-            if (!intact)
+            if (failure != null)
             {
-                return "A damaged line reached the device before it could be taken back.";
+                return failure;
             }
             return CheckSendResult(prepared, result, "text");
         }
@@ -1033,6 +1059,12 @@ public static class GzipBase64Transfer
         /// </summary>
         private string SendRawAttempt(Prepared prepared, Capabilities caps, ChecksumKind checksum, string name, string remotePath, string summary, string attemptText)
         {
+            if (caps.Has("head-c") || caps.Has("dd-c"))
+            {
+                return SendRawBlocksAttempt(prepared, caps, checksum, name, remotePath, summary, attemptText);
+            }
+            // The device cannot count bytes: the archive goes as one stream that ends on silence, and the checksum at the end is the only check.
+            _rawBlocks = false;
             string reader = RawReaderCommand(caps, prepared.EncodedLength);
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
@@ -1088,6 +1120,244 @@ public static class GzipBase64Transfer
             return CheckSendResult(prepared, result, "data");
         }
 
+        /// <summary>Bytes of the archive in one block of a raw send: a whole block fits in the 4 KB that the tty on the device buffers, so it is not lost even while the reader is not running.</summary>
+        private const int RawBlockSize = 4000;
+
+        /// <summary>Deciseconds of silence after which the device stops waiting for the rest of a block (a byte was lost) or for the verdict about it (this side is gone).</summary>
+        private const int RawBlockIdleDeciseconds = 30;
+
+        /// <summary>How many times in a row one block may arrive damaged before the attempt is given up (the device itself gives up after <see cref="RawBlockDeviceRetries"/>).</summary>
+        private const int RawBlockRetries = 10;
+
+        private const int RawBlockDeviceRetries = 20;
+
+        // The verdicts about a block, typed to the device: put it in the archive, read it again, give the transfer up.
+        private static readonly byte[] BlockAccepted = Encoding.ASCII.GetBytes("SMOK");
+        private static readonly byte[] BlockAgain = Encoding.ASCII.GetBytes("SMRE");
+        private static readonly byte[] BlockGiveUp = Encoding.ASCII.GetBytes("SMEX");
+
+        /// <summary>The checksum for the blocks of a raw send: the cheapest one the device has (the checksum of the whole file is still compared at the end).</summary>
+        private static ChecksumKind BlockChecksum(Capabilities caps, ChecksumKind whole)
+        {
+            return caps.Has("cksum") ? ChecksumKind.Cksum : caps.Has("md5sum") ? ChecksumKind.Md5 : caps.Has("sha256sum") ? ChecksumKind.Sha256 : whole;
+        }
+
+        private static string BlockChecksumOf(ChecksumKind kind, byte[] data, int count)
+        {
+            using (RunningChecksum sum = new RunningChecksum(kind))
+            {
+                sum.Update(data, 0, count);
+                return sum.Finish();
+            }
+        }
+
+        /// <summary>
+        /// One try of a raw send ("gzip + cat") to a device that can count bytes (head -c, or dd). A serial line has no flow control and a
+        /// small device loses bytes of a fast stream now and then (its UART overruns while the flash is written), so the archive is not sent as
+        /// one stream that a single lost byte spoils: the device asks for it block by block. For each block it prints "G:offset" when it is
+        /// ready to read (so nothing is on the line while it is busy writing), reads the block into a temporary file, prints "C:offset:checksum"
+        /// and waits for the verdict: SMOK puts the block into the pipe of gunzip, SMEX ends the transfer, anything else makes it read the same
+        /// block again (after the line has been quiet). No verdict at all (its line with the checksum was damaged on the way here) makes it
+        /// ask again too, but three times in a row and it gives up: nobody is there. This side only answers: it sends the block that was asked
+        /// for and compares the checksum. The checksum of the whole file is still compared at the end. Null on success, the reason when the
+        /// data did not arrive intact.
+        /// </summary>
+        private string SendRawBlocksAttempt(Prepared prepared, Capabilities caps, ChecksumKind checksum, string name, string remotePath, string summary, string attemptText)
+        {
+            string take = caps.Has("head-c") ? "head -c \"$1\"" : "dd bs=1 count=\"$1\" 2>/dev/null";
+            string sumTool = ChecksumTool(checksum);
+            string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            ChecksumKind blockSum = BlockChecksum(caps, checksum);
+            string blockTrim = blockSum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            string length = prepared.EncodedLength.ToString(CultureInfo.InvariantCulture);
+            string block = RawBlockSize.ToString(CultureInfo.InvariantCulture);
+            string idle = RawBlockIdleDeciseconds.ToString(CultureInfo.InvariantCulture);
+            Trace("The reader on the device: " + (caps.Has("head-c") ? "head -c" : "dd bs=1 count=") + ", in blocks of " + block + " bytes, each checked with " + ChecksumTool(blockSum));
+
+            // Complete lines, as for the text forms. The block reader runs as the left side of a pipe: its output is the archive (the blocks
+            // that were accepted), its words go to the terminal through stderr. When it gives up it adds a byte that is no archive, so that
+            // gunzip fails whatever it has been given so far (nothing at all too). After it the terminal is drained for 0.3 s of quiet before
+            // it gets its settings back: bytes that are still on their way must not reach the shell, which would take them for typed commands.
+            string overwriteCheck = _options.Overwrite
+                ? "if false; then :; "
+                : "if [ -e \"$d\" ]; then printf " + Say("EXISTS") + "; ";
+            string[] script =
+            {
+                DestinationScript(remotePath, name) + "; p=\"$d.smtty~\"",
+                PutFunctionScript(),
+                EndFunctionScript(prepared, sumTool, trim),
+                "_smtty_n() { " + take + "; }; _smtty_dr() { stty min 0 time 3; cat >/dev/null; stty min 0 time " + idle + "; }",
+                "_smtty_rd() { i=0; f=0; while [ $i -lt " + length + " ]; do n=$((" + length + "-i)); [ $n -gt " + block + " ] && n=" + block
+                    + "; printf " + Say("G:%s") + " $i >&2; _smtty_n $n >\"$c\"; s=$(" + ChecksumTool(blockSum) + " <\"$c\");" + blockTrim
+                    + " printf " + Say("C:%s:%s") + " $i \"$s\" >&2; a=$(_smtty_n 4); case $a in SMOK) cat \"$c\"; i=$((i+n)); f=0;; SMEX) break;;"
+                    + " '') f=$((f+7));; *) f=$((f+1)); _smtty_dr;; esac; [ $f -gt " + RawBlockDeviceRetries.ToString(CultureInfo.InvariantCulture) + " ] && break; done; [ $i -ge " + length + " ] || printf x; }",
+                overwriteCheck + "elif ! ( : >\"$p\" ) 2>/dev/null; then printf " + Say("NOWRITE") + "; else c=$(mktemp 2>/dev/null) || c=\"$p.c\"; o=$(stty -g); stty raw -echo min 0 time "
+                    + idle + "; printf " + Say("READY") + "; _smtty_rd | ( gunzip -c >\"$p\"; r=$?; cat >/dev/null; exit $r ); r=$?; stty min 0 time 3; cat >/dev/null; stty \"$o\";"
+                    + " rm -f \"$c\"; unset o c; _smtty_end; unset -f _smtty_end _smtty_put _smtty_n _smtty_dr _smtty_rd 2>/dev/null; fi"
+            };
+
+            Report(0, prepared.EncodedLength, "Starting the receiver on the device...");
+            _pendingCleanup = DestinationScript(remotePath, name);
+            _readerWaiting = false;
+            _rawSend = true;
+            _rawBlocks = true;
+            TypeLines(script);
+            string answer = WaitForMarker(20000, "receiver start");
+            if (answer == "EXISTS" || answer == "NOWRITE")
+            {
+                _pendingCleanup = null;
+            }
+            _readerWaiting = answer == "READY"; // the device is in its raw reader
+            if (answer == "EXISTS")
+            {
+                throw new IOException("The file already exists on the device. Choose \"Overwrite\" to replace it.");
+            }
+            if (answer == "NOWRITE")
+            {
+                throw new IOException("The device cannot write to the destination.");
+            }
+            if (answer != "READY")
+            {
+                throw new IOException("Unexpected answer of the device: " + answer);
+            }
+
+            string failure = SendRawBlocks(prepared, blockSum, summary + attemptText, out string result);
+
+            Report(prepared.EncodedLength, prepared.EncodedLength, "Unpacking and checking on the device...");
+            if (result == null)
+            {
+                result = WaitForResult(prepared);
+            }
+            _readerWaiting = false;
+            _pendingCleanup = null; // the script is over, and it has removed its partial file itself when it failed
+            if (failure != null)
+            {
+                return failure;
+            }
+            return CheckSendResult(prepared, result, "data");
+        }
+
+        /// <summary>
+        /// Serves the block reader of the device until the whole archive has been accepted: sends the block it asks for ("G:offset"), never
+        /// faster than the speed limit, and answers the checksum it has read ("C:offset:checksum"). Null when every block was accepted;
+        /// the reason when a block could not be brought over. <paramref name="result"/> is the verdict of the device's script when it came
+        /// before the last block was accepted (the device gave up by itself), else null.
+        /// </summary>
+        private string SendRawBlocks(Prepared prepared, ChecksumKind blockSum, string status, out string result)
+        {
+            result = null;
+            int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
+            long total = prepared.EncodedLength;
+            Trace("Sending " + total + " bytes of the archive as they are, in blocks of " + RawBlockSize + " bytes that the device asks for and checks one by one, at most "
+                + rate + " bytes/s; a damaged block is sent again");
+            long accepted = 0;
+            long sent = 0;
+            int repeats = 0; // of the block in hand, in a row
+            int repeated = 0; // blocks sent again, in all
+            Stopwatch clock = Stopwatch.StartNew();
+            bool wasQuiet = _quietRx;
+            _quietRx = true; // two lines of the device per block: only what is wrong with them goes to the log
+            try
+            {
+                using (FileStream input = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
+                {
+                    byte[] block = new byte[RawBlockSize];
+                    while (accepted < total)
+                    {
+                        _token.ThrowIfCancellationRequested();
+                        // A device that writes slower than the line brings the data asks for the next block when it has put the last one away.
+                        string answer = WaitForMarker(BusyDeviceTimeoutMs, "the next block of the archive, " + accepted + " of " + total + " bytes are there");
+                        if (answer.StartsWith("OK:", StringComparison.Ordinal) || answer.StartsWith("FAIL:", StringComparison.Ordinal))
+                        {
+                            Trace("The device ended the transfer by itself after " + accepted + " of " + total + " bytes: " + Escape(answer, 200));
+                            result = answer;
+                            return "The device gave the transfer up after " + accepted + " of " + total + " bytes (the line was damaged too often, or it waited too long for an answer).";
+                        }
+                        bool asks = answer.StartsWith("G:", StringComparison.Ordinal);
+                        if (!asks && !answer.StartsWith("C:", StringComparison.Ordinal))
+                        {
+                            Trace("RX ignored: " + Escape(answer, 200));
+                            continue;
+                        }
+                        string rest = answer.Substring(2);
+                        int colon = rest.IndexOf(':');
+                        string offsetText = asks ? rest.Trim() : colon >= 0 ? rest.Substring(0, colon) : string.Empty;
+                        if (!long.TryParse(offsetText, NumberStyles.None, CultureInfo.InvariantCulture, out long offset) || offset < 0 || offset >= total || offset % RawBlockSize != 0)
+                        {
+                            // The device's own line was damaged on the way: it gets no block (or no verdict it knows), notices and asks again.
+                            Trace("RX damaged, the offset cannot be read: " + Escape(answer, 200));
+                            if (!asks)
+                            {
+                                _send(BlockAgain, 0, BlockAgain.Length);
+                            }
+                            continue;
+                        }
+                        int count = (int)Math.Min(RawBlockSize, total - offset);
+                        input.Position = offset;
+                        if (ReadFull(input, block, count) != count)
+                        {
+                            throw new IOException("The packed file could not be read again.");
+                        }
+                        if (asks)
+                        {
+                            sent += SendRawBlock(block, count, offset, total, rate, status);
+                            continue;
+                        }
+                        string deviceSum = rest.Substring(colon + 1).Trim();
+                        if (SameChecksum(BlockChecksumOf(blockSum, block, count), deviceSum))
+                        {
+                            _send(BlockAccepted, 0, BlockAccepted.Length);
+                            accepted = offset + count;
+                            repeats = 0;
+                            continue;
+                        }
+                        _errors++;
+                        repeats++;
+                        repeated++;
+                        Trace("The block at " + offset + " arrived damaged (the device has " + Escape(deviceSum, 80) + "): time " + repeats + " in a row");
+                        if (repeats > RawBlockRetries)
+                        {
+                            _send(BlockGiveUp, 0, BlockGiveUp.Length);
+                            return "A block of the archive (at " + offset + " of " + total + " bytes) arrived damaged " + repeats
+                                + " times in a row: the line loses too much at this speed. Lower the speed, or use gzip + base64.";
+                        }
+                        _send(BlockAgain, 0, BlockAgain.Length);
+                        Report(offset, total, status + " - a damaged block is sent again (" + repeated + " so far)");
+                    }
+                }
+            }
+            finally
+            {
+                _quietRx = wasQuiet;
+            }
+            Trace("All " + total + " bytes accepted by the device in " + clock.ElapsedMilliseconds + " ms; " + sent + " bytes sent, " + repeated + " blocks sent again");
+            return null;
+        }
+
+        /// <summary>Sends one block of the archive, never faster than the speed limit; stops when the device says something before the block is out (it gave the block up). Returns the bytes sent.</summary>
+        private int SendRawBlock(byte[] block, int count, long offset, long total, int rate, string status)
+        {
+            Stopwatch clock = Stopwatch.StartNew();
+            int sent = 0;
+            while (sent < count && _early.Count == 0)
+            {
+                _token.ThrowIfCancellationRequested();
+                int part = Math.Min(RawBlockBytes, count - sent);
+                byte[] chunk = new byte[part]; // the line may keep the array until it has written it
+                Buffer.BlockCopy(block, sent, chunk, 0, part);
+                _send(chunk, 0, part);
+                sent += part;
+                Report(offset + sent, total, status + " - sending " + FormatSize(offset + sent) + " of " + FormatSize(total));
+                long due = sent * 1000L / rate;
+                while (clock.ElapsedMilliseconds < due && _early.Count == 0)
+                {
+                    _token.ThrowIfCancellationRequested();
+                    PumpKeepingAnswers((int)Math.Max(1, Math.Min(50, due - clock.ElapsedMilliseconds)), out _);
+                }
+            }
+            return sent;
+        }
+
         /// <summary>
         /// Sends the archive as it is, in blocks, never faster than the speed limit. Nothing comes back to check it against (the device's
         /// terminal does not echo in raw mode), and a byte lost on the way is found out by the checksum at the end.
@@ -1127,20 +1397,33 @@ public static class GzipBase64Transfer
         /// <summary>
         /// Raw mode ignores Ctrl-C and the end marker (to the terminal they are data), so a raw send cannot be stopped by typing: the reader on
         /// the device ends by itself when the line has been quiet for <see cref="RawIdleDeciseconds"/>, and its script then restores the terminal,
-        /// removes the unfinished file and answers. This waits for that answer. It also runs after a cancel, so it does not use the cancellable readers.
+        /// removes the unfinished file and answers. This waits for that answer. A reader that takes the archive block by block is told to give
+        /// up as soon as it asks for a verdict (it does when its block is complete, or when the line has been quiet for
+        /// <see cref="RawBlockIdleDeciseconds"/>); it gives up by itself when no verdict comes. It also runs after a cancel, so it does not use
+        /// the cancellable readers.
         /// </summary>
         private void WaitForRawReader()
         {
+            bool verdictWanted = false;
             foreach (string waiting in _early)
             {
                 if (waiting.IndexOf(_marker + "OK:", StringComparison.Ordinal) >= 0 || waiting.IndexOf(_marker + "FAIL:", StringComparison.Ordinal) >= 0)
                 {
                     return; // the script is over already
                 }
+                // The last line decides: after "C:" the device waits for a verdict, after "G:" for a block.
+                verdictWanted = waiting.IndexOf(_marker + "C:", StringComparison.Ordinal) >= 0;
             }
-            Trace("Waiting for the raw reader on the device to give up (it does when the line has been quiet for " + RawIdleDeciseconds / 10 + " s)");
-            int deadline = Environment.TickCount + RawIdleDeciseconds * 100 + 15000;
-            StringBuilder seen = new StringBuilder();
+            _early.Clear();
+            int idle = _rawBlocks ? RawBlockIdleDeciseconds * 6 : RawIdleDeciseconds; // three rounds of a block and a verdict that do not come
+            Trace("Waiting for the raw reader on the device to give up (it does when the line has been quiet for " + idle / 10 + " s)");
+            if (_rawBlocks && verdictWanted)
+            {
+                _send(BlockGiveUp, 0, BlockGiveUp.Length);
+            }
+            int deadline = Environment.TickCount + idle * 100 + 15000;
+            StringBuilder seen = new StringBuilder(_line.ToString());
+            _line.Length = 0;
             while (Environment.TickCount - deadline < 0)
             {
                 byte? b = _readByte(200);
@@ -1153,11 +1436,21 @@ public static class GzipBase64Transfer
                 {
                     seen.Remove(0, 2000);
                 }
+                if (b.Value != (byte)'\n')
+                {
+                    continue;
+                }
                 string text = seen.ToString();
                 if (text.IndexOf(_marker + "OK:", StringComparison.Ordinal) >= 0 || text.IndexOf(_marker + "FAIL:", StringComparison.Ordinal) >= 0)
                 {
                     Thread.Sleep(300);
                     return;
+                }
+                if (_rawBlocks && text.IndexOf(_marker + "C:", StringComparison.Ordinal) >= 0)
+                {
+                    // The device has read its block (or as much of it as came) and waits for the verdict.
+                    _send(BlockGiveUp, 0, BlockGiveUp.Length);
+                    seen.Length = 0;
                 }
             }
             Trace("The device did not answer in time; going on");
@@ -1193,15 +1486,124 @@ public static class GzipBase64Transfer
         // Ctrl-U: erases the line that has been typed and not committed.
         private static readonly byte[] KillLine = { 0x15 };
 
-        /// <summary>
-        /// Types the text of the archive, one line at a time, the way a person does at a terminal: a line is typed without its
-        /// line end, and the device's terminal sends back what it received. When that is the same as what was typed, the line
-        /// end commits the line to the device's reader; when it is not (the noise of the line has changed or lost characters)
-        /// the line is erased with Ctrl-U and typed again, so nothing damaged ever reaches the reader. Returns false only
-        /// when a damaged line got committed anyway.
-        /// </summary>
-        private bool SendData(Prepared prepared, string status)
+        /// <summary>A block of the text of the archive: whole lines, where they are in the text file and how many bytes they take with their line ends.</summary>
+        private sealed class TextBlock
         {
+            public long Offset;
+            public int Length;
+        }
+
+        /// <summary>Characters of text (with the line ends) that make a block of a send in a text form; a block is whole lines, at least one.</summary>
+        private const int TextBlockChars = 8192;
+
+        // The verdicts about a block of text, typed as lines.
+        private const string TextBlockAccepted = "SMOK";
+        private const string TextBlockAgain = "SMRE";
+        private const string TextBlockGiveUp = "SMEX";
+
+        /// <summary>
+        /// How long the device may say nothing before it is asked where it is (once): its line with a checksum, or with a request, may have
+        /// been damaged on the way here. A checksum comes at once; before a request the device puts the last block away, and a busy flash
+        /// can hold that for a long time, so it is given more.
+        /// </summary>
+        private const int TextBlockPokeMs = 8000;
+        private const int TextBlockBusyPokeMs = 30000;
+
+        /// <summary>Cuts the text of the archive into blocks of whole lines; the end marker line that closes the file belongs to no block.</summary>
+        private List<TextBlock> IndexTextBlocks(string path)
+        {
+            List<TextBlock> blocks = new List<TextBlock>();
+            TextBlock current = null;
+            long offset = 0;
+            using (StreamReader reader = new StreamReader(path, Encoding.ASCII))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (line == _endMarker)
+                    {
+                        break;
+                    }
+                    if (current == null || current.Length + line.Length + 1 > TextBlockChars)
+                    {
+                        current = new TextBlock { Offset = offset };
+                        blocks.Add(current);
+                    }
+                    current.Length += line.Length + 1;
+                    offset += line.Length + 1;
+                }
+            }
+            return blocks;
+        }
+
+        /// <summary>
+        /// Waits for the next word of the device's block reader. When nothing comes for <see cref="TextBlockPokeMs"/>, the line with its
+        /// request or its checksum may have been damaged on the way here (a message of the kernel in the middle of it), and the device waits
+        /// for ever, for a block or for a verdict: the end marker is typed once. A reader that waits for a block takes it for the end of an
+        /// empty block and prints a checksum; one that waits for a verdict takes it for "again" and asks for its block. Either way it says
+        /// where it is, at the cost of one repeated block (a device that was only busy writing reads the marker later, at the same cost).
+        /// </summary>
+        private string WaitForTextBlockWord(string what, bool afterVerdict)
+        {
+            int started = Environment.TickCount;
+            int deadline = started + BusyDeviceTimeoutMs;
+            int pokeAfter = afterVerdict ? TextBlockBusyPokeMs : TextBlockPokeMs;
+            bool poked = false;
+            bool busySaid = false;
+            while (true)
+            {
+                _token.ThrowIfCancellationRequested();
+                int left = deadline - Environment.TickCount;
+                if (left <= 0)
+                {
+                    throw new IOException("The device stopped taking the data: it has said nothing for " + BusyDeviceTimeoutMs / 1000
+                        + " s (" + what + "). Is it still running, and is there room left on its disk?" + RecentOutput());
+                }
+                string line = ReadLine(Math.Min(left, 500));
+                if (line == null)
+                {
+                    int waited = Environment.TickCount - started;
+                    if (afterVerdict && !busySaid && waited >= 1500)
+                    {
+                        // The device puts a block away before it asks for the next one: it writes the data slower than the line brings it,
+                        // and a flash file system stops now and then for seconds (garbage collection). Nothing is typed meanwhile.
+                        busySaid = true;
+                        Trace("The device does not ask for the next block: the device is busy (it writes the data slower than it comes), waiting for it");
+                        Report(_dataSent, _dataTotal, _dataStatus + " - the device is busy writing, waiting...");
+                    }
+                    if (!poked && waited >= pokeAfter)
+                    {
+                        poked = true;
+                        Trace("The device has said nothing for " + pokeAfter / 1000 + " s: asking it where it is");
+                        byte[] poke = Encoding.ASCII.GetBytes("\u0015" + _endMarker + "\n\n");
+                        _send(poke, 0, poke.Length);
+                    }
+                    continue;
+                }
+                int at = line.IndexOf(_marker, StringComparison.Ordinal);
+                if (at >= 0)
+                {
+                    if (busySaid)
+                    {
+                        Trace("The device went on after " + (Environment.TickCount - started) + " ms");
+                    }
+                    return line.Substring(at + _marker.Length);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Serves the block reader of the device until all of the text has been accepted. For "G:number" the lines of that block are typed
+        /// the way a person does at a terminal: a line is typed without its line end, and the device's terminal sends back what it received.
+        /// When that is the same as what was typed, the line end commits the line to the device's reader; when it is not (the noise of the
+        /// line has changed or lost characters) the line is erased with Ctrl-U and typed again. The end marker line closes the block. For
+        /// "C:number:checksum" the checksum is compared and the verdict typed: a block that arrived damaged all the same (a line that the
+        /// noise committed, a device without echo) is typed again. Null when every block was accepted, else the reason;
+        /// <paramref name="result"/> is the verdict of the device's script when it came before that (the device gave up by itself).
+        /// </summary>
+        private string SendTextBlocks(Prepared prepared, List<TextBlock> blocks, ChecksumKind blockSum, string status, out string result)
+        {
+            result = null;
             // The echoed lines are the data itself: only what is wrong with them goes to the log.
             bool wasQuiet = _quietRx;
             _quietRx = true;
@@ -1209,52 +1611,156 @@ public static class GzipBase64Transfer
             {
                 bool echoWorks = true;
                 int rate = Math.Max(500, _options.NoEchoBytesPerSecond);
-                long sent = 0;
+                long total = prepared.EncodedLength;
                 int lineNumber = 0;
-                _dataTotal = prepared.EncodedLength;
+                int accepted = 0;
+                int repeats = 0;  // of the block in hand, in a row
+                int repeated = 0; // blocks typed again, in all
+                bool afterVerdict = false; // the last thing typed was "accepted": the device is putting the block away
+                _dataTotal = total;
                 _dataStatus = status;
-                Trace("Sending " + prepared.EncodedLength + " bytes of text in lines of up to " + BlockChars() + " characters, each checked against the echo; without echo " + rate + " bytes/s");
-                using (StreamReader reader = new StreamReader(prepared.EncodedPath, Encoding.ASCII))
+                Trace("Sending " + total + " bytes of text in lines of up to " + BlockChars() + " characters, each checked against the echo, in " + blocks.Count
+                    + " blocks that the device asks for and checks with " + ChecksumTool(blockSum) + " one by one; without echo " + rate + " bytes/s");
+                using (FileStream input = new FileStream(prepared.EncodedPath, FileMode.Open, FileAccess.Read, FileShare.Read, 65536))
                 {
-                    string line;
-                    while ((line = reader.ReadLine()) != null)
+                    while (accepted < blocks.Count)
                     {
                         _token.ThrowIfCancellationRequested();
-                        lineNumber++;
-                        int startedAt = Environment.TickCount;
-                        if (lineNumber <= 3 || lineNumber % 100 == 0)
+                        // A device that writes slower than the line brings the data asks for the next block when it has put the last one away.
+                        string answer = WaitForTextBlockWord("the next block of the text, " + accepted + " of " + blocks.Count + " blocks are there", afterVerdict);
+                        afterVerdict = false;
+                        if (answer.StartsWith("OK:", StringComparison.Ordinal) || answer.StartsWith("FAIL:", StringComparison.Ordinal))
                         {
-                            Trace("Line " + lineNumber + ": " + line.Length + " characters, " + sent + " of " + prepared.EncodedLength + " bytes done; starts with " + Escape(line.Substring(0, Math.Min(line.Length, 40)), 80));
+                            Trace("The device ended the transfer by itself after " + accepted + " of " + blocks.Count + " blocks: " + Escape(answer, 200));
+                            result = answer;
+                            return "The device gave the transfer up after " + accepted + " of " + blocks.Count + " blocks (the line was damaged too often).";
                         }
-                        _dataSent = sent;
-                        if (!SendVerifiedLine(line, lineNumber, ref echoWorks, rate))
+                        bool asks = answer.StartsWith("G:", StringComparison.Ordinal);
+                        if (!asks && !answer.StartsWith("C:", StringComparison.Ordinal))
                         {
-                            return false;
+                            Trace("RX ignored: " + Escape(answer, 200));
+                            continue;
                         }
-                        sent += line.Length + 1;
-                        Report(sent, prepared.EncodedLength, status + " - sending " + FormatSize(sent) + " of " + FormatSize(prepared.EncodedLength));
-                        if (!echoWorks)
+                        _verdictWanted = !asks;
+                        string rest = answer.Substring(2);
+                        int colon = rest.IndexOf(':');
+                        string numberText = asks ? rest.Trim() : colon >= 0 ? rest.Substring(0, colon) : string.Empty;
+                        bool known = int.TryParse(numberText, NumberStyles.None, CultureInfo.InvariantCulture, out int number) && number >= 0 && number < blocks.Count;
+                        byte[] text = null;
+                        if (known)
                         {
-                            // No echo to wait for: keep to the speed limit and keep the receive queue empty.
-                            int due = startedAt + (int)((line.Length + 1) * 1000L / rate);
-                            while (Environment.TickCount - due < 0)
+                            text = new byte[blocks[number].Length];
+                            input.Position = blocks[number].Offset;
+                            if (ReadFull(input, text, text.Length) != text.Length)
                             {
-                                _token.ThrowIfCancellationRequested();
-                                PumpKeepingAnswers(Math.Max(1, Math.Min(50, due - Environment.TickCount)), out _);
+                                throw new IOException("The text of the archive could not be read again.");
                             }
                         }
+                        if (asks)
+                        {
+                            // A request that cannot be read (damaged on the way here) gets an empty block: its checksum then tells which block is wanted.
+                            if (!known)
+                            {
+                                Trace("RX damaged, the number of the block cannot be read: " + Escape(answer, 200));
+                            }
+                            TypeTextBlock(known ? Encoding.ASCII.GetString(text) : string.Empty, known ? blocks[number].Offset : 0, total, status, ref lineNumber, ref echoWorks, rate);
+                            continue;
+                        }
+                        string deviceSum = rest.Substring(colon + 1).Trim();
+                        if (known && SameChecksum(BlockChecksumOf(blockSum, text, text.Length), deviceSum))
+                        {
+                            TypeVerdict(TextBlockAccepted, ref lineNumber, ref echoWorks, rate);
+                            accepted = number + 1;
+                            repeats = 0;
+                            afterVerdict = true;
+                            _dataSent = blocks[number].Offset + blocks[number].Length;
+                            continue;
+                        }
+                        _errors++;
+                        repeats++;
+                        repeated++;
+                        Trace("Block " + numberText + " arrived damaged (the device has " + Escape(deviceSum, 80) + "): time " + repeats + " in a row");
+                        if (repeats > RawBlockRetries)
+                        {
+                            TypeVerdict(TextBlockGiveUp, ref lineNumber, ref echoWorks, rate);
+                            return "A block of the text (" + numberText + " of " + blocks.Count + ") arrived damaged " + repeats
+                                + " times in a row: the line is too noisy (a smaller block size, a lower baud rate or flow control may help).";
+                        }
+                        TypeVerdict(TextBlockAgain, ref lineNumber, ref echoWorks, rate);
+                        Report(known ? blocks[number].Offset : 0, total, status + " - a damaged block is typed again (" + repeated + " so far)");
                     }
                 }
-                // sed acts on the end marker only when it has read something of the line after it (GNU sed one character, busybox
-                // a whole line): an empty line does it. It is not checked against the echo: the device may be answering already.
-                _send(NewLine, 0, 1);
-                Trace("All " + sent + " bytes sent in " + lineNumber + " lines");
-                return true;
+                Trace("All " + total + " bytes accepted by the device in " + blocks.Count + " blocks, " + lineNumber + " lines typed, " + repeated + " blocks typed again");
+                return null;
             }
             finally
             {
                 _quietRx = wasQuiet;
             }
+        }
+
+        /// <summary>Types the lines of one block and the end marker line that closes it.</summary>
+        private void TypeTextBlock(string text, long offset, long total, string status, ref int lineNumber, ref bool echoWorks, int rate)
+        {
+            long sent = offset;
+            bool intact = true;
+            int start = 0;
+            while (start < text.Length && intact)
+            {
+                _token.ThrowIfCancellationRequested();
+                int end = text.IndexOf('\n', start);
+                string line = text.Substring(start, end - start);
+                start = end + 1;
+                lineNumber++;
+                if (lineNumber <= 3 || lineNumber % 100 == 0)
+                {
+                    Trace("Line " + lineNumber + ": " + line.Length + " characters, " + sent + " of " + total + " bytes done; starts with " + Escape(line.Substring(0, Math.Min(line.Length, 40)), 80));
+                }
+                _dataSent = sent;
+                intact = TypeLine(line, lineNumber, ref echoWorks, rate);
+                sent += line.Length + 1;
+                Report(sent, total, status + " - sending " + FormatSize(sent) + " of " + FormatSize(total));
+            }
+            if (!intact)
+            {
+                // A line that came back damaged was committed (the device took a line end out of the noise): the block is spoiled, its
+                // checksum will say so. It is closed here and typed again.
+                Trace("A damaged line was committed: the block is closed and will be typed again");
+            }
+            // sed acts on the end marker only when it has read something of the line after it (GNU sed one character, busybox a
+            // whole line): an empty line does it. It is not checked against the echo: the device may be answering already.
+            lineNumber++;
+            TypeLine(_endMarker, lineNumber, ref echoWorks, rate);
+            _send(NewLine, 0, 1);
+        }
+
+        /// <summary>Types one line, checked against its echo; without echo, at the speed limit. False when a damaged line got committed.</summary>
+        private bool TypeLine(string line, int lineNumber, ref bool echoWorks, int rate)
+        {
+            int startedAt = Environment.TickCount;
+            if (!SendVerifiedLine(line, lineNumber, ref echoWorks, rate))
+            {
+                return false;
+            }
+            if (!echoWorks)
+            {
+                // No echo to wait for: keep to the speed limit and keep the receive queue empty.
+                int due = startedAt + (int)((line.Length + 1) * 1000L / rate);
+                while (Environment.TickCount - due < 0)
+                {
+                    _token.ThrowIfCancellationRequested();
+                    PumpKeepingAnswers(Math.Max(1, Math.Min(50, due - Environment.TickCount)), out _);
+                }
+            }
+            return true;
+        }
+
+        /// <summary>Types the verdict about a block as a line of its own. A verdict that arrives damaged is no "accepted": the device reads the block again.</summary>
+        private void TypeVerdict(string verdict, ref int lineNumber, ref bool echoWorks, int rate)
+        {
+            lineNumber++;
+            TypeLine(verdict, Math.Max(2, lineNumber), ref echoWorks, rate);
+            _verdictWanted = false;
         }
 
         private bool SendVerifiedLine(string line, int lineNumber, ref bool echoWorks, int rate)
@@ -1401,20 +1907,29 @@ public static class GzipBase64Transfer
             _line.Length = 0;
         }
 
-        /// <summary>Ends the device's reader by typing the end marker (after erasing what may be on the line).</summary>
+        /// <summary>
+        /// Ends the device's block reader: the end marker (after erasing what may be on the line) closes the block it is reading, and the
+        /// verdict that follows makes it give up. A reader that waits for a verdict already gets the verdict alone.
+        /// </summary>
         private void EndReader()
         {
             _send(KillLine, 0, 1);
             Thread.Sleep(50); // not Pause: this also runs after a cancel, when the token is cancelled already
-            byte[] end = Encoding.ASCII.GetBytes(_endMarker + "\n\n"); // and an empty line: sed reads ahead
+            byte[] end = Encoding.ASCII.GetBytes(EndReaderText());
             _send(end, 0, end.Length);
             _readerWaiting = false;
         }
 
+        /// <summary>What ends the block reader, where it is now: the end marker and an empty line (sed reads ahead) when it reads a block, then the verdict to give up.</summary>
+        private string EndReaderText()
+        {
+            return (_verdictWanted ? string.Empty : _endMarker + "\n\n") + TextBlockGiveUp + "\n";
+        }
+
         /// <summary>
         /// When this side gives up (cancel, an error) while a script it typed is still running, the device may be waiting for
-        /// more data: the end marker ends its reader (the script then removes the unfinished file by itself), Ctrl-C ends
-        /// anything else, and the unfinished file is removed once more to be sure.
+        /// more data or for a verdict: the end marker and the verdict to give up end its reader (the script then removes the
+        /// unfinished file by itself), Ctrl-C ends anything else, and the unfinished file is removed once more to be sure.
         /// </summary>
         private void AbortDevice()
         {
@@ -1440,6 +1955,15 @@ public static class GzipBase64Transfer
                         Thread.Sleep(600);
                     }
                 }
+                if (_rawReceive && _rawBlocks)
+                {
+                    StopRawBlockSender(); // what is left of its verdicts on the prompt is thrown away by the Ctrl-C that follows
+                }
+                bool textSender = !_rawReceive && _textBlocks && cleanup.Length == 0;
+                if (textSender)
+                {
+                    StopTextBlockSender();
+                }
                 SendBytes(new byte[] { 0x03 });
                 Thread.Sleep(200);
                 SendBytes(new byte[] { 0x03, (byte)'\r' });
@@ -1452,7 +1976,13 @@ public static class GzipBase64Transfer
                 }
                 if (cleanup.Length > 0)
                 {
-                    SendBytes(Ascii("trap - INT QUIT TSTP; " + cleanup + "; rm -f \"$d.smtty~\"\r"));
+                    SendBytes(Ascii("trap - INT QUIT TSTP; " + cleanup + "; rm -f \"$d.smtty~\" \"$d.smtty~.c\"\r"));
+                    Thread.Sleep(100);
+                }
+                if (textSender)
+                {
+                    // A sender that had to be stopped with Ctrl-C has left the block in hand behind.
+                    SendBytes(Ascii(RemoveBlockFileScript + "\r"));
                     Thread.Sleep(100);
                 }
                 while (_readByte(150) != null)
@@ -1477,15 +2007,19 @@ public static class GzipBase64Transfer
 
         /// <summary>
         /// What brings a console back that a lost transfer left in the middle of it. For a receive (nothing is removed): Ctrl-C ends the
-        /// sender. For a send: Ctrl-U clears the line, the end marker ends the reader (the script then removes the unfinished file by
-        /// itself and restores its signals, as it does after any ended transfer), and the last two lines do the same once more in
-        /// case there was no script any more. At a plain prompt all of this is harmless: the marker is an unknown command.
+        /// sender (one that goes block by block gets the verdict that ends it first, and the block in hand is removed). For a send:
+        /// Ctrl-U clears the line, the end marker closes the block that the reader is reading and the verdict to give up ends it (the
+        /// script then removes the unfinished file by itself and restores its signals, as it does after any ended transfer), and the
+        /// last two lines do the same once more in case there was no script any more. At a plain prompt all of this is harmless: the
+        /// marker and the verdict are unknown commands.
         /// </summary>
         private byte[] BuildRecovery(string cleanup)
         {
             if (_rawReceive)
             {
-                return Ascii("\u0003\r" + RestoreTerminalScript + "\r"); // Ctrl-C ends the sender, then the terminal gets its settings back
+                // Ctrl-C ends the sender, then the terminal gets its settings back. A sender that goes block by block has given up by itself
+                // long before (nobody answered it); if it is still there, the verdict that ends it comes first.
+                return Ascii((_rawBlocks ? "XXXXXXXX" : string.Empty) + "\u0003\r" + RestoreTerminalScript + "\r");
             }
             if (_rawSend)
             {
@@ -1495,13 +2029,21 @@ public static class GzipBase64Transfer
             }
             if (cleanup.Length == 0)
             {
+                if (_textBlocks)
+                {
+                    // A receive in a text form, block by block: the verdict that ends it, Ctrl-C for a sender that is busy, and the block in hand is removed.
+                    return Ascii(TextReceiveGiveUp + "\n\u0003\r" + RemoveBlockFileScript + "\r");
+                }
                 return new byte[] { 0x03, (byte)'\r' };
             }
-            return Ascii("\u0015" + _endMarker + "\n\ntrap - INT QUIT TSTP\r" + cleanup + "; rm -f \"$d.smtty~\"\r");
+            return Ascii("\u0015" + EndReaderText() + "trap - INT QUIT TSTP\r" + cleanup + "; rm -f \"$d.smtty~\" \"$d.smtty~.c\"\r");
         }
 
         /// <summary>The shell text that puts the terminal back as the receive script found it (the script keeps its settings in $o).</summary>
         private const string RestoreTerminalScript = "[ -n \"$o\" ] && stty \"$o\"; unset o";
+
+        /// <summary>The shell text that removes the block in hand of a receive in a text form (the script keeps its path in $q).</summary>
+        private const string RemoveBlockFileScript = "[ -n \"$q\" ] && rm -f \"$q\"; unset q";
 
         // ----- receiving -----
 
@@ -1618,8 +2160,14 @@ public static class GzipBase64Transfer
         {
             if (encoding == EncodingKind.Raw)
             {
-                return ReceiveRawAttempt(checksum, remotePath, partPath, attemptText);
+                return ReceiveRawAttempt(caps, checksum, remotePath, partPath, attemptText);
             }
+            if (caps.Has("dd-c") && caps.Has("mktemp") && (caps.Has("wc") || BlockChecksum(caps, checksum) == ChecksumKind.Cksum))
+            {
+                return ReceiveTextBlocksAttempt(caps, encoding, checksum, remotePath, storedName, partPath, attemptText);
+            }
+            // The device cannot cut the archive into blocks: it comes as one stream, and the checksum at the end is the only check.
+            _textBlocks = false;
             string encoder = encoding == EncodingKind.Base64 ? "base64" : "uuencode " + ShellQuote(storedName);
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
@@ -1779,13 +2327,368 @@ public static class GzipBase64Transfer
             return decodeError;
         }
 
+        /// <summary>Bytes of the archive in one block of a receive in a text form (what the device reads from gzip at once; a block may be shorter).</summary>
+        private const int TextReceiveBlockSize = 6144;
+
+        /// <summary>Seconds the device waits for the verdict about a block (when its shell's read takes a timeout) before it sends the block again.</summary>
+        private const int TextVerdictSeconds = 8;
+
+        /// <summary>The verdict that ends a receive in a text form (a line of its own).</summary>
+        private const string TextReceiveGiveUp = "XXXXXXXX";
+
+        private static bool IsVerdictLine(string line)
+        {
+            if (line.Length != 8 || (line[0] != 'K' && line[0] != 'R' && line[0] != 'X'))
+            {
+                return false;
+            }
+            for (int i = 1; i < line.Length; i++)
+            {
+                if (line[0] == 'X' ? line[i] != 'X' : line[i] < '0' || line[i] > '9')
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void TypeReceiveVerdict(char letter, long index)
+        {
+            byte[] verdict = BlockVerdict(letter, index);
+            _send(verdict, 0, verdict.Length);
+            _send(NewLine, 0, 1);
+        }
+
+        /// <summary>
+        /// One try of a receive in a text form from a device that can cut the archive into blocks (dd, and mktemp for the block in hand).
+        /// What a console sends is not always what was written to it (the kernel prints its messages into the same line, a character gets
+        /// lost), and one such character would spoil a whole archive, so the archive comes block by block: the device prints
+        /// "D:number:length:checksum", the block as text (base64 or uuencode), "E:number", and reads a verdict, a line of eight characters:
+        /// K and the number of the block lets it go on, X ends the transfer, anything else makes it send the same block again. Its terminal
+        /// stays as it is (the lines are text), so it echoes the verdicts, and Ctrl-C still stops it. When its read takes a timeout, no
+        /// verdict at all makes it send the block again too, and three times in a row it gives up. Null on success, the reason when the data
+        /// did not arrive intact.
+        /// </summary>
+        private string ReceiveTextBlocksAttempt(Capabilities caps, EncodingKind encoding, ChecksumKind checksum, string remotePath, string storedName,
+            string partPath, string attemptText)
+        {
+            string encoder = encoding == EncodingKind.Base64 ? "base64" : "uuencode " + ShellQuote(UuSafeName(storedName));
+            string sumTool = ChecksumTool(checksum);
+            string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            ChecksumKind blockSum = BlockChecksum(caps, checksum);
+            // cksum prints the length after the checksum; the other tools need wc for it.
+            string blockStep = blockSum == ChecksumKind.Cksum
+                ? "s=$(cksum <\"$q\"); n=${s#* }"
+                : "s=$(" + ChecksumTool(blockSum) + " <\"$q\"); s=${s%% *}; n=$(wc -c <\"$q\")";
+            string read = caps.Has("read-t") ? "read -t " + TextVerdictSeconds.ToString(CultureInfo.InvariantCulture) + " -r a" : "read -r a";
+            string sizeStep = caps.Has("wc") ? "printf " + Say("SIZE:%s") + " \"$(wc -c <\"$f\")\"; " : string.Empty;
+            // The sender is the right side of a pipe from gzip: it reads the archive from the pipe, a block at a time, and the verdicts from
+            // the terminal, which it has as descriptor 3. The block in hand is in "$q".
+            string[] script =
+            {
+                "f=" + ShellPath(remotePath),
+                "_smtty_tx() { k=0; e=0; while dd bs=" + TextReceiveBlockSize.ToString(CultureInfo.InvariantCulture) + " count=1 2>/dev/null >\"$q\"; [ -s \"$q\" ]; do "
+                    + blockStep + "; h=$((1000000+k%1000000)); while :; do printf " + Say("D:%s:%s:%s") + " $k $n \"$s\"; " + encoder + " <\"$q\"; printf " + Say("E:%s") + " $k; a=; "
+                    + read + " <&3; case $a in K$h) e=0; break;; X*) return 1;; '') e=$((e+7));; *) e=$((e+1));; esac; [ $e -gt "
+                    + RawBlockDeviceRetries.ToString(CultureInfo.InvariantCulture) + " ] && return 1; done; k=$((k+1)); done; }",
+                "if [ ! -f \"$f\" ] || [ ! -r \"$f\" ]; then printf " + Say("NOFILE") + "; elif ! q=$(mktemp 2>/dev/null); then printf " + Say("NOTEMP") + "; else " + sizeStep
+                    + "printf " + Say("BEGIN") + "; { gzip -c <\"$f\" | _smtty_tx; } 3<&0; r=$?; rm -f \"$q\"; unset q; if [ $r = 0 ]; then s=$(" + sumTool + " <\"$f\");" + trim
+                    + " printf " + Say("END:%s") + " \"$s\"; else printf " + Say("ABORT") + "; fi; fi; unset -f _smtty_tx 2>/dev/null"
+            };
+
+            Report(0, 0, "Starting the sender on the device...");
+            _pendingCleanup = string.Empty;
+            _textBlocks = true;
+            TypeLines(script);
+
+            long originalLength = -1;
+            string answer;
+            while (true)
+            {
+                answer = WaitForMarker(30000, "start of the data");
+                if (answer.StartsWith("SIZE:", StringComparison.Ordinal))
+                {
+                    long.TryParse(answer.Substring(5).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out originalLength);
+                    continue;
+                }
+                break;
+            }
+            if (answer == "NOFILE" || answer == "NOTEMP")
+            {
+                _pendingCleanup = null;
+                throw new IOException(answer == "NOFILE"
+                    ? "The file was not found on the device, or it cannot be read: " + remotePath
+                    : "The device cannot make a temporary file (mktemp failed).");
+            }
+            if (answer != "BEGIN")
+            {
+                throw new IOException("Unexpected answer of the device: " + answer);
+            }
+
+            string failure;
+            using (Unpacker unpacker = new Unpacker(checksum, partPath))
+            {
+                UuDecoder uu = encoding == EncodingKind.UuEncode ? new UuDecoder() : null;
+                long received = 0;      // characters of text taken
+                long expected = 0;      // the number of the block that comes next
+                int repeats = 0;        // of the block in hand, in a row
+                int repeated = 0;
+                bool inBlock = false;   // between "D:" and "E:"
+                bool intact = false;    // the block in hand, so far
+                long index = -1;
+                int count = 0;
+                string blockSumText = null;
+                long textChars = 0;
+                MemoryStream data = new MemoryStream();
+                long again = -1;        // a block that came once more: its verdict is repeated when the device stays quiet
+                bool unanswered = false; // data has come since the last verdict: a device that goes quiet now may be waiting for one
+                string deviceSum = null;
+                string gaveUp = null;
+                int quietSince = Environment.TickCount;
+                int askedAt = Environment.TickCount - 60000;
+                Trace("Receiving the archive as text, in blocks of up to " + TextReceiveBlockSize + " bytes, each checked with " + ChecksumTool(blockSum)
+                    + " (" + originalLength + " bytes unpacked); a damaged block is asked for again");
+                _quietRx = true; // thousands of data lines: only what is wrong goes to the log
+                try
+                {
+                    while (true)
+                    {
+                        _token.ThrowIfCancellationRequested();
+                        string line = ReadLine(500);
+                        if (line == null)
+                        {
+                            int quiet = Environment.TickCount - quietSince;
+                            if (gaveUp == null && again >= 0 && quiet >= 2000)
+                            {
+                                // The block that came twice is not followed by the next one: the device did not get the verdict about it.
+                                Trace("Block " + again + " came once more and the device waits: its verdict is typed again");
+                                TypeReceiveVerdict('K', again);
+                                again = -1;
+                                unanswered = false;
+                                quietSince = Environment.TickCount;
+                            }
+                            else if (gaveUp == null && (inBlock || unanswered) && quiet >= 3000 && Environment.TickCount - askedAt >= 10000)
+                            {
+                                // Data came and then nothing: the line that ends the block was lost, and the device waits for a verdict.
+                                Trace("The device went quiet in the middle of block " + expected + ": asking for it again");
+                                _errors++;
+                                repeated++;
+                                inBlock = false;
+                                unanswered = false;
+                                askedAt = Environment.TickCount;
+                                TypeReceiveVerdict('R', expected);
+                            }
+                            // After the last block the device reads the whole file once more for its checksum (500 KB/s is allowed for that).
+                            long checksumMs = originalLength > 0 && unpacker.Produced >= originalLength ? originalLength / 500 : 0;
+                            if (quiet >= 30000 + checksumMs)
+                            {
+                                throw new IOException("The device stopped sending data after " + received + " characters of the archive." + RecentOutput());
+                            }
+                            continue;
+                        }
+                        quietSince = Environment.TickCount;
+                        int at = line.IndexOf(_marker, StringComparison.Ordinal);
+                        if (at < 0)
+                        {
+                            string text = line.Trim();
+                            if (text.Length == 0 || IsVerdictLine(text))
+                            {
+                                continue; // the echo of a verdict
+                            }
+                            byte[] decoded = uu != null ? uu.DecodeLine(line) : DecodeBase64Line(line);
+                            if (decoded == null)
+                            {
+                                // Not a line of the archive: a message of the kernel on the console, or a damaged line. Inside a block only the
+                                // checksum can tell whether it took something of the block with it.
+                                Trace("RX skipped, not a line of the archive: " + Escape(line, 200));
+                                continue;
+                            }
+                            unanswered = true;
+                            if (inBlock)
+                            {
+                                data.Write(decoded, 0, decoded.Length);
+                                textChars += line.Length + 1;
+                            }
+                            continue;
+                        }
+                        string tag = line.Substring(at + _marker.Length);
+                        if (tag.StartsWith("END:", StringComparison.Ordinal))
+                        {
+                            Trace("RX " + Escape(line, 200));
+                            deviceSum = tag.Substring(4).Trim();
+                            break;
+                        }
+                        if (tag == "ABORT")
+                        {
+                            Trace("RX " + Escape(line, 200));
+                            gaveUp = gaveUp ?? "The device gave the transfer up after " + expected + " blocks of the archive (the line was damaged too often, or it waited too long for an answer).";
+                            break;
+                        }
+                        if (gaveUp != null)
+                        {
+                            continue; // the device has been told to give up: what it still sends is not wanted
+                        }
+                        if (tag.StartsWith("D:", StringComparison.Ordinal))
+                        {
+                            string[] parts = tag.Substring(2).Split(new[] { ':' }, 3);
+                            inBlock = true;
+                            again = -1;
+                            data.SetLength(0);
+                            textChars = 0;
+                            intact = parts.Length == 3
+                                && long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out index)
+                                && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out count) && count >= 1 && count <= TextReceiveBlockSize;
+                            blockSumText = intact ? parts[2] : null;
+                            if (!intact)
+                            {
+                                Trace("RX damaged, not the start of a block: " + Escape(line, 200));
+                            }
+                            continue;
+                        }
+                        if (!tag.StartsWith("E:", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+                        // The block is over, and the device waits for the verdict about it.
+                        bool started = inBlock;
+                        inBlock = false;
+                        unanswered = false;
+                        bool ended = long.TryParse(tag.Substring(2).Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out long endIndex);
+                        byte[] block = data.ToArray();
+                        if (started && intact && ended && endIndex == index && index < expected)
+                        {
+                            // A block that was taken already. Either the device did not get the verdict about it (it then waits, and is told
+                            // again when it stays quiet), or it acted on an older answer and has the verdict still to read (it then goes on).
+                            again = index;
+                            continue;
+                        }
+                        if (started && intact && ended && endIndex == index && index == expected && block.Length == count
+                            && SameChecksum(BlockChecksumOf(blockSum, block, count), blockSumText))
+                        {
+                            unpacker.Write(block, count);
+                            received += textChars;
+                            expected++;
+                            repeats = 0;
+                            TypeReceiveVerdict('K', index);
+                            long shown = unpacker.Produced;
+                            if (originalLength > 0)
+                            {
+                                Report(Math.Min(shown, originalLength), originalLength, "Receiving " + FormatSize(received) + " of text, unpacked " + FormatSize(shown) + " of " + FormatSize(originalLength) + attemptText);
+                            }
+                            else
+                            {
+                                Report(shown, 0, "Receiving " + FormatSize(received) + " of text" + attemptText);
+                            }
+                            continue;
+                        }
+                        _errors++;
+                        repeats++;
+                        repeated++;
+                        Trace("Block " + expected + " arrived damaged (" + block.Length + " bytes" + (started && intact ? " of " + count + ", numbered " + index : ", its start was lost")
+                            + "): time " + repeats + " in a row");
+                        if (repeats > RawBlockRetries)
+                        {
+                            gaveUp = "A block of the archive (block " + expected + ") arrived damaged " + repeats + " times in a row: the line is too noisy (a lower baud rate or flow control may help).";
+                            byte[] giveUp = Encoding.ASCII.GetBytes(TextReceiveGiveUp + "\n");
+                            _send(giveUp, 0, giveUp.Length);
+                            continue; // the device answers ABORT
+                        }
+                        askedAt = Environment.TickCount;
+                        TypeReceiveVerdict('R', expected);
+                        Report(Math.Min(unpacker.Produced, Math.Max(0, originalLength)), Math.Max(0, originalLength), "Receiving " + FormatSize(received) + " of text - a damaged block is asked for again (" + repeated + " so far)" + attemptText);
+                    }
+                }
+                finally
+                {
+                    _quietRx = false;
+                }
+                _pendingCleanup = null; // the sender is done
+                Trace("The data has ended: " + received + " characters of text in " + expected + " blocks, " + repeated + " blocks asked for again, " + unpacker.Produced + " bytes unpacked so far");
+                if (gaveUp != null)
+                {
+                    failure = gaveUp;
+                }
+                else
+                {
+                    string mine;
+                    string unpackError = unpacker.Finish(out mine);
+                    Exception localError = unpacker.Error;
+                    if (localError != null)
+                    {
+                        ThrowIfLocalFailure(localError, partPath);
+                    }
+                    if (unpackError != null)
+                    {
+                        failure = "The data could not be unpacked (" + unpackError + "): it was damaged on the way.";
+                    }
+                    else if (!SameChecksum(mine, deviceSum))
+                    {
+                        failure = "Checksum mismatch: received " + mine + ", the device has " + deviceSum + ".";
+                    }
+                    else
+                    {
+                        failure = null;
+                    }
+                }
+            }
+            if (failure != null)
+            {
+                Trace("The received data was refused: " + failure);
+            }
+            return failure;
+        }
+
+        /// <summary>
+        /// Stops a receive in a text form that goes block by block: the sender reads a verdict after each block, a line, and the one that
+        /// ends the transfer waits in its terminal until then. A sender that is stopped this way removes its temporary file itself; the
+        /// Ctrl-C that follows is for one that did not answer. It also runs after a cancel, so it does not use the cancellable readers.
+        /// </summary>
+        private void StopTextBlockSender()
+        {
+            Trace("Telling the sender on the device to give up");
+            byte[] giveUp = Encoding.ASCII.GetBytes(TextReceiveGiveUp + "\n");
+            _send(giveUp, 0, giveUp.Length);
+            int deadline = Environment.TickCount + 6000;
+            StringBuilder seen = new StringBuilder();
+            while (Environment.TickCount - deadline < 0)
+            {
+                byte? b = _readByte(100);
+                if (b == null)
+                {
+                    continue;
+                }
+                seen.Append((char)b.Value);
+                if (seen.Length > 4000)
+                {
+                    seen.Remove(0, 2000);
+                }
+                if (b.Value != (byte)'\n')
+                {
+                    continue;
+                }
+                string text = seen.ToString();
+                if (text.IndexOf(_marker + "ABORT", StringComparison.Ordinal) >= 0 || text.IndexOf(_marker + "END:", StringComparison.Ordinal) >= 0)
+                {
+                    Thread.Sleep(200);
+                    return;
+                }
+            }
+            Trace("The device did not answer in time; going on");
+        }
+
         /// <summary>
         /// One try of a raw receive ("gzip + cat"). The device compresses the file once to learn the length of the archive (nothing is kept on
         /// it), says that length, switches its output to raw (no CR before LF) and writes the archive as it is; this side reads exactly that
         /// many bytes, unpacks them on the fly, and compares the checksum with the one the device prints at the end. Null on success.
         /// </summary>
-        private string ReceiveRawAttempt(ChecksumKind checksum, string remotePath, string partPath, string attemptText)
+        private string ReceiveRawAttempt(Capabilities caps, ChecksumKind checksum, string remotePath, string partPath, string attemptText)
         {
+            if (caps.Has("dd-c") && caps.Has("mktemp"))
+            {
+                return ReceiveRawBlocksAttempt(caps, checksum, remotePath, partPath, attemptText);
+            }
+            // The device cannot cut the archive into blocks: it comes as one stream, and the checksum at the end is the only check.
+            _rawBlocks = false;
             string sumTool = ChecksumTool(checksum);
             string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
             // The archive goes through cat: GNU gzip refuses to write compressed data to a terminal (its output here is the terminal), a pipe it takes.
@@ -1917,6 +2820,305 @@ public static class GzipBase64Transfer
             return failure;
         }
 
+        /// <summary>Bytes of the archive in one block of a raw receive (what the device reads from gzip at once; a block may be shorter).</summary>
+        private const int RawReceiveBlockSize = 8192;
+
+        private static readonly byte[] ReceiveGiveUp = Encoding.ASCII.GetBytes("XXXXXXXX");
+
+        /// <summary>The verdict about block <paramref name="index"/> of a raw receive: a letter (K: go on, R: send it again) and the number of the block, eight bytes in all.</summary>
+        private static byte[] BlockVerdict(char letter, long index)
+        {
+            return Encoding.ASCII.GetBytes(letter + (1000000 + index % 1000000).ToString(CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>
+        /// One try of a raw receive ("gzip + cat") from a device that can cut the archive into blocks (dd, and mktemp for the block in hand).
+        /// What a console sends is not always what was written to it (the kernel prints its messages into the same line, a byte gets lost), and
+        /// one such byte would spoil a whole archive, so the archive comes block by block: the device prints "D:number:length:checksum", writes
+        /// the block as it is and waits for a verdict of eight bytes: K and the number of the block lets it go on, X ends the transfer, anything
+        /// else makes it send the same block again (after its line has been quiet); no verdict at all does that too, but three times in a row
+        /// and it gives up. Its terminal is raw meanwhile (no echo, no signals, every byte of a verdict is data) and is restored before the
+        /// checksum of the whole file is printed. Null on success, the reason when the data did not arrive intact.
+        /// </summary>
+        private string ReceiveRawBlocksAttempt(Capabilities caps, ChecksumKind checksum, string remotePath, string partPath, string attemptText)
+        {
+            string take = caps.Has("head-c") ? "head -c \"$1\"" : "dd bs=1 count=\"$1\" 2>/dev/null";
+            string sumTool = ChecksumTool(checksum);
+            string trim = checksum == ChecksumKind.Cksum ? string.Empty : " s=${s%% *};";
+            ChecksumKind blockSum = BlockChecksum(caps, checksum);
+            // cksum prints the length after the checksum; the other tools need wc for it.
+            string blockStep = blockSum == ChecksumKind.Cksum
+                ? "s=$(cksum <\"$c\"); n=${s#* }"
+                : "s=$(" + ChecksumTool(blockSum) + " <\"$c\"); s=${s%% *}; n=$(wc -c <\"$c\")";
+            string idle = RawBlockIdleDeciseconds.ToString(CultureInfo.InvariantCulture);
+            // The sender is the right side of a pipe from gzip: it reads the archive from the pipe, a block at a time, and the verdicts from
+            // the terminal, which it has as descriptor 3.
+            string[] script =
+            {
+                "f=" + ShellPath(remotePath),
+                "_smtty_n() { " + take + "; }; _smtty_dr() { stty min 0 time 3; cat >/dev/null; stty min 0 time " + idle + "; }",
+                "_smtty_tx() { k=0; e=0; while dd bs=" + RawReceiveBlockSize.ToString(CultureInfo.InvariantCulture) + " count=1 2>/dev/null >\"$c\"; [ -s \"$c\" ]; do "
+                    + blockStep + "; h=$((1000000+k%1000000)); while :; do printf " + Say("D:%s:%s:%s") + " $k $n \"$s\"; cat \"$c\"; a=$(_smtty_n 8 <&3);"
+                    + " case $a in K$h) e=0; break;; X*) return 1;; '') e=$((e+7));; *) e=$((e+1)); _smtty_dr <&3;; esac; [ $e -gt "
+                    + RawBlockDeviceRetries.ToString(CultureInfo.InvariantCulture) + " ] && return 1; done; k=$((k+1)); done; }",
+                // After the sender: the terminal is drained for 0.3 s of quiet (verdicts that are still on their way must not reach the shell)
+                // and gets its settings back, then the checksum of the whole file is printed, or that the sender gave up.
+                "_smtty_fin() { stty min 0 time 3; cat >/dev/null; stty \"$o\"; rm -f \"$c\"; unset o c; if [ $r = 0 ]; then s=$(" + sumTool + " <\"$f\");" + trim
+                    + " printf " + Say("END:%s") + " \"$s\"; else printf " + Say("ABORT") + "; fi; }",
+                "if [ ! -f \"$f\" ] || [ ! -r \"$f\" ]; then printf " + Say("NOFILE") + "; elif ! c=$(mktemp 2>/dev/null); then printf " + Say("NOTEMP") + "; else printf "
+                    + Say("SIZE:%s") + " \"$(wc -c <\"$f\")\"; o=$(stty -g); stty raw -echo min 0 time " + idle + "; printf " + Say("BEGIN")
+                    + "; { gzip -c <\"$f\" | _smtty_tx; } 3<&0; r=$?; _smtty_fin; fi; unset -f _smtty_n _smtty_dr _smtty_tx _smtty_fin 2>/dev/null"
+            };
+
+            Report(0, 0, "Starting the sender on the device...");
+            _pendingCleanup = string.Empty;
+            _rawReceive = true;
+            _rawBlocks = true;
+            TypeLines(script);
+
+            long originalLength = -1;
+            string answer;
+            while (true)
+            {
+                answer = WaitForMarker(30000, "start of the data");
+                if (answer.StartsWith("SIZE:", StringComparison.Ordinal))
+                {
+                    long.TryParse(answer.Substring(5).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out originalLength);
+                    continue;
+                }
+                break;
+            }
+            if (answer == "NOFILE" || answer == "NOTEMP")
+            {
+                _pendingCleanup = null;
+                throw new IOException(answer == "NOFILE"
+                    ? "The file was not found on the device, or it cannot be read: " + remotePath
+                    : "The device cannot make a temporary file (mktemp failed).");
+            }
+            if (answer != "BEGIN")
+            {
+                throw new IOException("Unexpected answer of the device: " + answer);
+            }
+
+            string failure;
+            using (Unpacker unpacker = new Unpacker(checksum, partPath))
+            {
+                long received = 0;
+                long expected = 0; // the number of the block that comes next
+                int repeats = 0;   // of the block in hand, in a row
+                int repeated = 0;
+                byte[] block = new byte[RawReceiveBlockSize];
+                string deviceSum = null;
+                string gaveUp = null;
+                int quietSince = Environment.TickCount;
+                Trace("Receiving the archive as it is, in blocks of up to " + RawReceiveBlockSize + " bytes, each checked with " + ChecksumTool(blockSum)
+                    + " (" + originalLength + " bytes unpacked); a damaged block is asked for again");
+                _quietRx = true; // a line of the device per block, and whatever a damaged block looks like: only what is wrong goes to the log
+                try
+                {
+                    while (true)
+                    {
+                        _token.ThrowIfCancellationRequested();
+                        string line = ReadLine(1000);
+                        if (line == null)
+                        {
+                            // After the last block the device reads the whole file once more for its checksum (500 KB/s is allowed for that).
+                            long checksumMs = originalLength > 0 && unpacker.Produced >= originalLength ? originalLength / 500 : 0;
+                            if (Environment.TickCount - quietSince >= 30000 + checksumMs)
+                            {
+                                throw new IOException("The device stopped sending data after " + received + " bytes of the archive." + RecentOutput());
+                            }
+                            continue;
+                        }
+                        quietSince = Environment.TickCount;
+                        int at = line.IndexOf(_marker, StringComparison.Ordinal);
+                        if (at < 0)
+                        {
+                            continue; // a message of the kernel, or what is left of a damaged block
+                        }
+                        string tag = line.Substring(at + _marker.Length);
+                        if (tag.StartsWith("END:", StringComparison.Ordinal))
+                        {
+                            Trace("RX " + Escape(line, 200));
+                            deviceSum = tag.Substring(4).Trim();
+                            break;
+                        }
+                        if (tag == "ABORT")
+                        {
+                            Trace("RX " + Escape(line, 200));
+                            gaveUp = gaveUp ?? "The device gave the transfer up after " + received + " bytes of the archive (the line was damaged too often, or it waited too long for an answer).";
+                            break;
+                        }
+                        string[] parts = tag.StartsWith("D:", StringComparison.Ordinal) ? tag.Substring(2).Split(new[] { ':' }, 3) : new string[0];
+                        if (gaveUp != null || parts.Length != 3
+                            || !long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out long index)
+                            || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int count) || count < 1 || count > RawReceiveBlockSize)
+                        {
+                            // The device's own line was damaged (its block goes by as lines that mean nothing): it gets no verdict and sends the block again.
+                            if (gaveUp == null)
+                            {
+                                Trace("RX damaged, not the start of a block: " + Escape(line, 200));
+                            }
+                            continue;
+                        }
+                        int got = ReadRawBlock(block, count);
+                        quietSince = Environment.TickCount;
+                        if (index < expected)
+                        {
+                            // A block that was taken already: the device did not get the verdict about it. It is told again.
+                            Trace("Block " + index + " came once more (the device did not get the verdict): told again");
+                            SendVerdict('K', index, got < count);
+                            continue;
+                        }
+                        if (index == expected && got == count && SameChecksum(BlockChecksumOf(blockSum, block, count), parts[2]))
+                        {
+                            unpacker.Write(block, count);
+                            received += count;
+                            expected++;
+                            repeats = 0;
+                            SendVerdict('K', index, false);
+                            long shown = unpacker.Produced;
+                            if (originalLength > 0)
+                            {
+                                Report(Math.Min(shown, originalLength), originalLength, "Receiving " + FormatSize(received) + " of the archive, unpacked " + FormatSize(shown) + " of " + FormatSize(originalLength) + attemptText);
+                            }
+                            else
+                            {
+                                Report(shown, 0, "Receiving " + FormatSize(received) + " of the archive" + attemptText);
+                            }
+                            continue;
+                        }
+                        _errors++;
+                        repeats++;
+                        repeated++;
+                        Trace("Block " + index + " arrived damaged (" + got + " of " + count + " bytes, block " + expected + " was expected): time " + repeats + " in a row");
+                        if (repeats > RawBlockRetries)
+                        {
+                            gaveUp = "A block of the archive (after " + received + " bytes) arrived damaged " + repeats + " times in a row: the line loses too much. Use gzip + base64.";
+                            Drain(300, 5000);
+                            _send(ReceiveGiveUp, 0, ReceiveGiveUp.Length);
+                            continue; // the device answers ABORT when it has restored its terminal
+                        }
+                        SendVerdict('R', expected, true);
+                        Report(Math.Min(unpacker.Produced, Math.Max(0, originalLength)), Math.Max(0, originalLength), "Receiving " + FormatSize(received) + " of the archive - a damaged block is asked for again (" + repeated + " so far)" + attemptText);
+                    }
+                }
+                finally
+                {
+                    _quietRx = false;
+                }
+                _pendingCleanup = null; // the sender is done, its terminal is restored
+                _rawReceive = false;
+                Trace("The archive has arrived: " + received + " bytes in " + expected + " blocks, " + repeated + " blocks asked for again, " + unpacker.Produced + " bytes unpacked so far");
+                if (gaveUp != null)
+                {
+                    failure = gaveUp;
+                }
+                else
+                {
+                    string mine;
+                    string unpackError = unpacker.Finish(out mine);
+                    Exception localError = unpacker.Error;
+                    if (localError != null)
+                    {
+                        ThrowIfLocalFailure(localError, partPath);
+                    }
+                    if (unpackError != null)
+                    {
+                        failure = "The data could not be unpacked (" + unpackError + "): it was damaged on the way.";
+                    }
+                    else if (!SameChecksum(mine, deviceSum))
+                    {
+                        failure = "Checksum mismatch: received " + mine + ", the device has " + deviceSum + ".";
+                    }
+                    else
+                    {
+                        failure = null;
+                    }
+                }
+            }
+            if (failure != null)
+            {
+                Trace("The received data was refused: " + failure);
+            }
+            return failure;
+        }
+
+        /// <summary>Reads the <paramref name="count"/> bytes of a block as they are; fewer are returned when the line went quiet before the block was complete (bytes were lost).</summary>
+        private int ReadRawBlock(byte[] block, int count)
+        {
+            int got = 0;
+            while (got < count)
+            {
+                _token.ThrowIfCancellationRequested();
+                byte? b = _readByte(1500);
+                if (b == null)
+                {
+                    break;
+                }
+                block[got++] = b.Value;
+            }
+            return got;
+        }
+
+        /// <summary>
+        /// Types the verdict about a block. Before a verdict that is not a plain "go on" the line is given time to become quiet: what is left
+        /// of a damaged block (bytes that the line added) must not be taken for the start of the next one.
+        /// </summary>
+        private void SendVerdict(char letter, long index, bool afterQuiet)
+        {
+            if (afterQuiet)
+            {
+                Drain(300, 5000);
+                _line.Length = 0;
+            }
+            byte[] verdict = BlockVerdict(letter, index);
+            _send(verdict, 0, verdict.Length);
+        }
+
+        /// <summary>
+        /// Stops a raw receive that goes block by block. The sender's terminal is raw (Ctrl-C is a byte like any other), and it listens only
+        /// after each block, for a verdict: the one that ends the transfer is repeated until the device says that it has given up (it reads a
+        /// verdict together with whatever else has arrived, so a single one could be lost behind an earlier verdict). It also runs after a
+        /// cancel, so it does not use the cancellable readers.
+        /// </summary>
+        private void StopRawBlockSender()
+        {
+            Trace("Telling the sender on the device to give up");
+            int deadline = Environment.TickCount + RawBlockIdleDeciseconds * 300 + 6000; // by then it has given up by itself, three times without a verdict
+            int lastSent = Environment.TickCount - 1000;
+            StringBuilder seen = new StringBuilder();
+            while (Environment.TickCount - deadline < 0)
+            {
+                if (Environment.TickCount - lastSent >= 400)
+                {
+                    _send(ReceiveGiveUp, 0, ReceiveGiveUp.Length);
+                    lastSent = Environment.TickCount;
+                }
+                byte? b = _readByte(100);
+                if (b == null)
+                {
+                    continue;
+                }
+                seen.Append((char)b.Value);
+                if (seen.Length > 4000)
+                {
+                    seen.Remove(0, 2000);
+                }
+                if (b.Value != (byte)'\n')
+                {
+                    continue;
+                }
+                string text = seen.ToString();
+                if (text.IndexOf(_marker + "ABORT", StringComparison.Ordinal) >= 0 || text.IndexOf(_marker + "END:", StringComparison.Ordinal) >= 0)
+                {
+                    Thread.Sleep(300);
+                    return;
+                }
+            }
+            Trace("The device did not answer in time; going on");
+        }
+
         /// <summary>
         /// The next line of the data the device sends, or null when it has been quiet for too long. After the last line of the data
         /// the device reads the whole file once more for its checksum, and prints nothing until that is done: for a big file on a
@@ -2006,10 +3208,15 @@ public static class GzipBase64Transfer
 
     private static int ReadFull(Stream stream, byte[] buffer)
     {
+        return ReadFull(stream, buffer, buffer.Length);
+    }
+
+    private static int ReadFull(Stream stream, byte[] buffer, int wanted)
+    {
         int total = 0;
-        while (total < buffer.Length)
+        while (total < wanted)
         {
-            int count = stream.Read(buffer, total, buffer.Length - total);
+            int count = stream.Read(buffer, total, wanted - total);
             if (count <= 0)
             {
                 break;
