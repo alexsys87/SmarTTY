@@ -1669,6 +1669,7 @@ public class KermitTransfer
         long fileSize = -1;
         bool fileSizeExact = false; // fileSize is in bytes (not the rounded kilobytes of the '!' attribute)
         int sizeMismatches = 0; // files that ended with another size than announced: kept, and the user is told at the end
+        bool droppedUnfinished = false; // the sender ended the transfer (B) without finishing the last file (Z): the file was removed
         DateTime? fileDate = null;
         int consecutiveErrors = 0;
         int consecutiveDamaged = 0;
@@ -1815,10 +1816,17 @@ public class KermitTransfer
                     }
                     return true;
                 case TypeBreak:
+                    if (fileName != null)
+                    {
+                        // No end-of-file for the last file: it is not complete, and its stream must not stay open.
+                        droppedUnfinished = true;
+                        DropCurrent();
+                    }
                     completed = true;
                     Report(onProgress, received, 0, errors, (filesDone == 1 ? "File received successfully." : filesDone + " files received successfully.")
                         + (sizeMismatches == 0 ? string.Empty : " WARNING: " + sizeMismatches + (sizeMismatches == 1 ? " file has" : " files have")
-                            + " another size than the sender announced and may be incomplete."));
+                            + " another size than the sender announced and may be incomplete.")
+                        + (droppedUnfinished ? " WARNING: the sender ended the transfer before the last file was finished; that file was removed." : string.Empty));
                     return false;
                 default:
                     return true; // 'X': text the sender wants shown; nothing to do with it here
@@ -1858,6 +1866,13 @@ public class KermitTransfer
                 }
                 if (status == ReadStatus.Timeout && quick)
                 {
+                    // These quiet spells are short and do not count as consecutive errors, so a sender that has vanished with a gap in the
+                    // window would be asked for the missing packet for ever: the same silence that ends the slow path ends this one.
+                    if (lastPacketAt != 0 && ElapsedMs(lastPacketAt) > timeouts.PacketMs * MaxRetries)
+                    {
+                        errors++;
+                        return Abort("Too many errors", "Transfer failed: the sender stopped responding.");
+                    }
                     afterDamage = false;
                     errors++;
                     asked.Clear();
