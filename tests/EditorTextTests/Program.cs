@@ -1088,7 +1088,9 @@ internal static class Program
             "2026/10/31 07:00:07 [error] 12#12: *1 open() failed",
             "ts=1 level=warn msg=slow",
             "an ordinary sentence with error and Warning in it",
-            "07:00:09 FATAL out of memory"
+            "07:00:09 FATAL out of memory",
+            "[31/Oct/2026:07:00:10 +0000] \"POST /login HTTP/1.1\" 404 5",
+            "[31/Oct/2026:07:00:11 +0000] \"GET /old HTTP/1.1\" 301 0"
         }));
         Equal(Join(log.Tokens(0, SyntaxHighlighting.TypeSection)), "2026-10-31 07:00:01,123", "log: a timestamp with a comma fraction");
         Equal(Join(log.Tokens(0, SyntaxHighlighting.TypeString)), "ERROR", "log: ERROR");
@@ -1107,6 +1109,50 @@ internal static class Program
         Equal(Join(log.Tokens(8, SyntaxHighlighting.TypeString)) + Join(log.Tokens(8, SyntaxHighlighting.TypeNumber)), "", "log: the words in a sentence are left alone");
         Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeSection)), "07:00:09", "log: a time of the day alone");
         Equal(Join(log.Tokens(9, SyntaxHighlighting.TypeString)), "FATAL", "log: FATAL");
+        Equal(Join(log.Tokens(5, SyntaxHighlighting.TypeKeyword)), "200", "log: the answer code of an access log");
+        Equal(Join(log.Tokens(10, SyntaxHighlighting.TypeString)), "\"POST /login HTTP/1.1\"|404", "log: the request and the error of an access log");
+        Equal(Join(log.Tokens(11, SyntaxHighlighting.TypeNumber)), "301", "log: a redirect of an access log");
+
+        // JSON logs: journald's fields and the fields of application logs.
+        Highlighted jsonLog = new Highlighted(L.Log, string.Join("\n", new[]
+        {
+            "{\"__REALTIME_TIMESTAMP\":\"1761884401000000\",\"PRIORITY\":\"3\",\"MESSAGE\":\"disk full\",\"_HOSTNAME\":\"web1\"}",
+            "{\"__CURSOR\":\"s=abc\",\"PRIORITY\":\"7\",\"MESSAGE\":\"debug\"}",
+            "{\"level\":\"error\",\"msg\":\"boom\",\"count\":12}",
+            "{\"level\":\"warn\",\"ok\":false}",
+            "{\"level\":30,\"msg\":\"info\"}",
+            "{\"level\":50,\"msg\":\"error\"}",
+            "{\"time\":\"2026-10-31T07:00:01Z\",\"event\":\"error\"}",
+            "{\"custom\":1,\"level\":\"debug\"}",
+            "[{\"level\":\"warning\",\"msg\":\"slow\"}]",
+            "{",
+            "\t\"__CURSOR\" : \"s=abc\",",
+            "\t\"PRIORITY\" : \"6\",",
+            "\t\"MESSAGE\" : \"started\"",
+            "}",
+            "an ordinary { brace"
+        }));
+        Equal(Join(jsonLog.Tokens(0, SyntaxHighlighting.TypeKeyword)), "\"__REALTIME_TIMESTAMP\"|\"PRIORITY\"|\"MESSAGE\"|\"_HOSTNAME\"", "JSON log: the journald fields are keywords");
+        Equal(Join(jsonLog.Tokens(0, SyntaxHighlighting.TypeSection)), "\"1761884401000000\"", "JSON log: __REALTIME_TIMESTAMP");
+        Equal(Join(jsonLog.Tokens(0, SyntaxHighlighting.TypeString)), "\"3\"|\"disk full\"|\"web1\"", "JSON log: a priority, a message and a host");
+        Equal(Join(jsonLog.Tokens(1, SyntaxHighlighting.TypeComment)), "\"7\"", "JSON log: PRIORITY 7 is DEBUG");
+        Equal(Join(jsonLog.Tokens(2, SyntaxHighlighting.TypeString)), "\"error\"|\"boom\"", "JSON log: level=error");
+        Equal(Join(jsonLog.Tokens(2, SyntaxHighlighting.TypeNumber)), "12", "JSON log: a number value");
+        Equal(Join(jsonLog.Tokens(3, SyntaxHighlighting.TypeNumber)), "\"warn\"", "JSON log: level=warn");
+        Equal(Join(jsonLog.Tokens(3, SyntaxHighlighting.TypeKeyword)), "\"level\"|false", "JSON log: false");
+        Equal(Join(jsonLog.Tokens(4, SyntaxHighlighting.TypeKeyword)), "\"level\"|30|\"msg\"", "JSON log: the pino level 30 is INFO");
+        Equal(Join(jsonLog.Tokens(5, SyntaxHighlighting.TypeString)), "50|\"error\"", "JSON log: the pino level 50 is an error");
+        Equal(Join(jsonLog.Tokens(6, SyntaxHighlighting.TypeSection)), "\"2026-10-31T07:00:01Z\"", "JSON log: a time field");
+        Equal(Join(jsonLog.Tokens(6, SyntaxHighlighting.TypeString)), "\"error\"", "JSON log: a value that is not a level");
+        Equal(Join(jsonLog.Tokens(7, SyntaxHighlighting.TypeVariable)), "\"custom\"", "JSON log: a field of the application");
+        Equal(Join(jsonLog.Tokens(7, SyntaxHighlighting.TypeNumber)), "1", "JSON log: an application number");
+        Equal(Join(jsonLog.Tokens(7, SyntaxHighlighting.TypeComment)), "\"debug\"", "JSON log: an application level");
+        Equal(Join(jsonLog.Tokens(8, SyntaxHighlighting.TypeNumber)), "\"warning\"", "JSON log: a record in an array");
+        Equal(Join(jsonLog.Tokens(10, SyntaxHighlighting.TypeKeyword)), "\"__CURSOR\"", "JSON log: a pretty record starts with {");
+        Equal(Join(jsonLog.Tokens(11, SyntaxHighlighting.TypeKeyword)), "\"PRIORITY\"|\"6\"", "JSON log: a pretty record continues");
+        Equal(Join(jsonLog.Tokens(12, SyntaxHighlighting.TypeKeyword)), "\"MESSAGE\"", "JSON log: the message of a pretty record");
+        Equal(Join(jsonLog.Tokens(12, SyntaxHighlighting.TypeString)), "\"started\"", "JSON log: a value of a pretty record");
+        Equal(Join(jsonLog.Tokens(14, SyntaxHighlighting.TypeSection)) + Join(jsonLog.Tokens(14, SyntaxHighlighting.TypeKeyword)), "", "log: a brace in a sentence does not start JSON");
     }
 
     private static void CrontabChecks()

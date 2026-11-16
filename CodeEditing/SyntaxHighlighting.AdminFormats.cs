@@ -2654,6 +2654,84 @@ public static partial class SyntaxHighlighting
         "FATAL", "CRITICAL", "CRIT", "SEVERE", "EMERG", "EMERGENCY", "ALERT", "ERROR", "ERR", "WARNING", "WARN", "NOTICE", "INFO", "DEBUG", "TRACE", "VERBOSE"
     };
 
+    /// <summary>The line state of a JSON log record that continues on the next lines (journalctl -o json-pretty).</summary>
+    private const int StLogJson = 0x01;
+
+    /// <summary>The bits of the line state that hold the depth of the brackets of a JSON record.</summary>
+    private const int LogJsonDepthShift = 1;
+    private const int LogJsonMaxDepth = 15;
+
+    /// <summary>The fields of journald and the usual fields of JSON logs; they are keywords in a JSON record.</summary>
+    private static readonly HashSet<string> LogJsonKeys = Words(StringComparer.OrdinalIgnoreCase,
+        // journald
+        @"MESSAGE MESSAGE_ID PRIORITY CODE_FILE CODE_LINE CODE_FUNC ERRNO SYSLOG_FACILITY SYSLOG_IDENTIFIER
+          SYSLOG_PID SYSLOG_TIMESTAMP SYSLOG_RAW OBJECT_PID OBJECT_UID OBJECT_GID OBJECT_COMM OBJECT_EXE
+          _PID _UID _GID _COMM _EXE _CMDLINE _CAP_EFFECTIVE _AUDIT_SESSION _AUDIT_LOGINUID _SYSTEMD_CGROUP
+          _SYSTEMD_SLICE _SYSTEMD_UNIT _SYSTEMD_USER_UNIT _SYSTEMD_SESSION _SYSTEMD_OWNER_UID
+          _SYSTEMD_INVOCATION_ID _SYSTEMD_USER_SLICE _SYSTEMD_SESSION_ID _HOSTNAME _MACHINE_ID _BOOT_ID
+          _TRANSPORT _STREAM_ID _LINE_BREAK _NAMESPACE _RUNTIME_SCOPE _SOURCE_REALTIME_TIMESTAMP
+          _SOURCE_MONOTONIC_TIMESTAMP __CURSOR __REALTIME_TIMESTAMP __MONOTONIC_TIMESTAMP
+          // the usual fields of JSON logs
+          time timestamp ts @timestamp datetime level severity lvl loglevel levelname level_name
+          log.level syslog.severity severity_text severitytext message msg logger name service host
+          hostname source thread thread_name exception trace_id span_id");
+
+    /// <summary>The keys whose value is a time: it is coloured like the timestamp of a line.</summary>
+    private static readonly HashSet<string> LogTimestampKeys = Words(StringComparer.OrdinalIgnoreCase,
+        @"__REALTIME_TIMESTAMP _SOURCE_REALTIME_TIMESTAMP __MONOTONIC_TIMESTAMP _SOURCE_MONOTONIC_TIMESTAMP
+          time timestamp ts @timestamp datetime");
+
+    /// <summary>The keys whose value is a level: it is coloured like the level of a line.</summary>
+    private static readonly HashSet<string> LogLevelKeys = Words(StringComparer.OrdinalIgnoreCase,
+        @"PRIORITY level severity lvl loglevel levelname level_name log.level syslog.severity severity_text severitytext");
+
+    /// <summary>The colour of a journald/syslog priority 0..7, or -1 when the number is none.</summary>
+    private static int LogPriorityType(int priority)
+    {
+        switch (priority)
+        {
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+                return TypeString;
+            case 4:
+                return TypeNumber;
+            case 5:
+            case 6:
+                return TypeKeyword;
+            case 7:
+                return TypeComment;
+            default:
+                return -1;
+        }
+    }
+
+    /// <summary>The colour of the value of a level key: a syslog priority 0..7, a pino/Bunyan number (10..60) or a word.</summary>
+    private static int LogJsonLevelType(string value)
+    {
+        if (value.Length == 1 && IsDigit(value[0]))
+        {
+            return LogPriorityType(value[0] - '0');
+        }
+        if (value.Length == 2 && value[1] == '0' && value[0] >= '1' && value[0] <= '6')
+        {
+            switch (value[0])
+            {
+                case '1':
+                case '2':
+                    return TypeComment;
+                case '3':
+                    return TypeKeyword;
+                case '4':
+                    return TypeNumber;
+                default:
+                    return TypeString;
+            }
+        }
+        return LogLevelType(value);
+    }
+
     // ------------------------------------------------------------ tokenizers
 
     private static readonly TokenCache.LineTokenizer SystemdTokenizer =
@@ -2844,26 +2922,75 @@ public static partial class SyntaxHighlighting
     }
 
     /// <summary>
-    /// A log line: the timestamp at its start, and the level of the message (ERROR, WARN, INFO, DEBUG in capitals, [error] or
-    /// level=warn in the forms logs use). The rest of the line is left as it is. Nothing spans lines.
+    /// A log line: a JSON record (journald's "journalctl -o json", the "json-pretty" form whose record spans lines, and the
+    /// JSON logs of applications), or the timestamp at its start and the level of the message (ERROR, WARN, INFO, DEBUG in
+    /// capitals, [error] or level=warn in the forms logs use). In an access log the quoted request and the answer code are
+    /// coloured too. The rest of the line is left as it is. Nothing spans lines except a pretty-printed JSON record.
     /// </summary>
     private static bool TokenizeLog(int startState, string text, TokenCache.ITokenSink sink, out int endState)
     {
-        endState = 0;
         int len = text.Length;
+        int first = SkipBlanks(text, 0);
+        if ((startState & StLogJson) != 0 || StartsLogJson(text, first))
+        {
+            TokenizeLogJson(text, sink);
+            int depth = CountJsonDepth(text, startState >> LogJsonDepthShift);
+            endState = (depth == 0) ? 0 : (StLogJson | (Math.Min(depth, LogJsonMaxDepth) << LogJsonDepthShift));
+            return true;
+        }
+
+        endState = 0;
         int last = 0;
-        int i = SkipBlanks(text, 0);
+        int i = first;
+        bool accessLog = false;
         int stampEnd = MatchLogTimestamp(text, i);
         if (stampEnd > i)
         {
+            accessLog = text[i] == '[' && MatchCommonLogTimestamp(text, i + 1) == stampEnd - 1;
             Normal(ref last, last, i, sink);
             sink.AddToken(TypeSection, i, stampEnd);
             i = stampEnd;
             last = i;
         }
+        bool request = accessLog;
+        bool status = false;
         while (i < len)
         {
             char c = text[i];
+            if (request && c == '"')
+            {
+                // The request of an access log: "GET /index.html HTTP/1.1".
+                int end = FindQuoteEnd(text, i, '"');
+                int stop = (end < 0) ? len : end;
+                Normal(ref last, last, i, sink);
+                sink.AddToken(TypeString, i, stop);
+                i = stop;
+                last = i;
+                request = false;
+                status = true;
+                continue;
+            }
+            if (status)
+            {
+                // The answer code after the request: 200, 301, 404, 500.
+                int numberStart = SkipBlanks(text, i);
+                int numberEnd = numberStart;
+                while (numberEnd < len && numberEnd - numberStart < 3 && IsDigit(text[numberEnd]))
+                {
+                    numberEnd++;
+                }
+                if (numberEnd - numberStart == 3)
+                {
+                    int code = (text[numberStart] - '0') * 100 + (text[numberStart + 1] - '0') * 10 + (text[numberStart + 2] - '0');
+                    int type = (code >= 400) ? TypeString : ((code >= 300) ? TypeNumber : TypeKeyword);
+                    Normal(ref last, last, numberStart, sink);
+                    sink.AddToken(type, numberStart, numberEnd);
+                    last = numberEnd;
+                    i = numberEnd;
+                }
+                status = false;
+                continue;
+            }
             if (c == '[')
             {
                 int close = text.IndexOf(']', i + 1);
@@ -2876,6 +3003,9 @@ public static partial class SyntaxHighlighting
                         sink.AddToken(TypeSection, i, close + 1);
                         i = close + 1;
                         last = i;
+                        // The request of an access log follows its time: "GET /index.html HTTP/1.1".
+                        request = true;
+                        status = false;
                         continue;
                     }
                     int type = LogLevelType(text.Substring(i + 1, close - i - 1));
@@ -2930,5 +3060,169 @@ public static partial class SyntaxHighlighting
         }
         Normal(ref last, last, len, sink);
         return true;
+    }
+
+    /// <summary>Whether a log line starts a JSON record: "{" or the "[" of an array of records.</summary>
+    private static bool StartsLogJson(string text, int start)
+    {
+        if (start >= text.Length)
+        {
+            return false;
+        }
+        if (text[start] == '{')
+        {
+            return true;
+        }
+        if (text[start] != '[')
+        {
+            return false;
+        }
+        int next = SkipBlanks(text, start + 1);
+        return next < text.Length && (text[next] == '{' || text[next] == ']');
+    }
+
+    /// <summary>The depth of the { } and [ ] of a JSON record after the line, ignoring the brackets inside strings.</summary>
+    private static int CountJsonDepth(string text, int depth)
+    {
+        char quote = '\0';
+        for (int i = 0; i < text.Length; i++)
+        {
+            char c = text[i];
+            if (quote != '\0')
+            {
+                if (c == '\\')
+                {
+                    i++;
+                }
+                else if (c == quote)
+                {
+                    quote = '\0';
+                }
+                continue;
+            }
+            if (c == '"')
+            {
+                quote = c;
+            }
+            else if (c == '{' || c == '[')
+            {
+                depth++;
+            }
+            else if ((c == '}' || c == ']') && depth > 0)
+            {
+                depth--;
+            }
+        }
+        return depth;
+    }
+
+    /// <summary>
+    /// The tokens of a JSON log record: the keys are variables (the fields of journald and the usual fields of JSON logs are
+    /// keywords), the strings and numbers are values, and "true", "false" and "null" are keywords. The value of a level key
+    /// gets the colour of the level it names, the value of a timestamp key the colour of a timestamp.
+    /// </summary>
+    private static void TokenizeLogJson(string text, TokenCache.ITokenSink sink)
+    {
+        int len = text.Length;
+        int last = 0;
+        int i = 0;
+        string key = null;
+        while (i < len)
+        {
+            char c = text[i];
+            if (c == '"')
+            {
+                int end = FindQuoteEnd(text, i, '"');
+                int stop = (end < 0) ? len : end;
+                int after = SkipBlanks(text, stop);
+                bool isKey = after < len && text[after] == ':';
+                int contentLength = (stop - i) - ((end < 0) ? 1 : 2);
+                string value = contentLength > 0 ? text.Substring(i + 1, contentLength) : string.Empty;
+                Normal(ref last, last, i, sink);
+                if (isKey)
+                {
+                    key = value;
+                    sink.AddToken(LogJsonKeys.Contains(value) ? TypeKeyword : TypeVariable, i, stop);
+                }
+                else
+                {
+                    int type = TypeString;
+                    if (key != null && LogTimestampKeys.Contains(key))
+                    {
+                        type = TypeSection;
+                    }
+                    else if (key != null && LogLevelKeys.Contains(key))
+                    {
+                        int level = LogJsonLevelType(value);
+                        if (level >= 0)
+                        {
+                            type = level;
+                        }
+                    }
+                    sink.AddToken(type, i, stop);
+                    key = null;
+                }
+                i = stop;
+                last = i;
+                continue;
+            }
+
+            if (IsDigit(c) || (c == '-' && i + 1 < len && IsDigit(text[i + 1])))
+            {
+                int s = i;
+                i++;
+                while (i < len && (IsIdChar(text[i]) || text[i] == '.' ||
+                    ((text[i] == '+' || text[i] == '-') && (text[i - 1] == 'e' || text[i - 1] == 'E'))))
+                {
+                    i++;
+                }
+                int type = TypeNumber;
+                if (key != null)
+                {
+                    if (LogTimestampKeys.Contains(key))
+                    {
+                        type = TypeSection;
+                    }
+                    else if (LogLevelKeys.Contains(key))
+                    {
+                        int level = LogJsonLevelType(text.Substring(s, i - s));
+                        if (level >= 0)
+                        {
+                            type = level;
+                        }
+                    }
+                    key = null;
+                }
+                Normal(ref last, last, s, sink);
+                sink.AddToken(type, s, i);
+                last = i;
+                continue;
+            }
+
+            if (IsIdStart(c))
+            {
+                int s = i;
+                while (i < len && IsIdChar(text[i]))
+                {
+                    i++;
+                }
+                string word = text.Substring(s, i - s);
+                if (word == "true" || word == "false" || word == "null")
+                {
+                    Normal(ref last, last, s, sink);
+                    sink.AddToken(TypeKeyword, s, i);
+                    last = i;
+                }
+                key = null;
+                continue;
+            }
+
+            if (c == ',' || c == '{' || c == '[' || c == '}' || c == ']')
+            {
+                key = null;
+            }
+            i++;
+        }
+        Normal(ref last, last, len, sink);
     }
 }
