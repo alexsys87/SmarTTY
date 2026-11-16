@@ -653,6 +653,23 @@ public static class GzipBase64Transfer
             return new Capabilities(tools);
         }
 
+        /// <summary>
+        /// The raw form (gzip + cat) puts the device's terminal in raw mode with stty, and many OpenWrt builds have no stty in their busybox.
+        /// Without it the archive cannot cross the terminal safely (echo, CR/LF translation and flow control would damage it), so the
+        /// transfer goes on in the text form (base64, or uuencode) instead, which needs no stty. Returns the new value of "raw".
+        /// </summary>
+        private bool FallBackFromRaw(Capabilities caps, bool raw)
+        {
+            if (!raw || caps.Has("stty"))
+            {
+                return raw;
+            }
+            Trace("The device has no stty, which gzip + cat needs to put its terminal in raw mode: using gzip + base64 instead");
+            Report(0, 0, "The device has no stty: using gzip + base64 instead of gzip + cat...");
+            _options.Encoding = EncodingKind.Auto;
+            return false;
+        }
+
         private static string Missing(Capabilities caps, params string[] tools)
         {
             List<string> missing = new List<string>();
@@ -831,6 +848,7 @@ public static class GzipBase64Transfer
                 StartShell();
                 bool raw = _options.Encoding == EncodingKind.Raw;
                 Capabilities caps = Probe(raw);
+                raw = FallBackFromRaw(caps, raw);
                 string missing = raw ? Missing(caps, "gunzip", "mv", "rm", "cat", "stty") : Missing(caps, "gunzip", "mv", "rm", "cat", "sed");
                 if (missing != null)
                 {
@@ -2084,6 +2102,7 @@ public static class GzipBase64Transfer
                 StartShell();
                 bool raw = _options.Encoding == EncodingKind.Raw;
                 Capabilities caps = Probe(raw);
+                raw = FallBackFromRaw(caps, raw);
                 string missing = raw ? Missing(caps, "gzip", "stty", "wc") : Missing(caps, "gzip");
                 if (missing != null)
                 {
