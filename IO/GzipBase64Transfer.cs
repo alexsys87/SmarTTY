@@ -58,6 +58,9 @@ public static class GzipBase64Transfer
 
     public delegate byte? ReadByteHandler(int timeoutMs);
 
+    public const int MinPacketBytes = 64;
+    public const int MaxPacketBytes = 65536;
+
     /// <summary>What the user asked for in the transfer window: the file here, the path on the device and the options.</summary>
     public sealed class Request
     {
@@ -90,6 +93,14 @@ public static class GzipBase64Transfer
         /// a repeated block each time.
         /// </summary>
         public int NoEchoBytesPerSecond = 6000;
+
+        /// <summary>
+        /// Size of one packet of the archive that is checked on its own: the next packet is sent only when the device (or this side, on a
+        /// receive) has confirmed the checksum of the previous one, and a damaged packet is sent again. Bytes of the packed archive for
+        /// gzip + cat, characters of text for the text forms (whole lines, at least one). 0 = the defaults of each direction and form;
+        /// otherwise <see cref="MinPacketBytes"/> to <see cref="MaxPacketBytes"/>.
+        /// </summary>
+        public int PacketBytes;
 
         /// <summary>
         /// Called when the transfer had to give up while the device was still running its end of it and the connection was
@@ -346,6 +357,13 @@ public static class GzipBase64Transfer
             _nonce = text.ToString();
             _marker = MarkerStart + _nonce + ":";
             _endMarker = "SMTTY_END_" + _nonce;
+        }
+
+        /// <summary>The packet size the user chose, or <paramref name="fallback"/> when none was chosen.</summary>
+        private int PacketOr(int fallback)
+        {
+            int wanted = _options.PacketBytes;
+            return wanted <= 0 ? fallback : Math.Max(MinPacketBytes, Math.Min(MaxPacketBytes, wanted));
         }
 
         private void Report(long done, long total, string status)
@@ -1121,7 +1139,7 @@ public static class GzipBase64Transfer
         }
 
         /// <summary>Bytes of the archive in one block of a raw send: a whole block fits in the 4 KB that the tty on the device buffers, so it is not lost even while the reader is not running.</summary>
-        private const int RawBlockSize = 4000;
+        private int RawBlockSize => PacketOr(4000);
 
         /// <summary>Deciseconds of silence after which the device stops waiting for the rest of a block (a byte was lost) or for the verdict about it (this side is gone).</summary>
         private const int RawBlockIdleDeciseconds = 30;
@@ -1494,7 +1512,7 @@ public static class GzipBase64Transfer
         }
 
         /// <summary>Characters of text (with the line ends) that make a block of a send in a text form; a block is whole lines, at least one.</summary>
-        private const int TextBlockChars = 8192;
+        private int TextBlockChars => PacketOr(8192);
 
         // The verdicts about a block of text, typed as lines.
         private const string TextBlockAccepted = "SMOK";
@@ -2328,7 +2346,7 @@ public static class GzipBase64Transfer
         }
 
         /// <summary>Bytes of the archive in one block of a receive in a text form (what the device reads from gzip at once; a block may be shorter).</summary>
-        private const int TextReceiveBlockSize = 6144;
+        private int TextReceiveBlockSize => PacketOr(6144);
 
         /// <summary>Seconds the device waits for the verdict about a block (when its shell's read takes a timeout) before it sends the block again.</summary>
         private const int TextVerdictSeconds = 8;
@@ -2821,7 +2839,7 @@ public static class GzipBase64Transfer
         }
 
         /// <summary>Bytes of the archive in one block of a raw receive (what the device reads from gzip at once; a block may be shorter).</summary>
-        private const int RawReceiveBlockSize = 8192;
+        private int RawReceiveBlockSize => PacketOr(8192);
 
         private static readonly byte[] ReceiveGiveUp = Encoding.ASCII.GetBytes("XXXXXXXX");
 

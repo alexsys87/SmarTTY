@@ -67,6 +67,11 @@
         <TextBox x:Name="BlockBox" Width="50" Text="1024" VerticalContentAlignment="Center" ToolTip="Characters in a line of the text typed to the device. Every line is checked against the echo of the device and typed again if it came back damaged. A smaller value costs less on a noisy line." />
         <TextBlock Text="characters" VerticalAlignment="Center" Margin="6 0 0 0" />
       </StackPanel>
+      <TextBlock Grid.Row="2" Grid.Column="2" Text="Packet size:" VerticalAlignment="Center" Margin="0 2 8 2" />
+      <StackPanel Grid.Row="2" Grid.Column="3" Orientation="Horizontal" Margin="0 2 0 2">
+        <TextBox x:Name="PacketBox" Width="70" Text="" VerticalContentAlignment="Center" ToolTip="Size of one packet that is checked on its own: the next packet is sent only after the checksum of the previous one has been confirmed, and a damaged packet is sent again. Bytes of the archive for gzip + cat, characters of text for gzip + base64. Empty = the default (4000 bytes to the device and 8192 from it in raw mode; 8192 characters to the device and 6144 bytes from it in base64 mode). 64 to 65536. A smaller packet costs less on a bad line, a larger one is faster on a good line." />
+        <TextBlock Text="empty = default" VerticalAlignment="Center" Margin="6 0 0 0" Opacity="0.7" />
+      </StackPanel>
     </Grid>
     <CheckBox x:Name="OverwriteBox" Grid.Row="4" Margin="0 8 0 0" Content="Replace the file if it exists" />
     <TextBlock x:Name="NoteText" Grid.Row="5" TextWrapping="Wrap" Margin="0 10 0 0" Opacity="0.7" Text="Start this at an idle shell prompt of the device (not inside another program). The device needs gzip, base64 (or uuencode) and sha256sum (or md5sum); OpenWrt has them in busybox. Nothing is installed on the device. The file is packed with gzip, typed into the shell as text and unpacked there, then the checksums are compared; the file gets its name only when they match. The text goes in blocks that are checked one by one: a block that arrives damaged is sent again, not the whole file." />
