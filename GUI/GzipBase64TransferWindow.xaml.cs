@@ -25,6 +25,7 @@ public partial class GzipBase64TransferWindow : Window
     private static string _lastRate = "6000";
     private static string _lastBlock = "1024";
     private static string _lastRawRate = "6000";
+    private static string _lastPacket = string.Empty;
 
     private readonly bool _sending;
     private readonly bool _raw;
@@ -41,6 +42,7 @@ public partial class GzipBase64TransferWindow : Window
         AttemptsBox.Text = _lastAttempts;
         RateBox.Text = raw ? _lastRawRate : _lastRate;
         BlockBox.Text = _lastBlock;
+        PacketBox.Text = _lastPacket;
         if (raw)
         {
             // gzip + cat: the archive goes as it is, so there is no text form and no line to check against an echo.
@@ -199,6 +201,17 @@ public partial class GzipBase64TransferWindow : Window
             return;
         }
 
+        int packet = 0;
+        string packetText = PacketBox.Text.Trim();
+        if (packetText.Length > 0
+            && (!int.TryParse(packetText, NumberStyles.None, CultureInfo.InvariantCulture, out packet)
+                || packet < GzipBase64Transfer.MinPacketBytes || packet > GzipBase64Transfer.MaxPacketBytes))
+        {
+            MessageBoxes.Warning("The packet size must be empty (the default) or a number from " + GzipBase64Transfer.MinPacketBytes + " to " + GzipBase64Transfer.MaxPacketBytes + ".");
+            PacketBox.Focus();
+            return;
+        }
+
         GzipBase64Transfer.Options options = new GzipBase64Transfer.Options
         {
             Encoding = _raw ? GzipBase64Transfer.EncodingKind.Raw : (GzipBase64Transfer.EncodingKind)EncodingBox.SelectedIndex,
@@ -206,11 +219,13 @@ public partial class GzipBase64TransferWindow : Window
             Attempts = attempts,
             Overwrite = OverwriteBox.IsChecked == true,
             NoEchoBytesPerSecond = rate,
-            WindowBytes = block
+            WindowBytes = block,
+            PacketBytes = packet
         };
         Request = new GzipBase64Transfer.Request { LocalPath = local, RemotePath = remote, Options = options };
 
         _lastChecksum = ChecksumBox.SelectedIndex;
+        _lastPacket = packetText;
         _lastAttempts = attempts.ToString(CultureInfo.InvariantCulture);
         if (_raw)
         {
