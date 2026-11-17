@@ -89,8 +89,8 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 
 | Stage | Content | Status |
 | --- | --- | --- |
-| 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 (open) |
-| 1A | Editor logic out of WinForms | Next |
+| 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
+| 1A | Editor logic out of WinForms | In progress: A1 done (types, boundary check); next A2 |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -130,6 +130,18 @@ commits), one small PR per step, each green on its own. Do not fix bugs found on
 | `TerminalEmulatorControl` VT parsing, screen operations, host responses | `Terminal/Emulation/TerminalEmulator.cs` |
 | Key/mouse/paste → bytes | `Terminal/Emulation/TerminalInputEncoder.cs` |
 | Smart Terminal command line (`SshTerminalControl`), line input (`SerialTerminalControl`), `DeviceTerminalControl` feature partials | `Terminal/`, `VisualTTY/DeviceTerminal/` (`*Session`/`*Controller`) |
+
+Done in A1: `TextEditing/RgbColor`, `GridPoint`, `VirtualKey` (generated from the `Keys` of WinForms, 194 members), `KeyStroke`;
+`Controls/ModelInterop.cs` (the only conversions). `tests/ModelTypesTests` (net8.0) checks the types, `tests/ModelInteropTests`
+(net48, Mono) checks `VirtualKey` against the real `Keys` member by member and every conversion.
+
+Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
+`SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start: the 20
+of the specification plus `Completion/ShellCompletionAnalyzer`, `Terminal/CommandRun`, `Terminal/OutputLinkScanner`, which
+use the terminal controls). The list only shrinks, and the script fails on a listed file that is already clean.
+`tests/ModelBuildTests` (net8.0, no Windows) compiles the model folders without the listed files; two clean files that need
+listed ones are excluded in its csproj (`IHintView`, `ITerminalSessionContext`): when a file leaves the allowlist, make sure it
+is compiled there as well, and add to the dependency list there when the model starts to use new code outside its folders.
 
 Safety nets that stage 1 adds before moving code: terminal golden snapshots captured from the old code before any
 terminal move (`tests/TerminalSnapshots/`, never re-recorded); `tests/check-model-boundary.sh` with an allowlist that

@@ -1,0 +1,34 @@
+# Files of the logic folders (Terminal/, TextEditing/, CodeEditing/, Completion/) that still refer to WinForms, GDI+, WPF
+# or to the view folders (Controls/, Forms/, GUI/). Checked by tests/check-model-boundary.sh.
+#
+# The list may only shrink: remove a file here in the same change that makes it clean. The script fails on a file that is
+# listed but already clean (or gone), so the list cannot go stale. A new file must never be added: keep the logic folders
+# free of UI types instead (see "Stage 1 rules" in CLAUDE.md).
+#
+# The list of the stage 1 specification (section 6.1).
+Terminal/CompletionPopupRequest.cs
+Terminal/CompletionSession.cs
+Terminal/ICompletionPopup.cs
+TextEditing/HighlightStyle.cs
+TextEditing/ICaret.cs
+TextEditing/ICaretHost.cs
+TextEditing/IMargin.cs
+TextEditing/IScrollBar.cs
+TextEditing/LineNumberMargin.cs
+TextEditing/SoftwareCaret.cs
+TextEditing/WindowsCaret.cs
+CodeEditing/EditorCommands.cs
+CodeEditing/FoldingManager.cs
+CodeEditing/InlineMessageProvider.cs
+CodeEditing/KeyBindingMap.cs
+Completion/ICompletionHost.cs
+Completion/SignatureHintController.cs
+Completion/SuggestionCatalog.cs
+Completion/SuggestionController.cs
+Completion/SuggestionPopup.cs
+#
+# Found when the check was added, not in the table of the specification: these files use the terminal controls
+# (SshTerminalControl, TerminalEmulatorBase) of SmarTTY.Controls. They go with the terminal work (stages 1B and 1C).
+Completion/ShellCompletionAnalyzer.cs
+Terminal/CommandRun.cs
+Terminal/OutputLinkScanner.cs

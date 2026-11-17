@@ -219,6 +219,15 @@ jobs:
       - name: Run HEX terminal byte search checks (matches across rows, breaks, row map)
         run: dotnet run --project tests/HexStreamMapTests -c Release
 
+      - name: Check that the logic folders do not refer to WinForms, GDI+, WPF or the view folders (allowlist only shrinks)
+        run: tests/check-model-boundary.sh
+
+      - name: Compile the logic folders without Windows types (a hidden dependency on the UI is a compile error)
+        run: dotnet run --project tests/ModelBuildTests -c Release
+
+      - name: Run model type checks (RgbColor, GridPoint, VirtualKey, KeyStroke)
+        run: dotnet run --project tests/ModelTypesTests -c Release
+
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 
@@ -357,6 +366,12 @@ jobs:
 
       - name: Run the COM/TCP input line checks (history suggestions and Up/Down by prefix, the real control over TCP, under Mono)
         run: xvfb-run -a mono tests/DeviceLineEditorTests/bin/Release/net48/DeviceLineEditorTests.exe
+
+      - name: Build the model interop checks
+        run: dotnet build tests/ModelInteropTests -c Release
+
+      - name: Run the model interop checks (VirtualKey matches the WinForms Keys member by member; colour, point and key conversions, under Mono)
+        run: xvfb-run -a mono tests/ModelInteropTests/bin/Release/net48/ModelInteropTests.exe
 
   build:
     name: Build SmarTTY (Release)
