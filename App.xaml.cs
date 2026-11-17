@@ -19,6 +19,8 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Legacy code pages (cp866, koi8-r, windows-1251) are not built into .NET; the terminal encodings need them from the start.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         base.OnStartup(e);
         CrashLog.Install(this);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
