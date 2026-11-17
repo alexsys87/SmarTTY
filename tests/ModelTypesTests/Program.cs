@@ -154,8 +154,29 @@ internal static class Program
         Equal(Enum.GetValues(typeof(VirtualKey)).Length, 194, "VirtualKey has as many members as the WinForms Keys enumeration");
     }
 
+    private static void HighlightStyleChecks()
+    {
+        // The style of a selection: the system colours (the view resolves them when it paints), no border.
+        var selection = new HighlightStyle();
+        Check(selection.UseSystemSelectionColors, "the default style uses the system selection colours");
+        Check(selection.FillColor.IsEmpty && selection.TextColor.IsEmpty && selection.BorderColor.IsEmpty, "the default style holds no colours of its own");
+
+        var marker = new HighlightStyle(RgbColor.FromArgb(45, 90, 140, 255), RgbColor.FromArgb(150, 70, 120, 230), RgbColor.Empty);
+        Check(!marker.UseSystemSelectionColors, "a style with colours does not use the system colours");
+        Equal(marker.FillColor, RgbColor.FromArgb(45, 90, 140, 255), "style fill colour");
+        Equal(marker.BorderColor, RgbColor.FromArgb(150, 70, 120, 230), "style border colour");
+        Check(marker.TextColor.IsEmpty, "a style without a text colour keeps the text colour of the text");
+
+        var none = new HighlightStyle(RgbColor.Empty, RgbColor.Empty, RgbColor.Empty);
+        Check(!none.UseSystemSelectionColors && none.FillColor.IsEmpty && none.BorderColor.IsEmpty && none.TextColor.IsEmpty, "a style of empty colours draws nothing");
+
+        marker.FillColor = RgbColor.FromArgb(1, 2, 3);
+        Equal(marker.FillColor, RgbColor.FromArgb(1, 2, 3), "the colours of a style can be changed");
+    }
+
     private static void Main()
     {
+        HighlightStyleChecks();
         RgbColorChecks();
         GridPointChecks();
         KeyStrokeChecks();

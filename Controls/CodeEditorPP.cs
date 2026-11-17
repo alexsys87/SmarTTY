@@ -29,17 +29,17 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     private FoldingManager _foldingManager;
 
-    public HighlightStyle ParenHighlightStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(100, Color.LightYellow)), new Pen(Color.FromArgb(50, Color.Blue), 1f), null);
+    public HighlightStyle ParenHighlightStyle = new HighlightStyle(Color.FromArgb(100, Color.LightYellow).ToRgb(), Color.FromArgb(50, Color.Blue).ToRgb(), RgbColor.Empty);
 
-    public HighlightStyle BraceHighlightStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(50, Color.LightGreen)), new Pen(Color.FromArgb(50, Color.Blue), 1f), null);
+    public HighlightStyle BraceHighlightStyle = new HighlightStyle(Color.FromArgb(50, Color.LightGreen).ToRgb(), Color.FromArgb(50, Color.Blue).ToRgb(), RgbColor.Empty);
 
-    public HighlightStyle BracketHighlightStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(50, Color.LightBlue)), new Pen(Color.FromArgb(50, Color.Blue), 1f), null);
+    public HighlightStyle BracketHighlightStyle = new HighlightStyle(Color.FromArgb(50, Color.LightBlue).ToRgb(), Color.FromArgb(50, Color.Blue).ToRgb(), RgbColor.Empty);
 
-    public HighlightStyle AngleHighlightStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(50, Color.LightGray)), new Pen(Color.FromArgb(50, Color.Blue), 1f), null);
+    public HighlightStyle AngleHighlightStyle = new HighlightStyle(Color.FromArgb(50, Color.LightGray).ToRgb(), Color.FromArgb(50, Color.Blue).ToRgb(), RgbColor.Empty);
 
-    public HighlightStyle UnpairedHighlightStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(100, Color.Red)), new Pen(Color.FromArgb(50, Color.Black), 1f), null);
+    public HighlightStyle UnpairedHighlightStyle = new HighlightStyle(Color.FromArgb(100, Color.Red).ToRgb(), Color.FromArgb(50, Color.Black).ToRgb(), RgbColor.Empty);
 
-    public HighlightStyle DefaultPairHighlightStyle = new HighlightStyle(null, null, null);
+    public HighlightStyle DefaultPairHighlightStyle = new HighlightStyle(RgbColor.Empty, RgbColor.Empty, RgbColor.Empty);
 
     protected KeyBindingMap _keyBindingMap = new KeyBindingMap(EditorCommands.All);
 

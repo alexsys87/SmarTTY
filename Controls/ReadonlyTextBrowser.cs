@@ -2468,6 +2468,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         int scrollColumn = ScrollColumn;
         int previousStartX = -1;
         int previousEndX = -1;
+        // The brushes and the pen of the style: made once for a colour, the system colours are read now.
+        Brush textBrush = HighlightBrushes.TextBrush(highlightStyle);
+        Brush fillBrush = HighlightBrushes.FillBrush(highlightStyle);
+        Pen borderPen = HighlightBrushes.BorderPen(highlightStyle);
         for (int row = 0; row < this._visibleRows; row++)
         {
             int line = _displayRows[row].Line;
@@ -2517,11 +2521,11 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                     continue;
                 }
             }
-            if (highlightStyle.TextBrush != null)
+            if (textBrush != null)
             {
                 for (int column = Math.Max(startColumn, firstColumn); column < Math.Min(endColumn, lastColumn + 1); column++)
                 {
-                    items[row, column - firstColumn] = highlightStyle.TextBrush;
+                    items[row, column - firstColumn] = textBrush;
                 }
             }
             int startX = Round(ColumnToXFrom(startColumn, firstColumn));
@@ -2536,33 +2540,33 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 endX = previousEndX;
             }
             int y = Round(RowToY(row));
-            if (highlightStyle.FillBrush != null)
+            if (fillBrush != null)
             {
-                graphics.FillRectangle(highlightStyle.FillBrush, startX, y, endX - startX, _charSize.Height);
+                graphics.FillRectangle(fillBrush, startX, y, endX - startX, _charSize.Height);
             }
-            if (highlightStyle.BorderPen != null)
+            if (borderPen != null)
             {
                 if (line == rangeStart.Line)
                 {
-                    graphics.DrawLine(highlightStyle.BorderPen, startX, y, endX, y);
+                    graphics.DrawLine(borderPen, startX, y, endX, y);
                 }
                 else
                 {
                     if (previousStartX != startX)
                     {
-                        graphics.DrawLine(highlightStyle.BorderPen, startX, y, previousStartX, y);
+                        graphics.DrawLine(borderPen, startX, y, previousStartX, y);
                     }
                     if (previousEndX != endX)
                     {
-                        graphics.DrawLine(highlightStyle.BorderPen, endX, y, previousEndX, y);
+                        graphics.DrawLine(borderPen, endX, y, previousEndX, y);
                     }
                 }
                 if (line == rangeEnd.Line)
                 {
-                    graphics.DrawLine(highlightStyle.BorderPen, startX, (float)y + _charSize.Height, endX, (float)y + _charSize.Height);
+                    graphics.DrawLine(borderPen, startX, (float)y + _charSize.Height, endX, (float)y + _charSize.Height);
                 }
-                graphics.DrawLine(highlightStyle.BorderPen, startX, y, startX, (float)y + _charSize.Height);
-                graphics.DrawLine(highlightStyle.BorderPen, endX, y, endX, (float)y + _charSize.Height);
+                graphics.DrawLine(borderPen, startX, y, startX, (float)y + _charSize.Height);
+                graphics.DrawLine(borderPen, endX, y, endX, (float)y + _charSize.Height);
             }
             previousStartX = startX;
             previousEndX = endX;

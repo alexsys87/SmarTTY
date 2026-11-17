@@ -54,7 +54,7 @@ public class TextSearcher : INotifyPropertyChanged
     // The searcher itself is editing the text: that must not end the search in the selection.
     private bool _applying;
 
-    private static readonly HighlightStyle ScopeStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(45, 90, 140, 255)), new Pen(Color.FromArgb(150, 70, 120, 230), 1f), null);
+    private static readonly HighlightStyle ScopeStyle = new HighlightStyle(Color.FromArgb(45, 90, 140, 255).ToRgb(), Color.FromArgb(150, 70, 120, 230).ToRgb(), RgbColor.Empty);
 
     public bool IsVisible
     {

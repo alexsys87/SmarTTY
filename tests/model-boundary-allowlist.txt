@@ -9,14 +9,6 @@
 Terminal/CompletionPopupRequest.cs
 Terminal/CompletionSession.cs
 Terminal/ICompletionPopup.cs
-TextEditing/HighlightStyle.cs
-TextEditing/ICaret.cs
-TextEditing/ICaretHost.cs
-TextEditing/IMargin.cs
-TextEditing/IScrollBar.cs
-TextEditing/LineNumberMargin.cs
-TextEditing/SoftwareCaret.cs
-TextEditing/WindowsCaret.cs
 CodeEditing/EditorCommands.cs
 CodeEditing/FoldingManager.cs
 CodeEditing/InlineMessageProvider.cs
