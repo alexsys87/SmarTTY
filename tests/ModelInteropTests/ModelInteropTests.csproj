@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Checks Controls/ModelInterop.cs against the real WinForms and GDI+ types: every member of the Keys enumeration has a
+    member of VirtualKey with the same name and value and vice versa, and the colour, point and key conversions are exact.
+    It is a .NET Framework 4.8 program, so on Linux it is built with the .NET SDK and run by Mono (no display is needed):
+
+      dotnet build tests/ModelInteropTests -c Release
+      mono tests/ModelInteropTests/bin/Release/net48/ModelInteropTests.exe
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <Compile Include="../../TextEditing/KeyStroke.cs" Link="KeyStroke.cs" />
+    <Compile Include="../../Controls/ModelInterop.cs" Link="ModelInterop.cs" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+</Project>
