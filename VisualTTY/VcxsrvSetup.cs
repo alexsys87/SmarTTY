@@ -86,8 +86,8 @@ public static class VcxsrvSetup
 
     /// <summary>
     /// Directories that may hold vcxsrv.exe, most specific first: a copy next to SmarTTY.exe, the folder recorded by the
-    /// installer and the standard installation folders (SmarTTY is a 32-bit process, so "Program Files" of the 64-bit
-    /// system comes from ProgramW6432).
+    /// installer and the standard installation folders ("Program Files" and "Program Files (x86)"; ProgramW6432 is the
+    /// 64-bit folder whatever the bitness of the process).
     /// </summary>
     public static IEnumerable<string> CandidateDirectories()
     {
@@ -486,6 +486,9 @@ public static class VcxsrvSetup
         }
     }
 
+    // HttpWebRequest and ServicePointManager are obsolete on .NET (SYSLIB0014) but still work; replacing them with HttpClient
+    // is not part of the move to .NET 10.
+#pragma warning disable SYSLIB0014
     private static HttpWebRequest CreateRequest(string url)
     {
         HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -515,6 +518,7 @@ public static class VcxsrvSetup
             ServicePointManager.SecurityProtocol = protocols | SecurityProtocolType.Tls12;
         }
     }
+#pragma warning restore SYSLIB0014
 
     private static string ToHex(byte[] data)
     {

@@ -573,7 +573,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
         {
             if (!IsWindows() && message.Msg == 258)
             {
-                OnKeyPress(new KeyPressEventArgs((char)(byte)(int)message.WParam));
+                OnKeyPress(new KeyPressEventArgs((char)(byte)(int)message.WParam.ToInt64()));
             }
             else
             {

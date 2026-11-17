@@ -1919,7 +1919,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         if (message.Msg == 256)
         {
-            _extendedKey = ((int)message.LParam & 0x1000000) != 0;
+            _extendedKey = (message.LParam.ToInt64() & 0x1000000) != 0;
             base.WndProc(ref message);
             _extendedKey = false;
         }
