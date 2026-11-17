@@ -1,6 +1,5 @@
-using SmarTTY.Controls;
+using SmarTTY.TextEditing;
 using System.Collections.Generic;
-using System.Windows.Forms;
 
 namespace SmarTTY.CodeEditing;
 
@@ -8,7 +7,7 @@ public class EditorCommands
 {
     public class DelegateCommand : KeyBindingMap.EditorCommand
     {
-        public delegate void CommandAction(CodeEditorPP codeEditorPP);
+        public delegate void CommandAction(IEditorCommandTarget codeEditorPP);
 
         private CommandAction _action;
 
@@ -20,13 +19,13 @@ public class EditorCommands
 
         public override void Execute(object target)
         {
-            _action(target as CodeEditorPP);
+            _action(target as IEditorCommandTarget);
         }
     }
 
     public static List<KeyBindingMap.EditorCommand> All = new List<KeyBindingMap.EditorCommand>
     {
-        new DelegateCommand("ShowCompletion", "Show the completion popup", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ShowCompletion", "Show the completion popup", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ShowCompletion();
         })
@@ -34,10 +33,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Space
+                Key = VirtualKey.Space
             }
         },
-        new DelegateCommand("RetokenizeDocument", "Rebuild token pairing", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("RetokenizeDocument", "Rebuild token pairing", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.Retokenize();
         })
@@ -45,10 +44,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.R
+                Key = VirtualKey.R
             }
         },
-        new DelegateCommand("GoToOpeningRoundBracket", "Go to next '('", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToOpeningRoundBracket", "Go to next '('", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "(");
         })
@@ -57,10 +56,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.D9
+                Key = VirtualKey.D9
             }
         },
-        new DelegateCommand("SelectToOpeningRoundBracket", "Select to next '('", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToOpeningRoundBracket", "Select to next '('", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "(");
         })
@@ -69,10 +68,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.D9
+                Key = VirtualKey.D9
             }
         },
-        new DelegateCommand("GoToClosingRoundBracket", "Go to next ')'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToClosingRoundBracket", "Go to next ')'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == ")");
         })
@@ -81,10 +80,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.D0
+                Key = VirtualKey.D0
             }
         },
-        new DelegateCommand("SelectToClosingRoundBracket", "Select to next ')'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToClosingRoundBracket", "Select to next ')'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == ")");
         })
@@ -93,10 +92,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.D0
+                Key = VirtualKey.D0
             }
         },
-        new DelegateCommand("GoToOpeningCurlyBracket", "Go to next '{'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToOpeningCurlyBracket", "Go to next '{'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "{");
         })
@@ -105,10 +104,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.OemOpenBrackets
+                Key = VirtualKey.OemOpenBrackets
             }
         },
-        new DelegateCommand("SelectToOpeningCurlyBracket", "Select to next '{'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToOpeningCurlyBracket", "Select to next '{'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "{");
         })
@@ -118,10 +117,10 @@ public class EditorCommands
                 Ctrl = true,
                 Shift = true,
                 Alt = true,
-                Key = Keys.OemOpenBrackets
+                Key = VirtualKey.OemOpenBrackets
             }
         },
-        new DelegateCommand("GoToClosingCurlyBracket", "Go to next '}'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToClosingCurlyBracket", "Go to next '}'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == "}");
         })
@@ -130,10 +129,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.OemCloseBrackets
+                Key = VirtualKey.OemCloseBrackets
             }
         },
-        new DelegateCommand("SelectToClosingCurlyBracket", "Select to next '}'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToClosingCurlyBracket", "Select to next '}'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == "}");
         })
@@ -143,10 +142,10 @@ public class EditorCommands
                 Ctrl = true,
                 Shift = true,
                 Alt = true,
-                Key = Keys.OemCloseBrackets
+                Key = VirtualKey.OemCloseBrackets
             }
         },
-        new DelegateCommand("GoToOpeningSquareBracket", "Go to next '['", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToOpeningSquareBracket", "Go to next '['", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "[");
         })
@@ -154,10 +153,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.OemOpenBrackets
+                Key = VirtualKey.OemOpenBrackets
             }
         },
-        new DelegateCommand("SelectToOpeningSquareBracket", "Select to next '['", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToOpeningSquareBracket", "Select to next '['", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "[");
         })
@@ -166,10 +165,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.OemOpenBrackets
+                Key = VirtualKey.OemOpenBrackets
             }
         },
-        new DelegateCommand("GoToClosingSquareBracket", "Go to next ']'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToClosingSquareBracket", "Go to next ']'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == "]");
         })
@@ -177,10 +176,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.OemCloseBrackets
+                Key = VirtualKey.OemCloseBrackets
             }
         },
-        new DelegateCommand("SelectToClosingSquareBracket", "Select to next ']'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToClosingSquareBracket", "Select to next ']'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == "]");
         })
@@ -189,10 +188,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.OemCloseBrackets
+                Key = VirtualKey.OemCloseBrackets
             }
         },
-        new DelegateCommand("GoToOpeningAngularBracket", "Go to next '<'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToOpeningAngularBracket", "Go to next '<'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: false, (string tokenText) => tokenText == "<");
         })
@@ -200,10 +199,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Oemcomma
+                Key = VirtualKey.Oemcomma
             }
         },
-        new DelegateCommand("SelectToOpeningAngularBracket", "Select to next '<'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToOpeningAngularBracket", "Select to next '<'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: true, isOpening: false, selectText: true, (string tokenText) => tokenText == "<");
         })
@@ -212,10 +211,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.Oemcomma
+                Key = VirtualKey.Oemcomma
             }
         },
-        new DelegateCommand("GoToClosingAngularBracket", "Go to next '>'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("GoToClosingAngularBracket", "Go to next '>'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: false, (string tokenText) => tokenText == ">");
         })
@@ -223,10 +222,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.OemPeriod
+                Key = VirtualKey.OemPeriod
             }
         },
-        new DelegateCommand("SelectToClosingAngularBracket", "Select to next '>'", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectToClosingAngularBracket", "Select to next '>'", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveToToken(searchPrevious: false, isOpening: false, selectText: true, (string tokenText) => tokenText == ">");
         })
@@ -235,10 +234,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.OemPeriod
+                Key = VirtualKey.OemPeriod
             }
         },
-        new DelegateCommand("ExpandHiddenBlockNearCursor", "Expand a fold", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ExpandHiddenBlockNearCursor", "Expand a fold", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ExpandCurrentFold();
         })
@@ -247,10 +246,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.Right
+                Key = VirtualKey.Right
             }
         },
-        new DelegateCommand("CollapseHiddenBlockNearCursor", "Collapse a fold", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("CollapseHiddenBlockNearCursor", "Collapse a fold", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.CollapseCurrentFold();
         })
@@ -259,10 +258,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.Left
+                Key = VirtualKey.Left
             }
         },
-        new DelegateCommand("AddNextOccurrence", "Add the next occurrence of the word to the selection (multiple cursors)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("AddNextOccurrence", "Add the next occurrence of the word to the selection (multiple cursors)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.AddNextOccurrence();
         })
@@ -270,10 +269,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.D
+                Key = VirtualKey.D
             }
         },
-        new DelegateCommand("SelectAllOccurrences", "Select all occurrences of the word (multiple cursors)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("SelectAllOccurrences", "Select all occurrences of the word (multiple cursors)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.SelectAllOccurrences();
         })
@@ -282,10 +281,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.L
+                Key = VirtualKey.L
             }
         },
-        new DelegateCommand("AddCursorAbove", "Add a cursor on the line above", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("AddCursorAbove", "Add a cursor on the line above", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.AddCursorAbove();
         })
@@ -294,10 +293,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.Up
+                Key = VirtualKey.Up
             }
         },
-        new DelegateCommand("AddCursorBelow", "Add a cursor on the line below", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("AddCursorBelow", "Add a cursor on the line below", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.AddCursorBelow();
         })
@@ -306,10 +305,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Alt = true,
-                Key = Keys.Down
+                Key = VirtualKey.Down
             }
         },
-        new DelegateCommand("DuplicateLines", "Duplicate line", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("DuplicateLines", "Duplicate line", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.DuplicateLines();
         })
@@ -318,10 +317,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.D
+                Key = VirtualKey.D
             }
         },
-        new DelegateCommand("MoveLinesUp", "Move line up", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("MoveLinesUp", "Move line up", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveLines(-1);
         })
@@ -329,10 +328,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Alt = true,
-                Key = Keys.Up
+                Key = VirtualKey.Up
             }
         },
-        new DelegateCommand("MoveLinesDown", "Move line down", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("MoveLinesDown", "Move line down", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.MoveLines(1);
         })
@@ -340,10 +339,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Alt = true,
-                Key = Keys.Down
+                Key = VirtualKey.Down
             }
         },
-        new DelegateCommand("DeleteLines", "Delete line", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("DeleteLines", "Delete line", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.DeleteLines();
         })
@@ -352,10 +351,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.K
+                Key = VirtualKey.K
             }
         },
-        new DelegateCommand("ToggleComment", "Comment / uncomment", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ToggleComment", "Comment / uncomment", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ToggleComment();
         })
@@ -363,10 +362,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.OemQuestion
+                Key = VirtualKey.OemQuestion
             }
         },
-        new DelegateCommand("ToggleCommentNumpad", "Comment / uncomment (numpad)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ToggleCommentNumpad", "Comment / uncomment (numpad)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ToggleComment();
         })
@@ -374,10 +373,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Divide
+                Key = VirtualKey.Divide
             }
         },
-        new DelegateCommand("ToggleCommentShiftedDigit", "Comment / uncomment (Ctrl+/ on layouts where / is Shift+7)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ToggleCommentShiftedDigit", "Comment / uncomment (Ctrl+/ on layouts where / is Shift+7)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ToggleComment();
         })
@@ -386,10 +385,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.D7
+                Key = VirtualKey.D7
             }
         },
-        new DelegateCommand("ZoomIn", "Zoom in", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomIn", "Zoom in", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(1);
         })
@@ -397,10 +396,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Oemplus
+                Key = VirtualKey.Oemplus
             }
         },
-        new DelegateCommand("ZoomInShifted", "Zoom in (Ctrl+Plus)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomInShifted", "Zoom in (Ctrl+Plus)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(1);
         })
@@ -409,10 +408,10 @@ public class EditorCommands
             {
                 Ctrl = true,
                 Shift = true,
-                Key = Keys.Oemplus
+                Key = VirtualKey.Oemplus
             }
         },
-        new DelegateCommand("ZoomInNumpad", "Zoom in (numpad)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomInNumpad", "Zoom in (numpad)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(1);
         })
@@ -420,10 +419,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Add
+                Key = VirtualKey.Add
             }
         },
-        new DelegateCommand("ZoomOut", "Zoom out", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomOut", "Zoom out", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(-1);
         })
@@ -431,10 +430,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.OemMinus
+                Key = VirtualKey.OemMinus
             }
         },
-        new DelegateCommand("ZoomOutNumpad", "Zoom out (numpad)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomOutNumpad", "Zoom out (numpad)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ZoomBy(-1);
         })
@@ -442,10 +441,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.Subtract
+                Key = VirtualKey.Subtract
             }
         },
-        new DelegateCommand("ZoomReset", "Reset zoom", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomReset", "Reset zoom", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ResetZoom();
         })
@@ -453,10 +452,10 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.D0
+                Key = VirtualKey.D0
             }
         },
-        new DelegateCommand("ZoomResetNumpad", "Reset zoom (numpad)", (CodeEditorPP codeEditorPP) =>
+        new DelegateCommand("ZoomResetNumpad", "Reset zoom (numpad)", (IEditorCommandTarget codeEditorPP) =>
         {
             codeEditorPP.ResetZoom();
         })
@@ -464,7 +463,7 @@ public class EditorCommands
             DefaultShortcut = new KeyBindingMap.KeyShortcut
             {
                 Ctrl = true,
-                Key = Keys.NumPad0
+                Key = VirtualKey.NumPad0
             }
         }
     };

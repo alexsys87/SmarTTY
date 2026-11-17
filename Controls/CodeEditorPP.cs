@@ -11,13 +11,11 @@ using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 
-public partial class CodeEditorPP : TextEditorControl, ICompletionHost
+public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorCommandTarget
 {
     public delegate void SuggestionAcceptedHandler(CodeEditorPP codeEditorPP, ISuggestion suggestion, Keys keys);
 
     internal delegate void TabHandler(ref bool handled);
-
-    public delegate bool TokenPredicate(string text);
 
     public delegate void HoverHandler(TextDocument.TextPosition textPosition, ref Control control);
 
@@ -516,7 +514,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
             // Ctrl pressed while the mouse stands over an address: the pointer becomes a hand without a mouse move.
             RefreshHoverTarget();
         }
-        if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(e), out var value))
+        if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(e.ToKeyStroke()), out var value))
         {
             if (HasMultipleCursors && !IsMultiCursorCommand(value))
             {

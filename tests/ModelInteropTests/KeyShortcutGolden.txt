@@ -1,0 +1,391 @@
+F|32|0|Space
+F|32|1|Control + Space
+F|32|2|Alt + Space
+F|32|3|Control + Alt + Space
+F|32|4|Shift + Space
+F|32|5|Control + Shift + Space
+F|32|6|Alt + Shift + Space
+F|32|7|Control + Alt + Shift + Space
+F|82|0|R
+F|82|1|Control + R
+F|82|2|Alt + R
+F|82|3|Control + Alt + R
+F|82|4|Shift + R
+F|82|5|Control + Shift + R
+F|82|6|Alt + Shift + R
+F|82|7|Control + Alt + Shift + R
+F|57|0|D9
+F|57|1|Control + D9
+F|57|2|Alt + D9
+F|57|3|Control + Alt + D9
+F|57|4|Shift + D9
+F|57|5|Control + Shift + D9
+F|57|6|Alt + Shift + D9
+F|57|7|Control + Alt + Shift + D9
+F|48|0|D0
+F|48|1|Control + D0
+F|48|2|Alt + D0
+F|48|3|Control + Alt + D0
+F|48|4|Shift + D0
+F|48|5|Control + Shift + D0
+F|48|6|Alt + Shift + D0
+F|48|7|Control + Alt + Shift + D0
+F|55|0|D7
+F|55|1|Control + D7
+F|55|2|Alt + D7
+F|55|3|Control + Alt + D7
+F|55|4|Shift + D7
+F|55|5|Control + Shift + D7
+F|55|6|Alt + Shift + D7
+F|55|7|Control + Alt + Shift + D7
+F|219|0|OemOpenBrackets
+F|219|1|Control + OemOpenBrackets
+F|219|2|Alt + OemOpenBrackets
+F|219|3|Control + Alt + OemOpenBrackets
+F|219|4|Shift + OemOpenBrackets
+F|219|5|Control + Shift + OemOpenBrackets
+F|219|6|Alt + Shift + OemOpenBrackets
+F|219|7|Control + Alt + Shift + OemOpenBrackets
+F|221|0|OemCloseBrackets
+F|221|1|Control + OemCloseBrackets
+F|221|2|Alt + OemCloseBrackets
+F|221|3|Control + Alt + OemCloseBrackets
+F|221|4|Shift + OemCloseBrackets
+F|221|5|Control + Shift + OemCloseBrackets
+F|221|6|Alt + Shift + OemCloseBrackets
+F|221|7|Control + Alt + Shift + OemCloseBrackets
+F|188|0|Oemcomma
+F|188|1|Control + Oemcomma
+F|188|2|Alt + Oemcomma
+F|188|3|Control + Alt + Oemcomma
+F|188|4|Shift + Oemcomma
+F|188|5|Control + Shift + Oemcomma
+F|188|6|Alt + Shift + Oemcomma
+F|188|7|Control + Alt + Shift + Oemcomma
+F|190|0|OemPeriod
+F|190|1|Control + OemPeriod
+F|190|2|Alt + OemPeriod
+F|190|3|Control + Alt + OemPeriod
+F|190|4|Shift + OemPeriod
+F|190|5|Control + Shift + OemPeriod
+F|190|6|Alt + Shift + OemPeriod
+F|190|7|Control + Alt + Shift + OemPeriod
+F|39|0|Right
+F|39|1|Control + Right
+F|39|2|Alt + Right
+F|39|3|Control + Alt + Right
+F|39|4|Shift + Right
+F|39|5|Control + Shift + Right
+F|39|6|Alt + Shift + Right
+F|39|7|Control + Alt + Shift + Right
+F|37|0|Left
+F|37|1|Control + Left
+F|37|2|Alt + Left
+F|37|3|Control + Alt + Left
+F|37|4|Shift + Left
+F|37|5|Control + Shift + Left
+F|37|6|Alt + Shift + Left
+F|37|7|Control + Alt + Shift + Left
+F|68|0|D
+F|68|1|Control + D
+F|68|2|Alt + D
+F|68|3|Control + Alt + D
+F|68|4|Shift + D
+F|68|5|Control + Shift + D
+F|68|6|Alt + Shift + D
+F|68|7|Control + Alt + Shift + D
+F|76|0|L
+F|76|1|Control + L
+F|76|2|Alt + L
+F|76|3|Control + Alt + L
+F|76|4|Shift + L
+F|76|5|Control + Shift + L
+F|76|6|Alt + Shift + L
+F|76|7|Control + Alt + Shift + L
+F|38|0|Up
+F|38|1|Control + Up
+F|38|2|Alt + Up
+F|38|3|Control + Alt + Up
+F|38|4|Shift + Up
+F|38|5|Control + Shift + Up
+F|38|6|Alt + Shift + Up
+F|38|7|Control + Alt + Shift + Up
+F|40|0|Down
+F|40|1|Control + Down
+F|40|2|Alt + Down
+F|40|3|Control + Alt + Down
+F|40|4|Shift + Down
+F|40|5|Control + Shift + Down
+F|40|6|Alt + Shift + Down
+F|40|7|Control + Alt + Shift + Down
+F|75|0|K
+F|75|1|Control + K
+F|75|2|Alt + K
+F|75|3|Control + Alt + K
+F|75|4|Shift + K
+F|75|5|Control + Shift + K
+F|75|6|Alt + Shift + K
+F|75|7|Control + Alt + Shift + K
+F|191|0|Oem2
+F|191|1|Control + Oem2
+F|191|2|Alt + Oem2
+F|191|3|Control + Alt + Oem2
+F|191|4|Shift + Oem2
+F|191|5|Control + Shift + Oem2
+F|191|6|Alt + Shift + Oem2
+F|191|7|Control + Alt + Shift + Oem2
+F|111|0|Divide
+F|111|1|Control + Divide
+F|111|2|Alt + Divide
+F|111|3|Control + Alt + Divide
+F|111|4|Shift + Divide
+F|111|5|Control + Shift + Divide
+F|111|6|Alt + Shift + Divide
+F|111|7|Control + Alt + Shift + Divide
+F|187|0|Oemplus
+F|187|1|Control + Oemplus
+F|187|2|Alt + Oemplus
+F|187|3|Control + Alt + Oemplus
+F|187|4|Shift + Oemplus
+F|187|5|Control + Shift + Oemplus
+F|187|6|Alt + Shift + Oemplus
+F|187|7|Control + Alt + Shift + Oemplus
+F|107|0|Add
+F|107|1|Control + Add
+F|107|2|Alt + Add
+F|107|3|Control + Alt + Add
+F|107|4|Shift + Add
+F|107|5|Control + Shift + Add
+F|107|6|Alt + Shift + Add
+F|107|7|Control + Alt + Shift + Add
+F|189|0|OemMinus
+F|189|1|Control + OemMinus
+F|189|2|Alt + OemMinus
+F|189|3|Control + Alt + OemMinus
+F|189|4|Shift + OemMinus
+F|189|5|Control + Shift + OemMinus
+F|189|6|Alt + Shift + OemMinus
+F|189|7|Control + Alt + Shift + OemMinus
+F|109|0|Subtract
+F|109|1|Control + Subtract
+F|109|2|Alt + Subtract
+F|109|3|Control + Alt + Subtract
+F|109|4|Shift + Subtract
+F|109|5|Control + Shift + Subtract
+F|109|6|Alt + Shift + Subtract
+F|109|7|Control + Alt + Shift + Subtract
+F|96|0|NumPad0
+F|96|1|Control + NumPad0
+F|96|2|Alt + NumPad0
+F|96|3|Control + Alt + NumPad0
+F|96|4|Shift + NumPad0
+F|96|5|Control + Shift + NumPad0
+F|96|6|Alt + Shift + NumPad0
+F|96|7|Control + Alt + Shift + NumPad0
+F|116|0|F5
+F|116|1|Control + F5
+F|116|2|Alt + F5
+F|116|3|Control + Alt + F5
+F|116|4|Shift + F5
+F|116|5|Control + Shift + F5
+F|116|6|Alt + Shift + F5
+F|116|7|Control + Alt + Shift + F5
+F|123|0|F12
+F|123|1|Control + F12
+F|123|2|Alt + F12
+F|123|3|Control + Alt + F12
+F|123|4|Shift + F12
+F|123|5|Control + Shift + F12
+F|123|6|Alt + Shift + F12
+F|123|7|Control + Alt + Shift + F12
+F|13|0|Return
+F|13|1|Control + Return
+F|13|2|Alt + Return
+F|13|3|Control + Alt + Return
+F|13|4|Shift + Return
+F|13|5|Control + Shift + Return
+F|13|6|Alt + Shift + Return
+F|13|7|Control + Alt + Shift + Return
+F|27|0|Escape
+F|27|1|Control + Escape
+F|27|2|Alt + Escape
+F|27|3|Control + Alt + Escape
+F|27|4|Shift + Escape
+F|27|5|Control + Shift + Escape
+F|27|6|Alt + Shift + Escape
+F|27|7|Control + Alt + Shift + Escape
+F|8|0|Back
+F|8|1|Control + Back
+F|8|2|Alt + Back
+F|8|3|Control + Alt + Back
+F|8|4|Shift + Back
+F|8|5|Control + Shift + Back
+F|8|6|Alt + Shift + Back
+F|8|7|Control + Alt + Shift + Back
+F|33|0|PageUp
+F|33|1|Control + PageUp
+F|33|2|Alt + PageUp
+F|33|3|Control + Alt + PageUp
+F|33|4|Shift + PageUp
+F|33|5|Control + Shift + PageUp
+F|33|6|Alt + Shift + PageUp
+F|33|7|Control + Alt + Shift + PageUp
+F|34|0|PageDown
+F|34|1|Control + PageDown
+F|34|2|Alt + PageDown
+F|34|3|Control + Alt + PageDown
+F|34|4|Shift + PageDown
+F|34|5|Control + Shift + PageDown
+F|34|6|Alt + Shift + PageDown
+F|34|7|Control + Alt + Shift + PageDown
+F|65|0|A
+F|65|1|Control + A
+F|65|2|Alt + A
+F|65|3|Control + Alt + A
+F|65|4|Shift + A
+F|65|5|Control + Shift + A
+F|65|6|Alt + Shift + A
+F|65|7|Control + Alt + Shift + A
+F|9|0|Tab
+F|9|1|Control + Tab
+F|9|2|Alt + Tab
+F|9|3|Control + Alt + Tab
+F|9|4|Shift + Tab
+F|9|5|Control + Shift + Tab
+F|9|6|Alt + Shift + Tab
+F|9|7|Control + Alt + Shift + Tab
+F|46|0|Delete
+F|46|1|Control + Delete
+F|46|2|Alt + Delete
+F|46|3|Control + Alt + Delete
+F|46|4|Shift + Delete
+F|46|5|Control + Shift + Delete
+F|46|6|Alt + Shift + Delete
+F|46|7|Control + Alt + Shift + Delete
+F|36|0|Home
+F|36|1|Control + Home
+F|36|2|Alt + Home
+F|36|3|Control + Alt + Home
+F|36|4|Shift + Home
+F|36|5|Control + Shift + Home
+F|36|6|Alt + Shift + Home
+F|36|7|Control + Alt + Shift + Home
+F|35|0|End
+F|35|1|Control + End
+F|35|2|Alt + End
+F|35|3|Control + Alt + End
+F|35|4|Shift + End
+F|35|5|Control + Shift + End
+F|35|6|Alt + Shift + End
+F|35|7|Control + Alt + Shift + End
+F|45|0|Insert
+F|45|1|Control + Insert
+F|45|2|Alt + Insert
+F|45|3|Control + Alt + Insert
+F|45|4|Shift + Insert
+F|45|5|Control + Shift + Insert
+F|45|6|Alt + Shift + Insert
+F|45|7|Control + Alt + Shift + Insert
+F|0|0|None
+F|0|1|Control + None
+F|0|2|Alt + None
+F|0|3|Control + Alt + None
+F|0|4|Shift + None
+F|0|5|Control + Shift + None
+F|0|6|Alt + Shift + None
+F|0|7|Control + Alt + Shift + None
+F|186|0|OemSemicolon
+F|186|1|Control + OemSemicolon
+F|186|2|Alt + OemSemicolon
+F|186|3|Control + Alt + OemSemicolon
+F|186|4|Shift + OemSemicolon
+F|186|5|Control + Shift + OemSemicolon
+F|186|6|Alt + Shift + OemSemicolon
+F|186|7|Control + Alt + Shift + OemSemicolon
+F|192|0|Oemtilde
+F|192|1|Control + Oemtilde
+F|192|2|Alt + Oemtilde
+F|192|3|Control + Alt + Oemtilde
+F|192|4|Shift + Oemtilde
+F|192|5|Control + Shift + Oemtilde
+F|192|6|Alt + Shift + Oemtilde
+F|192|7|Control + Alt + Shift + Oemtilde
+F|226|0|OemBackslash
+F|226|1|Control + OemBackslash
+F|226|2|Alt + OemBackslash
+F|226|3|Control + Alt + OemBackslash
+F|226|4|Shift + OemBackslash
+F|226|5|Control + Shift + OemBackslash
+F|226|6|Alt + Shift + OemBackslash
+F|226|7|Control + Alt + Shift + OemBackslash
+F|106|0|Multiply
+F|106|1|Control + Multiply
+F|106|2|Alt + Multiply
+F|106|3|Control + Alt + Multiply
+F|106|4|Shift + Multiply
+F|106|5|Control + Shift + Multiply
+F|106|6|Alt + Shift + Multiply
+F|106|7|Control + Alt + Shift + Multiply
+F|33|0|PageUp
+F|33|1|Control + PageUp
+F|33|2|Alt + PageUp
+F|33|3|Control + Alt + PageUp
+F|33|4|Shift + PageUp
+F|33|5|Control + Shift + PageUp
+F|33|6|Alt + Shift + PageUp
+F|33|7|Control + Alt + Shift + PageUp
+F|17|0|ControlKey
+F|17|1|Control + ControlKey
+F|17|2|Alt + ControlKey
+F|17|3|Control + Alt + ControlKey
+F|17|4|Shift + ControlKey
+F|17|5|Control + Shift + ControlKey
+F|17|6|Alt + Shift + ControlKey
+F|17|7|Control + Alt + Shift + ControlKey
+F|18|0|Menu
+F|18|1|Control + Menu
+F|18|2|Alt + Menu
+F|18|3|Control + Alt + Menu
+F|18|4|Shift + Menu
+F|18|5|Control + Shift + Menu
+F|18|6|Alt + Shift + Menu
+F|18|7|Control + Alt + Shift + Menu
+P|Control + Space|True|32|True|False|False
+P|Control+Shift+K|True|75|True|False|True
+P|Alt + D9|True|57|False|True|False
+P|Alt + 9|True|57|False|True|False
+P|Shift + Oemcomma|True|188|False|False|True
+P|Ctrl + K|True|75|False|False|False
+P|K|True|75|False|False|False
+P||False|0|False|False|False
+P|Foo|False|0|False|False|False
+P|Control|False|0|False|False|False
+P|Control + Foo|False|0|False|False|False
+P|control + k|True|75|False|False|False
+P|Control + Space + K|True|75|True|False|False
+P|F5|True|116|False|False|False
+P|Shift+F5|True|116|False|False|True
+P|Control+Alt+Delete|True|46|True|True|False
+P|  Control  +  R |True|82|True|False|False
+P|Control + Add|True|107|True|False|False
+P|Control + OemOpenBrackets|True|219|True|False|False
+P|Control + Oemplus|True|187|True|False|False
+P|Control + Shift + NumPad0|True|96|True|False|True
+P|Alt + Return|True|13|False|True|False
+P|Alt+Enter|True|13|False|True|False
+P|Control + PageUp|True|33|True|False|False
+P|Control + Prior|True|33|True|False|False
+P|Shift + Control + A|True|65|True|False|True
+P|Control + Control + A|True|65|True|False|False
+P|Control + 7|True|55|True|False|False
+P|Control + Divide|True|111|True|False|False
+P|None|False|0|False|False|False
+P|Control + None|False|0|False|False|False
+P|Control+A+B|True|66|True|False|False
+P|a|True|65|False|False|False
+P|7|True|55|False|False|False
+P|Oemcomma|True|188|False|False|False
+P|Space|True|32|False|False|False
+P|Control + ,|False|0|False|False|False
+P|Control + -|False|0|False|False|False
+P|Control + +|False|0|False|False|False
