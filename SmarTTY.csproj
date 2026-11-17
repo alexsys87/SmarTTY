@@ -10,6 +10,8 @@
     <SelfContained>false</SelfContained>
     <!-- Keeps the output in bin\<Configuration>\net10.0-windows\ without a win-x64 subfolder. -->
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <!-- The SDK adds the runtime identifier to the publish folder anyway; the single-exe build is published to bin\<Configuration>\net10.0-windows\publish\. -->
+    <PublishDir>bin\$(Configuration)\$(TargetFramework)\publish\</PublishDir>
     <!-- Lets the project build on Linux (CI checks, no run). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>disable</ImplicitUsings>
