@@ -23,18 +23,21 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     /// The terminal shows a log (tail -F): the lines are coloured from their level (ERROR, WARN, [error], level=warn) to the
     /// end, unless the program wrote them in colours of its own.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool HighlightLogLevels { get; set; }
 
     /// <summary>
     /// File names in the output of the programs are links (Ctrl+click opens the file in the editor). Only for a classic terminal
     /// of a Unix host; a Smart Terminal tab has links of its own (see <see cref="SshTerminalControl"/>).
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool FileLinks { get; set; }
 
     /// <summary>
     /// The http, https and ftp addresses in the output are links (Ctrl+click opens them in the browser). Also on a Windows host,
     /// where file names are no links: an address names no file of either computer.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool UrlLinks { get; set; }
 
     /// <summary>
@@ -47,6 +50,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     /// Tells the directory of the shell when it did not report one (the title or the prompt, see AppEnvironment.GetCurrentDirectory);
     /// called when a link is clicked, since reading it may take a round trip to the server.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Func<string> DirectoryFallback { get; set; }
 
     /// <summary>A link to a file was clicked; the path is absolute when the directory of the shell is known.</summary>
@@ -348,22 +352,29 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public static readonly Color DefaultTextColor = Color.LightGray;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowUnrecognizedAsHex { get; set; }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int MaxChunkLength { get; set; }
 
     [Category("Terminal")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public BeepMode BellMode { get; set; }
 
     [Category("Terminal")]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string BellSoundFile { get; set; }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public TerminalEventDispatcher Dispatcher { get; set; }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ForwardAltF4 { get; set; }
 
     protected virtual bool UnusedOption => false;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string EnterSequence { get; set; }
 
     /// <summary>
@@ -445,6 +456,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     protected virtual bool UsesTerminalInput { get; } = true;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public MouseReportingMode MouseMode
     {
         get
@@ -490,6 +502,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int TabWidth
     {
         get
@@ -502,6 +515,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool CaptureDialogKeys { get; set; }
 
     public event TerminalSizeChangedHandler TerminalSizeChanged;
@@ -1905,7 +1919,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         if (message.Msg == 256)
         {
-            _extendedKey = ((int)message.LParam & 0x1000000) != 0;
+            _extendedKey = (message.LParam.ToInt64() & 0x1000000) != 0;
             base.WndProc(ref message);
             _extendedKey = false;
         }

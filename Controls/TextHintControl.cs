@@ -1,4 +1,5 @@
-﻿using SmarTTY.Completion;
+﻿using System.ComponentModel;
+using SmarTTY.Completion;
 using System;
 using System.Drawing;
 using System.Runtime.CompilerServices;
@@ -14,6 +15,7 @@ internal partial class TextHintControl : Control, IHintView
 
     private bool _showDescription;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowDescription
     {
         get
@@ -35,6 +37,7 @@ internal partial class TextHintControl : Control, IHintView
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string Description
     {
         get
@@ -48,6 +51,7 @@ internal partial class TextHintControl : Control, IHintView
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SignatureText
     {
         get

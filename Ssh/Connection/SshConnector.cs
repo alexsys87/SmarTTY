@@ -40,6 +40,7 @@ public partial class SshConnector : Component
 
     private ConnectionAttempt _currentAttempt;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public ContainerControl SynchronizationControl { get; set; }
 
     public override ISite Site

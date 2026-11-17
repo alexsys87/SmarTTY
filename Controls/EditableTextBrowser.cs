@@ -1,4 +1,5 @@
-﻿using SmarTTY.TextEditing;
+﻿using System.ComponentModel;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -312,6 +313,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
     protected bool _useExistingLineEnding = true;
 
     /// <summary>Tab and Indent insert TabSize spaces instead of a tab character.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool InsertSpaces { get; set; }
 
     private bool _modified;
@@ -328,6 +330,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
     // Collects the edits of ExecuteAsSingleUndoStep.
     private EditCommand.CompoundCommand _compoundCommand;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ReadOnly
     {
         get
@@ -344,6 +347,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     protected internal EditableTextDocument EditableDocument => Document;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public virtual bool IsModified
     {
         get

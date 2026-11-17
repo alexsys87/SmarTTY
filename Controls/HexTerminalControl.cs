@@ -86,6 +86,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     private int _resizeTicks;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Brush InactiveBrush
     {
         get
@@ -98,6 +99,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool HideCaret
     {
         get
@@ -214,6 +216,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
     /// </summary>
     public TextEditorControl SearchTextEditor => termHex;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool TextScrollBarVisible
     {
         get

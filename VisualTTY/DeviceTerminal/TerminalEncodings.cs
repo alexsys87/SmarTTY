@@ -29,6 +29,15 @@ public static class TerminalEncodings
         }
     }
 
+    static TerminalEncodings()
+    {
+        // cp866, koi8-r, windows-1251 and the like are built in on .NET Framework; newer runtimes need the provider, and this
+        // class can be used before the application registers it (the tests use it without App).
+#if NET5_0_OR_GREATER
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+#endif
+    }
+
     public const string DefaultName = "utf-8";
 
     public static IReadOnlyList<Choice> All { get; } = new Choice[]

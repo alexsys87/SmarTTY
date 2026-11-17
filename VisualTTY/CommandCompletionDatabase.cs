@@ -31,7 +31,7 @@ public class CommandCompletionDatabase
     /// <summary>The folder of the program; settable for the tests.</summary>
     public static string ProgramDirectory
     {
-        get { return _programDirectory ?? Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location); }
+        get { return _programDirectory ?? AppContext.BaseDirectory; }
         set { _programDirectory = value; }
     }
 

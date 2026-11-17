@@ -192,7 +192,7 @@ internal static class ProxyTests
                 CertificateRequest request = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
                 using X509Certificate2 selfSigned = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
                 // Through PKCS#12, so that the TLS server can use the private key on every platform.
-                _certificate = new X509Certificate2(selfSigned.Export(X509ContentType.Pkcs12));
+                _certificate = X509CertificateLoader.LoadPkcs12(selfSigned.Export(X509ContentType.Pkcs12), null);
             }
             _listener.Start();
             Task.Run(AcceptLoop);

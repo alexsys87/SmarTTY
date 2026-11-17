@@ -21,7 +21,12 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build SmarTTY on Linux (compile check only, the Windows application cannot run here)
+        run: dotnet build SmarTTY.csproj -c Release
 
       - name: Run command completion database checks
         run: dotnet run --project tests/CommandCompletionDatabaseTests -c Release
@@ -313,7 +318,9 @@ jobs:
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Install OpenSSH server (with xauth for X11 forwarding), Dropbear and BusyBox
         run: sudo apt-get update && sudo apt-get install -y openssh-server xauth python3 dropbear-bin busybox
@@ -358,20 +365,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v3
-
-      - name: Restore NuGet packages
-        run: msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
 
       - name: Build
-        run: msbuild SmarTTY.csproj -p:Configuration=Release
+        run: dotnet build SmarTTY.csproj -c Release
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
           name: SmarTTY-Release
-          path: bin/Release/net48/
+          path: bin/Release/net10.0-windows/
           if-no-files-found: error
 
   single-exe:
@@ -381,30 +387,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v3
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
 
-      - name: Restore NuGet packages
-        run: msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release -p:SingleExe=true
-
-      - name: Build single-file executable
-        run: msbuild SmarTTY.csproj -p:Configuration=Release -p:SingleExe=true
+      - name: Publish single-file executable
+        run: dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true
 
       - name: Verify the dependencies were embedded
         shell: pwsh
         run: |
-          $output = "bin/Release/net48"
-          $dlls = Get-ChildItem -Path $output -Filter *.dll
-          if ($dlls) {
-            Write-Error "Expected a self-contained executable, but found dependency DLLs: $($dlls.Name -join ', ')"
+          $output = "bin/Release/net10.0-windows/publish"
+          $extra = Get-ChildItem -Path $output | Where-Object { $_.Name -notin @('SmarTTY.exe', 'SmarTTY.pdb') }
+          if ($extra) {
+            Write-Error "Expected a self-contained executable, but found other files: $($extra.Name -join ', ')"
           }
           if (-not (Test-Path "$output/SmarTTY.exe")) {
             Write-Error "$output/SmarTTY.exe was not produced"
           }
+          "SmarTTY.exe size: {0:N0} bytes" -f (Get-Item "$output/SmarTTY.exe").Length
 
       - name: Upload single-file executable
         uses: actions/upload-artifact@v7
         with:
           name: SmarTTY-SingleExe
-          path: bin/Release/net48/SmarTTY.exe
+          path: bin/Release/net10.0-windows/publish/SmarTTY.exe
           if-no-files-found: error

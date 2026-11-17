@@ -630,7 +630,7 @@ public class FileTransferManager : IDisposable
         {
             try
             {
-                Process.Start(Path.GetDirectoryName(job.LocalPath));
+                ShellOpen.Open(Path.GetDirectoryName(job.LocalPath));
             }
             catch
             {
@@ -730,7 +730,7 @@ public class FileTransferManager : IDisposable
         {
             try
             {
-                Process.Start(Path.GetDirectoryName(job.LocalPath));
+                ShellOpen.Open(Path.GetDirectoryName(job.LocalPath));
             }
             catch
             {

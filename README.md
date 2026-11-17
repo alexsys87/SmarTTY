@@ -170,44 +170,31 @@
 
 ### 1. Требования и сборка
 
-**Для запуска:** Windows с .NET Framework 4.8. Приложение использует WPF и Windows Forms, целевая архитектура — **x86**; нативный запуск в Linux/macOS не предусмотрен.
+**Для запуска:** Windows 10 или 11 **x64** и [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64) для обычной сборки; без него Windows покажет системное сообщение с предложением установить среду. Единый exe-файл (см. [ниже](#сборка-единого-exe-файла)) не требует ничего. Приложение использует WPF и Windows Forms; 32-разрядная Windows, Windows 7 и 8.1 не поддерживаются (.NET 10 их не поддерживает), нативный запуск в Linux/macOS не предусмотрен.
 
-**Для сборки:** Visual Studio 2022 с компонентами **.NET desktop development** и **.NET Framework 4.8 targeting/developer pack**. Проект SDK-style; требуется .NET SDK и доступ к NuGet для восстановления зависимости `SSH.NET` версии `2026.0.0`.
+**Для сборки:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0); Visual Studio 2026 с компонентом **.NET desktop development** по желанию, достаточно одного SDK. Нужен доступ к NuGet для восстановления зависимостей (`SSH.NET` версии `2026.0.0`, `System.IO.Ports`, `System.Security.Cryptography.ProtectedData`).
 
 ```powershell
 git clone https://github.com/alexsys87/SmarTTY.git
 cd SmarTTY
-msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release
-msbuild SmarTTY.csproj -p:Configuration=Release
-.\bin\Release\net48\SmarTTY.exe
+dotnet build SmarTTY.csproj -c Release
+.\bin\Release\net10.0-windows\SmarTTY.exe
 ```
 
-Если зависимость `SSH.NET` не подтянулась, выполните из каталога проекта (рядом с `SmarTTY.csproj`) и повторите сборку:
+Восстановление пакетов выполняется самой командой `dotnet build`. Проект также собирается на Linux и macOS (`EnableWindowsTargeting`), но только для проверки компиляции: запустить приложение там нельзя.
 
-```powershell
-dotnet add package SSH.NET --version 2026.0.0
-msbuild SmarTTY.csproj -p:Configuration=Release
-```
-
-Для загрузки пакета нужен доступ к NuGet; при ошибках сети или источника пакетов сначала устраните их.
-
-Запускать команды `msbuild` следует из **Developer PowerShell for VS 2022** (или **Developer Command Prompt for VS 2022**), либо используя полный путь к `MSBuild.exe` из установки Visual Studio.
-
-Раньше `dotnet build`/`dotnet msbuild` для этого проекта падали с ошибками MSB3822/MSB3823: задача `GenerateResource` из .NET SDK не умеет встраивать нестроковые ресурсы (изображения и значки из `.resx` файлов Windows Forms) при целевом фреймворке `net48`. В проекте больше нет `.resx`: картинки тулбара терминала перенесены в `icons/` и грузятся через `Controls/Icons.cs`, поэтому `dotnet build SmarTTY.csproj` собирается и без MSBuild из Visual Studio.
-
-Альтернатива: откройте `SmarTTY.sln` в Visual Studio, восстановите пакеты NuGet, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
+Альтернатива: откройте `SmarTTY.sln` в Visual Studio, выберите `Release` и соберите решение. При переносе сборки копируйте всю выходную папку, а не только `SmarTTY.exe`.
 
 #### Сборка единого exe-файла
 
-Обычная сборка кладёт рядом с `SmarTTY.exe` зависимые сборки (`Renci.SshNet.dll`, `BouncyCastle.Cryptography.dll` и другие). Чтобы получить **один самодостаточный `SmarTTY.exe`**, соберите проект со свойством `SingleExe=true`: тогда зависимости встраиваются в исполняемый файл через [Costura.Fody](https://github.com/Fody/Costura).
+Обычная сборка зависит от установленного .NET 10 Desktop Runtime и кладёт рядом с `SmarTTY.exe` зависимые сборки (`Renci.SshNet.dll`, `BouncyCastle.Cryptography.dll` и другие). Чтобы получить **один самодостаточный `SmarTTY.exe`**, опубликуйте проект со свойством `SingleExe=true`: это штатная публикация .NET в один файл (single-file, self-contained, со сжатием и ReadyToRun), в которую входят среда выполнения, WPF/Windows Forms и все зависимости.
 
 ```powershell
-msbuild SmarTTY.csproj -t:Restore -p:Configuration=Release -p:SingleExe=true
-msbuild SmarTTY.csproj -p:Configuration=Release -p:SingleExe=true
-.\bin\Release\net48\SmarTTY.exe
+dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true
+.\bin\Release\net10.0-windows\publish\SmarTTY.exe
 ```
 
-В `bin\Release\net48\` рядом с `SmarTTY.exe` больше не будет зависимых сборок (`Renci.SshNet.dll` и других) — только сам исполняемый файл и, при наличии, отладочный `SmarTTY.pdb`. Свойство `SingleExe` действует только на время сборки и не меняет обычный вывод. Файл конфигурации встраивания — `FodyWeavers.xml` в корне проекта.
+В `bin\Release\net10.0-windows\publish\` лежит только `SmarTTY.exe` (отладочные символы встроены в него). Файл заметно больше обычной сборки, потому что содержит всю среду выполнения (около 95 МБ). Свойство `SingleExe` действует только на время публикации и не меняет обычный вывод. Файлы рядом с exe (`ApiSymbols.xml`, `CommandCompletions.xml`, `portable.txt`, `PortableSettings\`, `vcxsrv\`) работают так же, как и в обычной сборке: их ищут в папке, где лежит `SmarTTY.exe`.
 
 CI собирает оба варианта: job `build` публикует обычную сборку как `SmarTTY-Release`, а job `single-exe` — единый файл как `SmarTTY-SingleExe`.
 
@@ -886,7 +873,7 @@ OpenSSH/id_ed25519, id_ed25519.pub, id_ecdsa, id_ecdsa.pub, id_rsa, id_rsa.pub
 
 | Симптом | Что проверить |
 | --- | --- |
-| Не запускается или не собирается | Windows, .NET Framework 4.8, targeting pack для сборки, .NET SDK и восстановление SSH.NET; при переносе — все файлы выходной папки |
+| Не запускается или не собирается | Windows 10/11 x64, .NET 10 Desktop Runtime (для обычной сборки), .NET 10 SDK для сборки и восстановление пакетов NuGet; при переносе — все файлы выходной папки |
 | Сервер отмечен недоступным | DNS, адрес, порт, firewall и прокси; фоновая TCP-проверка не подтверждает корректность пароля или ключа |
 | Ошибка аутентификации | Имя пользователя, выбранный метод, приватный ключ и passphrase; разрешён ли этот способ входа на сервере |
 | Предупреждение о новом ключе сервера | Сверьте отпечаток с администратором, особенно после переустановки или смены адреса |
@@ -898,7 +885,7 @@ OpenSSH/id_ed25519, id_ed25519.pub, id_ecdsa, id_ecdsa.pub, id_rsa, id_rsa.pub
 | После перезапуска пропали настройки | Права на папку настроек, `portable.txt`, корректность XML; учитывайте отдельный путь `GUIPreferences.xml` |
 | В Visual Studio 2026 появляется `MC1000` «Неизвестная ошибка сборки, "Значение не попадает в ожидаемый диапазон"» со ссылкой на `Microsoft.WinFX.targets` | Это ложное design-time предупреждение WPF, а не ошибка проекта: обычная сборка проходит. Предупреждение подавлено для IntelliSense-сборок в `SmarTTY.csproj`; если оно осталось, закройте Visual Studio, удалите `.vs`, `bin` и `obj` и откройте решение заново |
 
-Предупреждение `MC1000` в `Microsoft.WinFX.targets` — известная регрессия Visual Studio 2026 (начиная с версии 18.5, [Developer Community 11078247](https://developercommunity.visualstudio.com/t/11078247)). Оно появляется только в списке ошибок IDE при design-time сборке XAML и не влияет на обычную сборку через `msbuild`. Проект использует стандартную точку входа `App.xaml` со сгенерированным `Main`; в `SmarTTY.csproj` предупреждение `MC1000` переведено в сообщения только для design-time сборок внутри Visual Studio, поэтому настоящие ошибки XAML по-прежнему обнаруживаются обычной сборкой.
+Предупреждение `MC1000` в `Microsoft.WinFX.targets` — известная регрессия Visual Studio 2026 (начиная с версии 18.5, [Developer Community 11078247](https://developercommunity.visualstudio.com/t/11078247)). Оно появляется только в списке ошибок IDE при design-time сборке XAML и не влияет на обычную сборку через `dotnet build`. Проект использует стандартную точку входа `App.xaml` со сгенерированным `Main`; в `SmarTTY.csproj` предупреждение `MC1000` переведено в сообщения только для design-time сборок внутри Visual Studio, поэтому настоящие ошибки XAML по-прежнему обнаруживаются обычной сборкой.
 
 ## Ограничения текущей реализации
 

@@ -633,6 +633,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     public bool AlwaysTrackLines;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool CaretWhenUnfocused
     {
         get
@@ -645,6 +646,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string Title
     {
         get
@@ -702,6 +704,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     protected virtual bool UnusedFlag => false;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color NormalTextColor
     {
         get
@@ -740,6 +743,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int ActiveBufferIndex
     {
         get
@@ -762,6 +766,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int ScrollbackLimit
     {
         get
@@ -775,6 +780,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool AutoWrap
     {
         get

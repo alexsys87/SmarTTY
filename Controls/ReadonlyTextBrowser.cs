@@ -1,4 +1,5 @@
-﻿using SmarTTY.TextEditing;
+﻿using System.ComponentModel;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -559,6 +560,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public int LineHeight => (int)Math.Ceiling(_charSize.Height);
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int TabSize
     {
         get
@@ -574,6 +576,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     internal EditableTextDocument Document => _document;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public HighlightStyle SelectionStyle
     {
         get
@@ -586,6 +589,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool GroupBinaryDigits
     {
         get
@@ -600,6 +604,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     }
 
     /// <summary>Draws a grey line under each tab character, so tab-indented lines are easy to tell from space-indented ones.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowTabs
     {
         get
@@ -618,6 +623,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     /// a middle dot for a space, an arrow for a tab, a pilcrow for a line break, a control picture for a
     /// control character.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowAllCharacters
     {
         get
@@ -634,6 +640,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int TopLine
     {
         get
@@ -656,6 +663,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public int LeftColumn => ScrollColumn;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool OverwriteMode
     {
         get
@@ -668,6 +676,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool TerminalMode
     {
         get
@@ -681,6 +690,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool NavigationLocked
     {
         get
@@ -705,6 +715,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool HideMargins
     {
         get
@@ -719,6 +730,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool SingleLine
     {
         get
@@ -733,6 +745,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowLineNumbers
     {
         get
@@ -834,6 +847,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool NoHorizontalScroll
     {
         get
@@ -873,6 +887,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool NoLeftPadding { get; set; }
 
     protected bool FillLineBackground { get; set; }
@@ -917,6 +932,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     }
 
     /// <summary>The factor the text is shown with on top of its font size: 1 is the size the font was set to.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public float FontZoom
     {
         get
@@ -954,6 +970,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool LayoutSuspended
     {
         get
@@ -973,6 +990,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     internal DisplayRow[] DisplayRows => _displayRows;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Rectangle CaretBounds
     {
         get
@@ -991,6 +1009,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public bool IsScrolledToEnd => TopLine + _visibleRows >= LineCount;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool VerticalScrollBarVisible
     {
         get
@@ -1006,6 +1025,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool HorizontalScrollBarVisible
     {
         get
@@ -1021,6 +1041,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool HideCaret
     {
         get

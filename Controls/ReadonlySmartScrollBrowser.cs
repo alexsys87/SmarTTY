@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.ComponentModel;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -39,6 +40,7 @@ public partial class ReadonlySmartScrollBrowser : ReadonlyTextBrowser
 
     private const int DragAutoScrollEdge = 2;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool SmartAutoScroll
     {
         get

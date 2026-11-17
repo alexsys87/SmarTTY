@@ -14,11 +14,16 @@ public partial class App : Application
 {
     public App()
     {
+        // The default font of WinForms is Segoe UI 9pt since .NET Core 3.0; the layouts of the designer-built controls
+        // were made for Microsoft Sans Serif 8.25pt (the .NET Framework default), so keep it.
+        System.Windows.Forms.Application.SetDefaultFont(new System.Drawing.Font("Microsoft Sans Serif", 8.25f));
         System.Windows.Forms.Application.EnableVisualStyles();
     }
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Legacy code pages (cp866, koi8-r, windows-1251) are not built into .NET; the terminal encodings need them from the start.
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         base.OnStartup(e);
         CrashLog.Install(this);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.

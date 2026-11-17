@@ -305,7 +305,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
             }
             try
             {
-                Process.Start(localPath);
+                ShellOpen.Open(localPath);
             }
             catch (Exception exception)
             {
@@ -329,7 +329,7 @@ public class SCPController : INotifyPropertyChanged, ICloseableElement
                 }
                 else
                 {
-                    Process.Start(Path.GetDirectoryName(localPath));
+                    ShellOpen.Open(Path.GetDirectoryName(localPath));
                 }
             }
             catch (Exception exception)

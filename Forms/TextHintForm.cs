@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.Completion;
 using System;
 using System.Drawing;
@@ -11,6 +12,7 @@ public partial class TextHintForm : Form, IHintView
 
     protected override bool ShowWithoutActivation => true;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string SignatureText
     {
         get
@@ -23,6 +25,7 @@ public partial class TextHintForm : Form, IHintView
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowDescription
     {
         get
@@ -35,6 +38,7 @@ public partial class TextHintForm : Form, IHintView
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string Description
     {
         get

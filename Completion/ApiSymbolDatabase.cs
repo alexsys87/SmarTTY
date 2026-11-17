@@ -81,10 +81,8 @@ public class ApiSymbolDatabase
     {
         get
         {
-            // Location is empty for an assembly that was loaded from a byte array or a bundle.
-            string location = Assembly.GetExecutingAssembly().Location;
-            string directory = string.IsNullOrEmpty(location) ? AppDomain.CurrentDomain.BaseDirectory : Path.GetDirectoryName(location);
-            return Path.Combine(directory ?? "", "ApiSymbols.xml");
+            // Not Assembly.Location: it is empty in a single-file executable.
+            return Path.Combine(AppContext.BaseDirectory, "ApiSymbols.xml");
         }
     }
 

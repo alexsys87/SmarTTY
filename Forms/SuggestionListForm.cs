@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.Completion;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ internal partial class SuggestionListForm : Form
 
     private bool _hostNotified;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowHints
     {
         get
@@ -34,6 +36,7 @@ internal partial class SuggestionListForm : Form
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color ListBackColor
     {
         get

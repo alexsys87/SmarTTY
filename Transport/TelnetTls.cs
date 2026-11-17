@@ -117,7 +117,12 @@ internal static class TelnetTls
         {
             try
             {
+#if NET9_0_OR_GREATER
+                // The constructor that loads a file is obsolete since .NET 9.
+                certificate = X509CertificateLoader.LoadPkcs12FromFile(text, null, X509KeyStorageFlags.UserKeySet);
+#else
                 certificate = new X509Certificate2(text, (string)null, X509KeyStorageFlags.UserKeySet);
+#endif
             }
             catch (CryptographicException exception)
             {

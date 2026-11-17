@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -218,6 +219,7 @@ public sealed class HexEditorControl : Control
     }
 
     /// <summary>The bytes being edited.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public HexDocument Document
     {
         get
@@ -250,6 +252,7 @@ public sealed class HexEditorControl : Control
     public int CaretOffset => _caretOffset;
 
     /// <summary>The text cannot be changed (a read-only file, a preview of a huge file).</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ReadOnly
     {
         get
@@ -290,6 +293,7 @@ public sealed class HexEditorControl : Control
     public string LastSearchText => _lastSearchText;
 
     /// <summary>The number of bytes in a row: 8, 16 or 32.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int BytesPerRow
     {
         get
@@ -311,6 +315,7 @@ public sealed class HexEditorControl : Control
     }
 
     /// <summary>The bytes shown together without a space: 1 (single bytes), 2, 4 or 8 (16-, 32- and 64-bit words).</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int GroupSize
     {
         get
@@ -334,6 +339,7 @@ public sealed class HexEditorControl : Control
     /// Numbers are read and written most significant byte first (network order, PowerPC, MIPS big endian); otherwise
     /// least significant first (x86, ARM).
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool BigEndian
     {
         get
@@ -359,6 +365,7 @@ public sealed class HexEditorControl : Control
     /// The bytes are coloured by their kind: zero bytes are dim, 0xFF, control and non-ASCII bytes have colours of
     /// their own, so that padding, erased flash and text stand out.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ColorByValue
     {
         get
@@ -379,6 +386,7 @@ public sealed class HexEditorControl : Control
     }
 
     /// <summary>The data inspector (the value at the caret as numbers, time and text) is shown beside the bytes.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ShowDataInspector
     {
         get

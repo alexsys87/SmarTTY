@@ -406,7 +406,7 @@ public class GlobalSettings : INotifyPropertyChanged
             bool changed = false;
             try
             {
-                changed = File.Exists(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "portable.txt"));
+                changed = File.Exists(Path.Combine(AppContext.BaseDirectory, "portable.txt"));
             }
             catch
             {
@@ -418,7 +418,7 @@ public class GlobalSettings : INotifyPropertyChanged
             }
             if (changed)
             {
-                return Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "PortableSettings");
+                return Path.Combine(AppContext.BaseDirectory, "PortableSettings");
             }
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), text);
         }

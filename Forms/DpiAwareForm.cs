@@ -112,6 +112,8 @@ public partial class DpiAwareForm : Form
     {
         if (m.Msg == DpiScaling.WM_DPICHANGED)
         {
+            // Handled here and not passed to base: since .NET Core 3.0 Form scales itself (and its children) on this message
+            // in a PerMonitorV2 process, which would scale the form a second time on top of FollowMonitorDpi.
             DpiScaling.ReadDpiChanged(ref m, out int dpi, out Rectangle suggestedBounds);
             FollowMonitorDpi(dpi, suggestedBounds);
             m.Result = IntPtr.Zero;
