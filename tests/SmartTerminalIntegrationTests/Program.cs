@@ -55,7 +55,7 @@ internal static class Program
 
         public bool IsOpen { get; private set; } = true;
 
-        public event Action<CompletionItem, Keys> ItemSelected;
+        public event Action<CompletionItem, VirtualKey> ItemSelected;
 
         public void Close()
         {
@@ -67,9 +67,9 @@ internal static class Program
             _filter = text ?? "";
         }
 
-        public bool TryHandleKeyEvent(KeyEventArgs e)
+        public bool TryHandleKeyEvent(KeyStroke e)
         {
-            if (!IsOpen || (e.KeyCode != Keys.Return && e.KeyCode != Keys.Tab))
+            if (!IsOpen || (e.KeyCode != VirtualKey.Return && e.KeyCode != VirtualKey.Tab))
             {
                 return false;
             }

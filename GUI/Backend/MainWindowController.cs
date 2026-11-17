@@ -2226,7 +2226,7 @@ public class MainWindowController : INotifyPropertyChanged
         ((FrameworkElement)_VirtualTerminalPopup).DataContext = suggestionPopupController;
         _VirtualTerminalPopup.CustomPopupPlacementCallback = suggestionPopupController.PlacePopup;
         _VirtualTerminalPopup.IsOpen = true;
-        suggestionPopupController.ItemSelected += (CompletionItem ba2, Keys isEnter) =>
+        suggestionPopupController.ItemSelected += (CompletionItem ba2, VirtualKey isEnter) =>
         {
             suggestionPopupController.Close();
             FocusMainControlDelayed(null);

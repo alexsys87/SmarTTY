@@ -1,5 +1,5 @@
+using SmarTTY.TextEditing;
 using System;
-using System.Windows.Forms;
 
 namespace SmarTTY.Terminal;
 
@@ -7,13 +7,13 @@ public interface ICompletionPopup
 {
     bool IsOpen { get; }
 
-    event Action<CompletionItem, Keys> ItemSelected;
+    event Action<CompletionItem, VirtualKey> ItemSelected;
 
     void Close();
 
     void SetFilter(string text);
 
-    bool TryHandleKeyEvent(KeyEventArgs e);
+    bool TryHandleKeyEvent(KeyStroke e);
 
     void DisplayException(Exception exception);
 

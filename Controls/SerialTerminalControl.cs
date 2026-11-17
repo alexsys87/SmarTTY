@@ -595,9 +595,9 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return first.Substring(0, limit);
         }
 
-        private void OnItemSelected(CompletionItem item, Keys keys)
+        private void OnItemSelected(CompletionItem item, VirtualKey keys)
         {
-            ApplyItem(item, keys == Keys.Return);
+            ApplyItem(item, keys == VirtualKey.Return);
         }
 
         private void ApplyItem(CompletionItem item, bool commit, string suffix = "")
@@ -1280,7 +1280,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     protected override void OnKeyDown(KeyEventArgs e)
     {
         // Handle completion popup key events
-        if (_completionPopup != null && _completionPopup.TryHandleKeyEvent(e))
+        if (_completionPopup != null && _completionPopup.TryHandleKeyEvent(e.ToKeyStroke()))
         {
             e.Handled = true;
             e.SuppressKeyPress = true;

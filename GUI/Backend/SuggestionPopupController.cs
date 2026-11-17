@@ -1,12 +1,11 @@
 ﻿using SmarTTY.Terminal;
+using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls.Primitives;
-using System.Windows.Forms;
 using VisualTTY;
-using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
 using Point = System.Windows.Point;
 
 namespace SmarTTY.GUI.Backend;
@@ -124,7 +123,7 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SelectedItem"));
             if (value != null && value == _MouseDownItem)
             {
-                ItemSelected?.Invoke(value.Entry, Keys.None);
+                ItemSelected?.Invoke(value.Entry, VirtualKey.None);
             }
         }
     }
@@ -146,7 +145,7 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
 
     public bool IsOpen { get; private set; }
 
-    public event Action<CompletionItem, Keys> ItemSelected;
+    public event Action<CompletionItem, VirtualKey> ItemSelected;
 
     public event PropertyChangedEventHandler PropertyChanged;
 
@@ -250,7 +249,7 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
         Detach();
     }
 
-    public bool TryHandleKeyEvent(KeyEventArgs e)
+    public bool TryHandleKeyEvent(KeyStroke e)
     {
         if (!IsOpen)
         {
@@ -258,33 +257,33 @@ internal class SuggestionPopupController : INotifyPropertyChanged, ICompletionPo
         }
         switch (e.KeyCode)
         {
-            case Keys.Up:
+            case VirtualKey.Up:
                 if (SelectedIndex > 0)
                 {
                     SelectedIndex--;
                 }
                 return true;
-            case Keys.Down:
+            case VirtualKey.Down:
                 // The last item is Items.Length - 1: the index used to run one past it.
                 if (SelectedIndex < Items.Length - 1)
                 {
                     SelectedIndex++;
                 }
                 return true;
-            case Keys.Prior:
+            case VirtualKey.Prior:
                 if (Items.Length > 0)
                 {
                     SelectedIndex = Math.Max(0, SelectedIndex - PageSize);
                 }
                 return true;
-            case Keys.Next:
+            case VirtualKey.Next:
                 if (Items.Length > 0)
                 {
                     SelectedIndex = Math.Min(Items.Length - 1, Math.Max(0, SelectedIndex) + PageSize);
                 }
                 return true;
-            case Keys.Tab:
-            case Keys.Return:
+            case VirtualKey.Tab:
+            case VirtualKey.Return:
                 if (SelectedItem != null)
                 {
                     ItemSelected?.Invoke(SelectedItem.Entry, e.KeyCode);
