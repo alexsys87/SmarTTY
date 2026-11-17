@@ -447,7 +447,17 @@ public class TextDocument : ILineCollection, IEnumerable<string>, IEnumerable, I
             using (fileStream)
             {
                 byte[] buffer = new byte[fileStream.Length];
-                fileStream.Read(buffer, 0, (int)fileStream.Length);
+                // Read does not have to return everything that was asked for in one call.
+                int total = 0;
+                while (total < buffer.Length)
+                {
+                    int read = fileStream.Read(buffer, total, buffer.Length - total);
+                    if (read <= 0)
+                    {
+                        break;
+                    }
+                    total += read;
+                }
                 return SetText(Encoding.ASCII.GetString(buffer));
             }
         }

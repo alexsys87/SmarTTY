@@ -524,7 +524,7 @@ public class TarExtractor
             int specialPadLen = 512 - (int)(entrySize % 512);
             if (specialPadLen != 512)
             {
-                _stream.Read(headerBuffer, 0, specialPadLen);
+                SkipPadding(headerBuffer, specialPadLen);
             }
         }
         else
@@ -598,7 +598,7 @@ public class TarExtractor
             int padLen = 512 - (int)(entrySize % 512);
             if (padLen != 512)
             {
-                _stream.Read(headerBuffer, 0, padLen);
+                SkipPadding(headerBuffer, padLen);
             }
             if (PreserveTimestamps)
             {
@@ -642,6 +642,21 @@ public class TarExtractor
         while (ExtractNextEntry(ignoreErrors, stripFirstDirectory))
         {
             count++;
+        }
+    }
+
+    // Reads (and drops) the padding of an entry up to the next 512-byte block; a single Read may return fewer bytes than asked.
+    private void SkipPadding(byte[] buffer, int count)
+    {
+        int total = 0;
+        while (total < count)
+        {
+            int read = _stream.Read(buffer, total, count - total);
+            if (read <= 0)
+            {
+                break;
+            }
+            total += read;
         }
     }
 
