@@ -148,8 +148,39 @@ internal static class Program
         Equal(default(GridPoint).ToPoint().IsEmpty, true, "default(GridPoint) gives the empty point");
     }
 
+    private static void HighlightBrushChecks()
+    {
+        // The model holds colours; the view makes the brushes and pens, as the former form of the style did.
+        var marker = new HighlightStyle(Color.FromArgb(45, 90, 140, 255).ToRgb(), Color.FromArgb(150, 70, 120, 230).ToRgb(), RgbColor.Empty);
+        Brush fill = HighlightBrushes.FillBrush(marker);
+        Check(fill is SolidBrush, "the fill is a solid brush");
+        Equal(((SolidBrush)fill).Color.ToArgb(), Color.FromArgb(45, 90, 140, 255).ToArgb(), "the fill brush has the colour of the style");
+        Pen border = HighlightBrushes.BorderPen(marker);
+        Equal(border.Color.ToArgb(), Color.FromArgb(150, 70, 120, 230).ToArgb(), "the border pen has the colour of the style");
+        Equal(border.Width, 1f, "the border pen is 1 pixel wide");
+        Check(HighlightBrushes.TextBrush(marker) == null, "a style without a text colour has no text brush");
+        Check(ReferenceEquals(fill, HighlightBrushes.FillBrush(marker)), "the brush of a colour is made once");
+        Check(ReferenceEquals(border, HighlightBrushes.BorderPen(marker)), "the pen of a colour is made once");
+        var same = new HighlightStyle(Color.FromArgb(45, 90, 140, 255).ToRgb(), RgbColor.Empty, RgbColor.Empty);
+        Check(ReferenceEquals(fill, HighlightBrushes.FillBrush(same)), "two styles of the same colour share the brush");
+        Check(HighlightBrushes.BorderPen(same) == null, "a style without a border has no pen");
+
+        var none = new HighlightStyle(RgbColor.Empty, RgbColor.Empty, RgbColor.Empty);
+        Check(HighlightBrushes.FillBrush(none) == null && HighlightBrushes.BorderPen(none) == null && HighlightBrushes.TextBrush(none) == null, "a style of empty colours has no brush and no pen");
+
+        var selection = new HighlightStyle();
+        Equal(((SolidBrush)HighlightBrushes.FillBrush(selection)).Color.ToArgb(), SystemColors.Highlight.ToArgb(), "the default style fills with the system selection colour");
+        Equal(((SolidBrush)HighlightBrushes.TextBrush(selection)).Color.ToArgb(), SystemColors.HighlightText.ToArgb(), "the default style has the system selected text colour");
+        Check(HighlightBrushes.BorderPen(selection) == null, "the default style has no border");
+
+        // A colour of the style wins over the system colour.
+        selection.FillColor = RgbColor.FromArgb(1, 2, 3);
+        Equal(((SolidBrush)HighlightBrushes.FillBrush(selection)).Color.ToArgb(), Color.FromArgb(1, 2, 3).ToArgb(), "a colour of the style wins over the system colour");
+    }
+
     private static void Main()
     {
+        HighlightBrushChecks();
         KeysMatchChecks();
         KeyConversionChecks();
         ColorChecks();

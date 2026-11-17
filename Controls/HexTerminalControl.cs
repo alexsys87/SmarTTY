@@ -76,7 +76,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     private bool _highlightRefreshPending;
 
-    private static readonly HighlightStyle MatchStyle = new HighlightStyle(new SolidBrush(Color.FromArgb(95, 255, 190, 0)), null, null);
+    private static readonly HighlightStyle MatchStyle = new HighlightStyle(Color.FromArgb(95, 255, 190, 0).ToRgb(), RgbColor.Empty, RgbColor.Empty);
 
     public Brush EchoBrush;
 
