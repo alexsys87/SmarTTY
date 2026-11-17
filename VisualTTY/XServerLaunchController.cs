@@ -146,7 +146,7 @@ public class XServerLaunchController : INotifyPropertyChanged
                     throw new Exception("Invalid X Server type");
             }
             ProgressText = "Launching X server...";
-            process = Process.Start(text, XServerArguments ?? "-multiwindow");
+            process = Process.Start(new ProcessStartInfo(text, XServerArguments ?? "-multiwindow") { UseShellExecute = true });
             DateTime now = DateTime.Now;
             int itemIndex = 0;
             while (true)
