@@ -94,7 +94,7 @@ public static class VcxsrvSetup
         List<string> directories = new List<string>();
         try
         {
-            directories.Add(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "vcxsrv"));
+            directories.Add(Path.Combine(AppContext.BaseDirectory, "vcxsrv"));
         }
         catch
         {

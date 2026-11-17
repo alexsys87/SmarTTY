@@ -363,8 +363,8 @@ public static class ThemeLibrary
     {
         try
         {
-            string location = Assembly.GetExecutingAssembly().Location;
-            string directory = string.IsNullOrEmpty(location) ? AppDomain.CurrentDomain.BaseDirectory : Path.GetDirectoryName(location);
+            // Not Assembly.Location: it is empty in a single-file executable.
+            string directory = AppContext.BaseDirectory;
             return string.IsNullOrEmpty(directory) ? null : Path.Combine(directory, FolderName);
         }
         catch
