@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
@@ -38,6 +39,7 @@ public partial class ReadonlyTextBrowser
     private int _desiredWrapOffset;
 
     /// <summary>Long lines continue on the next row instead of scrolling sideways.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool WordWrap
     {
         get

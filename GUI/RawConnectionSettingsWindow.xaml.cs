@@ -1118,12 +1118,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     MessageBoxes.Info("Your personal certificate store has no certificate with a private key. Import one first (open the .pfx / .p12 file with a double click).");
                     return;
                 }
-                System.Security.Cryptography.X509Certificates.X509Certificate2Collection chosen = System.Security.Cryptography.X509Certificates.X509Certificate2UI.SelectFromCollection(
-                    usable, "Client certificate", "Choose the certificate presented to the telnet server.",
-                    System.Security.Cryptography.X509Certificates.X509SelectionFlag.SingleSelection, new System.Windows.Interop.WindowInteropHelper(this).Handle);
-                if (chosen.Count > 0)
+                string thumbprint = SmarTTY.Native.CertificateDialog.SelectThumbprint(
+                    usable, new System.Windows.Interop.WindowInteropHelper(this).Handle,
+                    "Client certificate", "Choose the certificate presented to the telnet server.");
+                if (thumbprint != null)
                 {
-                    _Controller.TelnetTlsClientCertificate = chosen[0].Thumbprint;
+                    _Controller.TelnetTlsClientCertificate = thumbprint;
                 }
             }
             finally

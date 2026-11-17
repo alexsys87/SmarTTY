@@ -159,6 +159,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
 
     public float CharHeight => ((ReadonlyTextBrowser)this).CharSize.Height;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color SuggestionBackColor { get; set; } = SystemColors.Window;
 
     public event TokenCache.LineTokenizer Tokenizing;
@@ -582,6 +583,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     }
 
     /// <summary>The words of this language are offered by the completion popup (set by the code that picks the tokenizer).</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public SyntaxHighlighting.Language CompletionLanguage
     {
         get
@@ -599,6 +601,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     }
 
     /// <summary>Enables the completion popup (Ctrl+Space and, with <see cref="CompletionOnTyping"/>, typing).</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool CompletionEnabled
     {
         get
@@ -616,6 +619,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     }
 
     /// <summary>Opens the popup by itself once a couple of letters of an identifier have been typed.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool CompletionOnTyping
     {
         get
@@ -635,6 +639,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost
     /// The standard API symbols offered in the completion list and used by the parameter hint. Set from
     /// the settings; null switches the feature off (keywords and document words only).
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public ApiSymbolDatabase ApiSymbols
     {
         get

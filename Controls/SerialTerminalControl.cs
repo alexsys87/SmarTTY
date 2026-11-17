@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.Forms;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
@@ -641,6 +642,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     public delegate bool DeviceDirectoryListerHandler(string directory, Action<IReadOnlyList<DeviceDirectoryEntry>> done);
 
     /// <summary>Set by the device terminal: asks the shell of the device for the names that the path completion offers.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public DeviceDirectoryListerHandler DeviceDirectoryLister { get; set; }
 
     /// <summary>
@@ -683,6 +685,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// Commands offered by Tab completion for the first word of a line, in addition to the built-in ones: the user's
     /// command lists and the saved history of the device.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public IReadOnlyList<string> CommandSuggestions { get; set; } = new string[0];
 
     private IEnumerable<CompletionItem> GetSuggestedCommandItems()
@@ -762,6 +765,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// Put the command that sets the terminal size (COLUMNS, LINES, stty) in front of the next command when the
     /// terminal window has another size than the one the device was told last. Only after the device has shown a Linux shell prompt, and never for a password.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool SyncRemoteSize { get; set; }
 
     // The size the device was told last (empty: not told on this connection yet).
@@ -842,6 +846,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// characters) are also drawn by the terminal itself, with Enter and Backspace; for connections whose far end does
     /// not echo (telnet without the server's echo, line mode). Typing in the input line needs no echo.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool EchoRawInput { get; set; }
 
     private bool _inputLineDisabled;
@@ -851,6 +856,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     /// (a netconsole receiver in character mode, or one whose line is typed in a box of its own). An input line that is
     /// shown when this is switched on is taken off the screen with what was typed in it.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool InputLineDisabled
     {
         get => _inputLineDisabled;
@@ -909,6 +915,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     // How many typed characters of the current line Backspace may still erase on the screen.
     private int _rawEchoLength;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool LocalEcho
     {
         get => _localEcho;

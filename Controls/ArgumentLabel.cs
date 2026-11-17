@@ -1,4 +1,5 @@
-﻿using SmarTTY.Completion;
+﻿using System.ComponentModel;
+using SmarTTY.Completion;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -11,6 +12,7 @@ public partial class ArgumentLabel : UserControl
 
     private int _activeIndex;
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int ActiveIndex
     {
         get
@@ -24,6 +26,7 @@ public partial class ArgumentLabel : UserControl
         }
     }
 
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public ISignatureInfo Signature
     {
         get

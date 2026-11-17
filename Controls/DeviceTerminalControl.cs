@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
@@ -253,6 +254,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// the HEX dump alone, or the HEX dump with the text pane next to it. The toolbar and the connection profile
     /// both drive this one property, so switching in the toolbar is not limited to the current session.
     /// </summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public DeviceTerminalSettings.CharacterDisplayMode DisplayMode
     {
         get

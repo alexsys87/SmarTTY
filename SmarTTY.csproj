@@ -4,8 +4,16 @@
     <AssemblyName>SmarTTY</AssemblyName>
     <RootNamespace>SmarTTY</RootNamespace>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net48</TargetFramework>
-    <PlatformTarget>x86</PlatformTarget>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <!-- Keeps the output in bin\<Configuration>\net10.0-windows\ without a win-x64 subfolder. -->
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <!-- Lets the project build on Linux (CI checks, no run). -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
@@ -20,32 +28,38 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- Declares per-monitor DPI awareness (see the comment in the file). -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFO0003: the manifest keeps declaring PerMonitorV2, because the process is started as WPF and the manifest is
+         what sets its DPI mode (see app.manifest); Application.SetHighDpiMode would be too late. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Standalone regression harnesses are not part of the Windows application. -->
     <Compile Remove="tests\**\*.cs" />
-    <Reference Include="System.Core" />
-    <!-- X509Certificate2UI: the certificate picker of the telnet client certificate. -->
-    <Reference Include="System.Security" />
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- SSH.NET channel internals are used via reflection (Ssh/SshNetChannel.cs): check them when updating. -->
     <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    <!-- SerialPort is not part of the .NET runtime (Native/SerialPortStream.cs, GUI/RawConnectionSettingsWindow.xaml.cs). -->
+    <PackageReference Include="System.IO.Ports" Version="10.0.0" />
+    <!-- ProtectedData (IO/DpapiDraftProtector.cs). -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
   <!--
-    Single-executable build: `msbuild -p:SingleExe=true` weaves the managed dependencies (SSH.NET and
-    its transitive assemblies) into SmarTTY.exe through Costura.Fody, so the output has no sibling DLLs.
-    A regular build stays multi-file, as documented in README.md.
+    Single-executable build: `dotnet publish -p:SingleExe=true` produces one self-contained SmarTTY.exe that has the
+    runtime and all dependencies inside. A regular build is framework-dependent and multi-file, as documented in README.md.
   -->
-  <ItemGroup Condition="'$(SingleExe)' == 'true'">
-    <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
-    <PackageReference Include="Costura.Fody" Version="6.2.0" PrivateAssets="all" />
-  </ItemGroup>
+  <PropertyGroup Condition="'$(SingleExe)' == 'true'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <!-- WPF ships native DLLs (wpfgfx, PresentationNative, ...); without this they stay next to the exe. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="VisualTTY\XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
