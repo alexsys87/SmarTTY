@@ -182,8 +182,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         _inlineMessageProvider = new InlineMessageProvider();
         _foldingManager = new FoldingManager(_tokenCache);
         VirtualLineProviders.Add(_inlineMessageProvider);
-        VirtualLineProviders.Add(_foldingManager);
-        AddMargin(new FoldingManager.FoldingMargin(_foldingManager));
+        VirtualLineProviders.Add(new FoldingLineProvider(_foldingManager));
+        AddMargin(new FoldingMarginPainter(_foldingManager));
         // The completion popup reads its images from this list; the editor shows words without icons.
         ImageList = new ImageList();
         ImageList.ImageSize = new Size(16, 16);
@@ -1034,7 +1034,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             return;
         }
-        if (_foldingManager.CollapseLine(CaretPosition.Line, this))
+        if (_foldingManager.CollapseLine(CaretPosition.Line))
         {
             UpdateLayout();
             Redraw();
@@ -1075,7 +1075,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
             }
             if (foldedLine != -1)
             {
-                _foldingManager.CollapseLine(foldedLine, this);
+                _foldingManager.CollapseLine(foldedLine);
             }
         }
         UpdateLayout();
