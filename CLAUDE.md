@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`) and the loading thread (A4d: `RemoteFileLoader`) are out, next the save pipeline |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) and the server side of a save (A4e: `RemoteFileSaver`) are out, next the save flow (`PrepareSave`, `Save`, `SaveInBackground`, `CompleteSave`) and the rest |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -204,6 +204,14 @@ from the thread, `Controls/ControlUserPrompt`), `IUiDispatcher` (`Post`, `Contro
 explicitly). `tests/RemoteFileLoaderTests` (net8.0) drives it with a fake connection, user and UI thread, including the questions that the Mono
 stand cannot ask (no write permission, large files). `FinishLoading` and `ApplyContent` stay in the editor for now: they work on the document, the
 caret, the hex view and the folds. Next, A4e: the save pipeline (`PrepareSave`, `UploadAndReplace`, validation, sudo, `CompleteSave`).
+
+Done in A4e: what a save does on the server is `CodeEditing/RemoteFileSaver.cs` (upload of the temporary copy, the check of the file, the replace script and
+its failures, the replacement through sudo, the clean-up, the reload command of a service) with `CodeEditing/RemoteSaveJob.cs` (the old private `SaveJob`).
+It reaches the connection through `IRemoteFileWriteHost : IRemoteFileHost` (upload, `RunCommand` with status and timeout, the SFTP write of a Windows
+host, the sudo channel with its password prompt; `Controls/SessionRemoteFileHost` implements it, and the static `RemoteFileEditor.SudoConfirmationPrompt`
+stays in the view). The questions to the user (sudo? overwrite? CRLF? BOM? reload?), the threads and what a save does to the text and the hex view stay
+in the editor. `tests/RemoteFileSaverTests` (net8.0) drives it with a fake connection, including sudo, which the Mono stand cannot do. Next, A4f: the
+parts of `PrepareSave`/`CompleteSave`/`Save` that need no control (the encoding of the bytes, the decision of the questions, the state flags of a save).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20

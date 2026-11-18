@@ -48,6 +48,7 @@
     <Compile Include="../../IO/EditorFilePolicy.cs" />
     <Compile Include="../../IO/RemoteFileSignature.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" />
+    <Compile Include="../../IO/RemoteSaveCommand.cs" />
     <Compile Include="../../IO/RemoteScript.cs" />
     <Compile Include="../../Ssh/RemoteOperationException.cs" />
     <Compile Include="../../Ssh/WindowsSftpPath.cs" />
