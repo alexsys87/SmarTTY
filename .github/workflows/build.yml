@@ -249,7 +249,7 @@ jobs:
       - name: Run remote file saver checks (upload, check of the file, replacement and its failures, sudo, clean-up, service reload; fake connection)
         run: dotnet run --project tests/RemoteFileSaverTests -c Release
 
-      - name: Run remote file session checks (taking the bytes to save: CRLF and BOM questions, bytes kept from the hex view, backup, check of the file; fake editor)
+      - name: Run remote file session checks (taking the bytes to save, the CRLF and BOM questions, bytes kept from the hex view, backup, check of the file; fake editor)
         run: dotnet run --project tests/RemoteFileSessionTests -c Release
 
       - name: Run hex editing model checks (caret, selection, typing in both columns, search; what the view is told after each operation)
