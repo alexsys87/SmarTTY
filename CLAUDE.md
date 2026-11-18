@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done; A6 (hex editor model): the safety net (A6a) and the model of the editing (A6b: `HexEditingModel`) are in, next the value decoding of `HexDataInspector` (A6c), then the status bar |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5 (`TextSearcher` on `ISearchTarget`, the status bar on `IEditorStatusSource`) and A6 (hex editor: the net, `HexEditingModel`; the value decoding of the data inspector was already `HexValueFormats`) done; left in 1A: `RemoteFileEditor.Syntax.cs` and the check of the end state (Z1 for 1A) |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -247,6 +247,15 @@ the timers, the tool tip, the view options and the events. The model raises `Cha
 (or did the same by hand): `ShowCaret`, `RestartCaretBlink`, `EnsureCaretVisible`; the view does those, then always redraws and raises `StateChanged`. `HexEditorControlTests` (3608
 steps, the first 2204 written by the code before the move, the last 1404 by that code too with a script that searches again from a caret on a match) passes unchanged; the
 net8.0 `HexEditingModelTests` check the model and what it tells the view without Mono. Not covered by either: the mouse, the clipboard and the page keys.
+
+Done in A5b: the status bar below the remote file editor (`GUI/Backend/RemoteFileEditorStatusBar`, WPF) reads `CodeEditing/IEditorStatusSource` (the file, saved or not, the caret,
+the selection with the text and line breaks of its lines, encoding, line endings, syntax, the hex view as `IHexViewStatus`, `StateChanged`/`CurrentLanguageChanged`, and the commands its menus
+run) instead of `RemoteFileEditor`, `RemoteFileEditorPanel` and `HexEditorControl`. `Controls/RemoteFileEditorStatusSource` is the adapter (every member is the editor's own; `StateChanged` is
+the panel's event, handed over as two delegates so that it can be tested under Mono, where the WPF-based panel cannot be made); `HexEditorControl` implements `IHexViewStatus`;
+`TextEditing/HexViewChoices` holds the row widths and group sizes the menu lists. `RemoteFileEditorIntegrationTests` has a `status-source` scenario on the real editor.
+
+Done in A6c: nothing to move. The data inspector (`Controls/HexDataInspector`) already read its values through `HexValueFormats` (`TryRead`, `GetName`, `UsesByteOrder`, `InspectorTypes`,
+`TryParse`) in `TextEditing/`, and writes them through `HexEditorControl.WriteValue`, which is the model's; what is left in it is painting, the edit box and the clicks.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20

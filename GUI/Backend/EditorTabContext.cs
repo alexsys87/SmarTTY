@@ -85,7 +85,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         ((WindowsFormsHost)winFormsHostWrapper).Child = EditorPanel;
         Control = (FrameworkElement)winFormsHostWrapper;
         ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
-        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(editor, EditorPanel);
+        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, EditorPanel));
         Searcher = new TextSearcher(editor)
         {
             CanReplace = true
