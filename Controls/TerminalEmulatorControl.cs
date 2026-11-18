@@ -342,7 +342,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private ContextMenuStrip _normalContextMenu;
 
-    private Point _lastMouseCell = new Point(-1);
+    // What the terminal sends for the mouse (the modes, the buttons, the motion that is reported).
+    private readonly TerminalInputEncoder _input = new TerminalInputEncoder();
 
     private int _pendingFlushes;
 
@@ -473,7 +474,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             {
                 _mouseMode = value;
                 Cursor = ((value != MouseReportingMode.Off) ? Cursors.Arrow : Cursors.IBeam);
-                _lastMouseCell = new Point(-1);
+                _input.ResetMouseMotion();
                 if (value == MouseReportingMode.Off)
                 {
                     ContextMenuStrip = _normalContextMenu;
@@ -1142,100 +1143,44 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         return _mouseMode != MouseReportingMode.Off && TextArea.Contains(e.Location) && (Control.ModifierKeys & Keys.Shift) == 0;
     }
 
+    private static TerminalMouseButton ToMouseButton(MouseButtons button)
+    {
+        switch (button)
+        {
+            case MouseButtons.None:
+                return TerminalMouseButton.None;
+            case MouseButtons.Left:
+                return TerminalMouseButton.Left;
+            case MouseButtons.Middle:
+                return TerminalMouseButton.Middle;
+            case MouseButtons.Right:
+                return TerminalMouseButton.Right;
+            default:
+                return TerminalMouseButton.Other;
+        }
+    }
+
     private void HandleMouseButton(MouseEventArgs e, bool pressed)
     {
-        int buttonCode;
-        switch (e.Button)
-        {
-            case MouseButtons.Left:
-                buttonCode = 0;
-                break;
-            case MouseButtons.Middle:
-                buttonCode = 1;
-                break;
-            case MouseButtons.Right:
-                buttonCode = 2;
-                break;
-            default:
-                return;
-        }
-        switch (_mouseMode)
-        {
-            case MouseReportingMode.X10:
-                if (!pressed)
-                {
-                    return;
-                }
-                break;
-            case MouseReportingMode.Normal:
-            case MouseReportingMode.Highlight:
-            case MouseReportingMode.ButtonEvent:
-            case MouseReportingMode.AnyEvent:
-                buttonCode |= MouseModifierBits;
-                break;
-            default:
-                return;
-        }
-        SendMouseReport(buttonCode, HitTestCell(e.Location), release: !pressed);
+        SendMouseReport(_input.MouseButton(_mouseMode, ToMouseButton(e.Button), pressed, MouseModifierBits, HitTestCell(e.Location).ToGridPoint(), _visibleColumns, _visibleRows, IsPrivateModeSet(SgrMouseMode)));
     }
 
     private void HandleMouseWheel(MouseEventArgs e)
     {
-        int wheelCode = 64 + ((e.Delta <= 0) ? 1 : 0);
-        MouseReportingMode mouseReportingMode = _mouseMode;
-        if (mouseReportingMode != MouseReportingMode.X10 && (uint)(mouseReportingMode - 1000) <= 3u)
-        {
-            wheelCode |= MouseModifierBits;
-            SendMouseReport(wheelCode, HitTestCell(e.Location), release: false);
-        }
+        SendMouseReport(_input.MouseWheel(_mouseMode, e.Delta <= 0, MouseModifierBits, HitTestCell(e.Location).ToGridPoint(), _visibleColumns, _visibleRows, IsPrivateModeSet(SgrMouseMode)));
     }
 
     private void HandleMouseMove(MouseEventArgs e)
     {
-        // Motion reports carry the held button, or 3 ("no button") for plain motion in any-event mode.
-        int buttonCode;
-        switch (e.Button)
-        {
-            case MouseButtons.Left:
-                buttonCode = 0;
-                break;
-            case MouseButtons.Middle:
-                buttonCode = 1;
-                break;
-            case MouseButtons.Right:
-                buttonCode = 2;
-                break;
-            default:
-                buttonCode = 3;
-                break;
-        }
-        switch (_mouseMode)
-        {
-            case MouseReportingMode.ButtonEvent:
-                if (buttonCode == 3)
-                {
-                    return;
-                }
-                break;
-            case MouseReportingMode.AnyEvent:
-                break;
-            default:
-                return;
-        }
-        Point point = HitTestCell(e.Location);
-        if (!(point == _lastMouseCell))
-        {
-            _lastMouseCell = point;
-            SendMouseReport(buttonCode | 32 | MouseModifierBits, point, release: false);
-        }
+        SendMouseReport(_input.MouseMove(_mouseMode, ToMouseButton(e.Button), MouseModifierBits, HitTestCell(e.Location).ToGridPoint(), _visibleColumns, _visibleRows, IsPrivateModeSet(SgrMouseMode)));
     }
 
-    private void SendMouseReport(int buttonCode, Point cell, bool release)
+    private void SendMouseReport(byte[] report)
     {
-        // A click in scrolled-back text or in the partial cell at the edge is reported at the nearest screen cell.
-        int column = Math.Max(0, Math.Min(cell.X, _visibleColumns - 1));
-        int row = Math.Max(0, Math.Min(cell.Y, _visibleRows - 1));
-        SendBytes(XtermProtocol.EncodeMouseReport(buttonCode, column, row, release, IsPrivateModeSet(SgrMouseMode)), InputKind.MouseReport);
+        if (report != null)
+        {
+            SendBytes(report, InputKind.MouseReport);
+        }
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
