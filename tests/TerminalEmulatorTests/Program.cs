@@ -25,6 +25,9 @@ internal static class Program
         Check(EqualityComparer<T>.Default.Equals(actual, expected), name + (EqualityComparer<T>.Default.Equals(actual, expected) ? "" : " (expected '" + expected + "', got '" + actual + "')"));
     }
 
+    // What the screen and the host were asked, in the order they were asked (the output loop checks).
+    private static readonly List<string> Order = new List<string>();
+
     private sealed class Screen : ITerminalScreen
     {
         public readonly List<string> Log = new List<string>();
@@ -77,8 +80,21 @@ internal static class Program
             set => Log.Add("hide " + value);
         }
 
+        public void BeginBatch() => Order.Add("begin");
+
+        public void EndBatch() => Order.Add("end");
+
+        public void ResetLinkTracking() => Order.Add("linkreset");
+
+        public void WriteText(string text)
+        {
+            Log.Add("text '" + text + "'");
+            Order.Add("text '" + text + "'");
+        }
+
         public void MoveCursorBy(int deltaX, int deltaY, bool scroll = false)
         {
+            Order.Add("move " + deltaX + "," + deltaY + (scroll ? " scroll" : ""));
             Log.Add("move " + deltaX + "," + deltaY + (scroll ? " scroll" : ""));
             Cursor = new GridPoint(_cursor.X + deltaX, _cursor.Y + deltaY);
         }
@@ -145,7 +161,39 @@ internal static class Program
 
         public void MoveForwardBytes(int bytes) => Log.Add("bytes forward " + bytes);
 
-        public void MoveBackBytes(int bytes) => Log.Add("bytes back " + bytes);
+        public int BackResult = 1;
+
+        public int MoveBackBytes(int bytes)
+        {
+            Log.Add("bytes back " + bytes);
+            return BackResult;
+        }
+
+        public int MaxChunkLength { get; set; }
+
+        public bool ShowUnrecognizedAsHex { get; set; }
+
+        public int Bells;
+
+        public readonly List<string> Traced = new List<string>();
+
+        public void WriteOutputText(string text)
+        {
+            if (!string.IsNullOrEmpty(text))
+            {
+                Order.Add("out '" + text + "'");
+            }
+        }
+
+        public void Bell()
+        {
+            Bells++;
+            Order.Add("bell");
+        }
+
+        public void Trace(string text) => Traced.Add(text);
+
+        public IEscapeTrace BeginEscapeTrace() => null;
 
         MouseReportingMode ITerminalHost.MouseMode
         {
@@ -186,6 +234,15 @@ internal static class Program
 
         public string Log => string.Join("; ", Screen.Log);
 
+        // Carries out a chunk of output; returns what the screen and the host were asked, in order.
+        public string Process(string output)
+        {
+            Order.Clear();
+            Screen.Log.Clear();
+            Emulator.ProcessOutput(output);
+            return string.Join("; ", Order);
+        }
+
         // Scans the sequence that starts at the position; returns the number of characters it takes.
         public int Scan(string text, int position = 0)
         {
@@ -204,6 +261,7 @@ internal static class Program
         Style();
         Osc();
         Scanner();
+        OutputLoop();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " terminal emulator checks passed.");
     }
@@ -553,6 +611,97 @@ internal static class Program
         csi.Modes.ApplicationCursorKeys = true;
         csi.Emulator.ResetModes();
         Check(!csi.Modes.ApplicationCursorKeys, "ResetModes does the same without the region and the cursor");
+    }
+
+    private static void OutputLoop()
+    {
+        Rig rig = new Rig();
+        Equal(rig.Process("ab\r\ncd"), "begin; out 'ab'; linkreset; move 0,0; linkreset; move 0,1 scroll; out 'cd'; end", "text, CR and LF are carried out in order, between a begin and an end of the batch");
+        Equal(rig.Process("plain"), "begin; out 'plain'; end", "a chunk of text is written as it is");
+        Equal(rig.Process(""), "begin; end", "an empty chunk is a batch of nothing");
+        Equal(rig.Process("a\tb"), "begin; out 'a'; linkreset; move 8,0; out 'b'; end", "TAB goes to the next tab stop");
+        rig.Screen.Cursor = new GridPoint(5, 3);
+        Equal(rig.Process("\r"), "begin; linkreset; move -5,0; end", "CR goes to the start of the row");
+        Equal(rig.Process("a\ab"), "begin; out 'a'; linkreset; bell; out 'b'; end", "BEL rings");
+        Equal(rig.Host.Bells, 1, "...once");
+
+        rig.Modes.Charsets.Designate(')', '0');
+        rig.Process("\u000e");
+        Check(rig.Modes.Charsets.GraphicsActive, "SO shifts to G1");
+        rig.Process("\u000f");
+        Check(!rig.Modes.Charsets.GraphicsActive, "SI shifts back");
+
+        rig.Screen.Cursor = new GridPoint(5, 3);
+        Equal(rig.Process("\b"), "begin; linkreset; move -1,0; end", "BS moves left");
+        rig.Screen.Cursor = new GridPoint(0, 3);
+        Equal(rig.Process("\b"), "begin; linkreset; move 79,-1; end", "...and from the first column to the last of the row above");
+        rig.Screen.Cursor = new GridPoint(5, 3);
+        rig.Host.Bytes = true;
+        rig.Host.BackResult = 0;
+        Equal(rig.Process("\b"), "begin; linkreset; end", "in byte mode BS that moved back by a byte, and left none, is done");
+        Equal(rig.Screen.Cursor, new GridPoint(5, 3), "...the screen is not asked to move");
+        rig.Host.BackResult = 1;
+        Equal(rig.Process("\b"), "begin; linkreset; move -1,0; end", "...and with a byte left over it moves a cell");
+        rig.Host.Bytes = false;
+
+        rig.Host.ByteOffsetSet = 7;
+        rig.Process("\r");
+        Equal(rig.Host.ByteOffsetSet, 0, "CR puts the byte offset at the start of a cell");
+        rig.Host.ByteOffsetSet = 7;
+        rig.Process("\n");
+        Equal(rig.Host.ByteOffsetSet, 0, "LF too");
+        rig.Host.ByteOffsetSet = 7;
+        rig.Process("\t");
+        Equal(rig.Host.ByteOffsetSet, 0, "TAB too");
+        rig.Host.ByteOffsetSet = 7;
+        rig.Process("\a");
+        Equal(rig.Host.ByteOffsetSet, 7, "BEL does not");
+
+        Equal(rig.Process("\u0001\u0002"), "begin; linkreset; linkreset; end", "a control character that is not known is ignored");
+        rig.Host.ShowUnrecognizedAsHex = true;
+        Equal(rig.Process("a\u0001b"), "begin; out 'a'; linkreset; text '\\1'; out 'b'; end", "...or shown as its number when the terminal is asked to");
+        rig.Host.ShowUnrecognizedAsHex = false;
+
+        Equal(rig.Process("a\u001b[2Jb"), "begin; out 'a'; out 'b'; end", "an escape sequence is carried out between the segments, without a link reset");
+        Check(rig.Screen.Log.Contains("erase display All"), "...CSI 2 J reached the screen");
+        Equal(rig.Process("a\u001b[3"), "begin; out 'a'; end", "a sequence the chunk ends in the middle of is not carried out");
+        Equal(rig.Modes.IncompleteEscape, "\u001b[3", "...and is kept");
+        Equal(rig.Process("1mb"), "begin; out 'b'; end", "the next chunk completes it (CSI 31 m) and goes on");
+        Check(rig.Modes.IncompleteEscape == null && rig.Screen.CurrentStyle.Foreground == 2, "...it was carried out, and nothing is kept");
+        rig.Process("\u001b");
+        Equal(rig.Modes.IncompleteEscape, "\u001b", "an ESC at the end of a chunk is kept");
+        Equal(rig.Process("]0;x\a"), "begin; end", "...and the next chunk completes an OSC string");
+        Equal(rig.Host.TitleSet, "x", "...which was carried out");
+
+        rig.Host.MaxChunkLength = 10;
+        rig.Screen.Cursor = new GridPoint(0, 3);
+        string cut = rig.Process(new string('x', 30));
+        Equal(cut, "begin; linkreset; move 0,0; linkreset; move 0,1 scroll; out '--- skipped 20 bytes ---'; linkreset; move 0,0; linkreset; move 0,1 scroll; out 'xxxxxxxxxx'; end",
+            "a chunk longer than the limit is cut to its last characters, with a line that says how many were skipped");
+        Equal(rig.Process(new string('y', 10)), "begin; out 'yyyyyyyyyy'; end", "a chunk of the limit is shown whole");
+        rig.Host.MaxChunkLength = 0;
+        Equal(rig.Process(new string('z', 30)), "begin; out '" + new string('z', 30) + "'; end", "no limit with 0");
+
+        Rig pending = new Rig();
+        pending.Modes.IncompleteEscape = "\u001b[1";
+        Equal(pending.Process("m!"), "begin; out '!'; end", "the kept start of a sequence is put before the next chunk");
+        pending.Modes.IncompleteEscape = "\u001b[1";
+        pending.Process(null);
+        Equal(pending.Modes.IncompleteEscape, "\u001b[1", "a null chunk with a kept sequence: the sequence is still not complete, and is kept");
+        Equal(new Rig().Process(null), "", "a null chunk with nothing kept does not even begin a batch");
+
+        Rig crash = new Rig();
+        bool threw = false;
+        try
+        {
+            crash.Process("a\u001b[;;;;Hb");
+        }
+        catch (IndexOutOfRangeException)
+        {
+            threw = true;
+        }
+        Check(threw, "the known fault of a cursor position with empty items still throws out of the loop");
+        Equal(string.Join("; ", Order), "begin; out 'a'; end", "...and the batch is ended all the same");
     }
 
     private static void Replies()

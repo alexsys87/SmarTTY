@@ -680,4 +680,115 @@ internal sealed class TerminalEmulator
         _host.MouseMode = MouseReportingMode.Off;
         _screen.CurrentStyle = CellStyle.Default;
     }
+
+    /// <summary>Carries out a chunk of the output of the program: the text is written, the control characters and the escape sequences are carried out. A sequence that the chunk ends in the middle of is kept for the next one.</summary>
+    public void ProcessOutput(string output)
+    {
+        if (_modes.IncompleteEscape != null)
+        {
+            output = _modes.IncompleteEscape + output;
+            _modes.IncompleteEscape = null;
+        }
+        if (output == null)
+        {
+            return;
+        }
+        if (_host.MaxChunkLength != 0 && output.Length > _host.MaxChunkLength)
+        {
+            output = $"\r\n--- skipped {output.Length - _host.MaxChunkLength} bytes ---\r\n" + output.Substring(output.Length - _host.MaxChunkLength);
+            GC.Collect();
+        }
+        int segmentStart = 0;
+        try
+        {
+            _screen.BeginBatch();
+            for (int charIndex = 0; charIndex < output.Length; charIndex++)
+            {
+                if (output[charIndex] >= ' ')
+                {
+                    continue;
+                }
+                _host.WriteOutputText(output.Substring(segmentStart, charIndex - segmentStart));
+                if (output[charIndex] != '\u001b')
+                {
+                    _screen.ResetLinkTracking();
+                }
+                segmentStart = charIndex + 1;
+                switch (output[charIndex])
+                {
+                    case '\r':
+                        _host.Trace("<CR>");
+                        _host.ByteOffset = 0;
+                        _screen.MoveCursorBy(-_screen.Cursor.X, 0);
+                        break;
+                    case '\n':
+                        _host.Trace("<LF>");
+                        _host.ByteOffset = 0;
+                        _screen.MoveCursorBy(0, 1, scroll: true);
+                        break;
+                    case '\t':
+                        _host.Trace("<TAB>");
+                        _host.ByteOffset = 0;
+                        _screen.MoveCursorBy(_screen.Tabs.NextDistance(_screen.Cursor.X, _host.TabWidth), 0);
+                        break;
+                    case '\a':
+                        _host.Trace("<BEL>");
+                        _host.Bell();
+                        break;
+                    case '\u000e':
+                        _host.Trace("<SO>");
+                        _modes.Charsets.ShiftOut();
+                        break;
+                    case '\u000f':
+                        _host.Trace("<SI>");
+                        _modes.Charsets.ShiftIn();
+                        break;
+                    case '\b':
+                        _host.Trace("<BACK>");
+                        if (_host.ByteColumnsActive && _host.MoveBackBytes(1) == 0)
+                        {
+                            break;
+                        }
+                        if (_screen.Cursor.X == 0)
+                        {
+                            _screen.MoveCursorBy(_screen.Columns - 1, -1);
+                        }
+                        else
+                        {
+                            _screen.MoveCursorBy(-1, 0);
+                        }
+                        break;
+                    case '\u001b':
+                        {
+                            // Escape diagnostics exist in a Debug build only. The tracing object is created just
+                            // around the sequence, so its Dispose() reports what the sequence meant right after
+                            // it is parsed. A Release build compiles the whole thing out.
+                            using IEscapeTrace escapeTrace = _host.BeginEscapeTrace();
+                            int consumed = ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
+                            charIndex += consumed - 1;
+                            segmentStart += consumed - 1;
+                            if (text != null)
+                            {
+                                _screen.WriteText(text);
+                            }
+                            break;
+                        }
+                    default:
+                        if (_host.ShowUnrecognizedAsHex)
+                        {
+                            _screen.WriteText($"\\{(int)output[charIndex]}");
+                        }
+                        break;
+                }
+            }
+            if (segmentStart < output.Length)
+            {
+                _host.WriteOutputText(output.Substring(segmentStart, output.Length - segmentStart));
+            }
+        }
+        finally
+        {
+            _screen.EndBatch();
+        }
+    }
 }

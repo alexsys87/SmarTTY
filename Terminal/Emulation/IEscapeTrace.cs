@@ -4,7 +4,7 @@ namespace SmarTTY.Terminal.Emulation;
 /// Where the parser writes down what an escape sequence meant (a debugging aid of a Debug build: the control passes null otherwise, and
 /// the calls are made with <c>?.</c>).
 /// </summary>
-public interface IEscapeTrace
+public interface IEscapeTrace : System.IDisposable
 {
     void SetPosition(int position);
 

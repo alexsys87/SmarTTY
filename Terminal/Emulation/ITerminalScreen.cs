@@ -64,4 +64,15 @@ public interface ITerminalScreen
     void ClearActiveScreen();
 
     void InvalidateView();
+
+    /// <summary>Several changes follow that are drawn once (see <see cref="EndBatch"/>).</summary>
+    void BeginBatch();
+
+    void EndBatch();
+
+    /// <summary>The text that follows is not the continuation of the text before it (a link or a diagnostic is not looked for across it).</summary>
+    void ResetLinkTracking();
+
+    /// <summary>Writes text at the cursor, in the current style, and moves the cursor.</summary>
+    void WriteText(string text);
 }
