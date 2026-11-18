@@ -21,7 +21,7 @@ using System.Windows.Forms;
 //
 //   dotnet build tests/TerminalSnapshots -c Release
 //   xvfb-run -a mono tests/TerminalSnapshots/bin/Release/net48/TerminalSnapshots.exe
-//   ... TerminalSnapshots.exe --record <state file> <colours file>      writes the two golden files (old code only)
+//   ... TerminalSnapshots.exe --record <state file> <colours file> <mouse file>      writes the three golden files (old code only)
 //
 // TerminalSpansGolden.txt (what the view paints with: the brushes of the colour spans of every line, and the cases that use the foreground
 // override of the HEX terminal) was written by the code before the colour override of a cell was made a colour (stage 1B, B3a); the state
@@ -155,16 +155,106 @@ internal static class Program
         }
         lines.AddRange(RunRandomCases(seedCount: 6, casesPerSeed: 60));
 
-        if (args.Length == 3 && args[0] == "--record")
+        List<string> mouseLines = RunMouse();
+        if (args.Length == 4 && args[0] == "--record")
         {
             File.WriteAllLines(args[1], lines);
             File.WriteAllLines(args[2], SpanLines);
-            Console.WriteLine("recorded " + lines.Count + " lines to " + args[1] + " and " + SpanLines.Count + " lines to " + args[2]);
+            File.WriteAllLines(args[3], mouseLines);
+            Console.WriteLine("recorded " + lines.Count + " lines to " + args[1] + ", " + SpanLines.Count + " lines to " + args[2] + " and " + mouseLines.Count + " lines to " + args[3]);
             return 0;
         }
         int failed = Compare("terminal state", "TerminalSnapshotsGolden.txt", lines);
         failed += Compare("painted colours", "TerminalSpansGolden.txt", SpanLines);
+        failed += Compare("mouse reports", "TerminalMouseGolden.txt", mouseLines);
         return failed == 0 ? 0 : 1;
+    }
+
+    // ---- the mouse ------------------------------------------------------------------------------------------------------
+
+    // The bytes the terminal sends for the mouse (TerminalMouseGolden.txt, written by the code before the input encoder moved to the model, stage 1B,
+    // B4d): in every mouse reporting mode, with and without the SGR encoding, for the three buttons, the wheel and the motion, at several cells. The
+    // events are given to the control as the window system would (OnMouseDown and so on, at the pixel of a cell found with HitTestCell). The modifier
+    // keys cannot be set from here (Control.ModifierKeys is the state of the keyboard), so they are not in it.
+    private static List<string> RunMouse()
+    {
+        List<string> lines = new List<string>();
+        MethodInfo hitTest = typeof(TerminalEmulatorBase).GetMethod("HitTestCell", AllInstance);
+        MethodInfo down = typeof(TerminalEmulatorControl).GetMethod("OnMouseDown", AllInstance);
+        MethodInfo up = typeof(TerminalEmulatorControl).GetMethod("OnMouseUp", AllInstance);
+        MethodInfo move = typeof(TerminalEmulatorControl).GetMethod("OnMouseMove", AllInstance);
+        MethodInfo wheel = typeof(TerminalEmulatorControl).GetMethod("OnMouseWheel", AllInstance);
+        (string Name, int Mode)[] modes = { ("off", 0), ("x10", 9), ("normal", 1000), ("highlight", 1001), ("button-event", 1002), ("any-event", 1003) };
+        foreach (var mode in modes)
+        {
+            foreach (bool sgr in new[] { false, true })
+            {
+                using Harness harness = MakeHarness(null);
+                TerminalEmulatorControl terminal = harness.Terminal;
+                // The screen is full of text: the control tells which cell a pixel is in only where there is text.
+                Size size = terminal.TerminalSize;
+                StringBuilder fill = new StringBuilder();
+                for (int row = 1; row <= size.Height; row++)
+                {
+                    fill.Append(Csi).Append(row).Append(";1H").Append(new string('x', size.Width));
+                }
+                terminal.ProcessOutput(fill + Csi + "H" + (mode.Mode == 0 ? "" : Csi + "?" + mode.Mode + "h") + (sgr ? Csi + "?1006h" : ""));
+                Application.DoEvents();
+                // The pixel in the middle of a cell, found by asking the control which cell a pixel is in.
+                Func<int, int, Point> pixelOf = (column, row) =>
+                {
+                    for (int y = 0; y < terminal.ClientSize.Height; y++)
+                    {
+                        for (int x = 0; x < terminal.ClientSize.Width; x++)
+                        {
+                            Point cell = (Point)hitTest.Invoke(terminal, new object[] { new Point(x, y) });
+                            if (cell.X == column && cell.Y == row)
+                            {
+                                // A few pixels in, so that the pixel is inside the cell.
+                                return new Point(x + 2, y + 2);
+                            }
+                        }
+                    }
+                    throw new InvalidOperationException("no pixel for the cell " + column + "," + row);
+                };
+                foreach (Point cell in new[] { new Point(0, 0), new Point(10, 5), new Point(size.Width - 1, size.Height - 1), new Point(1, 1) })
+                {
+                    Point pixel = pixelOf(cell.X, cell.Y);
+                    string head = mode.Name + (sgr ? " sgr" : "") + " cell " + cell.X + "," + cell.Y;
+                    foreach (MouseButtons button in new[] { MouseButtons.Left, MouseButtons.Middle, MouseButtons.Right, MouseButtons.XButton1 })
+                    {
+                        MouseEventArgs press = new MouseEventArgs(button, 1, pixel.X, pixel.Y, 0);
+                        harness.Sent.Clear();
+                        down.Invoke(terminal, new object[] { press });
+                        lines.Add(head + " down " + button + " -> " + harness.Sent);
+                        harness.Sent.Clear();
+                        up.Invoke(terminal, new object[] { press });
+                        lines.Add(head + " up " + button + " -> " + harness.Sent);
+                    }
+                    foreach (int delta in new[] { 120, -120, 0 })
+                    {
+                        harness.Sent.Clear();
+                        wheel.Invoke(terminal, new object[] { new MouseEventArgs(MouseButtons.None, 0, pixel.X, pixel.Y, delta) });
+                        lines.Add(head + " wheel " + delta + " -> " + harness.Sent);
+                    }
+                    foreach (MouseButtons button in new[] { MouseButtons.None, MouseButtons.Left, MouseButtons.Middle, MouseButtons.Right })
+                    {
+                        // The same movement twice: a report is sent when the cell changes, not for every pixel.
+                        for (int repeat = 0; repeat < 2; repeat++)
+                        {
+                            harness.Sent.Clear();
+                            move.Invoke(terminal, new object[] { new MouseEventArgs(button, 0, pixel.X, pixel.Y, 0) });
+                            lines.Add(head + " move " + button + " #" + repeat + " -> " + harness.Sent);
+                        }
+                    }
+                }
+                // Outside the text area: nothing is reported.
+                harness.Sent.Clear();
+                down.Invoke(terminal, new object[] { new MouseEventArgs(MouseButtons.Left, 1, -5, -5, 0) });
+                lines.Add(mode.Name + (sgr ? " sgr" : "") + " outside down -> " + harness.Sent);
+            }
+        }
+        return lines;
     }
 
     // Compares the lines with a golden file next to the program; returns 0 when they are equal.
