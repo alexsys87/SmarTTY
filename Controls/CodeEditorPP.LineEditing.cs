@@ -23,27 +23,7 @@ public partial class CodeEditorPP
     /// <summary>The first and the last line a line command works on: the lines of the selection, or the line of the caret.</summary>
     private void GetCommandLines(out int first, out int last)
     {
-        first = CaretPosition.Line;
-        last = first;
-        if (!HasSelection)
-        {
-            return;
-        }
-        TextDocument.TextPosition start = SelectionStart;
-        TextDocument.TextPosition end = CaretPosition;
-        if (end < start)
-        {
-            TextDocument.TextPosition swap = start;
-            start = end;
-            end = swap;
-        }
-        first = start.Line;
-        last = end.Line;
-        // A selection that ends at the very start of a line does not include that line.
-        if (end.Column == 0 && last > first)
-        {
-            last--;
-        }
+        LineEditing.GetCommandLines(CaretPosition.Line, HasSelection, SelectionStart, CaretPosition, out first, out last);
     }
 
     private string LineEnd(int line)
@@ -66,18 +46,7 @@ public partial class CodeEditorPP
     }
 
     /// <summary>The selection covers two lines or more (what sorting and removing duplicates work on).</summary>
-    public bool HasLineSelection
-    {
-        get
-        {
-            if (!HasSelection)
-            {
-                return false;
-            }
-            GetCommandLines(out int first, out int last);
-            return last > first;
-        }
-    }
+    public bool HasLineSelection => LineEditing.HasLineSelection(CaretPosition.Line, HasSelection, SelectionStart, CaretPosition);
 
     /// <summary>
     /// Rewrites lines as <paramref name="kind"/> says (the Text menu): the selected lines, or the whole text when nothing is
@@ -105,30 +74,11 @@ public partial class CodeEditorPP
             UpdateMaxLineWidth(-1);
             return true;
         }
-        int first;
-        int last;
-        if (LineTransforms.NeedsSelection(kind))
+        if (!LineEditing.TryGetTransformLines(kind, LineCount, CaretPosition.Line, HasSelection, SelectionStart, CaretPosition, out int first, out int last))
         {
-            if (!HasLineSelection)
-            {
-                return false;
-            }
-            GetCommandLines(out first, out last);
+            return false;
         }
-        else if (HasSelection)
-        {
-            GetCommandLines(out first, out last);
-        }
-        else
-        {
-            first = 0;
-            last = LineCount - 1;
-        }
-        string[] oldLines = new string[last - first + 1];
-        for (int i = 0; i < oldLines.Length; i++)
-        {
-            oldLines[i] = EditableDocument.GetLineText(first + i);
-        }
+        string[] oldLines = GetLines(first, last);
         string[] newLines = LineTransforms.Apply(kind, oldLines, TabSize);
         if (newLines.Length == oldLines.Length && newLines.SequenceEqual(oldLines))
         {
@@ -148,23 +98,13 @@ public partial class CodeEditorPP
         {
             ExecuteAsSingleUndoStep(() =>
             {
-                for (int i = 0; i < oldLines.Length; i++)
+                foreach (LineEditing.TextEdit edit in LineEditing.DiffLines(first, oldLines, newLines))
                 {
-                    if (oldLines[i] == newLines[i])
-                    {
-                        continue;
-                    }
-                    // Only the part that differs is replaced.
-                    string before = oldLines[i];
-                    string after = newLines[i];
-                    int prefix = CommonPrefixLength(before, after);
-                    int suffix = CommonSuffixLength(before, after, prefix);
-                    ReplaceText(new TextDocument.TextPosition(prefix, first + i), new TextDocument.TextPosition(before.Length - suffix, first + i), select: false,
-                        after.Substring(prefix, after.Length - suffix - prefix));
+                    ReplaceText(edit.Start, edit.End, select: false, edit.Text);
                 }
             });
-            anchor.Column = ShiftColumn(anchor, first, oldLines, newLines);
-            caret.Column = ShiftColumn(caret, first, oldLines, newLines);
+            anchor.Column = LineEditing.ShiftColumn(anchor, first, oldLines, newLines);
+            caret.Column = LineEditing.ShiftColumn(caret, first, oldLines, newLines);
             RestoreAfterEdit(hadSelection, anchor, caret, 0);
         }
         else
@@ -189,16 +129,12 @@ public partial class CodeEditorPP
             return;
         }
         GetCommandLines(out int first, out int last);
-        StringBuilder copy = new StringBuilder();
-        for (int line = first; line <= last; line++)
-        {
-            copy.Append(LineEnd(last)).Append(EditableDocument.GetLineText(line));
-        }
+        string copy = LineEditing.DuplicatedText(GetLines(first, last), LineEnd(last));
         // The copy goes in front of the line break of the last line, so a file without a final line break stays without it.
         bool hadSelection = HasSelection;
         TextDocument.TextPosition anchor = SelectionStart;
         TextDocument.TextPosition caret = CaretPosition;
-        ReplaceText(EndOfLine(last), EndOfLine(last), select: false, copy.ToString());
+        ReplaceText(EndOfLine(last), EndOfLine(last), select: false, copy);
         RestoreAfterEdit(hadSelection, anchor, caret, last - first + 1);
         UpdateMaxLineWidth(-1);
     }
@@ -220,34 +156,23 @@ public partial class CodeEditorPP
         string lineEnd = LineEnd(top);
         // The block and the line it swaps places with, in the new order.
         int neighbor = direction < 0 ? first - 1 : last + 1;
-        StringBuilder text = new StringBuilder();
-        if (direction < 0)
-        {
-            AppendLines(text, first, last, lineEnd);
-            text.Append(lineEnd).Append(EditableDocument.GetLineText(neighbor));
-        }
-        else
-        {
-            text.Append(EditableDocument.GetLineText(neighbor)).Append(lineEnd);
-            AppendLines(text, first, last, lineEnd);
-        }
+        string text = LineEditing.MovedText(GetLines(first, last), EditableDocument.GetLineText(neighbor), lineEnd, direction);
         bool hadSelection = HasSelection;
         TextDocument.TextPosition anchor = SelectionStart;
         TextDocument.TextPosition caret = CaretPosition;
-        ReplaceText(new TextDocument.TextPosition(0, top), EndOfLine(bottom), select: false, text.ToString());
+        ReplaceText(new TextDocument.TextPosition(0, top), EndOfLine(bottom), select: false, text);
         RestoreAfterEdit(hadSelection, anchor, caret, direction);
     }
 
-    private void AppendLines(StringBuilder text, int first, int last, string lineEnd)
+    /// <summary>The texts of the lines <paramref name="first"/> to <paramref name="last"/>, without their line breaks.</summary>
+    private string[] GetLines(int first, int last)
     {
-        for (int line = first; line <= last; line++)
+        string[] lines = new string[last - first + 1];
+        for (int i = 0; i < lines.Length; i++)
         {
-            if (line > first)
-            {
-                text.Append(lineEnd);
-            }
-            text.Append(EditableDocument.GetLineText(line));
+            lines[i] = EditableDocument.GetLineText(first + i);
         }
+        return lines;
     }
 
     /// <summary>Removes the selected lines (or the caret line) together with their line breaks.</summary>
@@ -274,73 +199,23 @@ public partial class CodeEditorPP
             return false;
         }
         GetCommandLines(out int first, out int last);
-        string[] oldLines = new string[last - first + 1];
-        for (int i = 0; i < oldLines.Length; i++)
-        {
-            oldLines[i] = EditableDocument.GetLineText(first + i);
-        }
+        string[] oldLines = GetLines(first, last);
         string[] newLines = CommentStyle.Toggle(oldLines);
         bool hadSelection = HasSelection;
         TextDocument.TextPosition anchor = SelectionStart;
         TextDocument.TextPosition caret = CaretPosition;
         ExecuteAsSingleUndoStep(() =>
         {
-            for (int i = 0; i < oldLines.Length; i++)
+            foreach (LineEditing.TextEdit edit in LineEditing.DiffLines(first, oldLines, newLines))
             {
-                if (oldLines[i] == newLines[i])
-                {
-                    continue;
-                }
-                // Only the part that differs is replaced.
-                string before = oldLines[i];
-                string after = newLines[i];
-                int prefix = CommonPrefixLength(before, after);
-                int suffix = CommonSuffixLength(before, after, prefix);
-                ReplaceText(new TextDocument.TextPosition(prefix, first + i), new TextDocument.TextPosition(before.Length - suffix, first + i), select: false,
-                    after.Substring(prefix, after.Length - suffix - prefix));
+                ReplaceText(edit.Start, edit.End, select: false, edit.Text);
             }
         });
-        anchor.Column = ShiftColumn(anchor, first, oldLines, newLines);
-        caret.Column = ShiftColumn(caret, first, oldLines, newLines);
+        anchor.Column = LineEditing.ShiftColumn(anchor, first, oldLines, newLines);
+        caret.Column = LineEditing.ShiftColumn(caret, first, oldLines, newLines);
         RestoreAfterEdit(hadSelection, anchor, caret, 0);
         UpdateMaxLineWidth(-1);
         return true;
-    }
-
-    private static int ShiftColumn(TextDocument.TextPosition position, int first, string[] oldLines, string[] newLines)
-    {
-        int index = position.Line - first;
-        if (index < 0 || index >= oldLines.Length || oldLines[index] == newLines[index])
-        {
-            return position.Column;
-        }
-        int changeStart = CommonPrefixLength(oldLines[index], newLines[index]);
-        if (position.Column <= changeStart)
-        {
-            return position.Column;
-        }
-        int delta = newLines[index].Length - oldLines[index].Length;
-        return Math.Max(changeStart, Math.Min(position.Column + delta, newLines[index].Length));
-    }
-
-    private static int CommonPrefixLength(string a, string b)
-    {
-        int length = 0;
-        while (length < a.Length && length < b.Length && a[length] == b[length])
-        {
-            length++;
-        }
-        return length;
-    }
-
-    private static int CommonSuffixLength(string a, string b, int prefix)
-    {
-        int length = 0;
-        while (length < a.Length - prefix && length < b.Length - prefix && a[a.Length - 1 - length] == b[b.Length - 1 - length])
-        {
-            length++;
-        }
-        return length;
     }
 
     /// <summary>Makes the text bigger (1) or smaller (-1) by a tenth of its size.</summary>
