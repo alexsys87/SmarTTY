@@ -1,14 +1,14 @@
-using System.Drawing;
+using SmarTTY.TextEditing;
 
 namespace SmarTTY.Completion;
 
 public class SuggestionController
 {
-    private SuggestionPopup _popup;
+    private ISuggestionPopup _popup;
 
-    private ICompletionHost _host;
+    private ISuggestionPopupFactory _popupFactory;
 
-    public Color BackColor;
+    public RgbColor BackColor;
 
     public bool IsVisible
     {
@@ -22,9 +22,9 @@ public class SuggestionController
         }
     }
 
-    public SuggestionController(ICompletionHost completionHost)
+    public SuggestionController(ISuggestionPopupFactory popupFactory)
     {
-        _host = completionHost;
+        _popupFactory = popupFactory;
     }
 
     public void Show(ISuggestionSource suggestionSource, bool autoSize, bool allowMultiSelect)
@@ -33,7 +33,7 @@ public class SuggestionController
         {
             _popup.Dispose();
         }
-        _popup = new SuggestionPopup(suggestionSource, _host, allowMultiSelect);
+        _popup = _popupFactory.Create(suggestionSource, allowMultiSelect);
         _popup.BackColor = this.BackColor;
         if (_popup != null)
         {
@@ -51,7 +51,7 @@ public class SuggestionController
         {
             _popup.Dispose();
         }
-        _popup = suggestionCatalog.CreatePopup(prefix, _host, allowMultiSelect);
+        _popup = _popupFactory.Create(suggestionCatalog.CreateSnapshot(prefix), allowMultiSelect);
         _popup.BackColor = this.BackColor;
         if (_popup != null)
         {

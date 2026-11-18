@@ -16,7 +16,7 @@ internal interface IHintView
 
     void Dismiss();
 
-    void ShowAt(ICompletionHost completionHost, bool isVertical);
+    void ShowAt(bool isVertical);
 
-    void Reposition(ICompletionHost completionHost, bool isVertical);
+    void Reposition(bool isVertical);
 }

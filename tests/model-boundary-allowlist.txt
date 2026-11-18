@@ -8,9 +8,6 @@
 # The list of the stage 1 specification (section 6.1).
 Terminal/CompletionPopupRequest.cs
 Terminal/CompletionSession.cs
-Completion/SignatureHintController.cs
-Completion/SuggestionCatalog.cs
-Completion/SuggestionController.cs
 #
 # Found when the check was added, not in the table of the specification: these files use the terminal controls
 # (SshTerminalControl, TerminalEmulatorBase) of SmarTTY.Controls. They go with the terminal work (stages 1B and 1C).

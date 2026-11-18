@@ -92,6 +92,20 @@ public partial class TextHintForm : Form, IHintView
         this.ShowPopup();
     }
 
+    /// <summary>The editor the hint is shown for: it knows where the caret is.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal ICompletionHost Host { get; set; }
+
+    void IHintView.ShowAt(bool isVertical)
+    {
+        ShowAt(Host, isVertical);
+    }
+
+    void IHintView.Reposition(bool isVertical)
+    {
+        Reposition(Host, isVertical);
+    }
+
     public void ShowAt(ICompletionHost completionHost, bool isVertical)
     {
         Reposition(completionHost, isVertical);

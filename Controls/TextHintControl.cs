@@ -132,6 +132,20 @@ internal partial class TextHintControl : Control, IHintView
         return true;
     }
 
+    /// <summary>The editor the hint is shown for: it knows where the caret is.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal ICompletionHost Host { get; set; }
+
+    void IHintView.ShowAt(bool isVertical)
+    {
+        ShowAt(Host, isVertical);
+    }
+
+    void IHintView.Reposition(bool isVertical)
+    {
+        Reposition(Host, isVertical);
+    }
+
     public void Reposition(ICompletionHost completionHost, bool above)
     {
         Point point = Parent.PointToScreen(new Point(0, 0));
