@@ -78,7 +78,8 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     private static readonly HighlightStyle MatchStyle = new HighlightStyle(Color.FromArgb(95, 255, 190, 0).ToRgb(), RgbColor.Empty, RgbColor.Empty);
 
-    public Brush EchoBrush;
+    /// <summary>The colour of the echo of what was typed; null until the settings are applied.</summary>
+    public RgbColor? EchoColor;
 
     private DeviceTerminalSettings.HexTerminalSettings _settings;
 
@@ -292,7 +293,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
                 {
                     Override = new TerminalEmulatorBase.CellStyle.ForegroundOverride
                     {
-                        Brush = EchoBrush
+                        Color = EchoColor
                     }
                 });
             }
