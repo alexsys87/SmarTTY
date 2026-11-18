@@ -124,10 +124,41 @@ internal static class Program
 
     private static readonly string AsciiChars = "azAZ09 ~!éя";
 
+    // Runs that also look for the same pattern again and again from a caret that stands on a match, so that the edges of the search are met.
+    private static bool _focusedSearches;
+
+    private static void FocusedSearch(Random random)
+    {
+        byte[] bytes = _hex.Document.ToArray();
+        if (bytes.Length < 4)
+        {
+            return;
+        }
+        int offset = random.Next(0, bytes.Length - 2);
+        _hex.GoToOffset(offset);
+        Record("go to " + offset, "-");
+        byte[] pattern = new byte[random.Next(1, 4)];
+        Array.Copy(bytes, offset, pattern, 0, pattern.Length);
+        bool forward = random.Next(2) == 0;
+        bool ignoreCase = random.Next(2) == 0;
+        bool wrap = random.Next(4) != 0;
+        for (int i = 0; i < 3; i++)
+        {
+            bool direction = i == 2 ? !forward : forward;
+            bool found = _hex.Search(pattern, direction, ignoreCase, wrap);
+            Record("search again " + Hex(pattern, 8) + (direction ? " fwd" : " back") + (ignoreCase ? " icase" : "") + (wrap ? " wrap" : ""), Bool(found) + "/" + _hex.LastSearchText);
+        }
+    }
+
     private static void Step(Random random)
     {
         int kind = random.Next(100);
         bool shift = random.Next(3) == 0;
+        if (_focusedSearches && kind >= 78 && kind < 84)
+        {
+            FocusedSearch(random);
+            return;
+        }
         if (kind < 22)
         {
             Keys key = Arrows[random.Next(Arrows.Length)];
@@ -326,8 +357,9 @@ internal static class Program
         }
     }
 
-    private static void Run(int seed, int steps)
+    private static void Run(int seed, int steps, bool focusedSearches = false)
     {
+        _focusedSearches = focusedSearches;
         _driver = new Driver();
         _hex.Document = new HexDocument(InitialBytes(), InitialBytes());
         _hex.StateChanged += (sender, e) => _states++;
@@ -351,6 +383,8 @@ internal static class Program
             Run(2, 500);
             Run(3, 500);
             Run(20240601, 700);
+            Run(7, 600, focusedSearches: true);
+            Run(8, 600, focusedSearches: true);
         }
         catch (Exception exception)
         {
