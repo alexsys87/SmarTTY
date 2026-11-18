@@ -1,4 +1,3 @@
-using SmarTTY.Controls;
 using SmarTTY.Terminal.Emulation;
 
 namespace SmarTTY.Terminal;
@@ -9,7 +8,7 @@ namespace SmarTTY.Terminal;
 /// </summary>
 internal class CommandRun
 {
-    private readonly SshTerminalControl _terminal;
+    private readonly ICommandRunHost _terminal;
 
     public readonly string WorkingDirectory;
 
@@ -17,9 +16,9 @@ internal class CommandRun
 
     public readonly int StartLine;
 
-    public CommandRun(SshTerminalControl sshTerminalControl, string commandText, string workingDirectory, int startLine)
+    public CommandRun(ICommandRunHost terminal, string commandText, string workingDirectory, int startLine)
     {
-        _terminal = sshTerminalControl;
+        _terminal = terminal;
         WorkingDirectory = workingDirectory;
         CommandText = commandText;
         this.StartLine = startLine;
@@ -28,6 +27,13 @@ internal class CommandRun
     internal ILinkScanner CreateScanner(bool links, bool highlightDiagnostics)
     {
         return new OutputLinkScanner(_terminal, WorkingDirectory, CommandText, links, highlightDiagnostics, logLevels: false,
-            columnSetting: _terminal.VtSettings?.CompilerColumns ?? CodeEditing.ColumnUnit.Auto, urls: true);
+            columnSetting: _terminal.CompilerColumns, urls: true);
     }
+}
+
+/// <summary>What a <see cref="CommandRun"/> needs from the Smart Terminal tab: the link host of its scanner and the setting for the columns of the compiler.</summary>
+internal interface ICommandRunHost : IOutputLinkHost
+{
+    /// <summary>How the columns after a file name are counted (<see cref="CodeEditing.ColumnUnit.Auto"/> when the settings have none).</summary>
+    CodeEditing.ColumnUnit CompilerColumns { get; }
 }

@@ -1,4 +1,3 @@
-using SmarTTY.Controls;
 using SmarTTY.IO;
 using SmarTTY.TextEditing;
 using System;
@@ -79,7 +78,7 @@ internal class CompletionSession : IDisposable
         }
     }
 
-    private SshTerminalControl _terminal;
+    private ISmartTerminalHost _terminal;
 
     private readonly CompletionTarget _target;
 
@@ -130,9 +129,9 @@ internal class CompletionSession : IDisposable
 
     public event EventHandler<AppliedEventArgs> ItemApplied;
 
-    public CompletionSession(SshTerminalControl sshTerminalControl, string commandText, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool autoApply, CommandCompletion commandCompletion, string insertPrefix = null, string insertSuffix = null)
+    public CompletionSession(ISmartTerminalHost terminal, string commandText, CompletionTarget completionTarget, Token token, ICompletionPopup completionPopup, bool autoApply, CommandCompletion commandCompletion, string insertPrefix = null, string insertSuffix = null)
     {
-        _terminal = sshTerminalControl;
+        _terminal = terminal;
         _target = completionTarget;
         _insertPrefix = insertPrefix ?? "";
         _insertSuffix = insertSuffix ?? "";
@@ -181,15 +180,15 @@ internal class CompletionSession : IDisposable
     {
         try
         {
-            if (!_disposed && !_terminal.IsDisposed && _terminal.IsHandleCreated)
+            if (!_disposed)
             {
-                _terminal.BeginInvoke((Action)(() =>
+                _terminal.TryBeginInvoke(() =>
                 {
                     if (!_disposed)
                     {
                         action();
                     }
-                }));
+                });
             }
         }
         catch (InvalidOperationException)

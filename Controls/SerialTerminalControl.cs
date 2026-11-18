@@ -1496,7 +1496,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         // Request completion popup
         var request = new CompletionPopupRequest
         {
-            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
+            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))).ToGridPoint(),
             LineHeight = LineHeight,
             Items = null,
             StatusText = "Loading suggestions...",

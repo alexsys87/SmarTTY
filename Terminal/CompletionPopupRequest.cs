@@ -1,12 +1,13 @@
 ﻿using System;
-using System.Drawing;
+using SmarTTY.TextEditing;
 using VisualTTY;
 
 namespace SmarTTY.Terminal;
 
 public class CompletionPopupRequest : EventArgs
 {
-    public Point ScreenLocation;
+    /// <summary>The place of the popup on the screen, in pixels (<c>X</c> to the right, <c>Y</c> down): the caret of the command line.</summary>
+    public GridPoint ScreenLocation;
 
     public CompletionItem[] Items;
 
