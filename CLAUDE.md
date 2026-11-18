@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) and the server side of a save (A4e: `RemoteFileSaver`) are out, next the save flow (`PrepareSave`, `Save`, `SaveInBackground`, `CompleteSave`) and the rest |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out, next the save flow (`Save`, `SaveInBackground`, `FinishBackgroundSave`, `CompleteSave`) and the rest |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -212,6 +212,14 @@ host, the sudo channel with its password prompt; `Controls/SessionRemoteFileHost
 stays in the view). The questions to the user (sudo? overwrite? CRLF? BOM? reload?), the threads and what a save does to the text and the hex view stay
 in the editor. `tests/RemoteFileSaverTests` (net8.0) drives it with a fake connection, including sudo, which the Mono stand cannot do. Next, A4f: the
 parts of `PrepareSave`/`CompleteSave`/`Save` that need no control (the encoding of the bytes, the decision of the questions, the state flags of a save).
+
+Done in A4f: `CodeEditing/RemoteFileSession.cs` is the start of the session object: it holds the state of the saves that the editor kept in fields (the
+answers to the CRLF and BOM questions, `BackupDone`, `ForceOverwrite`, `SkipValidation`, the save generation, the bytes kept from the hex view and the text they were
+shown as) and `PrepareSave` (the text or the hex bytes, the two questions, the backup, the check of the file, the job). The editor gives it what it
+needs through `IRemoteSaveSource` (implemented explicitly: the text, the hex view, the two changes to the text, `Confirm`, the syntax) and
+`RemoteSaveOptions` (the settings and `IsNewFile`/`IsWindowsHost`, read after the questions as the old code did). `tests/RemoteFileSessionTests` (net8.0)
+drives it with a fake editor. Next, A4g: the flow around it (`Save`, `SaveInBackground`, `FinishBackgroundSave`, `CompleteSave`, the reload and the encodings), which
+moves the rest of the fields (`_loaded`, `_reloading`, `_rawBytes`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
