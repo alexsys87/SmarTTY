@@ -755,19 +755,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
     }
 
-    private static int[] ParseParameters(string[] items, params int[] defaults)
-    {
-        int[] parameters = new int[Math.Max(items.Length, defaults.Length)];
-        for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
-        {
-            if (parameterIndex >= items.Length || !int.TryParse(items[parameterIndex], out parameters[parameterIndex]))
-            {
-                parameters[parameterIndex] = defaults[parameterIndex];
-            }
-        }
-        return parameters;
-    }
-
     private int ParseEscapeSequence(string text, int position, out string parsedText, EscapeTrace escapeTrace = null)
     {
         parsedText = null;
@@ -1064,7 +1051,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case 'H':
             case 'f':
                 {
-                    int[] coordinates = ParseParameters(items, 1, 1);
+                    int[] coordinates = CsiParameters.Parse(items, 1, 1);
                     escapeTrace?.SetDescription($"GOTOXY {coordinates[1]}, {coordinates[0]}");
                     base.CursorPosition = new Point(coordinates[1] - 1, coordinates[0] - 1);
                     return true;
@@ -1157,7 +1144,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case 'm':
                 if (!set)
                 {
-                    ApplySgr(XtermProtocol.ParseSgr(items));
+                    SgrStyle.Apply(ref CurrentStyle, XtermProtocol.ParseSgr(items));
                     escapeTrace?.SetDescription($"SGR: {CurrentStyle}");
                 }
                 return true;
@@ -1340,16 +1327,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     private bool ExecuteOsc(string content, EscapeTrace escapeTrace)
     {
         escapeTrace?.SetDescription("OSC");
-        // Only the first ';' separates the command from its text: a title may contain ';' itself.
-        int separator = content.IndexOf(';');
-        if (separator == -1 || !int.TryParse(content.Substring(0, separator), out var command))
+        if (!OscString.TryParse(content, out int command, out string text))
         {
             return false;
         }
         if (command == 7)
         {
             // The directory of the shell (the prompt of bash and zsh sends it on many systems).
-            string directory = TerminalDirectoryWatcher.UnixDirectoryOfOsc(command, content.Substring(separator + 1));
+            string directory = TerminalDirectoryWatcher.UnixDirectoryOfOsc(command, text);
             if (directory != null)
             {
                 ReportedDirectory = directory;
@@ -1359,98 +1344,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         // 0 sets the icon name and the title, 2 the title only; 1 (the icon name alone) does not touch the title.
         if (command == 0 || command == 2)
         {
-            StringBuilder title = new StringBuilder();
-            foreach (char ch in content.Substring(separator + 1))
-            {
-                if (!char.IsControl(ch))
-                {
-                    title.Append(ch);
-                }
-            }
-            base.Title = title.ToString();
+            base.Title = OscString.TitleText(text);
             return true;
         }
         return false;
-    }
-
-    private void ApplySgr(System.Collections.Generic.List<XtermProtocol.SgrAttribute> attributes)
-    {
-        foreach (XtermProtocol.SgrAttribute attribute in attributes)
-        {
-            int code = attribute.Code;
-            if (code >= 30 && code <= 37)
-            {
-                CurrentStyle.Foreground = (byte)(1 + code - 30);
-                CurrentStyle.ExtendedForeground = 0;
-            }
-            else if (code >= 40 && code <= 47)
-            {
-                CurrentStyle.Background = (byte)(1 + code - 40);
-                CurrentStyle.ExtendedBackground = 0;
-            }
-            else if (code >= 90 && code <= 97)
-            {
-                // Bright colours are palette entries 8..15; they no longer turn bold on, which used to stick
-                // to the text written after a later normal colour.
-                CurrentStyle.Foreground = 0;
-                CurrentStyle.ExtendedForeground = EncodeExtendedColor(8 + code - 90);
-            }
-            else if (code >= 100 && code <= 107)
-            {
-                CurrentStyle.Background = 0;
-                CurrentStyle.ExtendedBackground = EncodeExtendedColor(8 + code - 100);
-            }
-            else
-            {
-                switch (code)
-                {
-                    case 0:
-                        CurrentStyle = CellStyle.Default;
-                        break;
-                    case 1:
-                        CurrentStyle.Bold = true;
-                        break;
-                    case 21:
-                    case 22:
-                        CurrentStyle.Bold = false;
-                        break;
-                    case 4:
-                        CurrentStyle.Underline = true;
-                        break;
-                    case 24:
-                        CurrentStyle.Underline = false;
-                        break;
-                    case 7:
-                        CurrentStyle.Inverse = true;
-                        break;
-                    case 27:
-                        CurrentStyle.Inverse = false;
-                        break;
-                    case 38:
-                        CurrentStyle.Foreground = 0;
-                        CurrentStyle.ExtendedForeground = EncodeExtendedColor(attribute.Color);
-                        break;
-                    case 39:
-                        CurrentStyle.Foreground = 0;
-                        CurrentStyle.ExtendedForeground = 0;
-                        break;
-                    case 48:
-                        CurrentStyle.Background = 0;
-                        CurrentStyle.ExtendedBackground = EncodeExtendedColor(attribute.Color);
-                        break;
-                    case 49:
-                        CurrentStyle.Background = 0;
-                        CurrentStyle.ExtendedBackground = 0;
-                        break;
-                }
-            }
-        }
-    }
-
-    // See CellStyle.ExtendedForeground: palette indices are stored + 1 so that 0 can mean "not set".
-    private static int EncodeExtendedColor(int color)
-    {
-        return ((color & XtermProtocol.RgbColorFlag) != 0) ? color : (color + 1);
     }
 
     private void ReportStatus(int request, EscapeTrace escapeTrace)
