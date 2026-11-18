@@ -262,6 +262,7 @@ internal static class Program
         Osc();
         Scanner();
         OutputLoop();
+        Mouse();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " terminal emulator checks passed.");
     }
@@ -702,6 +703,77 @@ internal static class Program
         }
         Check(threw, "the known fault of a cursor position with empty items still throws out of the loop");
         Equal(string.Join("; ", Order), "begin; out 'a'; end", "...and the batch is ended all the same");
+    }
+
+    private static string Text(byte[] bytes)
+    {
+        if (bytes == null)
+        {
+            return "<none>";
+        }
+        System.Text.StringBuilder text = new System.Text.StringBuilder();
+        foreach (byte value in bytes)
+        {
+            text.Append(value == 27 ? "ESC" : value < 32 || value > 126 ? "\\x" + value.ToString("x2") : ((char)value).ToString());
+        }
+        return text.ToString();
+    }
+
+    private static void Mouse()
+    {
+        TerminalInputEncoder encoder = new TerminalInputEncoder();
+        GridPoint cell = new GridPoint(10, 5);
+        MouseReportingMode normal = MouseReportingMode.Normal;
+
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, cell, 80, 24, false)), "ESC[M +&", "a left press in X10 encoding: button 0, column 11, row 6, each plus 32");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, false, 0, cell, 80, 24, false)), "ESC[M#+&", "a release is button 3 in that encoding");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Middle, true, 0, cell, 80, 24, false)), "ESC[M!+&", "the middle button is 1");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Right, true, 0, cell, 80, 24, false)), "ESC[M\"+&", "the right button is 2");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, cell, 80, 24, true)), "ESC[<0;11;6M", "SGR encoding: the cell counted from 1, M for a press");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, false, 0, cell, 80, 24, true)), "ESC[<0;11;6m", "...and m for a release, with the button kept");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Right, false, 0, cell, 80, 24, true)), "ESC[<2;11;6m", "...the right button");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 4 | 16, cell, 80, 24, true)), "ESC[<20;11;6M", "the Shift and Control bits are added to the button");
+        Check(encoder.MouseButton(normal, TerminalMouseButton.Other, true, 0, cell, 80, 24, false) == null && encoder.MouseButton(normal, TerminalMouseButton.None, true, 0, cell, 80, 24, false) == null, "another button, or none, is not reported");
+
+        MouseReportingMode x10 = MouseReportingMode.X10;
+        Equal(Text(encoder.MouseButton(x10, TerminalMouseButton.Left, true, 4, cell, 80, 24, false)), "ESC[M +&", "X10 mode: a press, without the modifier bits");
+        Check(encoder.MouseButton(x10, TerminalMouseButton.Left, false, 0, cell, 80, 24, false) == null, "...and no release");
+        Check(encoder.MouseButton(MouseReportingMode.Off, TerminalMouseButton.Left, true, 0, cell, 80, 24, false) == null, "mouse reporting off: nothing");
+        foreach (MouseReportingMode mode in new[] { MouseReportingMode.Highlight, MouseReportingMode.ButtonEvent, MouseReportingMode.AnyEvent })
+        {
+            Check(encoder.MouseButton(mode, TerminalMouseButton.Left, true, 0, cell, 80, 24, true) != null && encoder.MouseButton(mode, TerminalMouseButton.Left, false, 0, cell, 80, 24, true) != null, mode + ": presses and releases are reported");
+        }
+
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, new GridPoint(200, 90), 80, 24, true)), "ESC[<0;80;24M", "a cell past the screen is reported at the last column and row");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, new GridPoint(79, 23), 80, 24, true)), "ESC[<0;80;24M", "...the last cell is the last cell");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, new GridPoint(80, 24), 80, 24, true)), "ESC[<0;80;24M", "...and the cell just past it is brought back to it");
+        Equal(Text(encoder.MouseButton(normal, TerminalMouseButton.Left, true, 0, new GridPoint(-3, -1), 80, 24, true)), "ESC[<0;1;1M", "a negative cell is brought back to the first");
+
+        Equal(Text(encoder.MouseWheel(normal, false, 0, cell, 80, 24, true)), "ESC[<64;11;6M", "the wheel up is 64");
+        Equal(Text(encoder.MouseWheel(normal, true, 0, cell, 80, 24, true)), "ESC[<65;11;6M", "the wheel down is 65");
+        Equal(Text(encoder.MouseWheel(MouseReportingMode.AnyEvent, true, 8, cell, 80, 24, true)), "ESC[<73;11;6M", "...with the Alt bit");
+        Check(encoder.MouseWheel(x10, true, 0, cell, 80, 24, true) == null && encoder.MouseWheel(MouseReportingMode.Off, true, 0, cell, 80, 24, true) == null, "X10 mode and off: no wheel");
+        foreach (MouseReportingMode mode in new[] { MouseReportingMode.Normal, MouseReportingMode.Highlight, MouseReportingMode.ButtonEvent, MouseReportingMode.AnyEvent })
+        {
+            Check(encoder.MouseWheel(mode, false, 0, cell, 80, 24, true) != null, mode + ": the wheel is reported");
+        }
+
+        encoder.ResetMouseMotion();
+        Check(encoder.MouseMove(normal, TerminalMouseButton.Left, 0, cell, 80, 24, true) == null && encoder.MouseMove(x10, TerminalMouseButton.Left, 0, cell, 80, 24, true) == null, "motion is not reported in normal and X10 modes");
+        Check(encoder.MouseMove(MouseReportingMode.Highlight, TerminalMouseButton.Left, 0, cell, 80, 24, true) == null, "...nor in highlight mode");
+        Check(encoder.MouseMove(MouseReportingMode.ButtonEvent, TerminalMouseButton.None, 0, cell, 80, 24, true) == null, "button-event mode: no motion without a button");
+        Equal(Text(encoder.MouseMove(MouseReportingMode.ButtonEvent, TerminalMouseButton.Left, 0, cell, 80, 24, true)), "ESC[<32;11;6M", "...with a button, the motion is the button plus 32");
+        Check(encoder.MouseMove(MouseReportingMode.ButtonEvent, TerminalMouseButton.Left, 0, cell, 80, 24, true) == null, "...once for a cell");
+        Equal(Text(encoder.MouseMove(MouseReportingMode.ButtonEvent, TerminalMouseButton.Right, 0, new GridPoint(11, 5), 80, 24, true)), "ESC[<34;12;6M", "...a new cell is reported again (the right button is 2)");
+        Equal(Text(encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.None, 0, new GridPoint(12, 5), 80, 24, true)), "ESC[<35;13;6M", "any-event mode reports motion with no button as 3 plus 32");
+        Equal(Text(encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.Other, 4, new GridPoint(13, 5), 80, 24, true)), "ESC[<39;14;6M", "...another button counts as none, with the modifier bits");
+        Equal(Text(encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.Middle, 0, new GridPoint(14, 5), 80, 24, false)), "ESC[MA/&", "X10 encoding: 1 + 32 (motion) + 32 = 65 is 'A', column 15 + 32 = '/', row 6 + 32 = '&'");
+        Check(encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.Middle, 0, new GridPoint(14, 5), 80, 24, false) == null, "the same cell again: nothing");
+        encoder.ResetMouseMotion();
+        Check(encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.Middle, 0, new GridPoint(14, 5), 80, 24, false) != null, "after the mode changed the same cell is reported again");
+        TerminalInputEncoder fresh = new TerminalInputEncoder();
+        Check(fresh.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.None, 0, new GridPoint(0, 0), 80, 24, true) != null, "a new encoder reports a motion at the first cell");
+        Check(encoder.MouseMove(MouseReportingMode.Off, TerminalMouseButton.Left, 0, new GridPoint(20, 5), 80, 24, true) == null && encoder.MouseMove(MouseReportingMode.AnyEvent, TerminalMouseButton.Left, 0, new GridPoint(20, 5), 80, 24, true) != null, "a motion that is not reported does not change the last cell");
     }
 
     private static void Replies()
