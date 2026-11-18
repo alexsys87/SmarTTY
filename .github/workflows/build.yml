@@ -246,6 +246,9 @@ jobs:
       - name: Run remote file loader checks (new file, write permission and size questions, download and preview, reload, closed tab; fake connection, user and UI thread)
         run: dotnet run --project tests/RemoteFileLoaderTests -c Release
 
+      - name: Run remote file saver checks (upload, check of the file, replacement and its failures, sudo, clean-up, service reload; fake connection)
+        run: dotnet run --project tests/RemoteFileSaverTests -c Release
+
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 
