@@ -571,7 +571,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public TerminalEmulatorControl()
     {
-        _emulator = new TerminalEmulator(this, this, _modes);
+        _emulator = new TerminalEmulator(Screen, this, _modes);
         InitializeComponent();
         Disposed += (object sender, EventArgs e) => _pasteJob?.Abort();
         ((TextEditorControl)this).CopyLineWhenNoSelection = false;
@@ -722,7 +722,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             string completed = ByteColumns.TryComplete(_partialBytes, value);
             if (completed != null)
             {
-                WriteAt(new Point(_partialColumn, cursor.Y), completed, CurrentStyle);
+                Screen.WriteAt(new GridPoint(_partialColumn, cursor.Y), completed, CurrentStyle);
                 ResetByteState();
             }
             return;
@@ -1597,7 +1597,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             base.ActiveBufferIndex = 0;
         }
-        ClearScrollRegion();
+        Screen.ClearScrollRegion();
         Tabs = new TabStops();
         base.Reset();
         _emulator.ResetModes();
