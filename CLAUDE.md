@@ -95,7 +95,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
 | 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5 (`TextSearcher` on `ISearchTarget`, the status bar on `IEditorStatusSource`) and A6 (hex editor: the net, `HexEditingModel`; the value decoding of the data inspector was already `HexValueFormats`) done; A7 (`RemoteFileEditor.Syntax.cs` → `SyntaxChoice`) done: stage 1A is finished (what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here"), next 1B |
-| 1B | Terminal emulator core out of WinForms | In progress: B1 (the golden snapshots of the terminal control, `tests/TerminalSnapshots`) and B2 (the types of the screen that need no control: `EraseMode`, `TabStops`, `ScrollRegion`, the link types, `LinkTracker`) done; next B3 (`CellStyle`, `LineInfo`, `LineInfoStore`, `ScreenBuffer`) |
+| 1B | Terminal emulator core out of WinForms | In progress: B1 (the golden snapshots of the terminal control, `tests/TerminalSnapshots`) and B2 (the types of the screen that need no control: `EraseMode`, `TabStops`, `ScrollRegion`, the link types, `LinkTracker`) and B3a (`CellStyle`, its override colour an `RgbColor`) done; next B3b (`LineInfo`, `LineInfoStore`, `ScreenBuffer`) |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
@@ -280,6 +280,12 @@ controls (`TerminalEmulatorBase`, `TerminalEmulatorControl`, `SshTerminalControl
 no longer knows `TerminalEmulatorBase` and left the allowlist (4 files now); `tests/ModelBuildTests` compiles it (with `Utilities/UrlLinks.cs` added to its dependencies), and `tests/OutputLinkTests` links the real `LinkTypes.cs`
 instead of its stub of the three nested types (246 checks before and after). `TerminalSnapshots` passes unchanged. `CellStyle` (it holds a `Brush` override and a `LinkCell`), `LineInfo`, `LineInfoStore` and `ScreenBuffer` use the control
 (`ToDocumentPosition`, the visible columns, `Point`) and are B3.
+
+Done in B3a: `CellStyle` (with its nested `ForegroundOverride`) is a top-level struct in `Terminal/Emulation/CellStyle.cs`. The foreground override of a cell holds an `RgbColor?` (null: no colour, as the old null `Brush`) instead of a
+`Brush`; `TerminalEmulatorBase.GetOverrideBrush` makes and caches the brush when it paints, and `HexTerminalControl.EchoColor` (an `RgbColor?`, set from `Colors.Echo` with `ToRgb()` in `DeviceTerminalControl`) replaces `EchoBrush`.
+Before the change `tests/TerminalSnapshots` got a second golden, `TerminalSpansGolden.txt` (1261 lines): the brushes of the colour spans of every line as the view asks for them (`GetLineColorSpans`: the palette, bold, inverse, 256 and true colours, the colour of a
+log level or a diagnostic, the underline of a link), for all the cases of the first golden and five that use the override. It was written by the code before the change, on a worktree of that commit, and is never re-recorded either. The state golden did not
+change. Three changes of the painting code (the alpha of the override brush, the palette entry of a warning, the override under inverse) each make it fail. Not covered: the HEX terminal itself (the echo colour reaches the cells through the override only); it needs a check on Windows.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2: the 20

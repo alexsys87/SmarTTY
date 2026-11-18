@@ -1,3 +1,4 @@
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -78,7 +79,8 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     private static readonly HighlightStyle MatchStyle = new HighlightStyle(Color.FromArgb(95, 255, 190, 0).ToRgb(), RgbColor.Empty, RgbColor.Empty);
 
-    public Brush EchoBrush;
+    /// <summary>The colour of the echo of what was typed; null until the settings are applied.</summary>
+    public RgbColor? EchoColor;
 
     private DeviceTerminalSettings.HexTerminalSettings _settings;
 
@@ -288,11 +290,11 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
             int pendingBytes = 0;
             if (isEcho)
             {
-                termText.CurrentStyle = (termHex.CurrentStyle = new TerminalEmulatorBase.CellStyle
+                termText.CurrentStyle = (termHex.CurrentStyle = new CellStyle
                 {
-                    Override = new TerminalEmulatorBase.CellStyle.ForegroundOverride
+                    Override = new CellStyle.ForegroundOverride
                     {
-                        Brush = EchoBrush
+                        Color = EchoColor
                     }
                 });
             }
@@ -328,7 +330,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         }
         finally
         {
-            termText.CurrentStyle = (termHex.CurrentStyle = TerminalEmulatorBase.CellStyle.Default);
+            termText.CurrentStyle = (termHex.CurrentStyle = CellStyle.Default);
         }
     }
 

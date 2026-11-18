@@ -13,85 +13,6 @@ namespace SmarTTY.Controls;
 
 public partial class TerminalEmulatorBase : TextEditorControl
 {
-    public struct CellStyle
-    {
-        public class ForegroundOverride
-        {
-            public Brush Brush;
-        }
-
-        public byte Foreground;
-
-        public byte Background;
-
-        public bool Bold;
-
-        public bool Inverse;
-
-        public bool Underline;
-
-        /// <summary>
-        /// 256-colour or 24-bit foreground set by SGR 38/90-97; 0 when <see cref="Foreground"/> applies.
-        /// Encoded as palette index + 1 (1..256) or <see cref="XtermProtocol.RgbColorFlag"/> | 0xRRGGBB.
-        /// </summary>
-        public int ExtendedForeground;
-
-        /// <summary>The same as <see cref="ExtendedForeground"/> for the background (SGR 48/100-107).</summary>
-        public int ExtendedBackground;
-
-        public ForegroundOverride Override;
-
-        internal LinkCell _link;
-
-        private static readonly string[] ColorNames = new string[9] { "Default", "Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "White" };
-
-        public static readonly CellStyle Default = default;
-
-        public bool IsDefault
-        {
-            get
-            {
-                if (Foreground == 0 && Background == 0 && ExtendedForeground == 0 && ExtendedBackground == 0 && !Bold && !Inverse && !Underline && Override == null)
-                {
-                    return _link.Target == null && _link.Severity == 0;
-                }
-                return false;
-            }
-        }
-
-        public bool StyleEquals(CellStyle cellStyle)
-        {
-            if (Foreground == cellStyle.Foreground && Background == cellStyle.Background && ExtendedForeground == cellStyle.ExtendedForeground && ExtendedBackground == cellStyle.ExtendedBackground && Bold == cellStyle.Bold && Inverse == cellStyle.Inverse && Underline == cellStyle.Underline && object.Equals(Override, cellStyle.Override))
-            {
-                return object.Equals(_link, cellStyle._link);
-            }
-            return false;
-        }
-
-        private static string GetColorName(byte colorIndex)
-        {
-            if (colorIndex >= ColorNames.Length)
-            {
-                return "Invalid";
-            }
-            return ColorNames[colorIndex];
-        }
-
-        public override string ToString()
-        {
-            if (IsDefault)
-            {
-                return "Default";
-            }
-            string text = $"{GetColorName(Foreground)} on {GetColorName(Background)}";
-            if (Inverse)
-            {
-                text += " [inverse]";
-            }
-            return text;
-        }
-    }
-
     protected class LineInfo
     {
         public CellStyle[] Cells;
@@ -422,6 +343,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     // Brushes of 256-colour and 24-bit colours, created on first use.
     private readonly Dictionary<int, Brush> _extendedBrushes = new Dictionary<int, Brush>();
+
+    // Brushes of the colours of CellStyle.Override, created on first use.
+    private readonly Dictionary<RgbColor, Brush> _overrideBrushes = new Dictionary<RgbColor, Brush>();
 
     public Brush InactiveBrush = Brushes.DarkGray;
 
@@ -1090,6 +1014,17 @@ public partial class TerminalEmulatorBase : TextEditorControl
         return brush;
     }
 
+    // The brush of the colour a cell asks for with CellStyle.Override (the colour of the echo of a HEX terminal); made on first use.
+    private Brush GetOverrideBrush(RgbColor color)
+    {
+        if (!_overrideBrushes.TryGetValue(color, out Brush brush))
+        {
+            brush = new SolidBrush(color.ToColor());
+            _overrideBrushes[color] = brush;
+        }
+        return brush;
+    }
+
     // The palette entries of the colours: 2 is red, 4 yellow, 7 cyan (the SGR numbers 31, 33 and 36).
     private static byte SeverityColor(byte severity)
     {
@@ -1114,9 +1049,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 backgroundBrush = _defaultColors[0].Foreground;
             }
         }
-        if (cellStyle.Override != null && cellStyle.Override.Brush != null)
+        if (cellStyle.Override != null && cellStyle.Override.Color.HasValue)
         {
-            foregroundBrush = cellStyle.Override.Brush;
+            foregroundBrush = GetOverrideBrush(cellStyle.Override.Color.Value);
         }
         else if (cellStyle._link.Severity != 0 && cellStyle.Foreground == 0 && cellStyle.ExtendedForeground == 0 && !cellStyle.Inverse)
         {

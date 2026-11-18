@@ -1066,7 +1066,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
         _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, deviceTerminalSettings.AutoDetectPrompt);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
-        hexTerminalControl1.EchoBrush = new SolidBrush(_deviceTerminalSettings.Colors.Echo);
+        hexTerminalControl1.EchoColor = ((Color)_deviceTerminalSettings.Colors.Echo).ToRgb();
         // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
         // dump are resolved to the combined view instead of silently dropping one of the two panes.
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(

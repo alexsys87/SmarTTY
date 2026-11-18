@@ -1405,7 +1405,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 switch (code)
                 {
                     case 0:
-                        CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
+                        CurrentStyle = CellStyle.Default;
                         break;
                     case 1:
                         CurrentStyle.Bold = true;
@@ -1759,9 +1759,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         HideCaret = false;
         MouseMode = MouseReportingMode.Off;
         _privateModes.Clear();
-        CurrentStyle = TerminalEmulatorBase.CellStyle.Default;
+        CurrentStyle = CellStyle.Default;
         _savedCursor = Point.Empty;
-        _savedStyle = TerminalEmulatorBase.CellStyle.Default;
+        _savedStyle = CellStyle.Default;
         _charsets.Reset();
     }
 
