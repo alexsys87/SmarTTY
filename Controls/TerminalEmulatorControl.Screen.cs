@@ -113,6 +113,26 @@ public partial class TerminalEmulatorControl : ITerminalScreen, ITerminalHost
         InvalidateView();
     }
 
+    void ITerminalScreen.BeginBatch()
+    {
+        BeginBatch();
+    }
+
+    void ITerminalScreen.EndBatch()
+    {
+        EndBatch();
+    }
+
+    void ITerminalScreen.ResetLinkTracking()
+    {
+        ResetLinkTracking();
+    }
+
+    void ITerminalScreen.WriteText(string text)
+    {
+        WriteText(text);
+    }
+
     void ITerminalHost.SendReply(string reply)
     {
         if (!SuppressReplies)
@@ -145,9 +165,39 @@ public partial class TerminalEmulatorControl : ITerminalScreen, ITerminalHost
         MoveForwardBytes(bytes);
     }
 
-    void ITerminalHost.MoveBackBytes(int bytes)
+    int ITerminalHost.MoveBackBytes(int bytes)
     {
-        MoveBackBytes(bytes);
+        return MoveBackBytes(bytes);
+    }
+
+    int ITerminalHost.MaxChunkLength => MaxChunkLength;
+
+    bool ITerminalHost.ShowUnrecognizedAsHex => ShowUnrecognizedAsHex;
+
+    void ITerminalHost.WriteOutputText(string text)
+    {
+        WriteOutputText(text);
+    }
+
+    void ITerminalHost.Bell()
+    {
+        OnBell();
+    }
+
+    void ITerminalHost.Trace(string text)
+    {
+        Trace(text);
+    }
+
+    IEscapeTrace ITerminalHost.BeginEscapeTrace()
+    {
+#if DEBUG
+        // Escape diagnostics exist in a Debug build only. The tracing object is created just around the sequence, so its Dispose()
+        // reports what the sequence meant right after it is parsed. A Release build compiles the whole thing out.
+        return new EscapeTrace(this);
+#else
+        return null;
+#endif
     }
 
     MouseReportingMode ITerminalHost.MouseMode

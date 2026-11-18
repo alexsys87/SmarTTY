@@ -27,7 +27,26 @@ public interface ITerminalHost
 
     void MoveForwardBytes(int bytes);
 
-    void MoveBackBytes(int bytes);
+    /// <summary>Moves the cursor back by bytes; returns the bytes that were left at the start of the line.</summary>
+    int MoveBackBytes(int bytes);
+
+    /// <summary>The longest chunk of output that is shown whole; a longer one is cut to this many characters from its end (0: no limit).</summary>
+    int MaxChunkLength { get; }
+
+    /// <summary>A control character that the terminal does nothing about is shown as its number.</summary>
+    bool ShowUnrecognizedAsHex { get; }
+
+    /// <summary>Writes a segment of text (without control characters) at the cursor: through the character set, and in byte mode with the stray bytes of a letter put together.</summary>
+    void WriteOutputText(string text);
+
+    /// <summary>BEL.</summary>
+    void Bell();
+
+    /// <summary>A line of the Debug trace (it does nothing in a Release build).</summary>
+    void Trace(string text);
+
+    /// <summary>The object that the Debug trace of the next escape sequence is written to, or null in a Release build.</summary>
+    IEscapeTrace BeginEscapeTrace();
 
     MouseReportingMode MouseMode { set; }
 
