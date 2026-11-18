@@ -25,6 +25,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     private InlineMessageProvider _inlineMessageProvider;
 
+    private InlineMessageView _inlineMessageView;
+
     private FoldingManager _foldingManager;
 
     public HighlightStyle ParenHighlightStyle = new HighlightStyle(Color.FromArgb(100, Color.LightYellow).ToRgb(), Color.FromArgb(50, Color.Blue).ToRgb(), RgbColor.Empty);
@@ -180,15 +182,16 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         InitializeComponent();
         _inlineMessageProvider = new InlineMessageProvider();
+        _inlineMessageView = new InlineMessageView(_inlineMessageProvider);
         _foldingManager = new FoldingManager(_tokenCache);
-        VirtualLineProviders.Add(_inlineMessageProvider);
+        VirtualLineProviders.Add(_inlineMessageView);
         VirtualLineProviders.Add(new FoldingLineProvider(_foldingManager));
         AddMargin(new FoldingMarginPainter(_foldingManager));
         // The completion popup reads its images from this list; the editor shows words without icons.
         ImageList = new ImageList();
         ImageList.ImageSize = new Size(16, 16);
         ImageList.ColorDepth = ColorDepth.Depth32Bit;
-        Disposed += (object sender, EventArgs e) => _inlineMessageProvider.Dispose();
+        Disposed += (object sender, EventArgs e) => _inlineMessageView.Dispose();
         SuggestionAccepted += OnSuggestionAccepted;
     }
 
@@ -434,10 +437,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     /// <summary>The theme sets the colours the inline messages are drawn with.</summary>
     public void ApplyMessageColors(Color background, Color error, Color warning, Color border)
     {
-        _inlineMessageProvider.BackColor = background;
-        _inlineMessageProvider.ErrorColor = error;
-        _inlineMessageProvider.WarningColor = warning;
-        _inlineMessageProvider.BorderColor = border;
+        _inlineMessageView.BackColor = background;
+        _inlineMessageView.ErrorColor = error;
+        _inlineMessageView.WarningColor = warning;
+        _inlineMessageView.BorderColor = border;
         RefreshMessages();
     }
 

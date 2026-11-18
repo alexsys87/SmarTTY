@@ -13,6 +13,7 @@
     <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
     <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
     <Compile Include="../../CodeEditing/InlineMessageProvider.cs" Link="InlineMessageProvider.cs" />
+    <Compile Include="../../Controls/TextView/InlineMessageView.cs" Link="InlineMessageView.cs" />
     <Compile Include="../../Controls/VirtualRowLayout.cs" Link="VirtualRowLayout.cs" />
   </ItemGroup>
 </Project>

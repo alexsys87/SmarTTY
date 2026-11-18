@@ -126,7 +126,7 @@ internal static class Program
         {
             folds.Regions[region.Key] = region.Value;
         }
-        Composite provider = new Composite(messages, folds);
+        Composite provider = new Composite(new InlineMessageView(messages), folds);
         List<(int Line, bool Message)> rows = Rows(lineCount, messageLines, regions);
 
         int extent = lineCount + provider.GetTotalVirtualRows() - provider.GetTotalHiddenLines();
@@ -177,15 +177,17 @@ internal static class Program
 
     private static void ProviderChecks()
     {
-        InlineMessageProvider none = new InlineMessageProvider();
-        Check(none.Count == 0, "a new provider has no messages");
+        InlineMessageProvider noneMessages = new InlineMessageProvider();
+        InlineMessageView none = new InlineMessageView(noneMessages);
+        Check(noneMessages.Count == 0, "a new provider has no messages");
         Check(none.GetNextSpecialLine(0) == int.MaxValue, "no messages: no special line ahead (int.MaxValue, as the fold manager says)");
         Check(none.GetTotalVirtualRows() == 0 && none.GetVirtualRowCount(3) == 0, "no messages: no rows");
 
-        InlineMessageProvider provider = new InlineMessageProvider();
-        provider.AddMessage(4, InlineMessageProvider.MessageSeverity.Error, "a", 0);
-        provider.AddMessage(9, InlineMessageProvider.MessageSeverity.Warning, "b", 2);
-        Check(provider.Count == 2, "two messages");
+        InlineMessageProvider messages = new InlineMessageProvider();
+        InlineMessageView provider = new InlineMessageView(messages);
+        messages.AddMessage(4, InlineMessageProvider.MessageSeverity.Error, "a", 0);
+        messages.AddMessage(9, InlineMessageProvider.MessageSeverity.Warning, "b", 2);
+        Check(messages.Count == 2, "two messages");
         Check(provider.GetNextSpecialLine(0) == 4 && provider.GetNextSpecialLine(4) == 4, "the nearest line with a message, the line itself included");
         Check(provider.GetNextSpecialLine(5) == 9 && provider.GetNextSpecialLine(9) == 9, "the next one after a line");
         Check(provider.GetNextSpecialLine(10) == int.MaxValue, "after the last message: nothing ahead, and not -1, which would hide a fold ahead from the composite");
@@ -194,13 +196,13 @@ internal static class Program
         Check(provider.GetHiddenLineCount(4) == 0 && provider.GetTotalHiddenLines() == 0, "a message hides nothing");
 
         // Lines inserted above move the messages; lines deleted take the messages on them away.
-        provider.ShiftLines(1, 0, 3);
+        messages.ShiftLines(1, 0, 3);
         Check(provider.GetNextSpecialLine(0) == 7 && provider.GetNextSpecialLine(8) == 12, "three lines inserted above: the messages are 3 lines lower");
-        provider.ShiftLines(5, 3, 0);
-        Check(provider.Count == 1 && provider.GetNextSpecialLine(0) == 9, "three lines deleted around the first message: it is gone, the other moves up");
+        messages.ShiftLines(5, 3, 0);
+        Check(messages.Count == 1 && provider.GetNextSpecialLine(0) == 9, "three lines deleted around the first message: it is gone, the other moves up");
 
-        provider.Clear();
-        Check(provider.Count == 0 && provider.GetNextSpecialLine(0) == int.MaxValue, "cleared");
+        messages.Clear();
+        Check(messages.Count == 0 && provider.GetNextSpecialLine(0) == int.MaxValue, "cleared");
         provider.Dispose();
         provider.Dispose();
         Check(true, "disposing twice is harmless");
