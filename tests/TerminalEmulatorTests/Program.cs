@@ -675,8 +675,8 @@ internal static class Program
 
         rig.Host.MaxChunkLength = 10;
         rig.Screen.Cursor = new GridPoint(0, 3);
-        string cut = rig.Process(new string('x', 30));
-        Equal(cut, "begin; linkreset; move 0,0; linkreset; move 0,1 scroll; out '--- skipped 20 bytes ---'; linkreset; move 0,0; linkreset; move 0,1 scroll; out 'xxxxxxxxxx'; end",
+        string cut = rig.Process("abcdefghijklmnopqrstuvwxyz0123");
+        Equal(cut, "begin; linkreset; move 0,0; linkreset; move 0,1 scroll; out '--- skipped 20 bytes ---'; linkreset; move 0,0; linkreset; move 0,1 scroll; out 'uvwxyz0123'; end",
             "a chunk longer than the limit is cut to its last characters, with a line that says how many were skipped");
         Equal(rig.Process(new string('y', 10)), "begin; out 'yyyyyyyyyy'; end", "a chunk of the limit is shown whole");
         rig.Host.MaxChunkLength = 0;
