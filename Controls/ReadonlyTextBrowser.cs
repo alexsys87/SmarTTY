@@ -425,13 +425,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public delegate void CtrlTabHandler(ReadonlyTextBrowser readonlyTextBrowser, bool shift);
 
-    public enum FindSelectMode
-    {
-        None,
-        SelectOrClear,
-        Select
-    }
-
     private int _tabSize = 4;
 
     private int _verticalWheelStep = 3;

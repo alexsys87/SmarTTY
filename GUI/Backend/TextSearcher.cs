@@ -9,7 +9,7 @@ namespace SmarTTY.GUI.Backend;
 
 public class TextSearcher : INotifyPropertyChanged
 {
-    private readonly Func<TextEditorControl> _GetEditor;
+    private readonly Func<ISearchTarget> _GetEditor;
 
     private readonly Func<string, string> _NormalizeQuery;
 
@@ -47,7 +47,7 @@ public class TextSearcher : INotifyPropertyChanged
 
     private TextDocument.TextPosition _scopeEnd;
 
-    private TextEditorControl _scopeEditor;
+    private ISearchTarget _scopeEditor;
 
     private int _scopeHighlightId = -1;
 
@@ -234,7 +234,7 @@ public class TextSearcher : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    public TextSearcher(TextEditorControl e)
+    public TextSearcher(ISearchTarget e)
         : this(() => e, null)
     {
     }
@@ -244,7 +244,7 @@ public class TextSearcher : INotifyPropertyChanged
     /// ASCII text view and its HEX dump view) and optionally rewrites the query before searching (the HEX view
     /// expects lowercase byte pairs separated by spaces, e.g. "0A0D" becomes "0a 0d").
     /// </summary>
-    public TextSearcher(Func<TextEditorControl> getEditor, Func<string, string> normalizeQuery)
+    public TextSearcher(Func<ISearchTarget> getEditor, Func<string, string> normalizeQuery)
         : this(getEditor, normalizeQuery, null, null)
     {
     }
@@ -255,7 +255,7 @@ public class TextSearcher : INotifyPropertyChanged
     /// the searched text, the bytes are searched for in the stream, where a sequence that goes on in the next row is
     /// found too. Any other text is searched for in the lines of the editor, as before.
     /// </summary>
-    public TextSearcher(Func<TextEditorControl> getEditor, Func<string, string> normalizeQuery, Func<IByteSearchTarget> getByteTarget, Func<string, byte[]> parseByteQuery)
+    public TextSearcher(Func<ISearchTarget> getEditor, Func<string, string> normalizeQuery, Func<IByteSearchTarget> getByteTarget, Func<string, byte[]> parseByteQuery)
     {
         _GetEditor = getEditor;
         _NormalizeQuery = normalizeQuery;
@@ -340,8 +340,8 @@ public class TextSearcher : INotifyPropertyChanged
     {
         try
         {
-            Func<TextEditorControl> getEditor = _GetEditor;
-            TextEditorControl editor = (getEditor != null) ? getEditor() : null;
+            Func<ISearchTarget> getEditor = _GetEditor;
+            ISearchTarget editor = (getEditor != null) ? getEditor() : null;
             if (editor == null)
             {
                 return;
@@ -387,7 +387,7 @@ public class TextSearcher : INotifyPropertyChanged
                 textPosition = editor.SelectionEnd;
             }
             bool scoped = _InSelection && _scopeEditor == editor;
-            TextDocument.TextPosition found = editor.Find(textPosition, matcher, up, wrapAround: true, ReadonlyTextBrowser.FindSelectMode.SelectOrClear, scoped ? _scopeStart : TextDocument.TextPosition.Invalid, scoped ? _scopeEnd : TextDocument.TextPosition.Invalid);
+            TextDocument.TextPosition found = editor.Find(textPosition, matcher, up, wrapAround: true, FindSelectMode.SelectOrClear, scoped ? _scopeStart : TextDocument.TextPosition.Invalid, scoped ? _scopeEnd : TextDocument.TextPosition.Invalid);
             if (found.IsValid)
             {
                 ResultText = "";
@@ -414,7 +414,7 @@ public class TextSearcher : INotifyPropertyChanged
     {
         try
         {
-            TextEditorControl editor = _GetEditor?.Invoke();
+            ISearchTarget editor = _GetEditor?.Invoke();
             if (editor == null || !CanReplace || string.IsNullOrEmpty(SearchedText))
             {
                 return;
@@ -429,7 +429,7 @@ public class TextSearcher : INotifyPropertyChanged
             TextDocument.TextPosition end = editor.SelectionEnd;
             if (editor.HasSelection && start.IsValid && end.IsValid && start.Line == end.Line && start != end && IsInScope(editor, start, end))
             {
-                string line = editor.EditableDocument.GetLineText(start.Line);
+                string line = editor.GetLineText(start.Line);
                 if (end.Column <= line.Length && matcher.MatchesExactly(line, start.Column, end.Column))
                 {
                     string replacement = matcher.Expand(ReplacementText ?? "");
@@ -462,7 +462,7 @@ public class TextSearcher : INotifyPropertyChanged
     {
         try
         {
-            TextEditorControl editor = _GetEditor?.Invoke();
+            ISearchTarget editor = _GetEditor?.Invoke();
             if (editor == null || !CanReplace || string.IsNullOrEmpty(SearchedText))
             {
                 return;
@@ -502,7 +502,7 @@ public class TextSearcher : INotifyPropertyChanged
 
     // ---- the selection the search is limited to
 
-    private bool IsInScope(TextEditorControl editor, TextDocument.TextPosition start, TextDocument.TextPosition end)
+    private bool IsInScope(ISearchTarget editor, TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
         if (!_InSelection || _scopeEditor != editor)
         {
@@ -516,7 +516,7 @@ public class TextSearcher : INotifyPropertyChanged
 
     private bool BeginScope()
     {
-        TextEditorControl editor = _GetEditor?.Invoke();
+        ISearchTarget editor = _GetEditor?.Invoke();
         if (editor == null || !editor.HasSelection || !editor.SelectionStart.IsValid || !editor.SelectionEnd.IsValid || editor.SelectionStart == editor.SelectionEnd)
         {
             ResultText = "Select the text to search in first.";
@@ -535,7 +535,7 @@ public class TextSearcher : INotifyPropertyChanged
 
     private void EndScope()
     {
-        TextEditorControl editor = _scopeEditor;
+        ISearchTarget editor = _scopeEditor;
         _scopeEditor = null;
         if (editor == null)
         {
@@ -570,7 +570,7 @@ public class TextSearcher : INotifyPropertyChanged
     }
 
     // The range is a position in the text: once somebody else edits the text it points to the wrong place.
-    private void OnScopeEditorTextChanged(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
+    private void OnScopeEditorTextChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
         if (!_applying)
         {
@@ -592,7 +592,7 @@ public class TextSearcher : INotifyPropertyChanged
         {
             return;
         }
-        TextEditorControl editor = _GetEditor?.Invoke();
+        ISearchTarget editor = _GetEditor?.Invoke();
         if (editor == null)
         {
             return;
@@ -660,10 +660,10 @@ public class TextSearcher : INotifyPropertyChanged
             Activate();
             return;
         }
-        TextEditorControl editor = _GetEditor?.Invoke();
+        ISearchTarget editor = _GetEditor?.Invoke();
         if (editor != null && editor.HasSelection && editor.SelectionStart.Line == editor.SelectionEnd.Line && editor.SelectionStart != editor.SelectionEnd)
         {
-            SearchedText = editor.EditableDocument.GetRangeText(editor.SelectionStart, editor.SelectionEnd);
+            SearchedText = editor.GetRangeText(editor.SelectionStart, editor.SelectionEnd);
         }
         IsReplaceVisible = true;
         Activate();
