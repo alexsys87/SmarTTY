@@ -18,7 +18,7 @@ PR that changes them.
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
   `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
-  `DeviceLineEditorTests`. They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done, next the status bar, then A6 (hex editor model) |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done; A6 (hex editor model) started: its safety net is in (A6a), next the move itself (A6b), then the status bar |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -231,6 +231,13 @@ Done in A5a: `TextSearcher` (the WPF view model of the search bar) works on `Tex
 members it already had). `FindSelectMode` moved from `ReadonlyTextBrowser` to `TextEditing/`. `RemoteFileEditorIntegrationTests` has a scenario that drives the real control
 through the interface (the `search-target` scenario). `IByteSearchTarget` (the HEX terminal) was already such a seam. Next: the status bar (`RemoteFileEditorStatusBar` reads
 about 35 members of the editor and the hex view: its seam, `IEditorStatusSource`, is designed together with the hex editor model of A6).
+
+Done in A6a (before any move of the hex editor's logic): `tests/HexEditorControlTests` (net48, Mono + xvfb) drives the real `HexEditorControl` with a seeded random script of keys
+(`OnKeyDown`/`OnKeyPress` by reflection: the control is sealed) and calls (typing in both columns, arrows with and without Shift, Backspace/Delete/Insert, fill, insert pattern, swap,
+write value, search both ways, highlights, undo/redo, view options, read-only) and compares what it does after each of 2204 steps (caret, selection, mode, area, bytes, undo history,
+answers, `StateChanged` and `SearchFinished` events) with `HexEditorControlGolden.txt`, which the code before the move wrote (`--record <file>`; never re-recorded). Not in the script:
+the mouse, the clipboard and the page keys (they need the layout or the system clipboard). A hook, `HexEditorControl.AsciiAreaActive` (internal), puts the caret in the ASCII column
+without a mouse. It must keep passing unchanged while the editing logic moves to `TextEditing/HexEditingModel.cs`.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
