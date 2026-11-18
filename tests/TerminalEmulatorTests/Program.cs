@@ -376,6 +376,12 @@ internal static class Program
         Equal(save.Screen.Cursor, new GridPoint(6, 6), "CSI s / CSI u: the same, the ANSI.SYS way");
         save.Csi('s', "1", set: true);
         Equal(save.Screen.Cursor, new GridPoint(6, 6), "CSI ? s saves modes, not the cursor");
+        save.Csi('m', "1;31");
+        save.Csi('s');
+        save.Csi('m', "");
+        Check(save.Screen.CurrentStyle.IsDefault, "the style is plain after CSI m");
+        save.Csi('u');
+        Check(save.Screen.CurrentStyle.Bold && save.Screen.CurrentStyle.Foreground == 2, "CSI u brings back the style that CSI s saved with the cursor");
 
         Rig remembered = new Rig();
         remembered.Csi('h', "1;2004", set: true);
