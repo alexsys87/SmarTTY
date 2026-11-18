@@ -1,12 +1,11 @@
-using SmarTTY.Controls;
-using SmarTTY.Forms;
-using System.Windows.Forms;
+using System;
 
 namespace SmarTTY.Completion;
 
 public class SignatureHintController
 {
-    private ICompletionHost _host;
+    // Makes the window of a hint (the view knows where it goes and what it is shown in).
+    private readonly Func<IHintView> _createView;
 
     private IHintView _view;
 
@@ -24,24 +23,15 @@ public class SignatureHintController
         }
     }
 
-    public SignatureHintController(ICompletionHost completionHost)
+    internal SignatureHintController(Func<IHintView> createView)
     {
-        _host = completionHost;
+        _createView = createView;
     }
 
-    public void Show(ISignatureInfo signatureInfo, int activeParamIndex, string description, Control parentControl)
+    public void Show(ISignatureInfo signatureInfo, int activeParamIndex, string description)
     {
         this.Hide();
-        if (parentControl == null)
-        {
-            this._view = new TextHintForm();
-        }
-        else
-        {
-            TextHintControl textHintControl = (TextHintControl)(this._view = new TextHintControl());
-            textHintControl.Visible = false;
-            textHintControl.Parent = parentControl;
-        }
+        this._view = _createView();
         string fullSignatureText = "";
         string separator = signatureInfo.Separator;
         for (int i = 0; i < signatureInfo.ParameterCount; i++)
@@ -64,14 +54,14 @@ public class SignatureHintController
         this._view.SetSignature(signatureInfo);
         this._view.SetActiveParameter(activeParamIndex);
         _isVertical = signatureInfo.IsVertical;
-        this._view.ShowAt(_host, _isVertical);
+        this._view.ShowAt(_isVertical);
     }
 
     public void Reposition()
     {
         if (IsVisible)
         {
-            _view.Reposition(_host, _isVertical);
+            _view.Reposition(_isVertical);
         }
     }
 

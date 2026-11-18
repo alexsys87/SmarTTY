@@ -39,10 +39,8 @@
     <!--
       Clean files that cannot be compiled yet because they use a listed file or a settings type that holds Color or Keys
       (VisualTTY/ is frozen at stage 1). Remove a line when its cause is gone.
-        IHintView.cs:               ICompletionHost (listed: Control, Message, Keys, Rectangle)
         ITerminalSessionContext.cs: ShellCompletionAnalyzer (listed: uses the terminal controls) and VirtualTerminalSettings (GlobalSettings)
     -->
-    <Compile Remove="../../Completion/IHintView.cs" />
     <Compile Remove="../../Terminal/ITerminalSessionContext.cs" />
 
     <!-- Code outside the logic folders that the logic uses (found by compiling; plain code without WinForms). -->

@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
 
 namespace SmarTTY.Completion;
 
@@ -68,11 +67,12 @@ public class SuggestionCatalog
         }
     }
 
-    private List<Image> _images = new List<Image>();
+    // The images of the list (nothing adds one: the list shows words without icons); the view reads them as images.
+    private List<object> _images = new List<object>();
 
     private Dictionary<string, SuggestionItem> _items = new Dictionary<string, SuggestionItem>();
 
-    internal List<Image> Images => _images;
+    internal List<object> Images => _images;
 
     public bool Add(string name, int imageIndex, string detail, string hint, string documentation)
     {
@@ -115,11 +115,6 @@ public class SuggestionCatalog
     public void Clear()
     {
         _items.Clear();
-    }
-
-    internal SuggestionPopup CreatePopup(string prefix, ICompletionHost completionHost, bool allowMultiSelect)
-    {
-        return new SuggestionPopup(this, prefix, completionHost, allowMultiSelect);
     }
 
     internal ISuggestionSource CreateSnapshot(string prefix)

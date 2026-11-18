@@ -1,11 +1,13 @@
+using SmarTTY.Controls;
 using SmarTTY.Forms;
+using SmarTTY.TextEditing;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace SmarTTY.Completion;
 
-internal class SuggestionPopup
+internal class SuggestionPopup : ISuggestionPopup
 {
     private SuggestionListForm _form;
 
@@ -30,6 +32,21 @@ internal class SuggestionPopup
     }
 
     public bool IsVisible => _form.Visible;
+
+    RgbColor ISuggestionPopup.BackColor
+    {
+        set
+        {
+            BackColor = value.ToColor();
+        }
+    }
+
+    ISuggestion ISuggestionPopup.SelectedSuggestion => SelectedSuggestion;
+
+    void ISuggestionPopup.AcceptSelected()
+    {
+        AcceptSelected();
+    }
 
     internal SuggestionPopup(SuggestionCatalog suggestionCatalog, string filterText, ICompletionHost completionHost, bool allowMultiSelect)
         : this(suggestionCatalog.CreateSnapshot(filterText), completionHost, allowMultiSelect)

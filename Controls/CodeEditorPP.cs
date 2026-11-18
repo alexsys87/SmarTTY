@@ -779,9 +779,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         if (_suggestionController == null)
         {
-            _suggestionController = new SuggestionController(this);
+            _suggestionController = new SuggestionController(new SuggestionPopupFactory(this));
         }
-        _suggestionController.BackColor = SuggestionBackColor;
+        _suggestionController.BackColor = SuggestionBackColor.ToRgb();
         // The catalog is the source of the popup. The whole list is handed over (no prefix): the popup narrows it
         // to the typed word itself and can widen it again when letters are deleted.
         _suggestionCatalog.Clear();
@@ -803,14 +803,14 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     public void ShowSignatureHint(ISignatureInfo signatureInfo, int parameterIndex, string text)
     {
         HideSignatureHint();
-        _signatureHintController = new SignatureHintController(this);
-        _suppressHintClose = true;
         Control control = null;
         if (!IsWindows())
         {
             control = this;
         }
-        _signatureHintController.Show(signatureInfo, parameterIndex, (text == null) ? null : ("Press TAB to " + text), control);
+        _signatureHintController = new SignatureHintController(() => HintViewFactory.Create(this, control));
+        _suppressHintClose = true;
+        _signatureHintController.Show(signatureInfo, parameterIndex, (text == null) ? null : ("Press TAB to " + text));
         Focus();
         _suppressHintClose = false;
     }
