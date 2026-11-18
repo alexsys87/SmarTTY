@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/Emulation/CellStyle.cs" Link="CellStyle.cs" />
+    <Compile Include="../../Terminal/Emulation/ILineInfoHost.cs" Link="ILineInfoHost.cs" />
+    <Compile Include="../../Terminal/Emulation/LineInfo.cs" Link="LineInfo.cs" />
+    <Compile Include="../../Terminal/Emulation/LineInfoStore.cs" Link="LineInfoStore.cs" />
+    <Compile Include="../../Terminal/Emulation/LinkTypes.cs" Link="LinkTypes.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+  </ItemGroup>
+</Project>
