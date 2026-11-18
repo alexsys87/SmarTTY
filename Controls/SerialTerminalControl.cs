@@ -58,30 +58,6 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
-    private class HistorySearchSession
-    {
-        public readonly List<string> Matches;
-        public int CurrentIndex;
-        public readonly string OriginalInput;
-
-        public HistorySearchSession(List<string> history, string searchTerm, string originalInput)
-        {
-            OriginalInput = originalInput;
-            Matches = history
-                .Where(cmd => cmd.IndexOf(searchTerm, StringComparison.OrdinalIgnoreCase) >= 0)
-                .Reverse()
-                .ToList();
-            CurrentIndex = -1;
-        }
-
-        public string? GetNextMatch()
-        {
-            if (Matches.Count == 0) return null;
-            CurrentIndex = (CurrentIndex + 1) % Matches.Count;
-            return Matches[CurrentIndex];
-        }
-    }
-
     private InputLine? _inputLine;
 
     // What the input line and the full-screen state were when they were last reported, so a change is announced
@@ -89,24 +65,13 @@ public class SerialTerminalControl : TerminalEmulatorControl
     private bool _reportedHasInputLine;
 
     private bool _reportedFullScreenProgramActive;
-    private List<string> _commandHistory = new List<string>();
-    // Up/Down: the line as it was typed followed by the history, newest first, built at the first Up (null until then:
-    // a new line, a command added), and the entry shown.
-    private List<string>? _navigationEntries;
-    private int _navigationIndex;
-
-    // Changes with every change of the history, so the newest-first copy for the grey suggestion is built again.
-    private int _historyVersion;
-    private List<string>? _suggestionHistory;
-    private int _suggestionHistoryVersion = -1;
+    private readonly LineHistory _history = new LineHistory();
 
     // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion); null when none is shown.
     private string? _historySuggestion;
 
     // Esc hides the suggestion until the line changes: the text it was hidden for.
     private string? _suggestionDismissedFor;
-    private const int MaxHistorySize = 1000;
-    private HistorySearchSession? _historySearch;
     private string _currentPrompt = "> ";
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
@@ -840,7 +805,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public string CurrentPrompt => _currentPrompt;
 
-    public IReadOnlyList<string> CommandHistory => _commandHistory.AsReadOnly();
+    public IReadOnlyList<string> CommandHistory => _history.Items;
 
     /// <summary>
     /// When true, the characters typed while no input line is shown (a login prompt, a program that reads single
@@ -882,7 +847,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             return;
         }
-        _historySearch = null;
+        _history.EndSearch();
         ReplaceAfterDevicePrompt(string.Empty);
         OnTextReplaced();
         int row = _inputLine.StartLine - ActiveBuffer.FirstRow;
@@ -936,28 +901,22 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public void ClearHistory()
     {
-        _commandHistory.Clear();
-        _navigationEntries = null;
-        _historyVersion++;
+        _history.Clear();
     }
 
     /// <summary>The history for the "Command history" window: every command once, the newest first.</summary>
     public List<string> GetCommandHistory()
     {
-        return CommandHistoryEditing.Distinct(Enumerable.Reverse(_commandHistory));
+        return _history.Distinct();
     }
 
     /// <summary>Removes <paramref name="commands"/> from the history (Up/Down, Ctrl+R and the grey suggestion).</summary>
     public void RemoveFromHistory(IEnumerable<string> commands)
     {
-        HashSet<string> set = new HashSet<string>(commands ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
-        if (set.Count == 0 || _commandHistory.RemoveAll(set.Contains) == 0)
+        if (!_history.Remove(commands))
         {
             return;
         }
-        _navigationEntries = null;
-        _historySearch = null;
-        _historyVersion++;
         RefreshHistorySuggestion();
     }
 
@@ -976,8 +935,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
             base.InsertCommand(command);
             return;
         }
-        _historySearch = null;
-        _navigationEntries = null;
+        _history.EndSearch();
+        _history.ResetNavigation();
         CloseCompletion();
         _inputLine.SetText(command);
         RewrapInput();
@@ -991,20 +950,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     public void AddToHistory(string command)
     {
-        if (string.IsNullOrWhiteSpace(command))
-            return;
-
-        string trimmed = command.Trim();
-        if (_commandHistory.Count > 0 && _commandHistory[_commandHistory.Count - 1] == trimmed)
-            return; // Don't add duplicates
-
-        _commandHistory.Add(trimmed);
-        if (_commandHistory.Count > MaxHistorySize)
-        {
-            _commandHistory.RemoveAt(0);
-        }
-        _navigationEntries = null;
-        _historyVersion++;
+        _history.Add(command);
     }
 
     /// <summary>
@@ -1054,8 +1000,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         OnTextReplaced();
         UpdateCaretFromInputLine();
         NavigationLocked = false;
-        _navigationEntries = null;
-        _historySearch = null;
+        _history.ResetNavigation();
+        _history.EndSearch();
         return true;
     }
 
@@ -1115,8 +1061,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         OnTextReplaced();
         SetCaret(((EditableTextBrowser)this).EditableDocument.EndPosition);
         NavigationLocked = false;
-        _navigationEntries = null;
-        _historySearch = null;
+        _history.ResetNavigation();
+        _history.EndSearch();
     }
 
     private bool RewrapInput(int? caretIndex = null)
@@ -1346,7 +1292,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         // Handle Escape to cancel history search or completion
         if (e.KeyCode == Keys.Escape)
         {
-            if (_historySearch != null)
+            if (_history.IsSearching)
             {
                 CancelHistorySearch();
                 e.Handled = true;
@@ -1628,12 +1574,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null) return;
 
-        if (_historySearch == null)
-        {
-            string currentText = _inputLine.Text;
-            _historySearch = new HistorySearchSession(_commandHistory, currentText, currentText);
-        }
-        string? match = _historySearch.GetNextMatch();
+        string? match = _history.NextSearchMatch(_inputLine.Text);
         if (match != null)
         {
             _inputLine.SetText(match);
@@ -1644,12 +1585,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
     private void CancelHistorySearch()
     {
-        if (_historySearch != null && _inputLine != null)
+        if (_history.IsSearching && _inputLine != null)
         {
-            _inputLine.SetText(_historySearch.OriginalInput);
+            _inputLine.SetText(_history.SearchOriginalInput);
             RewrapInput();
             UpdateCaretFromInputLine();
-            _historySearch = null;
+            _history.EndSearch();
         }
     }
 
@@ -1658,35 +1599,11 @@ public class SerialTerminalControl : TerminalEmulatorControl
     // line back.
     private void NavigateHistory(bool forward)
     {
-        if (_inputLine == null || _commandHistory.Count == 0) return;
+        if (_inputLine == null || _history.Count == 0) return;
 
-        // Cancel any active history search
-        if (_historySearch != null)
-        {
-            _historySearch = null;
-        }
-
-        bool older = !forward;
-        if (_navigationEntries == null)
-        {
-            if (!older)
-            {
-                // Down on the line being typed: there is nothing newer.
-                return;
-            }
-            _navigationEntries = BuildNavigationEntries(_inputLine.Text);
-            _navigationIndex = 0;
-        }
-        else if (_navigationIndex == 0)
-        {
-            // The typed line may have been edited since Down brought it back.
-            _navigationEntries[0] = _inputLine.Text;
-        }
-        string prefix = HistoryPrefixSearchEnabled ? _navigationEntries[0] : "";
-        int newIndex = HistorySuggestion.StepByPrefix(_navigationEntries, _navigationIndex, older, prefix);
-        if (newIndex < 0) return;
-        _navigationIndex = newIndex;
-        _inputLine.SetText(_navigationEntries[newIndex]);
+        string? shown = _history.Navigate(_inputLine.Text, older: !forward, HistoryPrefixSearchEnabled);
+        if (shown == null) return;
+        _inputLine.SetText(shown);
         RewrapInput();
         UpdateCaretFromInputLine();
         // Send the updated line to device for echo
@@ -1696,39 +1613,12 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
     }
 
-    // The typed line, then every command of the history once, newest first.
-    private List<string> BuildNavigationEntries(string typed)
-    {
-        typed ??= "";
-        List<string> entries = new List<string> { typed };
-        HashSet<string> seen = new HashSet<string> { typed };
-        for (int i = _commandHistory.Count - 1; i >= 0; i--)
-        {
-            if (seen.Add(_commandHistory[i]))
-            {
-                entries.Add(_commandHistory[i]);
-            }
-        }
-        return entries;
-    }
-
     private AutoCompletionTriggers? CompletionTriggers => AppSettings?.VirtualTerminal?.CompletionTriggers;
 
     // The options are the ones of Settings -> Command Completion, shared with the Smart Terminal; on by default.
     private bool HistorySuggestionsEnabled => CompletionTriggers?.HistorySuggestions ?? true;
 
     private bool HistoryPrefixSearchEnabled => CompletionTriggers?.HistoryPrefixSearch ?? true;
-
-    // Newest first, built again only when the history has changed.
-    private List<string> GetSuggestionHistory()
-    {
-        if (_suggestionHistory == null || _suggestionHistoryVersion != _historyVersion)
-        {
-            _suggestionHistory = Enumerable.Reverse(_commandHistory).ToList();
-            _suggestionHistoryVersion = _historyVersion;
-        }
-        return _suggestionHistory;
-    }
 
     private string? ComputeHistorySuggestion()
     {
@@ -1749,7 +1639,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         {
             return null;
         }
-        return HistorySuggestion.Find(GetSuggestionHistory(), text);
+        return HistorySuggestion.Find(_history.NewestFirst, text);
     }
 
     /// <summary>Works out the grey suggestion for the line as it is now and repaints when it has changed.</summary>
@@ -1802,7 +1692,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
         }
         // The list was made for the word being typed, which the suggestion has just changed.
         CloseCompletion();
-        _historySearch = null;
+        _history.EndSearch();
         ReplaceInputLineText(inputLine.Text.Length, 0, part);
         // As if the characters were typed.
         if (_localEcho)
@@ -1852,7 +1742,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
 
         bool typedByUser = commandOverride == null;
         string command = (commandOverride ?? _inputLine.Text).Trim();
-        _historySearch = null;
+        _history.EndSearch();
 
         if (typedByUser)
         {
@@ -1911,8 +1801,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null) return;
 
-        _historySearch = null;
-        _navigationEntries = null;
+        _history.EndSearch();
+        _history.ResetNavigation();
         if (ContinuesDevicePrompt)
         {
             // The shell answers Ctrl+C itself with "^C" and a new prompt, which the input line then continues.
@@ -1938,7 +1828,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
     {
         if (_inputLine == null) return;
 
-        _historySearch = null;
+        _history.EndSearch();
         // Only the screen here is cleared: the line is edited locally, the device has nothing to redraw (an escape
         // sequence sent to it would land in its own line editor as keys).
         ClearScreen();
@@ -2051,8 +1941,8 @@ public class SerialTerminalControl : TerminalEmulatorControl
         base.Reset();
         _inputLine = null;
         _remoteProgram.Reset();
-        _historySearch = null;
-        _navigationEntries = null;
+        _history.EndSearch();
+        _history.ResetNavigation();
         NotifyInputLineState();
     }
 
@@ -2104,7 +1994,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
             return;
         }
         // The command continues from the text that a history search shows now.
-        _historySearch = null;
+        _history.EndSearch();
         SyncInputCaretFromScreen();
         ReplaceInputLineText(_inputLine.CaretIndex, 0, text);
         UpdateCaretFromInputLine();
@@ -2147,7 +2037,7 @@ public class SerialTerminalControl : TerminalEmulatorControl
                 return true;
             }
             // The command continues from the text that a history search shows now.
-            _historySearch = null;
+            _history.EndSearch();
 
             int start;
             int length = 0;
