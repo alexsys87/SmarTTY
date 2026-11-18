@@ -71,13 +71,10 @@ public sealed class HexEditorControl : Control
 
     private const TextFormatFlags TextFlags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
 
-    private enum EditArea
-    {
-        Hex,
-        Ascii
-    }
-
     private HexDocument _document = new HexDocument();
+
+    // The caret, the selection, the typing and what the keys and the commands do to the bytes; this control draws it and reads its input.
+    private readonly HexEditingModel _model;
 
     private readonly HexDataInspector _inspector;
 
@@ -86,11 +83,7 @@ public sealed class HexEditorControl : Control
     // The byte the tool tip describes; -1 when the mouse is not over a byte.
     private int _toolTipOffset = -1;
 
-    private int _bytesPerRow = 16;
-
     private int _groupSize = 1;
-
-    private bool _bigEndian;
 
     private bool _colorByValue;
 
@@ -111,20 +104,6 @@ public sealed class HexEditorControl : Control
 
     // Scrolls the table while a selection is dragged beyond its edge, even when the mouse stands still there.
     private readonly System.Windows.Forms.Timer _autoScrollTimer = new System.Windows.Forms.Timer();
-
-    private int _caretOffset;
-
-    // The nibble being typed: 0 is the high one, 1 the low one.
-    private int _nibble;
-
-    // The other end of the selection; -1 when nothing is selected.
-    private int _anchor = -1;
-
-    private EditArea _area = EditArea.Hex;
-
-    private bool _overwrite = true;
-
-    private bool _readOnly;
 
     private bool _caretVisible = true;
 
@@ -148,20 +127,9 @@ public sealed class HexEditorControl : Control
 
     private int _contentWidth = 640;
 
-    // The first digit of a byte was just typed: the second one joins its undo step.
-    private bool _secondNibblePending;
-
     private bool _updatingScrollBars;
 
     private bool _updatingLayout;
-
-    private byte[] _lastPattern;
-
-    private bool _lastIgnoreCase;
-
-    private bool _lastWrap = true;
-
-    private string _lastSearchText = "";
 
     /// <summary>The caret, the selection, the bytes or the undo history changed (the tool bar and status bar refresh).</summary>
     public event EventHandler StateChanged;
@@ -186,6 +154,8 @@ public sealed class HexEditorControl : Control
 
     public HexEditorControl()
     {
+        _model = new HexEditingModel(_document);
+        _model.Changed += OnModelChanged;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, value: true);
         TabStop = true;
         _verticalScrollBar.Dock = DockStyle.Right;
@@ -235,12 +205,13 @@ public sealed class HexEditorControl : Control
                 _document.HighlightsChanged -= OnDocumentHighlightsChanged;
             }
             _document = value ?? new HexDocument();
+            _model.Document = _document;
             _document.Changed += OnDocumentChanged;
             _document.ModifiedChanged += OnDocumentModifiedChanged;
             _document.HighlightsChanged += OnDocumentHighlightsChanged;
-            _caretOffset = Math.Min(_caretOffset, _document.Length);
-            _anchor = -1;
-            _nibble = 0;
+            _model.CaretOffset = Math.Min(_model.CaretOffset, _document.Length);
+            _model.Anchor = -1;
+            _model.Nibble = 0;
             UpdateScrollBars();
             Invalidate();
             OnStateChanged();
@@ -249,7 +220,7 @@ public sealed class HexEditorControl : Control
 
     public int Length => _document.Length;
 
-    public int CaretOffset => _caretOffset;
+    public int CaretOffset => _model.CaretOffset;
 
     // The ASCII column is where typing goes (set by a click there); tests/HexEditorControlTests puts the caret in it without a mouse.
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -257,11 +228,11 @@ public sealed class HexEditorControl : Control
     {
         get
         {
-            return _area == EditArea.Ascii;
+            return _model.Area == HexEditArea.Ascii;
         }
         set
         {
-            _area = value ? EditArea.Ascii : EditArea.Hex;
+            _model.Area = value ? HexEditArea.Ascii : HexEditArea.Hex;
         }
     }
 
@@ -271,40 +242,40 @@ public sealed class HexEditorControl : Control
     {
         get
         {
-            return _readOnly;
+            return _model.ReadOnly;
         }
         set
         {
-            if (_readOnly == value)
+            if (_model.ReadOnly == value)
             {
                 return;
             }
-            _readOnly = value;
+            _model.ReadOnly = value;
             Invalidate();
             OnStateChanged();
         }
     }
 
     /// <summary>Typing replaces the byte under the caret instead of inserting a new one.</summary>
-    public bool OverwriteMode => _overwrite;
+    public bool OverwriteMode => _model.Overwrite;
 
-    public bool InsertMode => !_overwrite;
+    public bool InsertMode => !_model.Overwrite;
 
-    public bool HasSelection => _anchor >= 0 && _anchor != _caretOffset;
+    public bool HasSelection => _model.Anchor >= 0 && _model.Anchor != _model.CaretOffset;
 
-    public int SelectionStart => HasSelection ? Math.Min(_anchor, _caretOffset) : _caretOffset;
+    public int SelectionStart => HasSelection ? Math.Min(_model.Anchor, _model.CaretOffset) : _model.CaretOffset;
 
-    public int SelectionEnd => HasSelection ? Math.Max(_anchor, _caretOffset) : _caretOffset;
+    public int SelectionEnd => HasSelection ? Math.Max(_model.Anchor, _model.CaretOffset) : _model.CaretOffset;
 
-    public int SelectionLength => HasSelection ? Math.Abs(_caretOffset - _anchor) : 0;
+    public int SelectionLength => HasSelection ? Math.Abs(_model.CaretOffset - _model.Anchor) : 0;
 
-    public bool CanUndo => !_readOnly && _document.CanUndo;
+    public bool CanUndo => !_model.ReadOnly && _document.CanUndo;
 
-    public bool CanRedo => !_readOnly && _document.CanRedo;
+    public bool CanRedo => !_model.ReadOnly && _document.CanRedo;
 
     public bool IsModified => _document.IsModified;
 
-    public string LastSearchText => _lastSearchText;
+    public string LastSearchText => _model.LastSearchText;
 
     /// <summary>The number of bytes in a row: 8, 16 or 32.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -312,17 +283,17 @@ public sealed class HexEditorControl : Control
     {
         get
         {
-            return _bytesPerRow;
+            return _model.BytesPerRow;
         }
         set
         {
             int bytesPerRow = Array.IndexOf(BytesPerRowChoices, value) >= 0 ? value : 16;
-            if (bytesPerRow == _bytesPerRow)
+            if (bytesPerRow == _model.BytesPerRow)
             {
                 return;
             }
-            _bytesPerRow = bytesPerRow;
-            _groupSize = Math.Min(_groupSize, _bytesPerRow);
+            _model.BytesPerRow = bytesPerRow;
+            _groupSize = Math.Min(_groupSize, _model.BytesPerRow);
             OnLayoutOptionChanged();
             OnViewOptionsChanged();
         }
@@ -338,7 +309,7 @@ public sealed class HexEditorControl : Control
         }
         set
         {
-            int groupSize = Array.IndexOf(GroupSizeChoices, value) >= 0 ? Math.Min(value, _bytesPerRow) : 1;
+            int groupSize = Array.IndexOf(GroupSizeChoices, value) >= 0 ? Math.Min(value, _model.BytesPerRow) : 1;
             if (groupSize == _groupSize)
             {
                 return;
@@ -358,15 +329,15 @@ public sealed class HexEditorControl : Control
     {
         get
         {
-            return _bigEndian;
+            return _model.BigEndian;
         }
         set
         {
-            if (_bigEndian == value)
+            if (_model.BigEndian == value)
             {
                 return;
             }
-            _bigEndian = value;
+            _model.BigEndian = value;
             _toolTipOffset = -1;
             Invalidate();
             _inspector.Invalidate();
@@ -423,9 +394,9 @@ public sealed class HexEditorControl : Control
     /// <summary>Sets the view options saved in the settings, without reporting them as changed.</summary>
     public void LoadViewOptions(int bytesPerRow, int groupSize, bool bigEndian, bool colorByValue, bool showDataInspector)
     {
-        _bytesPerRow = Array.IndexOf(BytesPerRowChoices, bytesPerRow) >= 0 ? bytesPerRow : 16;
-        _groupSize = Array.IndexOf(GroupSizeChoices, groupSize) >= 0 ? Math.Min(groupSize, _bytesPerRow) : 1;
-        _bigEndian = bigEndian;
+        _model.BytesPerRow = Array.IndexOf(BytesPerRowChoices, bytesPerRow) >= 0 ? bytesPerRow : 16;
+        _groupSize = Array.IndexOf(GroupSizeChoices, groupSize) >= 0 ? Math.Min(groupSize, _model.BytesPerRow) : 1;
+        _model.BigEndian = bigEndian;
         _colorByValue = colorByValue;
         _showInspector = showDataInspector;
         UpdateInspectorVisibility();
@@ -434,12 +405,12 @@ public sealed class HexEditorControl : Control
     }
 
     /// <summary>The coloured block under the caret, or null.</summary>
-    public HexHighlight HighlightAtCaret => _document.GetHighlightAt(_caretOffset);
+    public HexHighlight HighlightAtCaret => _document.GetHighlightAt(_model.CaretOffset);
 
     public bool HasHighlights => _document.Highlights.Count > 0;
 
     /// <summary>There are bytes to mark: the selection or the byte under the caret.</summary>
-    public bool CanHighlight => HasSelection || _caretOffset < _document.Length;
+    public bool CanHighlight => HasSelection || _model.CaretOffset < _document.Length;
 
     private int VisibleRows
     {
@@ -456,14 +427,14 @@ public sealed class HexEditorControl : Control
     private int AvailableWidth => ClientSize.Width - (_inspectorShown ? _inspector.Width : 0);
 
     // One more row than the bytes fill when the last row is full: the caret sits there after the last byte.
-    private int RowCount => _document.Length / _bytesPerRow + 1;
+    private int RowCount => _document.Length / _model.BytesPerRow + 1;
 
     /// <summary>Copies the selected bytes (the byte under the caret without a selection); false when nothing reached the clipboard.</summary>
     public bool CopySelection()
     {
         try
         {
-            byte[] bytes = GetSelectedBytes();
+            byte[] bytes = _model.GetSelectedBytes();
             if (bytes.Length == 0)
             {
                 return false;
@@ -492,11 +463,11 @@ public sealed class HexEditorControl : Control
 
     public void Cut()
     {
-        if (_readOnly)
+        if (_model.ReadOnly)
         {
             return;
         }
-        if (!HasSelection && _caretOffset >= _document.Length)
+        if (!HasSelection && _model.CaretOffset >= _document.Length)
         {
             return;
         }
@@ -509,22 +480,16 @@ public sealed class HexEditorControl : Control
 
     public void DeleteSelection()
     {
-        if (_readOnly)
+        if (_model.ReadOnly)
         {
             return;
         }
-        DeleteCurrentSelectionOrByte();
+        _model.DeleteCurrentSelectionOrByte();
     }
 
     public void SelectAll()
     {
-        _anchor = 0;
-        _caretOffset = _document.Length;
-        _nibble = 0;
-        _area = EditArea.Hex;
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
+        _model.SelectAll();
     }
 
     /// <summary>Copies the selected bytes (the byte under the caret without a selection) as <paramref name="format"/>.</summary>
@@ -532,7 +497,7 @@ public sealed class HexEditorControl : Control
     {
         try
         {
-            byte[] bytes = GetSelectedBytes();
+            byte[] bytes = _model.GetSelectedBytes();
             if (bytes.Length == 0)
             {
                 return false;
@@ -558,31 +523,13 @@ public sealed class HexEditorControl : Control
     /// </summary>
     public byte[] GetChecksumBytes(out string description)
     {
-        if (HasSelection)
-        {
-            description = "Selection 0x" + SelectionStart.ToString("X8", CultureInfo.InvariantCulture) + " - 0x"
-                + (SelectionEnd - 1).ToString("X8", CultureInfo.InvariantCulture) + ", " + FormatByteCount(SelectionLength);
-            return _document.GetBytes(SelectionStart, SelectionLength);
-        }
-        description = "The whole file, " + FormatByteCount(_document.Length);
-        return _document.ToArray();
+        return _model.GetChecksumBytes(out description);
     }
 
     /// <summary>Repeats <paramref name="pattern"/> over the selected bytes (one undo step); false without a selection.</summary>
     public bool FillSelection(byte[] pattern)
     {
-        if (_readOnly || !HasSelection || pattern == null || pattern.Length == 0)
-        {
-            return false;
-        }
-        int start = SelectionStart;
-        int count = SelectionLength;
-        _document.Replace(start, count, HexValueFormats.RepeatPattern(pattern, count));
-        _anchor = start;
-        _caretOffset = start + count;
-        _nibble = 0;
-        AfterContentChange();
-        return true;
+        return _model.FillSelection(pattern);
     }
 
     /// <summary>
@@ -591,17 +538,7 @@ public sealed class HexEditorControl : Control
     /// </summary>
     public bool InsertPattern(int count, byte[] pattern)
     {
-        if (_readOnly || count <= 0 || pattern == null || pattern.Length == 0)
-        {
-            return false;
-        }
-        int start = HasSelection ? SelectionStart : _caretOffset;
-        _document.Insert(start, HexValueFormats.RepeatPattern(pattern, count));
-        _anchor = start;
-        _caretOffset = start + count;
-        _nibble = 0;
-        AfterContentChange();
-        return true;
+        return _model.InsertPattern(count, pattern);
     }
 
     /// <summary>
@@ -610,27 +547,7 @@ public sealed class HexEditorControl : Control
     /// </summary>
     public bool SwapSelectionByteOrder(int size, out string error)
     {
-        error = null;
-        if (_readOnly)
-        {
-            error = "The file cannot be changed.";
-            return false;
-        }
-        if (!HasSelection || SelectionLength < size || SelectionLength % size != 0)
-        {
-            error = "Select whole " + (size * 8).ToString(CultureInfo.InvariantCulture) + "-bit words: a multiple of "
-                + size.ToString(CultureInfo.InvariantCulture) + " bytes.";
-            return false;
-        }
-        int start = SelectionStart;
-        int count = SelectionLength;
-        bool caretAtEnd = _caretOffset > _anchor;
-        _document.Replace(start, count, HexValueFormats.SwapByteOrder(_document.GetBytes(start, count), size));
-        _anchor = caretAtEnd ? start : start + count;
-        _caretOffset = caretAtEnd ? start + count : start;
-        _nibble = 0;
-        AfterContentChange();
-        return true;
+        return _model.SwapSelectionByteOrder(size, out error);
     }
 
     /// <summary>
@@ -639,84 +556,51 @@ public sealed class HexEditorControl : Control
     /// </summary>
     public bool WriteValue(HexValueType type, string text, out string error)
     {
-        if (_readOnly)
-        {
-            error = "The file cannot be changed.";
-            return false;
-        }
-        if (!HexValueFormats.TryParse(type, text, _bigEndian, out byte[] bytes, out error))
-        {
-            return false;
-        }
-        int offset = HasSelection ? SelectionStart : _caretOffset;
-        int replaced = Math.Min(bytes.Length, _document.Length - offset);
-        _document.Replace(offset, replaced, bytes);
-        _anchor = -1;
-        _caretOffset = offset;
-        _nibble = 0;
-        AfterContentChange();
-        return true;
+        return _model.WriteValue(type, text, out error);
     }
 
     /// <summary>Up to <paramref name="count"/> bytes from the caret (from the start of the selection).</summary>
     public byte[] GetBytesAtCaret(int count)
     {
-        int offset = HasSelection ? SelectionStart : _caretOffset;
-        int available = Math.Max(0, Math.Min(count, _document.Length - offset));
-        return _document.GetBytes(offset, available);
+        return _model.GetBytesAtCaret(count);
     }
 
     /// <summary>Marks the selected bytes (the byte under the caret without a selection) with a colour and a label.</summary>
     public bool HighlightSelection(Color color, string label)
     {
-        int start = HasSelection ? SelectionStart : _caretOffset;
-        int count = HasSelection ? SelectionLength : 1;
-        if (start + count > _document.Length || count <= 0)
-        {
-            return false;
-        }
-        _document.AddHighlight(start, count, Color.FromArgb(255, color).ToArgb(), (label ?? "").Trim());
-        return true;
+        return _model.HighlightSelection(Color.FromArgb(255, color).ToArgb(), label);
     }
 
     /// <summary>Removes the colour from the selected bytes, or the whole block under the caret without a selection.</summary>
     public bool RemoveHighlight()
     {
-        return HasSelection ? _document.RemoveHighlights(SelectionStart, SelectionLength) : _document.RemoveHighlights(_caretOffset, 0);
+        return _model.RemoveHighlight();
     }
 
     public void ClearHighlights()
     {
-        _document.ClearHighlights();
+        _model.ClearHighlights();
     }
 
     /// <summary>Selects the next coloured block after the caret (the previous one when <paramref name="forward"/> is false).</summary>
     public bool GoToHighlight(bool forward)
     {
-        int from = HasSelection ? SelectionStart : _caretOffset;
-        HexHighlight highlight = _document.FindHighlight(from, forward);
-        if (highlight == null)
+        if (!_model.GoToHighlight(forward))
         {
             SystemSounds.Beep.Play();
             return false;
         }
-        _anchor = highlight.Start;
-        _caretOffset = highlight.End;
-        _nibble = 0;
-        _area = EditArea.Hex;
-        AfterCaretChange();
         return true;
     }
 
     internal static string FormatByteCount(int count)
     {
-        return count.ToString("N0", CultureInfo.InvariantCulture) + (count == 1 ? " byte" : " bytes")
-            + " (0x" + count.ToString("X", CultureInfo.InvariantCulture) + ")";
+        return HexEditingModel.FormatByteCount(count);
     }
 
     public void Paste()
     {
-        if (_readOnly)
+        if (_model.ReadOnly)
         {
             return;
         }
@@ -728,7 +612,7 @@ public sealed class HexEditorControl : Control
                 return;
             }
             byte[] bytes;
-            if (_area == EditArea.Ascii)
+            if (_model.Area == HexEditArea.Ascii)
             {
                 bytes = Encoding.UTF8.GetBytes(text);
             }
@@ -761,7 +645,7 @@ public sealed class HexEditorControl : Control
                         break;
                 }
             }
-            InsertBytes(bytes);
+            _model.InsertBytes(bytes);
         }
         catch (Exception exception)
         {
@@ -771,47 +655,23 @@ public sealed class HexEditorControl : Control
 
     public void Undo()
     {
-        if (_readOnly)
-        {
-            return;
-        }
-        _document.Undo();
-        _nibble = 0;
-        AfterContentChange();
+        _model.Undo();
     }
 
     public void Redo()
     {
-        if (_readOnly)
-        {
-            return;
-        }
-        _document.Redo();
-        _nibble = 0;
-        AfterContentChange();
+        _model.Redo();
     }
 
     public void ToggleOverwriteMode()
     {
-        if (_readOnly)
-        {
-            return;
-        }
-        _overwrite = !_overwrite;
-        Invalidate();
-        OnStateChanged();
+        _model.ToggleOverwriteMode();
     }
 
     /// <summary>Moves the caret to <paramref name="offset"/> (clamped to the document) and selects nothing.</summary>
     public void GoToOffset(int offset)
     {
-        _anchor = -1;
-        _caretOffset = Math.Max(0, Math.Min(offset, _document.Length));
-        _nibble = 0;
-        _area = EditArea.Hex;
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
+        _model.GoToOffset(offset);
         Focus();
     }
 
@@ -821,30 +681,16 @@ public sealed class HexEditorControl : Control
     /// </summary>
     public bool Search(byte[] pattern, bool forward, bool ignoreCase, bool wrap)
     {
-        if (pattern == null || pattern.Length == 0)
+        int offset = _model.Search(pattern, forward, ignoreCase, wrap);
+        if (offset == HexEditingModel.SearchSkipped)
         {
             return false;
         }
-        _lastPattern = (byte[])pattern.Clone();
-        _lastIgnoreCase = ignoreCase;
-        _lastWrap = wrap;
-        _lastSearchText = HexDocument.FormatHex(pattern);
-        int start = HasSelection
-            ? (forward ? SelectionEnd : SelectionStart - 1)
-            : (forward ? _caretOffset : _caretOffset - 1);
-        int offset = _document.IndexOf(pattern, start, forward, ignoreCase, wrap);
         if (offset < 0)
         {
             SearchFinished?.Invoke(this, new HexSearchEventArgs { Found = false });
             return false;
         }
-        _anchor = offset;
-        _caretOffset = offset + pattern.Length;
-        _nibble = 0;
-        _area = EditArea.Hex;
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
         SearchFinished?.Invoke(this, new HexSearchEventArgs { Found = true, Offset = offset, Length = pattern.Length });
         return true;
     }
@@ -852,218 +698,17 @@ public sealed class HexEditorControl : Control
     /// <summary>Repeats the last search (F3 and Shift+F3).</summary>
     public bool FindNext(bool forward)
     {
-        if (_lastPattern == null)
+        if (_model.LastPattern == null)
         {
             FindRequested?.Invoke(this, EventArgs.Empty);
             return false;
         }
-        bool found = Search(_lastPattern, forward, _lastIgnoreCase, _lastWrap);
+        bool found = Search(_model.LastPattern, forward, _model.LastIgnoreCase, _model.LastWrap);
         if (!found)
         {
             SystemSounds.Beep.Play();
         }
         return found;
-    }
-
-    private byte[] GetSelectedBytes()
-    {
-        if (HasSelection)
-        {
-            return _document.GetBytes(SelectionStart, SelectionLength);
-        }
-        if (_caretOffset < _document.Length)
-        {
-            return new[] { _document[_caretOffset] };
-        }
-        return Array.Empty<byte>();
-    }
-
-    private void InsertBytes(byte[] bytes)
-    {
-        if (_readOnly || bytes == null || bytes.Length == 0)
-        {
-            return;
-        }
-        if (HasSelection)
-        {
-            int start = SelectionStart;
-            int count = SelectionLength;
-            _anchor = -1;
-            _caretOffset = start;
-            _document.Replace(start, count, bytes);
-        }
-        else if (_overwrite)
-        {
-            int count = Math.Min(bytes.Length, Math.Max(0, _document.Length - _caretOffset));
-            _document.Replace(_caretOffset, count, bytes);
-        }
-        else
-        {
-            _document.Insert(_caretOffset, bytes);
-        }
-        _caretOffset = Math.Min(_document.Length, _caretOffset + bytes.Length);
-        _nibble = 0;
-        _anchor = -1;
-        AfterContentChange();
-    }
-
-    private void DeleteCurrentSelectionOrByte()
-    {
-        if (_readOnly)
-        {
-            return;
-        }
-        if (HasSelection)
-        {
-            int start = SelectionStart;
-            int count = SelectionLength;
-            _anchor = -1;
-            _caretOffset = start;
-            _document.Remove(start, count);
-        }
-        else if (_caretOffset < _document.Length)
-        {
-            _document.Remove(_caretOffset, 1);
-        }
-        else
-        {
-            return;
-        }
-        _nibble = 0;
-        AfterContentChange();
-    }
-
-    private void AfterContentChange()
-    {
-        _secondNibblePending = false;
-        _caretOffset = Math.Max(0, Math.Min(_caretOffset, _document.Length));
-        if (_anchor > _document.Length)
-        {
-            _anchor = _document.Length;
-        }
-        if (_anchor == _caretOffset)
-        {
-            _anchor = -1;
-        }
-        _caretVisible = true;
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
-    }
-
-    /// <summary>
-    /// Makes room for a typed byte at a selection. Typing over a selection in the insert mode replaces it. In the overwrite mode
-    /// the length of the file must not change: the selection is only dropped, and the typed byte overwrites the first byte of it
-    /// (deleting the selection would shorten the file and shift the bytes after it, which is not what overwriting means).
-    /// </summary>
-    private void ReplaceSelectionForTyping()
-    {
-        if (!HasSelection)
-        {
-            return;
-        }
-        if (_overwrite)
-        {
-            _caretOffset = SelectionStart;
-            _anchor = -1;
-            _nibble = 0;
-            _secondNibblePending = false;
-            return;
-        }
-        DeleteCurrentSelectionOrByte();
-    }
-
-    private void EnterHexDigit(int digit)
-    {
-        if (_readOnly)
-        {
-            return;
-        }
-        ReplaceSelectionForTyping();
-        if (_nibble == 0)
-        {
-            byte value = (byte)(digit << 4);
-            if (_overwrite && _caretOffset < _document.Length)
-            {
-                byte existing = _document[_caretOffset];
-                _document.ReplaceByte(_caretOffset, (byte)((existing & 0x0F) | value));
-            }
-            else
-            {
-                _document.Insert(_caretOffset, new[] { value });
-            }
-            _nibble = 1;
-            _secondNibblePending = true;
-        }
-        else
-        {
-            bool joinStep = _secondNibblePending;
-            _secondNibblePending = false;
-            if (_caretOffset < _document.Length)
-            {
-                byte existing = _document[_caretOffset];
-                byte value = (byte)((existing & 0xF0) | digit);
-                if (joinStep)
-                {
-                    _document.ReplaceByteIntoLastStep(_caretOffset, value);
-                }
-                else
-                {
-                    _document.ReplaceByte(_caretOffset, value);
-                }
-            }
-            else
-            {
-                _document.Insert(_caretOffset, new[] { (byte)digit });
-            }
-            _nibble = 0;
-            _caretOffset = Math.Min(_document.Length, _caretOffset + 1);
-            EnsureVisible();
-        }
-        _caretVisible = true;
-        Invalidate();
-        OnStateChanged();
-    }
-
-    private void EnterAscii(byte[] bytes)
-    {
-        if (_readOnly || bytes == null || bytes.Length == 0)
-        {
-            return;
-        }
-        _secondNibblePending = false;
-        ReplaceSelectionForTyping();
-        if (_overwrite && _caretOffset < _document.Length)
-        {
-            _document.Replace(_caretOffset, Math.Min(bytes.Length, _document.Length - _caretOffset), bytes);
-        }
-        else
-        {
-            _document.Insert(_caretOffset, bytes);
-        }
-        _caretOffset = Math.Min(_document.Length, _caretOffset + bytes.Length);
-        _nibble = 0;
-        _caretVisible = true;
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
-    }
-
-    private static int HexDigitValue(char ch)
-    {
-        if (ch >= '0' && ch <= '9')
-        {
-            return ch - '0';
-        }
-        if (ch >= 'a' && ch <= 'f')
-        {
-            return ch - 'a' + 10;
-        }
-        if (ch >= 'A' && ch <= 'F')
-        {
-            return ch - 'A' + 10;
-        }
-        return -1;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -1117,10 +762,10 @@ public sealed class HexEditorControl : Control
                     SaveRequested?.Invoke(this, EventArgs.Empty);
                     break;
                 case Keys.Home:
-                    MoveTo(0, shift, 0);
+                    _model.MoveTo(0, shift, 0);
                     break;
                 case Keys.End:
-                    MoveTo(_document.Length, shift, 0);
+                    _model.MoveTo(_document.Length, shift, 0);
                     break;
                 default:
                     return;
@@ -1132,52 +777,34 @@ public sealed class HexEditorControl : Control
         switch (e.KeyCode)
         {
             case Keys.Left:
-                MoveHorizontally(left: true, extendSelection: shift);
+                _model.MoveHorizontally(left: true, extendSelection: shift);
                 break;
             case Keys.Right:
-                MoveHorizontally(left: false, extendSelection: shift);
+                _model.MoveHorizontally(left: false, extendSelection: shift);
                 break;
             case Keys.Up:
-                MoveVertically(-1, shift);
+                _model.MoveVertically(-1, shift);
                 break;
             case Keys.Down:
-                MoveVertically(1, shift);
+                _model.MoveVertically(1, shift);
                 break;
             case Keys.PageUp:
-                MoveVertically(-Math.Max(1, VisibleRows - 1), shift);
+                _model.MoveVertically(-Math.Max(1, VisibleRows - 1), shift);
                 break;
             case Keys.PageDown:
-                MoveVertically(Math.Max(1, VisibleRows - 1), shift);
+                _model.MoveVertically(Math.Max(1, VisibleRows - 1), shift);
                 break;
             case Keys.Home:
-                MoveTo((_caretOffset / _bytesPerRow) * _bytesPerRow, shift, _nibble);
+                _model.MoveTo((_model.CaretOffset / _model.BytesPerRow) * _model.BytesPerRow, shift, _model.Nibble);
                 break;
             case Keys.End:
-                MoveTo(Math.Min(_document.Length, (_caretOffset / _bytesPerRow) * _bytesPerRow + _bytesPerRow - 1), shift, _nibble);
+                _model.MoveTo(Math.Min(_document.Length, (_model.CaretOffset / _model.BytesPerRow) * _model.BytesPerRow + _model.BytesPerRow - 1), shift, _model.Nibble);
                 break;
             case Keys.Back:
-                if (_readOnly)
-                {
-                    break;
-                }
-                if (HasSelection)
-                {
-                    DeleteCurrentSelectionOrByte();
-                }
-                else if (_caretOffset > 0)
-                {
-                    int offset = _caretOffset - 1;
-                    _document.Remove(offset, 1);
-                    _caretOffset = offset;
-                    _nibble = 0;
-                    AfterContentChange();
-                }
+                _model.Backspace();
                 break;
             case Keys.Delete:
-                if (!_readOnly)
-                {
-                    DeleteCurrentSelectionOrByte();
-                }
+                _model.DeleteCurrentSelectionOrByte();
                 break;
             case Keys.Insert:
                 ToggleOverwriteMode();
@@ -1198,132 +825,14 @@ public sealed class HexEditorControl : Control
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
         base.OnKeyPress(e);
-        if (e.Handled || _readOnly || char.IsControl(e.KeyChar))
+        if (e.Handled)
         {
             return;
         }
-        if (_area == EditArea.Hex)
+        if (_model.TypeCharacter(e.KeyChar))
         {
-            int digit = HexDigitValue(e.KeyChar);
-            if (digit >= 0)
-            {
-                EnterHexDigit(digit);
-                e.Handled = true;
-            }
-            return;
+            e.Handled = true;
         }
-        // What is typed in the ASCII column is stored as UTF-8, like what is pasted there: "é" is two bytes, a Cyrillic letter is two,
-        // and a character outside the basic plane comes as two events (a surrogate pair), which are joined here. (It used to be one
-        // Latin-1 byte up to U+00FF and nothing at all above it.)
-        char typed = e.KeyChar;
-        e.Handled = true;
-        if (char.IsHighSurrogate(typed))
-        {
-            _pendingHighSurrogate = typed;
-            return;
-        }
-        string text;
-        if (char.IsLowSurrogate(typed))
-        {
-            if (_pendingHighSurrogate == '\0')
-            {
-                return;
-            }
-            text = new string(new[] { _pendingHighSurrogate, typed });
-        }
-        else
-        {
-            text = typed.ToString();
-        }
-        _pendingHighSurrogate = '\0';
-        EnterAscii(Encoding.UTF8.GetBytes(text));
-    }
-
-    private char _pendingHighSurrogate;
-
-    private void MoveHorizontally(bool left, bool extendSelection)
-    {
-        if (!extendSelection)
-        {
-            _anchor = -1;
-        }
-        else if (_anchor < 0)
-        {
-            _anchor = _caretOffset;
-        }
-        if (_area == EditArea.Ascii)
-        {
-            _caretOffset = Math.Max(0, Math.Min(_document.Length, _caretOffset + (left ? -1 : 1)));
-            _nibble = 0;
-        }
-        else if (left)
-        {
-            if (_nibble == 1)
-            {
-                _nibble = 0;
-            }
-            else if (_caretOffset > 0)
-            {
-                _caretOffset--;
-                _nibble = 1;
-            }
-        }
-        else if (_nibble == 0)
-        {
-            if (_caretOffset < _document.Length)
-            {
-                _nibble = 1;
-            }
-        }
-        else
-        {
-            if (_caretOffset < _document.Length)
-            {
-                _caretOffset++;
-            }
-            _nibble = 0;
-        }
-        AfterCaretChange();
-    }
-
-    private void MoveVertically(int rows, bool extendSelection)
-    {
-        int row = _caretOffset / _bytesPerRow + rows;
-        row = Math.Max(0, row);
-        int column = _caretOffset % _bytesPerRow;
-        int offset = row * _bytesPerRow + column;
-        MoveTo(offset, extendSelection, _nibble);
-    }
-
-    private void MoveTo(int offset, bool extendSelection, int nibble)
-    {
-        if (!extendSelection)
-        {
-            _anchor = -1;
-        }
-        else if (_anchor < 0)
-        {
-            _anchor = _caretOffset;
-        }
-        _caretOffset = Math.Max(0, Math.Min(offset, _document.Length));
-        _nibble = (nibble == 1) ? 1 : 0;
-        _area = EditArea.Hex;
-        AfterCaretChange();
-    }
-
-    private void AfterCaretChange()
-    {
-        _secondNibblePending = false;
-        if (_anchor == _caretOffset)
-        {
-            _anchor = -1;
-        }
-        _caretVisible = true;
-        _caretTimer.Stop();
-        _caretTimer.Start();
-        EnsureVisible();
-        Invalidate();
-        OnStateChanged();
     }
 
     /// <summary>
@@ -1371,22 +880,22 @@ public sealed class HexEditorControl : Control
         {
             return; // the column titles are not bytes: a click there used to put the caret on the row above the first visible one
         }
-        int offset = OffsetFromPoint(e.Location, out EditArea area, out int nibble);
+        int offset = OffsetFromPoint(e.Location, out HexEditArea area, out int nibble);
         bool shift = (ModifierKeys & Keys.Shift) == Keys.Shift;
         if (e.Button == MouseButtons.Right)
         {
-            _secondNibblePending = false;
+            _model.SecondNibblePending = false;
             // A right click inside the selection opens the menu for it (Copy, Cut, Delete) and keeps it.
             if (HasSelection && offset >= SelectionStart && offset < SelectionEnd)
             {
-                _area = area;
+                _model.Area = area;
                 Invalidate();
                 return;
             }
-            _anchor = -1;
-            _caretOffset = offset;
-            _area = area;
-            _nibble = nibble;
+            _model.Anchor = -1;
+            _model.CaretOffset = offset;
+            _model.Area = area;
+            _model.Nibble = nibble;
             _dragging = false;
             _caretVisible = true;
             EnsureVisible();
@@ -1397,16 +906,16 @@ public sealed class HexEditorControl : Control
         _dragging = true;
         _autoScrollTimer.Start();
         // Shift+click extends the selection from its anchor, or from the caret when nothing is selected.
-        _dragAnchor = shift ? (_anchor >= 0 ? _anchor : _caretOffset) : offset;
-        _anchor = shift ? _dragAnchor : -1;
-        _caretOffset = offset;
-        _area = area;
-        _nibble = nibble;
+        _dragAnchor = shift ? (_model.Anchor >= 0 ? _model.Anchor : _model.CaretOffset) : offset;
+        _model.Anchor = shift ? _dragAnchor : -1;
+        _model.CaretOffset = offset;
+        _model.Area = area;
+        _model.Nibble = nibble;
         if (!shift)
         {
-            _anchor = offset;
+            _model.Anchor = offset;
         }
-        AfterCaretChange();
+        _model.AfterCaretChange();
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -1426,13 +935,13 @@ public sealed class HexEditorControl : Control
 
     private void DragTo(Point point, bool ensureVisible)
     {
-        int offset = OffsetFromPoint(point, out EditArea area, out _);
-        _anchor = _dragAnchor;
-        _caretOffset = offset;
-        _area = area;
-        if (_anchor == _caretOffset)
+        int offset = OffsetFromPoint(point, out HexEditArea area, out _);
+        _model.Anchor = _dragAnchor;
+        _model.CaretOffset = offset;
+        _model.Area = area;
+        if (_model.Anchor == _model.CaretOffset)
         {
-            _anchor = -1;
+            _model.Anchor = -1;
         }
         _caretVisible = true;
         if (ensureVisible)
@@ -1550,9 +1059,9 @@ public sealed class HexEditorControl : Control
             int start = offset - offset % _groupSize;
             if (start + _groupSize <= _document.Length)
             {
-                ulong word = HexValueFormats.ReadUnsigned(_document.GetBytes(start, _groupSize), 0, _groupSize, _bigEndian);
+                ulong word = HexValueFormats.ReadUnsigned(_document.GetBytes(start, _groupSize), 0, _groupSize, _model.BigEndian);
                 text.Append("\n").Append((_groupSize * 8).ToString(CultureInfo.InvariantCulture)).Append("-bit word, ")
-                    .Append(_bigEndian ? "big" : "little").Append(" endian: 0x")
+                    .Append(_model.BigEndian ? "big" : "little").Append(" endian: 0x")
                     .Append(word.ToString("X" + (_groupSize * 2).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture))
                     .Append(" = ").Append(word.ToString(CultureInfo.InvariantCulture));
             }
@@ -1735,7 +1244,7 @@ public sealed class HexEditorControl : Control
         {
             // The offset column scrolls horizontally together with the hex and ASCII columns.
             TextRenderer.DrawText(graphics, "OFFSET", Font, new Point(Margin - _scrollX, 2), dimBrush.Color, TextFlags);
-            for (int index = 0; index < _bytesPerRow; index++)
+            for (int index = 0; index < _model.BytesPerRow; index++)
             {
                 int x = HexCellX(index) - _scrollX;
                 if (x + _charWidth * 2 < 0 || x > width)
@@ -1762,7 +1271,7 @@ public sealed class HexEditorControl : Control
                     {
                         break;
                     }
-                    int offset = row * _bytesPerRow;
+                    int offset = row * _model.BytesPerRow;
                     if (offset >= _document.Length)
                     {
                         break;
@@ -1770,7 +1279,7 @@ public sealed class HexEditorControl : Control
                     string offsetText = offset.ToString("X8", CultureInfo.InvariantCulture);
                     TextRenderer.DrawText(graphics, offsetText, Font, new Point(Margin - _scrollX, y + textYOffset), dimBrush.Color, TextFlags);
                     HexHighlight lastHighlight = null;
-                    for (int index = 0; index < _bytesPerRow; index++)
+                    for (int index = 0; index < _model.BytesPerRow; index++)
                     {
                         int position = offset + index;
                         if (position >= _document.Length)
@@ -1785,7 +1294,7 @@ public sealed class HexEditorControl : Control
                             : lastHighlight;
                         lastHighlight = highlight;
                         // A selection or a coloured block continues over the gap to the next byte of the same row.
-                        bool joinsNext = index + 1 < _bytesPerRow && position + 1 < _document.Length
+                        bool joinsNext = index + 1 < _model.BytesPerRow && position + 1 < _document.Length
                             && (selected ? position + 1 < selectionEnd : (highlight != null && highlight.Contains(position + 1)));
                         int fillWidth = joinsNext ? HexCellX(index + 1) - HexCellX(index) : _charWidth * 2;
                         Brush background = selected
@@ -1798,13 +1307,13 @@ public sealed class HexEditorControl : Control
                         byte value = _document[position];
                         Color color = selected ? selectionTextBrush.Color : (changed ? changedTextBrush.Color : ByteTextColor(value));
                         TextRenderer.DrawText(graphics, value.ToString("X2", CultureInfo.InvariantCulture), Font, new Point(x, y + textYOffset), color, TextFlags);
-                        if (Focused && _caretVisible && _caretOffset == position && _area == EditArea.Hex && !selected)
+                        if (Focused && _caretVisible && _model.CaretOffset == position && _model.Area == HexEditArea.Hex && !selected)
                         {
-                            int caretX = x + _nibble * _charWidth;
+                            int caretX = x + _model.Nibble * _charWidth;
                             graphics.FillRectangle(caretBrush, caretX, y + _rowHeight - 2, _charWidth, 2);
                         }
                         int asciiX = _asciiStart - _scrollX + index * _charWidth;
-                        if (Focused && _caretVisible && _caretOffset == position && _area == EditArea.Ascii && !selected)
+                        if (Focused && _caretVisible && _model.CaretOffset == position && _model.Area == HexEditArea.Ascii && !selected)
                         {
                             graphics.FillRectangle(caretBrush, asciiX, y + _rowHeight - 2, _charWidth, 2);
                         }
@@ -1820,14 +1329,14 @@ public sealed class HexEditorControl : Control
                 {
                     TextRenderer.DrawText(graphics, "The file is empty. Type hexadecimal digits to add bytes.", Font, new Point(Margin - _scrollX, _headerHeight + textYOffset), dimBrush.Color, TextFlags);
                 }
-                if (Focused && _caretVisible && _caretOffset == _document.Length)
+                if (Focused && _caretVisible && _model.CaretOffset == _document.Length)
                 {
-                    int row = _caretOffset / _bytesPerRow;
-                    int column = _caretOffset % _bytesPerRow;
+                    int row = _model.CaretOffset / _model.BytesPerRow;
+                    int column = _model.CaretOffset % _model.BytesPerRow;
                     if (row >= _firstRow)
                     {
                         int y = _headerHeight + (row - _firstRow) * _rowHeight;
-                        int x = (_area == EditArea.Ascii)
+                        int x = (_model.Area == HexEditArea.Ascii)
                             ? _asciiStart - _scrollX + column * _charWidth
                             : HexCellX(column) - _scrollX;
                         graphics.FillRectangle(caretBrush, x, y + _rowHeight - 2, _charWidth, 2);
@@ -1868,9 +1377,9 @@ public sealed class HexEditorControl : Control
         int row = (point.Y - _headerHeight) / Math.Max(1, _rowHeight) + _firstRow;
         int x = point.X + _scrollX;
         int column = -1;
-        if (x >= _hexStart && x < HexCellX(_bytesPerRow))
+        if (x >= _hexStart && x < HexCellX(_model.BytesPerRow))
         {
-            for (int index = 0; index < _bytesPerRow; index++)
+            for (int index = 0; index < _model.BytesPerRow; index++)
             {
                 if (x >= HexCellX(index) && x < HexCellX(index) + 2 * _charWidth)
                 {
@@ -1879,7 +1388,7 @@ public sealed class HexEditorControl : Control
                 }
             }
         }
-        else if (x >= _asciiStart && x < _asciiStart + _bytesPerRow * _charWidth)
+        else if (x >= _asciiStart && x < _asciiStart + _model.BytesPerRow * _charWidth)
         {
             column = (x - _asciiStart) / Math.Max(1, _charWidth);
         }
@@ -1887,15 +1396,15 @@ public sealed class HexEditorControl : Control
         {
             return -1;
         }
-        int offset = row * _bytesPerRow + column;
+        int offset = row * _model.BytesPerRow + column;
         return (offset < _document.Length) ? offset : -1;
     }
 
-    private int OffsetFromPoint(Point point, out EditArea area, out int nibble)
+    private int OffsetFromPoint(Point point, out HexEditArea area, out int nibble)
     {
         int row = Math.Max(0, (point.Y - _headerHeight) / Math.Max(1, _rowHeight) + _firstRow);
         int x = point.X + _scrollX;
-        area = EditArea.Hex;
+        area = HexEditArea.Hex;
         nibble = 0;
         int column;
         if (x < _hexStart)
@@ -1905,8 +1414,8 @@ public sealed class HexEditorControl : Control
         else if (x < _asciiStart)
         {
             // The gap after a byte belongs to it: a click there puts the caret on its low digit.
-            column = _bytesPerRow - 1;
-            for (int index = 0; index < _bytesPerRow; index++)
+            column = _model.BytesPerRow - 1;
+            for (int index = 0; index < _model.BytesPerRow; index++)
             {
                 if (x < HexCellX(index + 1))
                 {
@@ -1918,10 +1427,10 @@ public sealed class HexEditorControl : Control
         }
         else
         {
-            area = EditArea.Ascii;
-            column = Math.Max(0, Math.Min(_bytesPerRow - 1, (x - _asciiStart) / Math.Max(1, _charWidth)));
+            area = HexEditArea.Ascii;
+            column = Math.Max(0, Math.Min(_model.BytesPerRow - 1, (x - _asciiStart) / Math.Max(1, _charWidth)));
         }
-        return Math.Max(0, Math.Min(row * _bytesPerRow + column, _document.Length));
+        return Math.Max(0, Math.Min(row * _model.BytesPerRow + column, _document.Length));
     }
 
     private void OnScrollBarChanged()
@@ -1952,7 +1461,7 @@ public sealed class HexEditorControl : Control
 
     private void EnsureVisible()
     {
-        int row = Math.Min(RowCount - 1, _caretOffset / _bytesPerRow);
+        int row = Math.Min(RowCount - 1, _model.CaretOffset / _model.BytesPerRow);
         int visibleRows = VisibleRows;
         if (row < _firstRow)
         {
@@ -1978,12 +1487,12 @@ public sealed class HexEditorControl : Control
 
     private int CaretX()
     {
-        int column = _caretOffset % _bytesPerRow;
-        if (_caretOffset >= _document.Length)
+        int column = _model.CaretOffset % _model.BytesPerRow;
+        if (_model.CaretOffset >= _document.Length)
         {
-            column = _document.Length % _bytesPerRow;
+            column = _document.Length % _model.BytesPerRow;
         }
-        return (_area == EditArea.Ascii) ? _asciiStart + column * _charWidth : HexCellX(column);
+        return (_model.Area == HexEditArea.Ascii) ? _asciiStart + column * _charWidth : HexCellX(column);
     }
 
     private void UpdateScrollBars()
@@ -2050,23 +1559,43 @@ public sealed class HexEditorControl : Control
         _rowHeight = Math.Max(1, size.Height) + 3;
         _headerHeight = _rowHeight + 4;
         _hexStart = Margin + OffsetDigits * _charWidth + 2 * _charWidth;
-        _asciiStart = HexCellX(_bytesPerRow) + 2 * _charWidth;
-        _contentWidth = _asciiStart + _bytesPerRow * _charWidth + Margin + 1;
+        _asciiStart = HexCellX(_model.BytesPerRow) + 2 * _charWidth;
+        _contentWidth = _asciiStart + _model.BytesPerRow * _charWidth + Margin + 1;
+    }
+
+    // What the model asked for after an operation (the follow-up of the old AfterContentChange and AfterCaretChange), and then what every change needs.
+    private void OnModelChanged(HexChangeEffects effects)
+    {
+        if ((effects & HexChangeEffects.ShowCaret) != 0)
+        {
+            _caretVisible = true;
+        }
+        if ((effects & HexChangeEffects.RestartCaretBlink) != 0)
+        {
+            _caretTimer.Stop();
+            _caretTimer.Start();
+        }
+        if ((effects & HexChangeEffects.EnsureCaretVisible) != 0)
+        {
+            EnsureVisible();
+        }
+        Invalidate();
+        OnStateChanged();
     }
 
     private void OnDocumentChanged(object sender, EventArgs e)
     {
-        if (_caretOffset > _document.Length)
+        if (_model.CaretOffset > _document.Length)
         {
-            _caretOffset = _document.Length;
+            _model.CaretOffset = _document.Length;
         }
-        if (_anchor > _document.Length)
+        if (_model.Anchor > _document.Length)
         {
-            _anchor = _document.Length;
+            _model.Anchor = _document.Length;
         }
-        if (_anchor == _caretOffset)
+        if (_model.Anchor == _model.CaretOffset)
         {
-            _anchor = -1;
+            _model.Anchor = -1;
         }
         UpdateScrollBars();
         Invalidate();
