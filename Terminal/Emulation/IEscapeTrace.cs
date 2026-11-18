@@ -6,6 +6,8 @@ namespace SmarTTY.Terminal.Emulation;
 /// </summary>
 public interface IEscapeTrace
 {
+    void SetPosition(int position);
+
     void SetDescription(string text);
 
     void SetWarning(string text);

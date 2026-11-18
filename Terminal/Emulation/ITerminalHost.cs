@@ -19,6 +19,12 @@ public interface ITerminalHost
     /// <summary>Byte mode: how many bytes into the character at the cursor the remote cursor is.</summary>
     int ByteOffset { set; }
 
+    /// <summary>Byte mode: forgets the partial character and the offset (a reset).</summary>
+    void ResetByteState();
+
+    /// <summary>ESC c: a full reset of the terminal that the remote side asked for (the output queued after it is still valid).</summary>
+    void ResetFromStream();
+
     void MoveForwardBytes(int bytes);
 
     void MoveBackBytes(int bytes);

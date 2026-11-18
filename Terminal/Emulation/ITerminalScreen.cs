@@ -24,8 +24,14 @@ public interface ITerminalScreen
     /// <summary>0 for the normal screen, 1 for the alternate one.</summary>
     int ActiveBufferIndex { get; set; }
 
+    /// <summary>A scroll region is set (not the whole screen).</summary>
+    bool HasScrollRegion { get; }
+
     /// <summary>The first row of the scroll region.</summary>
     int ScrollTop { get; }
+
+    /// <summary>The last row of the scroll region.</summary>
+    int ScrollBottom { get; }
 
     /// <summary>The text pushes the characters after it to the right (insert mode, CSI 4 h) instead of replacing them.</summary>
     bool InsertMode { set; }

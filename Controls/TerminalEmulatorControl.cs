@@ -259,6 +259,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             this._raw = text;
         }
 
+        void IEscapeTrace.SetPosition(int position)
+        {
+            _position = position;
+        }
+
         void IEscapeTrace.SetDescription(string text)
         {
             _description = text;
@@ -301,10 +306,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     // What the escape sequences do (the CSI commands, the OSC strings, the saved cursor); it works on this control as its screen and host.
     private readonly TerminalEmulator _emulator;
-
-    // An escape sequence (an OSC title, say) that has not ended after this many characters is dropped, so that a
-    // stray ESC ] in binary output cannot swallow everything that follows while waiting for its terminator.
-    private const int MaxPendingEscapeLength = 16384;
 
     private const int BracketedPasteMode = 2004;
 
@@ -678,7 +679,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 #else
                             EscapeTrace escapeTrace = null;
 #endif
-                            int consumed = ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
+                            int consumed = _emulator.ParseEscapeSequence(output, charIndex, out var text, escapeTrace);
                             charIndex += consumed - 1;
                             segmentStart += consumed - 1;
                             if (text != null)
@@ -756,233 +757,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             Dispatcher.PostBeep(PlayBell);
         }
-    }
-
-    private int ParseEscapeSequence(string text, int position, out string parsedText, EscapeTrace escapeTrace = null)
-    {
-        parsedText = null;
-        escapeTrace?.SetPosition(position);
-        if (position + 1 >= text.Length)
-        {
-            _modes.IncompleteEscape = text.Substring(position);
-            return 1;
-        }
-        if (text[position + 1] != '[' && text[position + 1] != ']')
-        {
-            // ESC 7/8, ESC D/E/M, ESC c and the like place the cursor on a cell boundary.
-            _byteOffset = 0;
-        }
-        switch (text[position + 1])
-        {
-            case ']':
-                {
-                    int consumed = ParseControlString(text, position, out string content, escapeTrace);
-                    if (content != null)
-                    {
-                        _emulator.ExecuteOsc(content, escapeTrace);
-                    }
-                    return consumed;
-                }
-            case 'P':
-            case 'X':
-            case '^':
-            case '_':
-                // DCS, SOS, PM and APC strings are not supported, but their contents must not be shown as text.
-                escapeTrace?.SetDescription("Ignored control string");
-                return ParseControlString(text, position, out _, escapeTrace);
-            case '[':
-                {
-                    switch (AnsiEscapeUtils.ScanCsi(text, position + 2, out int csiEnd))
-                    {
-                        case CsiScanResult.Incomplete:
-                            escapeTrace?.SetWarning("Invalid CSI");
-                            return KeepIncompleteEscape(text, position, escapeTrace);
-                        case CsiScanResult.Cancelled:
-                            // Cut short by ESC or a control character: that one is dealt with as the next thing in the stream.
-                            escapeTrace?.SetWarning("CSI cancelled");
-                            return csiEnd - position;
-                    }
-                    ExecuteCsiSequence(text[csiEnd], text.Substring(position + 2, csiEnd - position - 2), escapeTrace);
-                    return csiEnd - position + 1;
-                }
-            case ' ':
-            case '#':
-            case '%':
-            case '(':
-            case ')':
-            case '*':
-            case '+':
-                if (text.Length - position < 3)
-                {
-                    _modes.IncompleteEscape = text.Substring(position);
-                    return _modes.IncompleteEscape.Length;
-                }
-                if (AnsiEscapeUtils.InterruptsEscape(text[position + 2]))
-                {
-                    // ESC ( cut short by ESC or a control character: that one is no final character, it is not swallowed.
-                    escapeTrace?.SetWarning("Escape sequence cut short");
-                    return 2;
-                }
-                if (text[position + 1] == '(' || text[position + 1] == ')')
-                {
-                    // Character set designation: ESC ( 0 = DEC Special Graphics (line drawing) for G0, ESC ( B = ASCII.
-                    _charsets.Designate(text[position + 1], text[position + 2]);
-                }
-                escapeTrace?.SetRaw("[ESC]" + text.Substring(position, 2));
-                return 3;
-            case '>':
-                _modes.ApplicationKeypad = false;
-                escapeTrace?.SetDescription("DECPNM");
-                return 2;
-            case '=':
-                _modes.ApplicationKeypad = true;
-                escapeTrace?.SetDescription("DECPNM");
-                return 2;
-            case '7':
-                escapeTrace?.SetDescription("Save cursor");
-                _emulator.SaveCursor();
-                return 2;
-            case '8':
-                escapeTrace?.SetDescription("Restore cursor");
-                _emulator.RestoreCursor();
-                return 2;
-            case 'H':
-                escapeTrace?.SetDescription("Set tab");
-                Tabs.SetStop(base.CursorPosition.X);
-                return 2;
-            case 'c':
-                escapeTrace?.SetDescription("Reset");
-                ResetFromStream();
-                return 2;
-            case 'D':
-                escapeTrace?.SetDescription("Remove lines");
-                if (base.HasScrollRegion && base.CursorPosition.Y == ScrollBottom)
-                {
-                    ScrollRegionUp(base.ScrollTop, 1);
-                }
-                else
-                {
-                    MoveCursorBy(0, 1, scroll: true);
-                }
-                return 2;
-            case 'M':
-                escapeTrace?.SetDescription("Add lines");
-                if (base.CursorPosition.Y == base.ScrollTop)
-                {
-                    InsertBlankLines(base.ScrollTop, 1);
-                }
-                else
-                {
-                    MoveCursorBy(0, -1, scroll: true);
-                }
-                return 2;
-            case 'E':
-                escapeTrace?.SetDescription("Got to next line");
-                MoveCursorBy(-base.CursorPosition.X, 1, scroll: true);
-                return 2;
-            default:
-                if (AnsiEscapeUtils.InterruptsEscape(text[position + 1]))
-                {
-                    // ESC ESC starts the next sequence, ESC CR is an ESC and a CR: only this ESC goes.
-                    escapeTrace?.SetWarning("Lone ESC");
-                    return 1;
-                }
-                return 2;
-        }
-    }
-
-    /// <summary>
-    /// Keeps an escape sequence that has not ended yet for the next chunk of output, or drops its ESC once it has
-    /// grown beyond <see cref="MaxPendingEscapeLength"/>, so the rest is shown as text instead of being swallowed.
-    /// Returns the number of characters consumed.
-    /// </summary>
-    private int KeepIncompleteEscape(string text, int position, EscapeTrace escapeTrace)
-    {
-        if (text.Length - position > MaxPendingEscapeLength)
-        {
-            escapeTrace?.SetWarning("Unterminated escape sequence dropped");
-            return 1;
-        }
-        _modes.IncompleteEscape = text.Substring(position);
-        return _modes.IncompleteEscape.Length;
-    }
-
-    /// <summary>
-    /// Parses an OSC/DCS-style string (ESC x ... BEL or ESC x ... ESC \). As in xterm, CAN or SUB cancel the string
-    /// and an ESC that does not start the terminator aborts it and begins the next sequence.
-    /// <paramref name="content"/> receives the text between the introducer and the terminator, or null when the
-    /// string was cancelled or is not complete yet. Returns the number of characters consumed.
-    /// </summary>
-    private int ParseControlString(string text, int position, out string content, EscapeTrace escapeTrace)
-    {
-        content = null;
-        for (int index = position + 2; index < text.Length; index++)
-        {
-            char ch = text[index];
-            if (ch == '\a')
-            {
-                content = text.Substring(position + 2, index - position - 2);
-                return index - position + 1;
-            }
-            if (ch == '\u0018' || ch == '\u001a')
-            {
-                return index - position + 1;
-            }
-            if (ch == '\u001b')
-            {
-                if (index + 1 >= text.Length)
-                {
-                    break;
-                }
-                if (text[index + 1] == '\\')
-                {
-                    content = text.Substring(position + 2, index - position - 2);
-                    return index - position + 2;
-                }
-                escapeTrace?.SetWarning("Control string aborted by ESC");
-                return index - position;
-            }
-        }
-        escapeTrace?.SetWarning("Invalid ST/BEL");
-        return KeepIncompleteEscape(text, position, escapeTrace);
-    }
-
-    /// <summary>
-    /// Splits a CSI sequence into its private prefix (? > = <), parameters and intermediate bytes before running it.
-    /// Sequences with a prefix other than '?' or with intermediates are xterm extensions that mostly are not
-    /// supported; they must not be run as the standard sequence with the same final character
-    /// (vim's "CSI > 4 ; 2 m" is not an SGR reset, "CSI 2 SP q" is not a scroll-region command).
-    /// </summary>
-    private void ExecuteCsiSequence(char final, string body, EscapeTrace escapeTrace)
-    {
-        char prefix = '\0';
-        if (body.Length > 0 && body[0] >= '<' && body[0] <= '?')
-        {
-            prefix = body[0];
-            body = body.Substring(1);
-        }
-        int intermediateStart = body.Length;
-        while (intermediateStart > 0 && body[intermediateStart - 1] >= ' ' && body[intermediateStart - 1] <= '/')
-        {
-            intermediateStart--;
-        }
-        string intermediates = body.Substring(intermediateStart);
-        body = body.Substring(0, intermediateStart);
-        if (intermediates.Length != 0)
-        {
-            if (prefix == '\0' && intermediates == "!" && final == 'p')
-            {
-                escapeTrace?.SetDescription("Soft reset");
-                SoftReset();
-            }
-            return;
-        }
-        if (prefix != '\0' && prefix != '?')
-        {
-            escapeTrace?.SetDescription($"Ignored private CSI {prefix}{body}{final}");
-            return;
-        }
-        _emulator.ExecuteCsi(final, body.Split(';'), prefix == '?', escapeTrace);
     }
 
     private void ResetByteState()
@@ -1231,25 +1005,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             result.Append(text);
         }
         return result.ToString();
-    }
-
-    /// <summary>DECSTR: resets the modes and attributes, but keeps the screen contents and the cursor position.</summary>
-    private void SoftReset()
-    {
-        Point cursor = base.CursorPosition;
-        ClearScrollRegion();
-        base.CursorPosition = cursor;
-        ResetModes();
-    }
-
-    private void ResetModes()
-    {
-        ResetByteState();
-        _modes.Reset();
-        _insertMode = false;
-        HideCaret = false;
-        MouseMode = MouseReportingMode.Off;
-        CurrentStyle = CellStyle.Default;
     }
 
     private void ResetFromStream()
@@ -2009,7 +1764,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         ClearScrollRegion();
         Tabs = new TabStops();
         base.Reset();
-        ResetModes();
+        _emulator.ResetModes();
         if (!_resetFromStream)
         {
             // Output queued after an ESC c from the remote side still has to be shown; only a reset requested
