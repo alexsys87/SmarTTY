@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/Emulation/*.cs" Exclude="../../Terminal/Emulation/LineInfo.cs;../../Terminal/Emulation/LineInfoStore.cs;../../Terminal/Emulation/ScreenBuffer.cs;../../Terminal/Emulation/ILineInfoHost.cs;../../Terminal/Emulation/LinkTracker.cs" />
+    <Compile Include="../../Terminal/CsiRepeatLimit.cs" Link="CsiRepeatLimit.cs" />
+    <Compile Include="../../Terminal/DecCharsets.cs" Link="DecCharsets.cs" />
+    <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
+    <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
+    <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+  </ItemGroup>
+</Project>

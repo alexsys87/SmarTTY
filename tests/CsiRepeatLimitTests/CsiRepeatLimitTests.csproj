@@ -8,6 +8,6 @@
   <ItemGroup>
     <Compile Include="../../Terminal/CsiRepeatLimit.cs" Link="CsiRepeatLimit.cs" />
     <!-- The emulator is read as text: the limit must be applied before the commands are carried out. -->
-    <AssemblyMetadata Include="EmulatorSource" Value="$(MSBuildProjectDirectory)/../../Controls/TerminalEmulatorControl.cs" />
+    <AssemblyMetadata Include="EmulatorSource" Value="$(MSBuildProjectDirectory)/../../Terminal/Emulation/TerminalEmulator.cs" />
   </ItemGroup>
 </Project>

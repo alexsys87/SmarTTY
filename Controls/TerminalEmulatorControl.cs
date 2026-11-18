@@ -197,7 +197,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     /// feeds it is <see cref="ConditionalAttribute"/> on DEBUG, so a Release build neither calls nor allocates any of
     /// this and the description strings are not even compiled in.
     /// </summary>
-    internal class EscapeTrace : IDisposable
+    internal class EscapeTrace : IDisposable, IEscapeTrace
     {
         private string _warning;
 
@@ -258,6 +258,21 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         {
             this._raw = text;
         }
+
+        void IEscapeTrace.SetDescription(string text)
+        {
+            _description = text;
+        }
+
+        void IEscapeTrace.SetWarning(string text)
+        {
+            _warning = text;
+        }
+
+        void IEscapeTrace.SetRaw(string text)
+        {
+            _raw = text;
+        }
     }
 
     public delegate void TerminalSizeChangedHandler(TerminalEmulatorControl terminalEmulatorControl, int columns, int rows);
@@ -272,16 +287,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public delegate void TerminalDataHandler(object sender, byte[] buffer, InputKind inputKind);
 
-    public enum MouseReportingMode
-    {
-        Off = 0,
-        X10 = 9,
-        Normal = 1000,
-        Highlight = 1001,
-        ButtonEvent = 1002,
-        AnyEvent = 1003
-    }
-
     private XTermKeyMap _keyMap;
 
     public const string TerminalType = "xterm";
@@ -293,6 +298,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     // The state that the escape sequences set and that is not the screen: the modes, the character sets, the saved cursor and the start of
     // an escape sequence that has not arrived whole.
     private readonly TerminalModes _modes = new TerminalModes();
+
+    // What the escape sequences do (the CSI commands, the OSC strings, the saved cursor); it works on this control as its screen and host.
+    private readonly TerminalEmulator _emulator;
 
     // An escape sequence (an OSC title, say) that has not ended after this many characters is dropped, so that a
     // stray ESC ] in binary output cannot swallow everything that follows while waiting for its terminator.
@@ -561,6 +569,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public TerminalEmulatorControl()
     {
+        _emulator = new TerminalEmulator(this, this, _modes);
         InitializeComponent();
         Disposed += (object sender, EventArgs e) => _pasteJob?.Abort();
         ((TextEditorControl)this).CopyLineWhenNoSelection = false;
@@ -770,7 +779,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                     int consumed = ParseControlString(text, position, out string content, escapeTrace);
                     if (content != null)
                     {
-                        ExecuteOsc(content, escapeTrace);
+                        _emulator.ExecuteOsc(content, escapeTrace);
                     }
                     return consumed;
                 }
@@ -831,11 +840,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 return 2;
             case '7':
                 escapeTrace?.SetDescription("Save cursor");
-                SaveCursor();
+                _emulator.SaveCursor();
                 return 2;
             case '8':
                 escapeTrace?.SetDescription("Restore cursor");
-                RestoreCursor();
+                _emulator.RestoreCursor();
                 return 2;
             case 'H':
                 escapeTrace?.SetDescription("Set tab");
@@ -973,403 +982,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             escapeTrace?.SetDescription($"Ignored private CSI {prefix}{body}{final}");
             return;
         }
-        ExecuteCsi(final, body.Split(';'), prefix == '?', escapeTrace);
-    }
-
-    internal bool ExecuteCsi(char ch, string[] items, bool set, EscapeTrace escapeTrace = null)
-    {
-        if ("CDJKmXP@hlnc".IndexOf(ch) == -1)
-        {
-            // Every other command that moves the cursor puts it on a cell boundary (byte mode).
-            _byteOffset = 0;
-        }
-        escapeTrace?.SetRaw(string.Format("Unknown CSI command: {2}{0}, DEC={1}", ch, set, string.Join(";", items)));
-        int count = 0;
-        int repeatCount = 1;
-        if (items.Length != 0 && int.TryParse(items[0], out count) && count > 0)
-        {
-            // A count of 0 means 1, as an omitted one does.
-            repeatCount = count;
-        }
-        // The count is the remote side's to choose, up to int.MaxValue: it is cut to what the screen can use (see CsiRepeatLimit).
-        repeatCount = CsiRepeatLimit.Clamp(ch, repeatCount, _visibleRows, _visibleColumns);
-        switch (ch)
-        {
-            case '@':
-                InsertChars(repeatCount);
-                escapeTrace?.SetDescription($"Insert char at {repeatCount}");
-                return true;
-            case 'A':
-                escapeTrace?.SetDescription($"Go up {repeatCount}");
-                MoveCursorBy(0, -repeatCount);
-                return true;
-            case 'B':
-                escapeTrace?.SetDescription($"Go down {repeatCount}");
-                MoveCursorBy(0, repeatCount);
-                return true;
-            case 'C':
-                escapeTrace?.SetDescription($"Go right {repeatCount}");
-                if (ByteColumnsActive)
-                {
-                    MoveForwardBytes(repeatCount);
-                }
-                else
-                {
-                    MoveCursorBy(repeatCount, 0);
-                }
-                return true;
-            case 'D':
-                escapeTrace?.SetDescription($"Go left {repeatCount}");
-                if (ByteColumnsActive)
-                {
-                    MoveBackBytes(repeatCount);
-                }
-                else
-                {
-                    MoveCursorBy(-repeatCount, 0);
-                }
-                return true;
-            case 'E':
-                escapeTrace?.SetDescription($"Go to start of relative line {repeatCount}");
-                MoveCursorBy(-base.CursorPosition.X, repeatCount);
-                return true;
-            case 'F':
-                escapeTrace?.SetDescription($"Go to start of relative line -{repeatCount}");
-                MoveCursorBy(-base.CursorPosition.X, -repeatCount);
-                return true;
-            case 'G':
-            case '`':
-                escapeTrace?.SetDescription($"Set X= {repeatCount}");
-                base.CursorPosition = new Point(repeatCount - 1, base.CursorPosition.Y);
-                return true;
-            case 'H':
-            case 'f':
-                {
-                    int[] coordinates = CsiParameters.Parse(items, 1, 1);
-                    escapeTrace?.SetDescription($"GOTOXY {coordinates[1]}, {coordinates[0]}");
-                    base.CursorPosition = new Point(coordinates[1] - 1, coordinates[0] - 1);
-                    return true;
-                }
-            case 'd':
-                escapeTrace?.SetDescription($"Set Y= {repeatCount}");
-                base.CursorPosition = new Point(base.CursorPosition.X, repeatCount - 1);
-                return true;
-            case 'I':
-                {
-                    escapeTrace?.SetDescription($"Go {repeatCount} tabs");
-                    for (int tabIndex = 0; tabIndex < repeatCount; tabIndex++)
-                    {
-                        MoveCursorBy(Tabs.NextDistance(base.CursorPosition.X, _tabWidth), 0);
-                    }
-                    return true;
-                }
-            case 'J':
-                escapeTrace?.SetDescription($"Erase terminal {(EraseMode)count}");
-                if ((uint)count <= 2u)
-                {
-                    EraseInDisplay((EraseMode)count);
-                }
-                InvalidateView();
-                return true;
-            case 'K':
-                escapeTrace?.SetDescription($"Erase line {(EraseMode)count}");
-                if ((uint)count <= 2u)
-                {
-                    EraseInLine((EraseMode)count);
-                }
-                InvalidateView();
-                return true;
-            case 'L':
-                escapeTrace?.SetDescription($"Insert {repeatCount} lines");
-                InsertBlankLines(base.CursorPosition.Y, repeatCount);
-                return true;
-            case 'M':
-                escapeTrace?.SetDescription($"Remove {repeatCount} lines");
-                ScrollRegionUp(base.CursorPosition.Y, repeatCount);
-                return true;
-            case 'P':
-                escapeTrace?.SetDescription($"Erase {repeatCount} chars");
-                DeleteChars(repeatCount);
-                return true;
-            case 'S':
-                escapeTrace?.SetDescription($"Remove {repeatCount} lines from clip region top");
-                ScrollRegionUp(base.ScrollTop, repeatCount);
-                return true;
-            case 'T':
-                escapeTrace?.SetDescription($"Insert {repeatCount} lines to clip region top");
-                InsertBlankLines(base.ScrollTop, repeatCount);
-                return true;
-            case 'X':
-                {
-                    // ECH erases up to the end of the line, it never wraps onto the next one.
-                    int eraseCount = Math.Min(repeatCount, _visibleColumns - base.CursorPosition.X);
-                    escapeTrace?.SetDescription($"Pad {eraseCount} chars");
-                    if (eraseCount > 0)
-                    {
-                        WriteAt(base.CursorPosition, new string(' ', eraseCount), CurrentStyle);
-                    }
-                    return true;
-                }
-            case 'Z':
-                {
-                    escapeTrace?.SetDescription($"Go {repeatCount} tabs back");
-                    for (int backTabIndex = 0; backTabIndex < repeatCount; backTabIndex++)
-                    {
-                        MoveCursorBy(-Tabs.PreviousDistance(base.CursorPosition.X), 0);
-                    }
-                    return true;
-                }
-            case 'b':
-                escapeTrace?.SetDescription("Clone char");
-                RepeatPreviousChar(repeatCount);
-                return true;
-            case 'g':
-                escapeTrace?.SetDescription("Clear/reset tab");
-                switch (count)
-                {
-                    case 0:
-                        Tabs.ClearStop(base.CursorPosition.X);
-                        break;
-                    case 3:
-                        Tabs.ClearAll();
-                        break;
-                }
-                return true;
-            case 'm':
-                if (!set)
-                {
-                    SgrStyle.Apply(ref CurrentStyle, XtermProtocol.ParseSgr(items));
-                    escapeTrace?.SetDescription($"SGR: {CurrentStyle}");
-                }
-                return true;
-            case 'n':
-                if (!set)
-                {
-                    ReportStatus(count, escapeTrace);
-                }
-                return true;
-            case 'c':
-                if (!set && count == 0)
-                {
-                    // Primary device attributes: a VT100 with advanced video option, as xterm reports by default.
-                    escapeTrace?.SetDescription("Device attributes");
-                    SendReply("\u001b[?1;2c");
-                }
-                return true;
-            case 'u':
-                if (!set)
-                {
-                    escapeTrace?.SetDescription("Restore cursor (SCORC)");
-                    RestoreCursor();
-                }
-                return true;
-            case 'h':
-            case 'l':
-                {
-                    string[] sgrParameters = items;
-                    for (int sgrParameterIndex = 0; sgrParameterIndex < sgrParameters.Length; sgrParameterIndex++)
-                    {
-                        if (int.TryParse(sgrParameters[sgrParameterIndex], out var mode))
-                        {
-                            SetMode(mode, set, ch == 'h', escapeTrace);
-                            if (set)
-                            {
-                                _privateModes.Set(mode, ch == 'h');
-                            }
-                        }
-                    }
-                    return true;
-                }
-            case 's':
-                escapeTrace?.SetDescription("Save features: " + string.Join(";", items));
-                if (!set)
-                {
-                    // SCOSC: the ANSI.SYS form of "save cursor".
-                    SaveCursor();
-                }
-                else
-                {
-                    string[] modeParameters = items;
-                    for (int modeParameterIndex = 0; modeParameterIndex < modeParameters.Length; modeParameterIndex++)
-                    {
-                        if (int.TryParse(modeParameters[modeParameterIndex], out var modeValue))
-                        {
-                            _privateModes.Save(modeValue);
-                        }
-                    }
-                }
-                return true;
-            case 'r':
-                if (set)
-                {
-                    escapeTrace?.SetDescription("Restore features: " + string.Join(";", items));
-                    string[] savedModeParameters = items;
-                    for (int savedModeParameterIndex = 0; savedModeParameterIndex < savedModeParameters.Length; savedModeParameterIndex++)
-                    {
-                        if (int.TryParse(savedModeParameters[savedModeParameterIndex], out var savedModeValue) && _privateModes.TryGetSaved(savedModeValue, out bool savedEnabled))
-                        {
-                            SetMode(savedModeValue, set: true, savedEnabled, escapeTrace);
-                            _privateModes.Set(savedModeValue, savedEnabled);
-                        }
-                    }
-                }
-                else
-                {
-                    // DECSTBM: an omitted (or 0) top is the first line, an omitted bottom the last one.
-                    int rows = _visibleRows;
-                    if (items.Length < 1 || !int.TryParse(items[0], out var top) || top < 1)
-                    {
-                        top = 1;
-                    }
-                    if (items.Length < 2 || !int.TryParse(items[1], out var bottom) || bottom < 1 || bottom > rows)
-                    {
-                        bottom = rows;
-                    }
-                    if (top == 1 && bottom == rows)
-                    {
-                        escapeTrace?.SetDescription("Reset clip region");
-                        ClearScrollRegion();
-                    }
-                    else if (top < bottom)
-                    {
-                        escapeTrace?.SetDescription($"Set clip region to {top}..{bottom}");
-                        SetScrollRegion(top - 1, bottom - 1);
-                    }
-                }
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private void SetMode(int mode, bool set, bool enabled, EscapeTrace escapeTrace)
-    {
-        escapeTrace?.SetDescription($"Terminal feature: {CurrentStyle}");
-        if (set)
-        {
-            switch (mode)
-            {
-                case 1:
-                    _modes.ApplicationCursorKeys = enabled;
-                    break;
-                case 25:
-                    HideCaret = !enabled;
-                    break;
-                case 47:
-                    base.ActiveBufferIndex = (enabled ? 1 : 0);
-                    break;
-                case 1047:
-                    // Alternate screen, cleared when it is left.
-                    if (!enabled && base.ActiveBufferIndex == 1)
-                    {
-                        ClearActiveScreen();
-                    }
-                    base.ActiveBufferIndex = (enabled ? 1 : 0);
-                    break;
-                case 1048:
-                    if (enabled)
-                    {
-                        SaveCursor();
-                    }
-                    else
-                    {
-                        RestoreCursor();
-                    }
-                    break;
-                case 1049:
-                    // Alternate screen, cleared when it is entered. The cursor starts where it was on the normal
-                    // screen, and the normal screen gets its own cursor back when the program leaves (each buffer
-                    // keeps its cursor, so an ESC 7 issued by the program cannot move it).
-                    if (enabled)
-                    {
-                        Point cursor = base.CursorPosition;
-                        SaveCursor();
-                        if (base.ActiveBufferIndex != 1)
-                        {
-                            base.ActiveBufferIndex = 1;
-                        }
-                        ClearActiveScreen();
-                        base.CursorPosition = cursor;
-                    }
-                    else if (base.ActiveBufferIndex != 0)
-                    {
-                        base.ActiveBufferIndex = 0;
-                    }
-                    break;
-                case 9:
-                case 1000:
-                case 1001:
-                case 1002:
-                case 1003:
-                    if (enabled)
-                    {
-                        MouseMode = (MouseReportingMode)mode;
-                    }
-                    else
-                    {
-                        MouseMode = MouseReportingMode.Off;
-                    }
-                    break;
-            }
-        }
-        else if (mode == 4)
-        {
-            _insertMode = enabled;
-        }
-    }
-
-    private bool ExecuteOsc(string content, EscapeTrace escapeTrace)
-    {
-        escapeTrace?.SetDescription("OSC");
-        if (!OscString.TryParse(content, out int command, out string text))
-        {
-            return false;
-        }
-        if (command == 7)
-        {
-            // The directory of the shell (the prompt of bash and zsh sends it on many systems).
-            string directory = TerminalDirectoryWatcher.UnixDirectoryOfOsc(command, text);
-            if (directory != null)
-            {
-                ReportedDirectory = directory;
-            }
-            return directory != null;
-        }
-        // 0 sets the icon name and the title, 2 the title only; 1 (the icon name alone) does not touch the title.
-        if (command == 0 || command == 2)
-        {
-            base.Title = OscString.TitleText(text);
-            return true;
-        }
-        return false;
-    }
-
-    private void ReportStatus(int request, EscapeTrace escapeTrace)
-    {
-        switch (request)
-        {
-            case 5:
-                escapeTrace?.SetDescription("Status report");
-                SendReply("\u001b[0n");
-                break;
-            case 6:
-                {
-                    // Cursor position report; at the pending-wrap position the cursor is still on the last column.
-                    escapeTrace?.SetDescription("Cursor position report");
-                    Point cursor = base.CursorPosition;
-                    int column = Math.Min(cursor.X, Math.Max(_visibleColumns - 1, 0));
-                    SendReply($"\u001b[{cursor.Y + 1};{column + 1}R");
-                    break;
-                }
-        }
-    }
-
-    private void SendReply(string reply)
-    {
-        if (!SuppressReplies)
-        {
-            SendText(reply, InputKind.KeySequence);
-        }
+        _emulator.ExecuteCsi(final, body.Split(';'), prefix == '?', escapeTrace);
     }
 
     private void ResetByteState()
@@ -1618,18 +1231,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             result.Append(text);
         }
         return result.ToString();
-    }
-
-    private void SaveCursor()
-    {
-        _modes.SavedCursor = base.CursorPosition.ToGridPoint();
-        _modes.SavedStyle = CurrentStyle;
-    }
-
-    private void RestoreCursor()
-    {
-        base.CursorPosition = _modes.SavedCursor.ToPoint();
-        CurrentStyle = _modes.SavedStyle;
     }
 
     /// <summary>DECSTR: resets the modes and attributes, but keeps the screen contents and the cursor position.</summary>

@@ -581,7 +581,7 @@ public partial class DeviceTerminalControl
             this.terminalEmulatorControl1.Location = new System.Drawing.Point(0, 0);
             this.terminalEmulatorControl1.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.terminalEmulatorControl1.MaxChunkLength = 0;
-            this.terminalEmulatorControl1.MouseMode = SmarTTY.Controls.TerminalEmulatorControl.MouseReportingMode.Off;
+            this.terminalEmulatorControl1.MouseMode = SmarTTY.Terminal.Emulation.MouseReportingMode.Off;
             this.terminalEmulatorControl1.Name = "terminalEmulatorControl1";
             this.terminalEmulatorControl1.NavigationLocked = true;
             this.terminalEmulatorControl1.NoHorizontalScroll = false;
