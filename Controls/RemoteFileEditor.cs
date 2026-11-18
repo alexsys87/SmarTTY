@@ -36,12 +36,12 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     // The loading of the file (the questions about the write permission and the size, the download): its flags are the ones of the editor.
     private RemoteFileLoader _loader;
 
+    // What a save does on the server: the upload, the check, the replacement (with sudo), the clean-up.
+    private RemoteFileSaver _saver;
+
     private GlobalSettings _settings;
 
     private Action<Exception> _errorHandler;
-
-    // Permissions of the temporary copy uploaded on save: it may hold a file only root can read.
-    private const int TemporaryFileMode = 0x180; // 0600
 
     // The user's answer to "Convert CRLF line endings to LF?", so that it is asked once per file.
     private bool? _convertCrLf;
@@ -549,7 +549,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         _initialColumnUnit = initialColumnUnit;
         this._context = terminalSessionContext;
         RemotePath = text;
-        _server = new RemoteFileServer(new SessionRemoteFileHost(terminalSessionContext), text);
+        SessionRemoteFileHost host = new SessionRemoteFileHost(terminalSessionContext);
+        _server = new RemoteFileServer(host, text);
+        _saver = new RemoteFileSaver(host, _server, text, () => _loader.SudoOnSave);
         _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         _drafts = new RemoteFileDrafts(Drafts, _draftKey);
@@ -953,48 +955,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
     }
 
-    /// <summary>A save in progress: the text and the temporary file it is uploaded to.</summary>
-    private sealed class SaveJob
-    {
-        public byte[] Bytes;
-
-        public string TemporaryPath;
-
-        // A POSIX sh script (RemoteSaveCommand.BuildScript): run through PosixShell.Wrap, or through "sudo sh -c".
-        public string ReplaceCommand;
-
-        // The replacement failed and the old content could not be put back: the uploaded text and the restore copy are all there
-        // is, so they are not deleted (RemoveTemporaryFile).
-        public bool KeepTemporaryFiles;
-
-        // The text version being saved (EditableTextBrowser.CurrentVersion), or the hex version
-        // (HexDocument.CurrentVersion) when HexMode is set.
-        public object Version;
-
-        // The save came from the hex view: CompleteSave marks the hex document saved instead of the text.
-        public bool HexMode;
-
-        // Saves started later supersede this one (see _saveGeneration).
-        public int Generation;
-
-        // The user already agreed to overwrite what changed on the server.
-        public bool SkipConflictCheck;
-
-        // The command also copies the old file to file~.
-        public bool IncludesBackup;
-
-        // The file on the server after the save (RemoteFileServer.FetchSignature).
-        public string NewSignature;
-
-        // The encoding the bytes were made with: they become the file as it is on the server.
-        public TextFileEncoding Encoding;
-
-        // The check run on the uploaded file before it replaces the target (null: none), and what it found if it failed.
-        public ConfigValidator Validator;
-
-        public ValidationResult Validation;
-    }
-
     private int _saveGeneration;
 
     // Set by the background thread once its upload and replace attempt finished (successfully or not).
@@ -1040,7 +1000,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             throw new IOException("The save of " + RemotePath + " that was started earlier has not ended after " + (int)BackgroundSaveWait.TotalSeconds
                 + " seconds: the connection may not answer. Close the tab again when it has (the changes are kept in the editor until then), or choose No to give them up.");
         }
-        SaveJob job = PrepareSave();
+        RemoteSaveJob job = PrepareSave();
         // Saving on close does not run the check: the user is leaving and cannot act on what it finds.
         job.Validator = null;
         try
@@ -1050,7 +1010,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             {
                 throw new OperationCanceledException();
             }
-            if (!UploadAndReplace(job))
+            if (!_saver.UploadAndReplace(job))
             {
                 SaveWithSudo(job);
             }
@@ -1058,7 +1018,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
         finally
         {
-            RemoveTemporaryFile(job);
+            _saver.RemoveTemporaryFile(job);
         }
     }
 
@@ -1079,7 +1039,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             _saveRequestedWhileSaving = true;
             return;
         }
-        SaveJob job = PrepareSave();
+        RemoteSaveJob job = PrepareSave();
         ManualResetEvent uploadDone = new ManualResetEvent(initialState: false);
         _backgroundUploadDone = uploadDone;
         SetSaving(true);
@@ -1093,7 +1053,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
                 conflict = !job.SkipConflictCheck && _server.HasChanged(_remoteSignature, IsNewFile);
                 if (!conflict)
                 {
-                    replaced = UploadAndReplace(job);
+                    replaced = _saver.UploadAndReplace(job);
                 }
             }
             catch (Exception exception)
@@ -1111,7 +1071,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             catch
             {
                 // The editor was closed meanwhile.
-                RemoveTemporaryFile(job);
+                _saver.RemoveTemporaryFile(job);
             }
         })
         {
@@ -1121,7 +1081,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         thread.Start();
     }
 
-    private void FinishBackgroundSave(SaveJob job, bool replaced, bool conflict, Exception error, ManualResetEvent uploadDone)
+    private void FinishBackgroundSave(RemoteSaveJob job, bool replaced, bool conflict, Exception error, ManualResetEvent uploadDone)
     {
         ServiceReload reloadToOffer = null;
         try
@@ -1174,7 +1134,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
         finally
         {
-            ThreadPool.QueueUserWorkItem((object state) => RemoveTemporaryFile(job));
+            ThreadPool.QueueUserWorkItem((object state) => _saver.RemoveTemporaryFile(job));
             if (_backgroundUploadDone == uploadDone)
             {
                 _backgroundUploadDone = null;
@@ -1232,7 +1192,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     /// The check found problems in the text, so the file on the server was not replaced. Says what was found and
     /// either saves anyway (the next save skips the check) or puts the caret on the first problem (UI thread).
     /// </summary>
-    private void HandleValidationFailure(SaveJob job)
+    private void HandleValidationFailure(RemoteSaveJob job)
     {
         // How many problems get an inline message; ParseIssues caps the list at the same number.
         const int MaxInline = 50;
@@ -1286,15 +1246,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
         ThreadPool.QueueUserWorkItem((object state) =>
         {
-            List<string> output = null;
-            int? exitStatus = null;
-            try
-            {
-                output = _context.Session.RunCommand(reload.Command, out exitStatus, timeout: TimeSpan.FromSeconds(30));
-            }
-            catch
-            {
-            }
+            _saver.RunServiceReload(reload, out List<string> output, out int? exitStatus);
             try
             {
                 BeginInvoke((ThreadStart)(() => FinishReload(reload, output, exitStatus)));
@@ -1329,7 +1281,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             {
                 return;
             }
-            RunSudoCommand(reload.Command);
+            _saver.RunSudoCommand(reload.Command);
             ThemedMessageBox.Show(reload.Name + " reloaded.", "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (OperationCanceledException)
@@ -1377,7 +1329,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     /// Takes the bytes to save (UI thread), asking once whether to convert CRLF line endings that a file which did not
     /// have them has got, and whether to drop a byte order mark that breaks a script.
     /// </summary>
-    private SaveJob PrepareSave()
+    private RemoteSaveJob PrepareSave()
     {
         // The problems the previous check named are about the text as it was: the check runs again now.
         ClearMessages();
@@ -1437,7 +1389,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         {
             validator = ConfigValidators.Find(RemotePath, DetectSyntax(), base.EditableDocument.GetLineText(0));
         }
-        SaveJob job = new SaveJob
+        RemoteSaveJob job = new RemoteSaveJob
         {
             Bytes = bytes,
             TemporaryPath = temporaryPath,
@@ -1455,125 +1407,17 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         return job;
     }
 
-    /// <summary>
-    /// Uploads the text to the temporary file and copies it over the target (any thread). Returns false when
-    /// the target could not be written, so that sudo can be offered.
-    /// </summary>
-    private bool UploadAndReplace(SaveJob job)
-    {
-        if (IsWindowsHost)
-        {
-            // Written over SFTP straight into the file (with the "~" backup if the job asks for one): there is no temporary file
-            // in /tmp and no cat, and a refused write is an error, not a question about sudo.
-            SmarTTY.Transport.WindowsRemoteFileEditing.Save(_context.Session, RemotePath, job.Bytes, job.IncludesBackup);
-            job.NewSignature = _server.FetchSignature();
-            return true;
-        }
-        using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(job.TemporaryPath, job.Bytes.Length, mode: TemporaryFileMode))
-        {
-            scpChannelStream.Write(job.Bytes, 0, job.Bytes.Length);
-        }
-        if (job.Validator != null)
-        {
-            // The target is still the old file: a text that the check rejects never replaces it.
-            ValidationResult validation = RunValidation(job);
-            if (validation.Outcome == ValidationOutcome.Failed)
-            {
-                job.Validation = validation;
-                return false;
-            }
-        }
-        if (_loader.SudoOnSave)
-        {
-            // The user said at opening that this file is written with sudo: no failing plain attempt first.
-            return false;
-        }
-        List<string> replaceOutput = _context.Session.RunCommand(PosixShell.Wrap(job.ReplaceCommand), out int? replaceStatus);
-        if (replaceStatus == 0)
-        {
-            job.NewSignature = _server.FetchSignature();
-            return true;
-        }
-        if (replaceStatus.HasValue)
-        {
-            // The space ran out or the write failed: the file is as it was (or, when even that failed, the old content is kept
-            // next to the uploaded text). That is no refused write, so sudo is not offered for it.
-            string description = RemoteSaveCommand.Describe(replaceStatus.Value, replaceOutput, RemotePath, job.TemporaryPath);
-            if (description != null)
-            {
-                job.KeepTemporaryFiles = replaceStatus.Value == RemoteSaveCommand.ExitNotRestored;
-                throw new IOException(description);
-            }
-        }
-        // A lost connection is not a refused write: do not offer sudo for it.
-        try
-        {
-            _context.Session.ThrowIfConnectionLost();
-        }
-        catch (IOException)
-        {
-            throw new IOException("The connection to the server was lost while " + RemotePath + " was being written. Check the file on the server before you save again: your text is still in the editor.");
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Runs the check of the file on the uploaded copy (any thread). A check that cannot run, or that finds nothing it
-    /// can point to, does not stop the save.
-    /// </summary>
-    private ValidationResult RunValidation(SaveJob job)
-    {
-        // Through /bin/sh, as the command that replaces the file: the command is POSIX shell ("if command -v x; then ...; fi"),
-        // which fish or tcsh as the login shell of the user cannot read (the check would then never run).
-        string command = PosixShell.Wrap(job.Validator.BuildCommand(RemotePathUtils.ShellQuote(job.TemporaryPath)));
-        List<string> output = _context.Session.RunCommand(command, out int? exitStatus, timeout: TimeSpan.FromSeconds(20));
-        return job.Validator.Interpret(output, exitStatus, job.TemporaryPath);
-    }
-
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
-    private void SaveWithSudo(SaveJob job)
+    private void SaveWithSudo(RemoteSaveJob job)
     {
         if (!_loader.SudoOnSave && ThemedMessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             throw new OperationCanceledException();
         }
-        RunSudoCommand(job.ReplaceCommand, status =>
-        {
-            // What the script printed is not captured here (it goes to the terminal of the prompt), so the message has no details.
-            job.KeepTemporaryFiles |= status == RemoteSaveCommand.ExitNotRestored;
-            return RemoteSaveCommand.Describe(status, null, RemotePath, job.TemporaryPath);
-        });
+        _saver.ReplaceWithSudo(job);
     }
 
-    /// <summary>
-    /// Runs a command through sudo on a shell channel, with the password prompt of the editor (UI thread).
-    /// <paramref name="describeFailure"/> may turn an exit status into the message of the exception (null: the usual one).
-    /// </summary>
-    private void RunSudoCommand(string command, Func<int, string> describeFailure = null)
-    {
-        string sudoCommand = "sudo sh -c " + RemotePathUtils.ShellQuote(command);
-        SshShellChannel sshShellChannel = _context.Session.OpenShellChannel(sudoCommand, "xterm");
-        SudoConfirmationPrompt?.Invoke(sshShellChannel, sudoCommand);
-        try
-        {
-            sshShellChannel.Input.Write(new byte[1] { 3 }, 0, 1);
-        }
-        catch
-        {
-        }
-        sshShellChannel.WaitClosed();
-        int sudoExitStatus = sshShellChannel.ExitStatus;
-        if (!sshShellChannel.HasExitStatus && sshShellChannel.ExitSignal == null)
-        {
-            throw new Exception("Sudo did not report an exit status");
-        }
-        if (sudoExitStatus != 0)
-        {
-            throw new Exception(describeFailure?.Invoke(sudoExitStatus) ?? "Sudo exited with code " + sudoExitStatus);
-        }
-    }
-
-    private void CompleteSave(SaveJob job)
+    private void CompleteSave(RemoteSaveJob job)
     {
         // A save through sudo has no signature yet.
         _remoteSignature = job.NewSignature ?? _server.FetchSignature();
@@ -1606,27 +1450,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         {
             // Everything is on the server: the draft is of no use (a later change makes a new one).
             DiscardDraft();
-        }
-    }
-
-    private void RemoveTemporaryFile(SaveJob job)
-    {
-        if (IsWindowsHost)
-        {
-            // Nothing was uploaded to a temporary file.
-            return;
-        }
-        if (job.KeepTemporaryFiles)
-        {
-            return;
-        }
-        try
-        {
-            // The script removes its restore copy itself; this is for the case that it was cut short.
-            _context.Session.RunCommandChecked("rm -f " + RemotePathUtils.ShellQuote(job.TemporaryPath) + " " + RemotePathUtils.ShellQuote(RemoteSaveCommand.RestoreCopyPath(job.TemporaryPath)), requireSuccess: true);
-        }
-        catch
-        {
         }
     }
 }
