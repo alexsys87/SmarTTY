@@ -18,7 +18,7 @@ PR that changes them.
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
   `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
-  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
@@ -95,7 +95,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
 | 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5 (`TextSearcher` on `ISearchTarget`, the status bar on `IEditorStatusSource`) and A6 (hex editor: the net, `HexEditingModel`; the value decoding of the data inspector was already `HexValueFormats`) done; A7 (`RemoteFileEditor.Syntax.cs` → `SyntaxChoice`) done: stage 1A is finished (what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here"), next 1B |
-| 1B | Terminal emulator core out of WinForms | Planned |
+| 1B | Terminal emulator core out of WinForms | In progress: B1 (the golden snapshots of the terminal control, `tests/TerminalSnapshots`) done; next B2 (the screen types to `Terminal/Emulation/`) |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
@@ -262,6 +262,17 @@ Done in A7: the state and the rules of the syntax of a file in the remote editor
 style before the constructor runs). `tests/SyntaxChoiceTests` (net8.0) check it; the `status-source` scenario of the Mono stand drives it through the editor.
 End of stage 1A: the allowlist of the boundary check holds 5 files, all about the terminal controls (`Terminal/CompletionPopupRequest`, `Terminal/CompletionSession`,
 `Completion/ShellCompletionAnalyzer`, `Terminal/CommandRun`, `Terminal/OutputLinkScanner`: they belong to 1B/1C); nothing of the editor is on it.
+
+Done in B1 (before any move of the terminal's logic, no change in `Controls/`): `tests/TerminalSnapshots` (net48, Mono + xvfb) drives the real `TerminalEmulatorControl` (a subclass that
+counts `OnBell`) in an 80 x 24 form (the form is sized until the terminal has that size, whatever the fonts are) with 146 scripted outputs and 360 generated from a seeded random script, each fed in
+the chunks given and, for the hand-written ones, also one character at a time (the screen must come out the same). It writes down what can be seen from outside: the lines of the active buffer with the style of
+every cell (colours, bold, inverse, underline, the link target and its text, the severity of a log line), the cursor, the active buffer, the title and its events, the mouse mode, the directory the shell reported, the
+bells, the exceptions the output made (the type only), the bytes the terminal sends back (the replies to the host, 20 keys and 6 characters typed, three pastes, `TypeText`, with the questions that the paste asked caught
+through `ThemedPasteConfirm.ConfirmImpl` and `ThemedMessageBox.ShowImpl`) and what a click on each file link opens. `TerminalSnapshotsGolden.txt` (6483 lines: full dumps of the hand-written cases, one line with a hash for each generated one) was written by the code
+before the move (`--record <file>`) and is never re-recorded; a difference means the move changed the behaviour. The accessors of the test (`ActiveBuffer`, `Lines.GetLine`, `LineInfo.Cells`, `OnBell`) are the only
+things that may follow a rename. It was checked by mutation: 25 changes of the terminal code (a CSI handler, a mode, a colour code, the OSC titles, the replies, the link rules, the paste markers) each make it fail (two of them first passed and led to new cases). Not covered: the mouse
+(reports and selection), painting, scrolling by the view, resize of a terminal with content, and the Smart Terminal and device line input of `SshTerminalControl` / `SerialTerminalControl`. A bug it found, kept as it is (the golden has it): a CSI `H` or `f` with more than two
+parameters (`ESC [ 1;2;3 H`) throws `IndexOutOfRangeException` in `ParseParameters`.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
