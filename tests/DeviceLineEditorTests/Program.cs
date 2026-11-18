@@ -1,4 +1,5 @@
 using SmarTTY.Controls;
+using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -35,6 +36,66 @@ internal static class Program
         public Func<bool> Done;
 
         public int TimeoutMs = 10000;
+    }
+
+    // Stands in for the suggestion popup of the application: it keeps what the terminal gave it.
+    private sealed class TestPopup : ICompletionPopup
+    {
+        private CompletionItem[] _items = new CompletionItem[0];
+
+        private string _filter = "";
+
+        public bool IsOpen { get; private set; } = true;
+
+        public CompletionItem[] Items => _items;
+
+        public string Filter => _filter;
+
+        public event Action<CompletionItem, VirtualKey> ItemSelected;
+
+        public void Close()
+        {
+            IsOpen = false;
+        }
+
+        public void SetFilter(string text)
+        {
+            _filter = text ?? "";
+        }
+
+        public bool TryHandleKeyEvent(KeyStroke e)
+        {
+            return false;
+        }
+
+        public void DisplayException(Exception exception)
+        {
+            Console.WriteLine("  (popup) " + exception.Message);
+        }
+
+        public void SetItemList(CompletionItem[] items)
+        {
+            _items = items ?? new CompletionItem[0];
+        }
+
+        public CompletionItem GetSelectedItem(bool onlyIfPrefixMatch)
+        {
+            return _items.FirstOrDefault((CompletionItem item) => item.Text != null && item.Text.StartsWith(_filter, StringComparison.Ordinal));
+        }
+    }
+
+    private static TestPopup _popup;
+
+    private static CompletionItem PopupItem(string text)
+    {
+        return _popup?.Items.FirstOrDefault((CompletionItem item) => item.Text == text) ?? default;
+    }
+
+    private static string PopupSummary(string text)
+    {
+        CompletionItem item = PopupItem(text);
+        VirtualTerminalPopupSummary.OptionInfo info = item.Summary as VirtualTerminalPopupSummary.OptionInfo;
+        return info == null ? null : info.Description.Summary + " / " + info.Description.Info;
     }
 
     private const string ShellPrompt = "root@board:~# ";
@@ -111,6 +172,12 @@ internal static class Program
         form.Controls.Add(control);
         _control = control;
         SerialTerminalControl terminal = (SerialTerminalControl)typeof(DeviceTerminalControl).GetField("_serialTerminalControl", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+
+        terminal.CompletionPopupRequested += (object sender, CompletionPopupRequest request) =>
+        {
+            _popup = new TestPopup();
+            request.Popup = _popup;
+        };
 
         List<Step> steps = new List<Step>
         {
@@ -393,6 +460,76 @@ internal static class Program
             {
                 Name = "the line is cleared",
                 Act = () => ClearLine(terminal),
+                Done = () => InputText(terminal) == ""
+            },
+            new Step
+            {
+                // The saved commands of the device, the built-in commands of the terminal and the programs on this computer.
+                Name = "Tab on an empty line lists the saved commands, the built-in commands and the programs of this computer",
+                Act = () => Key(terminal, Keys.Tab),
+                Done = () => _popup != null && PopupItem("help").Text != null && PopupItem("settings").Text != null && PopupItem("ls -la /tmp").Text != null
+            },
+            new Step
+            {
+                Name = "the list holds a saved command once, as a saved command",
+                Done = () => _popup.Items.Count((CompletionItem item) => item.Text == "ls -la /tmp") == 1 && PopupSummary("ls -la /tmp") == "Saved command / "
+            },
+            new Step
+            {
+                Name = "a built-in command comes with its signature and its description",
+                Done = () => PopupSummary("cd") == "cd <directory> / Change the current directory" && PopupSummary("sendhex") == "sendhex <hex> / Send hexadecimal bytes to the device"
+            },
+            new Step
+            {
+                Name = "a built-in command has the icon of a command",
+                Done = () => PopupItem("baud").Icon == VirtualTerminalPopupItemIcon.Command && PopupItem("baud").InsertText == "baud"
+            },
+            new Step
+            {
+                Name = "the list holds all 30 built-in commands",
+                Done = () => new[] { "help", "clear", "history", "exit", "quit", "cd", "pwd", "ls", "dir", "cat", "type", "echo", "set", "unset", "export", "env", "send", "sendhex", "sendfile", "recv", "recvfile", "break", "reset", "reconnect", "disconnect", "log", "logstart", "logstop", "baud", "settings" }.All((string name) => PopupItem(name).Text != null)
+            },
+            new Step
+            {
+                Name = "Esc closes the list and leaves the line",
+                Act = () => Key(terminal, Keys.Escape),
+                Done = () => !_popup.IsOpen && InputText(terminal) == ""
+            },
+            new Step
+            {
+                Name = "Tab after the start of a saved command completes it",
+                Act = () =>
+                {
+                    Type(terminal, "unam");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => InputText(terminal) == "uname -a"
+            },
+            new Step
+            {
+                Name = "that list is closed after the command is completed",
+                Done = () => !_popup.IsOpen
+            },
+            new Step
+            {
+                // Only the saved commands match a word that has letters in it: the built-in ones are offered for an empty word.
+                Name = "Tab after the start of a built-in command offers nothing and leaves the line",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "hel");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => _popup != null && _popup.Filter == "hel" && _popup.Items.Length == 0 && InputText(terminal) == "hel"
+            },
+            new Step
+            {
+                Name = "the line is cleared after the completion checks",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                },
                 Done = () => InputText(terminal) == ""
             },
             new Step
