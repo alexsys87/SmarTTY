@@ -252,6 +252,7 @@ public sealed class HexEditorControl : Control
     public int CaretOffset => _caretOffset;
 
     // The ASCII column is where typing goes (set by a click there); tests/HexEditorControlTests puts the caret in it without a mouse.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     internal bool AsciiAreaActive
     {
         get
