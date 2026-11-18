@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) and the drafts (A4c: `RemoteFileDrafts`) are out, next the load |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`) and the loading thread (A4d: `RemoteFileLoader`) are out, next the save pipeline |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -195,6 +195,15 @@ run) and `CodeEditing/DraftKeyClaims.cs` (the numbered key and its lock file, wi
 the hex view, and the question "restore the draft?". `tests/RemoteFileDraftsTests` (net8.0) runs them on a real `EditorDraftStore` in a temporary
 folder; `tests/RemoteFileEditorIntegrationTests` passes unchanged. Next, A4d: the load (`LoadFile`, `FinishLoading`, `ApplyContent`) with
 `IUiDispatcher` and `IUserPrompt`, then the save pipeline.
+
+Done in A4d: the loading thread of the editor (does the file exist, the write permission and size questions, the download and its preview) is
+`CodeEditing/RemoteFileLoader.cs`. It keeps the flags the user's answers set (`IsNewFile`, `IsReadOnlyMode`, `IsPreview`, `SudoOnSave`; the
+editor's properties read and write them there) and reaches the world through three seams from real call sites: `IUserPrompt` (the question asked
+from the thread, `Controls/ControlUserPrompt`), `IUiDispatcher` (`Post`, `Controls/ControlUiDispatcher`, which also waits for the window handle) and
+`IRemoteFileLoadView` (reload or not, tab closed, and what the thread tells the editor: preview, finish, cancelled, failed; the editor implements it
+explicitly). `tests/RemoteFileLoaderTests` (net8.0) drives it with a fake connection, user and UI thread, including the questions that the Mono
+stand cannot ask (no write permission, large files). `FinishLoading` and `ApplyContent` stay in the editor for now: they work on the document, the
+caret, the hex view and the folds. Next, A4e: the save pipeline (`PrepareSave`, `UploadAndReplace`, validation, sudo, `CompleteSave`).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
