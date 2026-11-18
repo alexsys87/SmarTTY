@@ -356,7 +356,7 @@ jobs:
         run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
       - name: Install Mono and a virtual display for the Smart Terminal checks
-        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libmono-windowsbase4.0-cil libgdiplus xvfb
+        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libmono-windowsbase4.0-cil libmono-i18n4.0-all libgdiplus xvfb
 
       - name: Build the Smart Terminal checks
         run: dotnet build tests/SmartTerminalIntegrationTests -c Release
@@ -375,6 +375,12 @@ jobs:
 
       - name: Run the COM/TCP input line checks (history suggestions and Up/Down by prefix, the real control over TCP, under Mono)
         run: xvfb-run -a mono tests/DeviceLineEditorTests/bin/Release/net48/DeviceLineEditorTests.exe
+
+      - name: Build the remote file editor checks
+        run: dotnet build tests/RemoteFileEditorIntegrationTests -c Release
+
+      - name: Run the remote file editor checks (the real editor loads, changes, saves and reloads files on OpenSSH and Dropbear, under Mono)
+        run: xvfb-run -a mono tests/RemoteFileEditorIntegrationTests/bin/Release/net48/RemoteFileEditorIntegrationTests.exe
 
       - name: Build the model interop checks
         run: dotnet build tests/ModelInteropTests -c Release
