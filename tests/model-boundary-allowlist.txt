@@ -5,11 +5,6 @@
 # listed but already clean (or gone), so the list cannot go stale. A new file must never be added: keep the logic folders
 # free of UI types instead (see "Stage 1 rules" in CLAUDE.md).
 #
-# The list of the stage 1 specification (section 6.1).
-Terminal/CompletionPopupRequest.cs
-Terminal/CompletionSession.cs
-#
-# Found when the check was added, not in the table of the specification: these files use the terminal controls
-# (SshTerminalControl, TerminalEmulatorBase) of SmarTTY.Controls. They go with the terminal work (stages 1B and 1C).
-Completion/ShellCompletionAnalyzer.cs
-Terminal/CommandRun.cs
+# Empty since stage 1C (C1): the four files that were listed (the completion of a command line, its popup request, the run of a
+# command and the shell analyzer) reach the Smart Terminal through ISmartTerminalHost and ICommandRunHost. A new file must never
+# be added.

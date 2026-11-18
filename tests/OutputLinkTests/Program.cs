@@ -29,7 +29,7 @@ internal static class Program
         Check(equal, name + (equal ? "" : $" (expected '{expected}', got '{actual}')"));
     }
 
-    private sealed class Host : IOutputLinkHost
+    private class Host : IOutputLinkHost
     {
         public readonly List<string> Opened = new List<string>();
 
@@ -687,6 +687,55 @@ internal static class Program
         Check(onlyUrls.Host.Opened.Count == 0 && onlyUrls.Host.Urls.SequenceEqual(new[] { "https://example.com/a.html" }), "addresses can be links without any file link");
     }
 
+    private sealed class RunHost : Host, ICommandRunHost
+    {
+        public ColumnUnit CompilerColumns { get; set; } = ColumnUnit.Auto;
+    }
+
+    // Terminal/CommandRun.cs: what the Smart Terminal keeps of a command that was run, and the scanner it makes for the output of it.
+    private static void CommandRunChecks()
+    {
+        RunHost host = new RunHost();
+        CommandRun run = new CommandRun(host, "gcc -Wall a.c", "/home/u/src", 7);
+        Equal(run.CommandText, "gcc -Wall a.c", "the run keeps the command");
+        Equal(run.WorkingDirectory, "/home/u/src", "the run keeps the directory it was started in");
+        Equal(run.StartLine, 7, "the run keeps the line it started at");
+        foreach (LinkCell cell in run.CreateScanner(links: true, highlightDiagnostics: false).Scan("a.c:3:5: error: x\n"))
+        {
+            if (cell.Target != null)
+            {
+                cell.Target.Activate();
+                break;
+            }
+        }
+        Equal(host.Opened.Count, 1, "the scanner of a run makes a link of a file name in its output");
+        Equal(host.Opened[0], "/home/u/src/a.c|2|4", "the link opens the file in the directory of the run, at the position that follows it");
+        Equal(host.Units[0], ColumnUnit.TabStops, "with no setting the columns are counted as the command says (gcc)");
+
+        host = new RunHost { CompilerColumns = ColumnUnit.Bytes };
+        run = new CommandRun(host, "gcc a.c", "/home/u/src", 0);
+        foreach (LinkCell cell in run.CreateScanner(links: true, highlightDiagnostics: false).Scan("a.c:3:5: error: x\n"))
+        {
+            if (cell.Target != null)
+            {
+                cell.Target.Activate();
+                break;
+            }
+        }
+        Equal(host.Units[0], ColumnUnit.Bytes, "the setting of the tab is read from the host and wins over the command");
+        host.CompilerColumns = ColumnUnit.Characters;
+        foreach (LinkCell cell in run.CreateScanner(links: true, highlightDiagnostics: false).Scan("a.c:3:5: error: x\n"))
+        {
+            if (cell.Target != null)
+            {
+                cell.Target.Activate();
+                break;
+            }
+        }
+        Equal(host.Units[1], ColumnUnit.Characters, "and it is read when the scanner is made, not before");
+        Equal(run.CreateScanner(links: false, highlightDiagnostics: false).Scan("a.c:3:5: error: x\n").All(cell => cell.Target == null), true, "no link when links are off");
+    }
+
     private static void Main()
     {
         UrlChecks();
@@ -704,6 +753,7 @@ internal static class Program
         DirectoryChecks();
         CommandHintChecks();
         MessageChecks();
+        CommandRunChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " link checks passed.");
     }

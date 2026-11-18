@@ -1,5 +1,4 @@
 using SmarTTY.Ssh;
-using SmarTTY.Controls;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -269,7 +268,7 @@ public class ShellCompletionAnalyzer : IDisposable
     /// wrapper (Smart Terminal Settings) that is the interactive shell, which reads .bashrc; without it only the
     /// environment is known, since aliases and functions of .bashrc are not available to the commands then.
     /// </summary>
-    internal CompletionSources.ShellDefinitions GetShellDefinitions(SshTerminalControl sshTerminalControl)
+    internal CompletionSources.ShellDefinitions GetShellDefinitions(ISmartTerminalHost terminal)
     {
         lock (_definitionsLock)
         {
@@ -282,14 +281,14 @@ public class ShellCompletionAnalyzer : IDisposable
             {
                 // Loaded once per session, so it waits for the shell rather than run without the wrapper on a slow server.
                 _shellProbed.Wait(ShellProbeBackgroundWait);
-                string command = sshTerminalControl.BuildRemoteCommand(CompletionSources.BuildShellDefinitionsScript(), interactive: true);
+                string command = terminal.BuildRemoteCommand(CompletionSources.BuildShellDefinitionsScript(), interactive: true);
                 // A .bashrc that waits for input must not keep the helper command (and with it the PTY gate) busy.
                 string quoted = SmarTTY.IO.RemotePathUtils.ShellQuote(command);
                 output = _sshSession.RunCommandChecked("if command -v timeout >/dev/null 2>&1; then timeout 10 sh -c " + quoted + "; else sh -c " + quoted + "; fi </dev/null", requireSuccess: false);
             }
             else
             {
-                output = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("env", interactive: false), requireSuccess: false);
+                output = _sshSession.RunCommandChecked(terminal.BuildRemoteCommand("env", interactive: false), requireSuccess: false);
                 output?.Insert(0, CompletionSources.VariablesMarker);
             }
             _shellDefinitions = CompletionSources.ParseShellDefinitions(output);
@@ -471,12 +470,12 @@ public class ShellCompletionAnalyzer : IDisposable
         return items;
     }
 
-    public IEnumerable<string> GetExecutables(SshTerminalControl sshTerminalControl)
+    public IEnumerable<string> GetExecutables(ISmartTerminalHost terminal)
     {
         List<string> rawPathLines = _pathDirs ?? new List<string>();
-        if (rawPathLines.FirstOrDefault((string path) => !path.StartsWith("/")) != null || rawPathLines.Count == 0 || sshTerminalControl.HasEnvironment)
+        if (rawPathLines.FirstOrDefault((string path) => !path.StartsWith("/")) != null || rawPathLines.Count == 0 || terminal.HasEnvironment)
         {
-            rawPathLines = _sshSession.RunCommandChecked(sshTerminalControl.BuildRemoteCommand("echo $PATH"), requireSuccess: true, "xterm");
+            rawPathLines = _sshSession.RunCommandChecked(terminal.BuildRemoteCommand("echo $PATH"), requireSuccess: true, "xterm");
         }
         List<string> pathDirectories = SplitPath(rawPathLines);
         return CollectExecutables(pathDirectories);

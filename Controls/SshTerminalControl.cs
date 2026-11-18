@@ -17,7 +17,7 @@ using SmarTTY.Completion;
 
 namespace SmarTTY.Controls;
 
-public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.IFileListHost, SmarTTY.Terminal.IOutputLinkHost
+public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.IFileListHost, SmarTTY.Terminal.IOutputLinkHost, SmarTTY.Terminal.ISmartTerminalHost, SmarTTY.Terminal.ICommandRunHost
 {
     public class InputRegion
     {
@@ -570,6 +570,22 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     {
         return _linkExtensions?.Contains(text) ?? false;
     }
+
+    // The tab as the host of the completion of a command line and of the scanner of the output of a command (Terminal/ISmartTerminalHost.cs).
+    // They are implemented explicitly, so that the public surface of the control is not changed.
+    SmarTTY.Completion.ShellCompletionAnalyzer SmarTTY.Terminal.ISmartTerminalHost.ShellAnalyzer => ShellAnalyzer;
+
+    bool SmarTTY.Terminal.ISmartTerminalHost.TryBeginInvoke(Action action)
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return false;
+        }
+        BeginInvoke(action);
+        return true;
+    }
+
+    SmarTTY.CodeEditing.ColumnUnit SmarTTY.Terminal.ICommandRunHost.CompilerColumns => VtSettings?.CompilerColumns ?? SmarTTY.CodeEditing.ColumnUnit.Auto;
 
     private void UpdateTitle()
     {
@@ -1274,7 +1290,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         _completion = null;
         CompletionPopupRequest completionPopupRequest = new CompletionPopupRequest
         {
-            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
+            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))).ToGridPoint(),
             LineHeight = LineHeight,
             Items = null,
             StatusText = "Loading suggestions..."
@@ -1626,7 +1642,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         CloseCompletion();
         CompletionPopupRequest completionPopupRequest = new CompletionPopupRequest
         {
-            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))),
+            ScreenLocation = PointToScreen(Point.Round(PositionToPoint(CaretPosition.Column, CaretPosition.Line))).ToGridPoint(),
             LineHeight = LineHeight,
             Items = _inputLine.BuildHistory()?.Select((string historyCommand) => new CompletionItem
             {
