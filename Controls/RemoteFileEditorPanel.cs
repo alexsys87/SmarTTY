@@ -76,6 +76,17 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
     internal event EventHandler StateChanged;
 
+    // For RemoteFileEditorStatusSource: the event as two calls.
+    internal void AddStateChanged(EventHandler handler)
+    {
+        StateChanged += handler;
+    }
+
+    internal void RemoveStateChanged(EventHandler handler)
+    {
+        StateChanged -= handler;
+    }
+
     internal EditorCommandState CommandState { get; private set; }
 
     public RemoteFileEditorPanel(RemoteFileEditor editor)
