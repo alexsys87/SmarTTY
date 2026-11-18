@@ -16,7 +16,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
+public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource
 {
 
     private ITerminalSessionContext _context;
@@ -39,12 +39,12 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     // What a save does on the server: the upload, the check, the replacement (with sudo), the clean-up.
     private RemoteFileSaver _saver;
 
+    // The state of the saves (the answers to the questions, the generation) and the taking of the bytes to save.
+    private RemoteFileSession _session;
+
     private GlobalSettings _settings;
 
     private Action<Exception> _errorHandler;
-
-    // The user's answer to "Convert CRLF line endings to LF?", so that it is asked once per file.
-    private bool? _convertCrLf;
 
     /// <summary>
     /// Shows the prompt that a <c>sudo</c> command printed on its shell channel (the channel, the command line). The
@@ -75,12 +75,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
 
     private TextDocument.TextPosition _textCaretBeforeHex;
 
-    // The bytes the hex view had when it was left, and the text they were shown as: saving the text before it is
-    // edited writes these bytes back exactly, which keeps a file in an encoding that does not round-trip intact.
-    private byte[] _hexBytesForTextSave;
-
-    private string _hexTextSnapshot;
-
     /// <summary>The hex view of the file.</summary>
     public HexEditorControl HexEditor => _hexEditor;
 
@@ -96,12 +90,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     // The file on the server as it was when it was opened or last saved (see RemoteFileServer.FetchSignature): a save that finds
     // something else there asks before it overwrites the changes of somebody else.
     private string _remoteSignature;
-
-    // The conflict question was answered "overwrite": the next save does not check the server again.
-    private bool _forceOverwrite;
-
-    // The user chose to save although the check of the file found problems: the next save does not run the check.
-    private bool _skipValidation;
 
     // The conflict question was answered "reload": the server version is loaded once the save has ended.
     private bool _pendingReload;
@@ -122,12 +110,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
 
     // The blocks folded when the reload started: the fresh document has no folds, so they are put back once it is in.
     private FoldedLineInfo[] _foldsToRestore;
-
-    // The file~ copy of the original is made by the first save of the file after it was loaded.
-    private bool _backupDone;
-
-    // The question about a byte order mark before "#!" is asked once per file.
-    private bool _bomAnswered;
 
     /// <summary>The encoding the file is read in and saved in.</summary>
     public TextFileEncoding FileEncoding { get; private set; } = TextFileEncodings.Utf8;
@@ -261,9 +243,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     /// </summary>
     private byte[] GetBytesForHexView(string text)
     {
-        if (_hexBytesForTextSave != null && _hexTextSnapshot == text)
+        if (_session.HexBytesForTextSave != null && _session.HexTextSnapshot == text)
         {
-            return _hexBytesForTextSave;
+            return _session.HexBytesForTextSave;
         }
         if (!base.IsModified && _rawBytes != null)
         {
@@ -280,8 +262,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
         string text = base.EditableDocument.GetText();
         HexDocument document = _hexDocument;
-        bool reuse = document != null && _hexTextSnapshot == text && _hexBytesForTextSave != null
-            && HexDocument.ByteArraysEqual(document.ToArray(), _hexBytesForTextSave);
+        bool reuse = document != null && _session.HexTextSnapshot == text && _session.HexBytesForTextSave != null
+            && HexDocument.ByteArraysEqual(document.ToArray(), _session.HexBytesForTextSave);
         if (!reuse)
         {
             try
@@ -367,8 +349,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
                 return;
             }
         }
-        _hexBytesForTextSave = bytes;
-        _hexTextSnapshot = text;
+        _session.HexBytesForTextSave = bytes;
+        _session.HexTextSnapshot = text;
         _hexMode = false;
         _hexEditor.Visible = false;
         _hexEditor.ReadOnly = true;
@@ -430,8 +412,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         bool hadHex = _hexMode || _hexDocument != null;
         AttachHexDocument(null);
         _hexMode = false;
-        _hexBytesForTextSave = null;
-        _hexTextSnapshot = null;
+        _session.HexBytesForTextSave = null;
+        _session.HexTextSnapshot = null;
         _textBeforeHex = null;
         _textModifiedBeforeHex = false;
         _hexEditor.Visible = false;
@@ -551,6 +533,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         RemotePath = text;
         SessionRemoteFileHost host = new SessionRemoteFileHost(terminalSessionContext);
         _server = new RemoteFileServer(host, text);
+        _session = new RemoteFileSession(text);
         _saver = new RemoteFileSaver(host, _server, text, () => _loader.SudoOnSave);
         _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
@@ -669,7 +652,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             }
             ApplyContent(file, encoding, text);
             _remoteSignature = signature;
-            _backupDone = false;
+            _session.BackupDone = false;
             _reloading = false;
             _loaded = true;
             ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
@@ -750,8 +733,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         document.SetText(text);
         SetDocument(document);
         ((EditableTextBrowser)this).IsModified = false;
-        _convertCrLf = null;
-        _bomAnswered = false;
+        _session.ConvertCrLf = null;
+        _session.BomAnswered = false;
         FormatChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -890,8 +873,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         }
         FileEncoding = encoding;
         // The bytes kept from the hex view are in the old encoding: save the text in the chosen one now.
-        _hexBytesForTextSave = null;
-        _hexTextSnapshot = null;
+        _session.HexBytesForTextSave = null;
+        _session.HexTextSnapshot = null;
         ((EditableTextBrowser)this).IsModified = true;
         FormatChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -926,8 +909,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         base.EditableDocument.DefaultLineEnding = lineEnding;
         LineEndings = (lineEnding == TextDocument.LineEnding.CrLf) ? LineEndingKind.CrLf : ((lineEnding == TextDocument.LineEnding.Cr) ? LineEndingKind.Cr : LineEndingKind.Lf);
         // The text no longer matches the bytes kept from the hex view.
-        _hexBytesForTextSave = null;
-        _hexTextSnapshot = null;
+        _session.HexBytesForTextSave = null;
+        _session.HexTextSnapshot = null;
         ((EditableTextBrowser)this).IsModified = true;
         FormatChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -954,8 +937,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             return false;
         }
     }
-
-    private int _saveGeneration;
 
     // Set by the background thread once its upload and replace attempt finished (successfully or not).
     private ManualResetEvent _backgroundUploadDone;
@@ -1087,7 +1068,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         try
         {
             // Superseded by a synchronous save of a newer version: only clean up.
-            if (job.Generation == _saveGeneration)
+            if (job.Generation == _session.SaveGeneration)
             {
                 if (error != null)
                 {
@@ -1098,7 +1079,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
                     switch (ThemedMessageBox.Show(_server.ConflictDescription(IsNewFile) + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
                     {
                         case DialogResult.Yes:
-                            _forceOverwrite = true;
+                            _session.ForceOverwrite = true;
                             _saveRequestedWhileSaving = true;
                             break;
                         case DialogResult.No:
@@ -1117,7 +1098,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
                         SaveWithSudo(job);
                     }
                     // The sudo prompt pumps messages: a synchronous save may have run meanwhile.
-                    if (job.Generation == _saveGeneration)
+                    if (job.Generation == _session.SaveGeneration)
                     {
                         CompleteSave(job);
                         reloadToOffer = ReloadToOffer();
@@ -1145,8 +1126,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             {
                 _pendingReload = false;
                 _saveRequestedWhileSaving = false;
-                _forceOverwrite = false;
-                _skipValidation = false;
+                _session.ForceOverwrite = false;
+                _session.SkipValidation = false;
                 if (IsNewFile)
                 {
                     // Somebody created the file this new one was going to be: there is a version to load now.
@@ -1157,7 +1138,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             else if (_saveRequestedWhileSaving)
             {
                 _saveRequestedWhileSaving = false;
-                if (IsModified || _forceOverwrite || _skipValidation)
+                if (IsModified || _session.ForceOverwrite || _session.SkipValidation)
                 {
                     SaveInBackground();
                 }
@@ -1219,7 +1200,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             + " in " + RemotePath + (showInText ? ", they are shown in the text" : "") + ".\n\nThe file on the server has not been changed.\n\nYes: save it anyway.\nNo: do not save, go to line " + issues[0].Line + ".";
         if (ThemedMessageBox.Show(text, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
         {
-            _skipValidation = true;
+            _session.SkipValidation = true;
             _saveRequestedWhileSaving = true;
             return;
         }
@@ -1326,85 +1307,69 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
     }
 
     /// <summary>
-    /// Takes the bytes to save (UI thread), asking once whether to convert CRLF line endings that a file which did not
-    /// have them has got, and whether to drop a byte order mark that breaks a script.
+    /// Takes the bytes to save (UI thread): the questions and the bytes are in <see cref="RemoteFileSession.PrepareSave"/>.
     /// </summary>
     private RemoteSaveJob PrepareSave()
     {
-        // The problems the previous check named are about the text as it was: the check runs again now.
+        return _session.PrepareSave(this, () => new RemoteSaveOptions
+        {
+            TemporaryDirectory = _settings.Editor.TemporaryDirectory,
+            BackupBeforeSave = _settings.Editor.BackupBeforeSave,
+            DisableConfigCheck = _settings.Editor.DisableConfigCheck,
+            IsNewFile = IsNewFile,
+            IsWindowsHost = IsWindowsHost
+        });
+    }
+
+    // What the taking of the bytes to save (RemoteFileSession.PrepareSave) needs from the editor.
+    bool IRemoteSaveSource.HexMode => _hexMode && _hexDocument != null;
+
+    object IRemoteSaveSource.HexVersion => _hexDocument.CurrentVersion;
+
+    byte[] IRemoteSaveSource.HexBytes()
+    {
+        return _hexDocument.ToArray();
+    }
+
+    string IRemoteSaveSource.GetText()
+    {
+        return base.EditableDocument.GetText();
+    }
+
+    object IRemoteSaveSource.TextVersion => CurrentVersion;
+
+    LineEndingKind IRemoteSaveSource.LineEndings => LineEndings;
+
+    TextFileEncoding IRemoteSaveSource.FileEncoding => FileEncoding;
+
+    void IRemoteSaveSource.ConvertLineEndingsToLf()
+    {
+        SetLineEnding(TextDocument.LineEnding.Lf);
+    }
+
+    void IRemoteSaveSource.SaveWithoutByteOrderMark()
+    {
+        SetSaveEncoding(TextFileEncodings.Utf8);
+    }
+
+    bool IRemoteSaveSource.Confirm(string question)
+    {
+        return ThemedMessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+    }
+
+    void IRemoteSaveSource.ClearMessages()
+    {
         ClearMessages();
-        bool hexMode = _hexMode && _hexDocument != null;
-        object version;
-        byte[] bytes;
-        if (hexMode)
-        {
-            // The bytes are saved as they are: the CRLF and BOM questions are about text that is not shown here.
-            version = _hexDocument.CurrentVersion;
-            bytes = _hexDocument.ToArray();
-        }
-        else
-        {
-            string value = base.EditableDocument.GetText();
-            // Bytes that came from the hex view are saved back exactly while the text has not been edited since: an
-            // encoding that does not round-trip intact must not change the file.
-            bool exactBytes = _hexBytesForTextSave != null && _hexTextSnapshot == value;
-            if (!exactBytes)
-            {
-                if (value.Contains("\r\n") && LineEndings != LineEndingKind.CrLf)
-                {
-                    if (!_convertCrLf.HasValue)
-                    {
-                        _convertCrLf = ThemedMessageBox.Show("The text has CRLF line endings, which break shell scripts and OpenWrt configuration files. Convert them to LF endings?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
-                    }
-                    if (_convertCrLf.Value)
-                    {
-                        SetLineEnding(TextDocument.LineEnding.Lf);
-                    }
-                }
-                value = base.EditableDocument.GetText();
-                if (FileEncoding == TextFileEncodings.Utf8Bom && value.StartsWith("#!", StringComparison.Ordinal) && !_bomAnswered)
-                {
-                    _bomAnswered = true;
-                    if (ThemedMessageBox.Show("The file starts with #! and is saved with a UTF-8 byte order mark, which makes the system fail to run it as a script. Save it without the mark?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                    {
-                        SetSaveEncoding(TextFileEncodings.Utf8);
-                    }
-                }
-                value = base.EditableDocument.GetText();
-                exactBytes = _hexBytesForTextSave != null && _hexTextSnapshot == value;
-            }
-            version = CurrentVersion;
-            bytes = exactBytes ? _hexBytesForTextSave : TextFileEncodings.Encode(value, FileEncoding);
-        }
-        string temporaryPath = _settings.Editor.TemporaryDirectory + "/" + Guid.NewGuid().ToString() + ".txt";
-        bool backup = _settings.Editor.BackupBeforeSave && !IsNewFile && !_backupDone;
-        // The file is written in place, which keeps its owner, mode and links, and that truncates it first. So the old content is
-        // kept until the result has been read back, and the script puts it back when the space ran out or the write failed half
-        // way. A failed backup copy ("~", as with other editors) does not stop the save. The paths are quoted by the script: a
-        // file name with ", $ or ` must neither break the command nor expand.
-        string replaceCommand = RemoteSaveCommand.BuildScript(RemotePath, temporaryPath, bytes.Length, backup);
-        // The check of the file runs on the text; the bytes of the hex view are saved as they are.
-        ConfigValidator validator = null;
-        if (!hexMode && !IsWindowsHost && !_skipValidation && !_settings.Editor.DisableConfigCheck)
-        {
-            validator = ConfigValidators.Find(RemotePath, DetectSyntax(), base.EditableDocument.GetLineText(0));
-        }
-        RemoteSaveJob job = new RemoteSaveJob
-        {
-            Bytes = bytes,
-            TemporaryPath = temporaryPath,
-            ReplaceCommand = replaceCommand,
-            Version = version,
-            HexMode = hexMode,
-            Generation = ++_saveGeneration,
-            SkipConflictCheck = _forceOverwrite,
-            IncludesBackup = backup,
-            Encoding = FileEncoding,
-            Validator = validator
-        };
-        _forceOverwrite = false;
-        _skipValidation = false;
-        return job;
+    }
+
+    SyntaxHighlighting.Language IRemoteSaveSource.DetectSyntax()
+    {
+        return DetectSyntax();
+    }
+
+    string IRemoteSaveSource.FirstLine()
+    {
+        return base.EditableDocument.GetLineText(0);
     }
 
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
@@ -1425,7 +1390,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
         _rawEncoding = job.Encoding ?? FileEncoding;
         if (job.IncludesBackup)
         {
-            _backupDone = true;
+            _session.BackupDone = true;
         }
         IsNewFile = false;
         if (job.HexMode && _hexDocument != null)
@@ -1433,8 +1398,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
             _hexDocument.MarkSaved(job.Version, job.Bytes);
             _hexEditor.Invalidate();
             // The text is rebuilt from these bytes when the hex view is closed.
-            _hexBytesForTextSave = null;
-            _hexTextSnapshot = null;
+            _session.HexBytesForTextSave = null;
+            _session.HexTextSnapshot = null;
         }
         else
         {
