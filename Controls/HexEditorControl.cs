@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -43,13 +44,13 @@ public sealed class HexHighlightColor
 /// remote file editor saves the bytes (see <see cref="RemoteFileEditor"/>). The control draws its own scroll bars,
 /// because the WPF scroll bars of the text editor are hidden in hex mode.
 /// </summary>
-public sealed class HexEditorControl : Control
+public sealed class HexEditorControl : Control, IHexViewStatus
 {
     /// <summary>The row widths the view offers.</summary>
-    public static readonly int[] BytesPerRowChoices = { 8, 16, 32 };
+    public static readonly int[] BytesPerRowChoices = HexViewChoices.BytesPerRow;
 
     /// <summary>The group sizes the view offers: single bytes, 16-, 32- and 64-bit words.</summary>
-    public static readonly int[] GroupSizeChoices = { 1, 2, 4, 8 };
+    public static readonly int[] GroupSizeChoices = HexViewChoices.GroupSize;
 
     /// <summary>The colours offered for marking bytes.</summary>
     public static readonly HexHighlightColor[] HighlightColors =

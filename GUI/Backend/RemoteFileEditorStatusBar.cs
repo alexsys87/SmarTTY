@@ -16,7 +16,7 @@ namespace SmarTTY.GUI.Backend;
 /// </summary>
 internal sealed class RemoteFileEditorStatusBar : StatusBar
 {
-    private readonly RemoteFileEditor _editor;
+    private readonly IEditorStatusSource _editor;
 
     private readonly TextBlock _path = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
 
@@ -39,13 +39,9 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private readonly StatusBarItem _hexViewItem;
 
-    public RemoteFileEditorStatusBar(RemoteFileEditor editor, RemoteFileEditorPanel panel)
+    public RemoteFileEditorStatusBar(IEditorStatusSource editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-        if (panel == null)
-        {
-            throw new ArgumentNullException(nameof(panel));
-        }
         _encodingButton = CreateMenuButton(ShowEncodingMenu);
         _lineEndingButton = CreateMenuButton(ShowLineEndingMenu);
         _syntaxButton = CreateMenuButton(ShowSyntaxMenu);
@@ -63,7 +59,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         Items.Add(CreateItem(_state, Dock.Right));
         Items.Add(new StatusBarItem { Content = _path });
 
-        panel.StateChanged += (sender, e) => Update();
+        editor.StateChanged += (sender, e) => Update();
         editor.CurrentLanguageChanged += (sender, e) => Update();
         Update();
     }
@@ -103,7 +99,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
     private void Update()
     {
         bool hex = _editor.IsHexMode;
-        bool readOnly = hex ? _editor.HexEditor.ReadOnly : _editor.ReadOnly;
+        bool readOnly = hex ? _editor.HexView.ReadOnly : _editor.ReadOnly;
         bool loading = readOnly && !_editor.IsReadOnlyMode;
         _state.Text = EditorStatusText.State(loading, _editor.IsReadOnlyMode, _editor.IsSaving, _editor.IsModified, _editor.IsNewFile);
         if (_editor.IsModified || _editor.IsSaving)
@@ -120,7 +116,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
         if (hex)
         {
-            HexEditorControl hexEditor = _editor.HexEditor;
+            IHexViewStatus hexEditor = _editor.HexView;
             _position.Text = EditorStatusText.HexPosition(hexEditor.CaretOffset, hexEditor.Length, hexEditor.InsertMode);
             _position.ToolTip = "Byte offset of the caret, the size of the file, and the typing mode (Insert toggles it)";
             int selectedBytes = hexEditor.SelectionLength;
@@ -172,7 +168,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         _hexViewItem.Visibility = hex ? Visibility.Visible : Visibility.Collapsed;
         if (hex)
         {
-            HexEditorControl hexEditor = _editor.HexEditor;
+            IHexViewStatus hexEditor = _editor.HexView;
             string order = hexEditor.BigEndian ? "Big endian" : "Little endian";
             _hexViewButton.Content = (hexEditor.GroupSize > 1)
                 ? order + ", " + (hexEditor.GroupSize * 8).ToString(System.Globalization.CultureInfo.InvariantCulture) + "-bit words"
@@ -209,11 +205,10 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         {
             return end.Column - start.Column;
         }
-        EditableTextDocument document = _editor.EditableDocument;
-        int length = document.GetLineText(start.Line).Length - start.Column + document.GetEffectiveLineTerminator(start.Line).Length;
+        int length = _editor.GetLineText(start.Line).Length - start.Column + _editor.GetEffectiveLineTerminator(start.Line).Length;
         for (int line = start.Line + 1; line < end.Line; line++)
         {
-            length += document.GetLineText(line).Length + document.GetEffectiveLineTerminator(line).Length;
+            length += _editor.GetLineText(line).Length + _editor.GetEffectiveLineTerminator(line).Length;
         }
         return length + end.Column;
     }
@@ -271,14 +266,14 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
 
     private void ShowHexViewMenu(Button button)
     {
-        HexEditorControl hexEditor = _editor.HexEditor;
+        IHexViewStatus hexEditor = _editor.HexView;
         ContextMenu menu = new ContextMenu();
         menu.Items.Add(CreateHeader("Byte order"));
         AddHexViewItem(menu, "Little endian (x86, ARM)", !hexEditor.BigEndian, () => hexEditor.BigEndian = false);
         AddHexViewItem(menu, "Big endian (network order, MIPS, PowerPC)", hexEditor.BigEndian, () => hexEditor.BigEndian = true);
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateHeader("Show bytes"));
-        foreach (int size in HexEditorControl.GroupSizeChoices)
+        foreach (int size in HexViewChoices.GroupSize)
         {
             int chosen = size;
             string text = (size == 1) ? "One by one" : "In " + (size * 8).ToString(System.Globalization.CultureInfo.InvariantCulture) + "-bit words";
@@ -287,7 +282,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
         }
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateHeader("Bytes per row"));
-        foreach (int count in HexEditorControl.BytesPerRowChoices)
+        foreach (int count in HexViewChoices.BytesPerRow)
         {
             int chosen = count;
             AddHexViewItem(menu, count.ToString(System.Globalization.CultureInfo.InvariantCulture), hexEditor.BytesPerRow == count, () => hexEditor.BytesPerRow = chosen);
@@ -314,7 +309,7 @@ internal sealed class RemoteFileEditorStatusBar : StatusBar
     {
         ContextMenu menu = new ContextMenu();
         menu.Items.Add(CreateHeader("Syntax highlighting"));
-        SyntaxHighlighting.Language detected = SyntaxHighlighting.DetectLanguage(_editor.RemotePath, _editor.EditableDocument?.GetLineText(0));
+        SyntaxHighlighting.Language detected = SyntaxHighlighting.DetectLanguage(_editor.RemotePath, _editor.FirstLine);
         MenuItem automatic = new MenuItem
         {
             Header = "Detect automatically (" + SyntaxHighlighting.GetDisplayName(detected) + ")",

@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.Ssh;
 using SmarTTY.Terminal;
@@ -373,6 +374,71 @@ internal static class Program
         target.SetMatchHighlight(two);
         target.SetMatchHighlight(null);
         Check(true, "highlights and the marks of the matches can be set and removed");
+        o.Close();
+    }
+
+    // The editor as what the status bar below it reads (IEditorStatusSource), on the real editor and panel: every member is the editor's own.
+    private static void StatusSource(Server server)
+    {
+        Console.WriteLine("-- the editor as the source of the status bar (IEditorStatusSource)");
+        WriteRemote(server, "status.sh", Bytes("#!/bin/sh\necho one\necho two\n"));
+        Opened o = Open(server, "status.sh");
+        // The panel is WPF-based and cannot be made under Mono: its StateChanged event is a field of the check.
+        EventHandler panelStateChanged = null;
+        IEditorStatusSource source = new RemoteFileEditorStatusSource(o.Editor, handler => panelStateChanged += handler, handler => panelStateChanged -= handler);
+        int stateChanges = 0;
+        int languageChanges = 0;
+        source.StateChanged += (sender, e) => stateChanges++;
+        source.CurrentLanguageChanged += (sender, e) => languageChanges++;
+
+        Equal(source.RemotePath, o.Path, "the path of the file");
+        Check(!source.IsHexMode && !source.IsModified && !source.IsNewFile && !source.IsPreview && !source.IsSaving && !source.IsReadOnlyMode && !source.ReadOnly, "a loaded file: text view, not modified, not new, not a preview, not saving, not read-only");
+        Equal(source.GetLineText(1), "echo one", "the text of a line");
+        Equal(source.FirstLine, "#!/bin/sh", "the first line");
+        Equal(source.GetEffectiveLineTerminator(0), "\n", "the line break of a line");
+        Check(source.FileEncoding == o.Editor.FileEncoding && source.LineEndings == LineEndingKind.Lf, "the encoding and the line endings are the editor's");
+        Check(source.CanReopenWithEncoding, "the file can be read again in another encoding");
+        Equal(source.CurrentLanguage, o.Editor.CurrentLanguage, "the syntax in use is the editor's (the application applies it; here nothing has)");
+        Check(!source.SyntaxOverride.HasValue, "and no syntax is chosen by hand");
+        o.Editor.ReportLanguage(SyntaxHighlighting.Language.Bash);
+        Equal(source.CurrentLanguage, SyntaxHighlighting.Language.Bash, "a syntax that the application applied is read");
+        Equal(languageChanges, 1, "and the bar is told");
+
+        Replace(o, 1, "one", "uno");
+        Check(source.IsModified, "a change makes the source modified");
+        panelStateChanged?.Invoke(null, EventArgs.Empty);
+        Equal(stateChanges, 1, "the event of the panel reaches the bar");
+        source.SetSyntax(SyntaxHighlighting.Language.Python);
+        Check(source.SyntaxOverride == SyntaxHighlighting.Language.Python, "the syntax can be chosen by hand");
+        source.SetSyntax(null);
+        Check(!source.SyntaxOverride.HasValue, "and null goes back to the detection");
+        source.SetLineEnding(TextDocument.LineEnding.CrLf);
+        Equal(source.LineEndings, LineEndingKind.CrLf, "the line endings can be changed");
+        source.SetLineEnding(TextDocument.LineEnding.Lf);
+        source.SetSaveEncoding(TextFileEncodings.Utf8Bom);
+        Check(source.FileEncoding == TextFileEncodings.Utf8Bom, "the encoding to save in can be changed");
+
+        // A selection of two lines is measured from the text and the line breaks of its lines.
+        o.Editor.SetSelection(true, new TextDocument.TextPosition(2, 1));
+        o.Editor.SetCaret(new TextDocument.TextPosition(4, 2));
+        Check(source.HasSelection, "a selection");
+        Check(source.SelectionStart.Line == 1 && source.SelectionEnd.Line == 2, "with its two ends");
+        Equal(source.CaretPosition.Line + ":" + source.CaretPosition.Column, "2:4", "the caret");
+
+        // The hex view: what the bar reads and the options its menu changes.
+        o.Editor.ToggleHexMode();
+        Check(source.IsHexMode, "the hex view is on");
+        IHexViewStatus hex = source.HexView;
+        Equal(hex.Length, o.Editor.HexEditor.Length, "the size of the file in the hex view");
+        Check(hex.InsertMode == !o.Editor.HexEditor.OverwriteMode && hex.CaretOffset == o.Editor.HexEditor.CaretOffset && hex.SelectionLength == o.Editor.HexEditor.SelectionLength, "the caret, the selection and the typing mode are the hex editor's");
+        hex.BigEndian = true;
+        Check(o.Editor.HexEditor.BigEndian && hex.BigEndian, "the byte order can be changed");
+        hex.BytesPerRow = 32;
+        hex.GroupSize = 4;
+        Check(o.Editor.HexEditor.BytesPerRow == 32 && hex.GroupSize == 4, "the layout can be changed");
+        hex.ShowDataInspector = true;
+        hex.ColorByValue = true;
+        Check(o.Editor.HexEditor.ShowDataInspector && o.Editor.HexEditor.ColorByValue, "and the inspector and the colours");
         o.Close();
     }
 
@@ -760,6 +826,7 @@ internal static class Program
         RunScenario(server, "load-save", LoadAndSave);
         RunScenario(server, "encodings", Encodings);
         RunScenario(server, "search-target", SearchTarget);
+        RunScenario(server, "status-source", StatusSource);
         RunScenario(server, "format", ChangeFormat);
         RunScenario(server, "questions", ConvertCrLf);
         RunScenario(server, "new-file", NewFile);
