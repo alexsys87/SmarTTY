@@ -21,6 +21,9 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private ITerminalSessionContext _context;
 
+    // The file as it is on the server: its probes, reading, and the version that tells whether somebody else changed it.
+    private RemoteFileServer _server;
+
     public readonly string RemotePath;
 
     private readonly TextDocument.TextPosition _initialCaret;
@@ -90,7 +93,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Raised when the editor switched between the text and the hex view.</summary>
     public event EventHandler HexModeChanged;
 
-    // The file on the server as it was when it was opened or last saved (see FetchSignature): a save that finds
+    // The file on the server as it was when it was opened or last saved (see RemoteFileServer.FetchSignature): a save that finds
     // something else there asks before it overwrites the changes of somebody else.
     private string _remoteSignature;
 
@@ -644,6 +647,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         _initialColumnUnit = initialColumnUnit;
         this._context = terminalSessionContext;
         RemotePath = text;
+        _server = new RemoteFileServer(new SessionRemoteFileHost(terminalSessionContext), text);
         _draftKey = ClaimDraftKey(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         if (Interlocked.Exchange(ref _draftCleanupDone, 1) == 0)
         {
@@ -743,11 +747,11 @@ public partial class RemoteFileEditor : CodeEditorPP
     {
         try
         {
-            if (!RemotePathExists(RemotePath))
+            if (!_server.Exists(RemotePath))
             {
                 // Opening a path that does not exist starts a new file, as in vi or nano.
                 string directory = RemotePathUtils.GetDirectoryName(RemotePath);
-                if (!string.IsNullOrEmpty(directory) && !RemotePathExists(directory))
+                if (!string.IsNullOrEmpty(directory) && !_server.Exists(directory))
                 {
                     throw new RemoteOperationException("Cannot create " + RemotePath + ": the directory " + directory + " does not exist.");
                 }
@@ -763,12 +767,12 @@ public partial class RemoteFileEditor : CodeEditorPP
                 CheckWriteAccess(RemotePath, forNewFile: false);
             }
             // Taken before the download: a change made while it runs is then noticed by the next save.
-            string signature = FetchSignature();
+            string signature = _server.FetchSignature();
             MemoryStream downloaded = new MemoryStream();
             // Only the text of the preview is decoded as it arrives; the file is decoded once it is complete.
             StringBuilder content = new StringBuilder();
             bool showPreview = !_reloading;
-            using (Stream scpDownloadStream = OpenForReading(out long remoteLength))
+            using (Stream scpDownloadStream = _server.OpenForReading(out long remoteLength))
             {
                 // The size is known from the first SCP header (or from SFTP), before any data is read.
                 long limit = _reloading ? (IsPreview ? EditorFilePolicy.PreviewBytes : 0) : ChooseLoadLimit(remoteLength);
@@ -845,22 +849,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
-    private bool IsWindowsHost => _context.Session.RemoteOs == SmarTTY.Ssh.RemoteOsKind.Windows;
-
-    /// <summary>
-    /// The file on the server as a stream, and its size: over SCP for a Unix host, over SFTP for a Windows host, which has none
-    /// of the commands that the rest of the editor uses either (test, stat, cat, cp, rm, sudo).
-    /// </summary>
-    private Stream OpenForReading(out long length)
-    {
-        if (IsWindowsHost)
-        {
-            return SmarTTY.Transport.WindowsRemoteFileEditing.OpenRead(_context.Session, RemotePath, out length);
-        }
-        ScpDownloadStream stream = _context.Session.OpenDownload(RemotePath);
-        length = stream.Length;
-        return stream;
-    }
+    private bool IsWindowsHost => _server.IsWindows;
 
     /// <summary>
     /// Shows a question from the loading thread; the answer of an editor that was closed (before or while the question is asked) is "cancel".
@@ -894,7 +883,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         if (IsWindowsHost)
         {
             // A new file: its folder is not probed (that would mean creating a file to delete it), a refused save says so then.
-            if (forNewFile || SmarTTY.Transport.WindowsRemoteFileEditing.CanWrite(_context.Session, target) != false)
+            if (forNewFile || _server.IsWritable(target))
             {
                 return;
             }
@@ -908,12 +897,11 @@ public partial class RemoteFileEditor : CodeEditorPP
             IsReadOnlyMode = true;
             return;
         }
-        if (_context.Session.RunCommandChecked("test -w " + RemotePathUtils.ShellQuote(target), requireSuccess: true) != null)
+        // No answer is not "not writable": IsWritable checks the connection before it says no.
+        if (_server.IsWritable(target))
         {
             return;
         }
-        // No answer is not "not writable": without a connection nothing is known.
-        _context.Session.ThrowIfConnectionLost();
         if (_context.AutoConfirmSudo)
         {
             // The connection asks to save with sudo without the question: the save goes through sudo directly.
@@ -979,21 +967,6 @@ public partial class RemoteFileEditor : CodeEditorPP
             default:
                 return 0;
         }
-    }
-
-    private bool RemotePathExists(string path)
-    {
-        if (IsWindowsHost)
-        {
-            return SmarTTY.Transport.WindowsRemoteFileEditing.Exists(_context.Session, path);
-        }
-        if (_context.Session.RunCommandChecked("test -e " + RemotePathUtils.ShellQuote(path), requireSuccess: true) != null)
-        {
-            return true;
-        }
-        // No answer is not "does not exist": without a connection the file may be there.
-        _context.Session.ThrowIfConnectionLost();
-        return false;
     }
 
     /// <summary>
@@ -1253,52 +1226,6 @@ public partial class RemoteFileEditor : CodeEditorPP
     }
 
     /// <summary>
-    /// Identifies the version of the file on the server (modification time and size, or a checksum where the system
-    /// has no stat) so that a change made by somebody else can be noticed. Null when it cannot be found out, or when
-    /// there is no such file. Runs a command: call it from any thread but not often.
-    /// </summary>
-    private string FetchSignature()
-    {
-        try
-        {
-            if (IsWindowsHost)
-            {
-                return SmarTTY.Transport.WindowsRemoteFileEditing.Signature(_context.Session, RemotePath);
-            }
-            return RemoteFileSignature.Parse(_context.Session.RunCommandChecked(RemoteFileSignature.BuildCommand(RemotePath), requireSuccess: true));
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// The file on the server is not the one that was opened (or a new file has been created there meanwhile).
-    /// Runs a command (any thread). Without a signature of the opened file nothing can be said: not a conflict.
-    /// </summary>
-    private bool HasServerChanged()
-    {
-        string current = FetchSignature();
-        if (current == null)
-        {
-            return false;
-        }
-        if (IsNewFile)
-        {
-            return true;
-        }
-        return _remoteSignature != null && current != _remoteSignature;
-    }
-
-    private string ConflictDescription()
-    {
-        return IsNewFile
-            ? RemotePath + " has been created on the server since you started this new file."
-            : RemotePath + " has been changed on the server since it was opened in the editor.";
-    }
-
-    /// <summary>
     /// Loads the file from the server again, dropping the text in the editor and its draft (the caller asks first when
     /// there are unsaved changes). The caret stays where it was.
     /// </summary>
@@ -1447,7 +1374,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         // The command also copies the old file to file~.
         public bool IncludesBackup;
 
-        // The file on the server after the save (FetchSignature).
+        // The file on the server after the save (RemoteFileServer.FetchSignature).
         public string NewSignature;
 
         // The encoding the bytes were made with: they become the file as it is on the server.
@@ -1509,8 +1436,8 @@ public partial class RemoteFileEditor : CodeEditorPP
         job.Validator = null;
         try
         {
-            if (!job.SkipConflictCheck && HasServerChanged()
-                && ThemedMessageBox.Show(ConflictDescription() + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            if (!job.SkipConflictCheck && _server.HasChanged(_remoteSignature, IsNewFile)
+                && ThemedMessageBox.Show(_server.ConflictDescription(IsNewFile) + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
             {
                 throw new OperationCanceledException();
             }
@@ -1554,7 +1481,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             Exception error = null;
             try
             {
-                conflict = !job.SkipConflictCheck && HasServerChanged();
+                conflict = !job.SkipConflictCheck && _server.HasChanged(_remoteSignature, IsNewFile);
                 if (!conflict)
                 {
                     replaced = UploadAndReplace(job);
@@ -1599,7 +1526,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 }
                 else if (conflict)
                 {
-                    switch (ThemedMessageBox.Show(ConflictDescription() + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
+                    switch (ThemedMessageBox.Show(_server.ConflictDescription(IsNewFile) + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
                     {
                         case DialogResult.Yes:
                             _forceOverwrite = true;
@@ -1930,7 +1857,7 @@ public partial class RemoteFileEditor : CodeEditorPP
             // Written over SFTP straight into the file (with the "~" backup if the job asks for one): there is no temporary file
             // in /tmp and no cat, and a refused write is an error, not a question about sudo.
             SmarTTY.Transport.WindowsRemoteFileEditing.Save(_context.Session, RemotePath, job.Bytes, job.IncludesBackup);
-            job.NewSignature = FetchSignature();
+            job.NewSignature = _server.FetchSignature();
             return true;
         }
         using (ScpChannelStream scpChannelStream = _context.Session.OpenUpload(job.TemporaryPath, job.Bytes.Length, mode: TemporaryFileMode))
@@ -1955,7 +1882,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         List<string> replaceOutput = _context.Session.RunCommand(PosixShell.Wrap(job.ReplaceCommand), out int? replaceStatus);
         if (replaceStatus == 0)
         {
-            job.NewSignature = FetchSignature();
+            job.NewSignature = _server.FetchSignature();
             return true;
         }
         if (replaceStatus.HasValue)
@@ -2040,7 +1967,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     private void CompleteSave(SaveJob job)
     {
         // A save through sudo has no signature yet.
-        _remoteSignature = job.NewSignature ?? FetchSignature();
+        _remoteSignature = job.NewSignature ?? _server.FetchSignature();
         _rawBytes = job.Bytes;
         _rawEncoding = job.Encoding ?? FileEncoding;
         if (job.IncludesBackup)
