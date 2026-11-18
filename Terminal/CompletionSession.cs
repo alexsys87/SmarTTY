@@ -1,10 +1,10 @@
 using SmarTTY.Controls;
 using SmarTTY.IO;
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Windows.Forms;
 using VisualTTY;
 
 namespace SmarTTY.Terminal;
@@ -579,9 +579,9 @@ internal class CompletionSession : IDisposable
         return StringComparer.InvariantCulture.Compare(first.Text, second.Text);
     }
 
-    private void OnItemSelected(CompletionItem completionItem, Keys keys)
+    private void OnItemSelected(CompletionItem completionItem, VirtualKey keys)
     {
-        ApplyItem(completionItem, keys == Keys.Return);
+        ApplyItem(completionItem, keys == VirtualKey.Return);
     }
 
     private void ApplyItem(CompletionItem completionItem, bool commit, string suffix = "")
@@ -796,7 +796,7 @@ internal class CompletionSession : IDisposable
         _popup.Close();
     }
 
-    public bool HandleKey(KeyEventArgs e)
+    public bool HandleKey(KeyStroke e)
     {
         return _popup.TryHandleKeyEvent(e);
     }

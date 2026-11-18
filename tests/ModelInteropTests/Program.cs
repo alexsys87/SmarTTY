@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 
@@ -178,8 +180,60 @@ internal static class Program
         Equal(((SolidBrush)HighlightBrushes.FillBrush(selection)).Color.ToArgb(), Color.FromArgb(1, 2, 3).ToArgb(), "a colour of the style wins over the system colour");
     }
 
+    // KeyShortcutGolden.txt was written by the shortcut code that used the Keys of WinForms directly (KeyBindingMap.KeyShortcut.ToString
+    // and TryParse before they moved to KeyShortcutText), run under Mono. F|key|modifiers|text: how a shortcut is written (modifiers: 1 Control,
+    // 2 Alt, 4 Shift). P|text|result|key|ctrl|alt|shift: what reading a text gives. The names come from the key converter of WinForms,
+    // so the file holds what Mono's converter gives.
+    private static void KeyShortcutTextChecks()
+    {
+        string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "KeyShortcutGolden.txt");
+        string[] lines = File.ReadAllLines(path);
+        int written = 0;
+        int read = 0;
+        foreach (string line in lines)
+        {
+            string[] parts = line.Split('|');
+            if (parts[0] == "F")
+            {
+                int mask = int.Parse(parts[2]);
+                var shortcut = new KeyBindingMap.KeyShortcut { Key = (VirtualKey)int.Parse(parts[1]), Ctrl = (mask & 1) != 0, Alt = (mask & 2) != 0, Shift = (mask & 4) != 0 };
+                string text = KeyShortcutText.Format(shortcut);
+                if (text != parts[3])
+                {
+                    throw new Exception("FAIL: shortcut " + parts[1] + "/" + mask + " is written as '" + text + "', expected '" + parts[3] + "'");
+                }
+                written++;
+            }
+            else if (parts[0] == "P")
+            {
+                KeyBindingMap.KeyShortcut shortcut;
+                bool ok = KeyShortcutText.TryParse(parts[1], out shortcut);
+                string actual = ok + "|" + (int)shortcut.Key + "|" + shortcut.Ctrl + "|" + shortcut.Alt + "|" + shortcut.Shift;
+                string expected = parts[2] + "|" + parts[3] + "|" + parts[4] + "|" + parts[5] + "|" + parts[6];
+                if (actual != expected)
+                {
+                    throw new Exception("FAIL: reading '" + parts[1] + "' gave " + actual + ", expected " + expected);
+                }
+                read++;
+            }
+        }
+        Check(written == 352, "all " + written + " shortcuts are written as before");
+        Check(read == 39, "all " + read + " texts are read as before (including the ones that are not shortcuts)");
+
+        // The default shortcuts of the editor survive a trip through the text.
+        int trips = 0;
+        foreach (KeyBindingMap.EditorCommand command in EditorCommands.All)
+        {
+            KeyBindingMap.KeyShortcut parsed;
+            Check(KeyShortcutText.TryParse(KeyShortcutText.Format(command.DefaultShortcut), out parsed) && parsed.Equals(command.DefaultShortcut), "the shortcut of " + command.Name + " survives its text");
+            trips++;
+        }
+        Equal(trips, 38, "every default shortcut was written and read");
+    }
+
     private static void Main()
     {
+        KeyShortcutTextChecks();
         HighlightBrushChecks();
         KeysMatchChecks();
         KeyConversionChecks();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 
 // Checks of the types that replace the GDI+ and WinForms types in the logic folders: RgbColor, GridPoint, VirtualKey and KeyStroke
@@ -174,8 +175,162 @@ internal static class Program
         Equal(marker.FillColor, RgbColor.FromArgb(1, 2, 3), "the colours of a style can be changed");
     }
 
+    // Records what a command does with the editor; the predicate of a token jump is asked about the brackets.
+    private sealed class RecordingTarget : IEditorCommandTarget
+    {
+        public readonly List<string> Calls = new List<string>();
+
+        public void ShowCompletion() { Calls.Add("ShowCompletion()"); }
+
+        public void Retokenize() { Calls.Add("Retokenize()"); }
+
+        public bool MoveToToken(bool searchPrevious, bool isOpening, bool selectText, TokenPredicate callback)
+        {
+            string accepted = "";
+            foreach (char bracket in "()[]{}<>")
+            {
+                if (callback(bracket.ToString()))
+                {
+                    accepted += bracket;
+                }
+            }
+            Calls.Add("MoveToToken(" + searchPrevious + "," + isOpening + "," + selectText + ",\"" + accepted + "\")");
+            return true;
+        }
+
+        public void ExpandCurrentFold() { Calls.Add("ExpandCurrentFold()"); }
+
+        public void CollapseCurrentFold() { Calls.Add("CollapseCurrentFold()"); }
+
+        public void DuplicateLines() { Calls.Add("DuplicateLines()"); }
+
+        public void MoveLines(int direction) { Calls.Add("MoveLines(" + direction + ")"); }
+
+        public void DeleteLines() { Calls.Add("DeleteLines()"); }
+
+        public bool ToggleComment() { Calls.Add("ToggleComment()"); return true; }
+
+        public void ZoomBy(int steps) { Calls.Add("ZoomBy(" + steps + ")"); }
+
+        public void ResetZoom() { Calls.Add("ResetZoom()"); }
+
+        public void AddNextOccurrence() { Calls.Add("AddNextOccurrence()"); }
+
+        public void SelectAllOccurrences() { Calls.Add("SelectAllOccurrences()"); }
+
+        public void AddCursorAbove() { Calls.Add("AddCursorAbove()"); }
+
+        public void AddCursorBelow() { Calls.Add("AddCursorBelow()"); }
+    }
+
+    private static void EditorCommandChecks()
+    {
+        // Name, modifiers (C = Control, A = Alt, S = Shift), key, calls of the command on the editor.
+        // Taken from the editor commands before they were moved from CodeEditorPP to IEditorCommandTarget and from Keys to VirtualKey.
+        object[][] expected =
+        {
+            new object[] { "ShowCompletion", "C", VirtualKey.Space, "ShowCompletion()" },
+            new object[] { "RetokenizeDocument", "C", VirtualKey.R, "Retokenize()" },
+            new object[] { "GoToOpeningRoundBracket", "CA", VirtualKey.D9, "MoveToToken(True,False,False,\"(\")" },
+            new object[] { "SelectToOpeningRoundBracket", "CS", VirtualKey.D9, "MoveToToken(True,False,True,\"(\")" },
+            new object[] { "GoToClosingRoundBracket", "CA", VirtualKey.D0, "MoveToToken(False,False,False,\")\")" },
+            new object[] { "SelectToClosingRoundBracket", "CS", VirtualKey.D0, "MoveToToken(False,False,True,\")\")" },
+            new object[] { "GoToOpeningCurlyBracket", "CA", VirtualKey.OemOpenBrackets, "MoveToToken(True,False,False,\"{\")" },
+            new object[] { "SelectToOpeningCurlyBracket", "CAS", VirtualKey.OemOpenBrackets, "MoveToToken(True,False,True,\"{\")" },
+            new object[] { "GoToClosingCurlyBracket", "CA", VirtualKey.OemCloseBrackets, "MoveToToken(False,False,False,\"}\")" },
+            new object[] { "SelectToClosingCurlyBracket", "CAS", VirtualKey.OemCloseBrackets, "MoveToToken(False,False,True,\"}\")" },
+            new object[] { "GoToOpeningSquareBracket", "C", VirtualKey.OemOpenBrackets, "MoveToToken(True,False,False,\"[\")" },
+            new object[] { "SelectToOpeningSquareBracket", "CS", VirtualKey.OemOpenBrackets, "MoveToToken(True,False,True,\"[\")" },
+            new object[] { "GoToClosingSquareBracket", "C", VirtualKey.OemCloseBrackets, "MoveToToken(False,False,False,\"]\")" },
+            new object[] { "SelectToClosingSquareBracket", "CS", VirtualKey.OemCloseBrackets, "MoveToToken(False,False,True,\"]\")" },
+            new object[] { "GoToOpeningAngularBracket", "C", VirtualKey.Oemcomma, "MoveToToken(True,False,False,\"<\")" },
+            new object[] { "SelectToOpeningAngularBracket", "CS", VirtualKey.Oemcomma, "MoveToToken(True,False,True,\"<\")" },
+            new object[] { "GoToClosingAngularBracket", "C", VirtualKey.OemPeriod, "MoveToToken(False,False,False,\">\")" },
+            new object[] { "SelectToClosingAngularBracket", "CS", VirtualKey.OemPeriod, "MoveToToken(False,False,True,\">\")" },
+            new object[] { "ExpandHiddenBlockNearCursor", "CA", VirtualKey.Right, "ExpandCurrentFold()" },
+            new object[] { "CollapseHiddenBlockNearCursor", "CA", VirtualKey.Left, "CollapseCurrentFold()" },
+            new object[] { "AddNextOccurrence", "C", VirtualKey.D, "AddNextOccurrence()" },
+            new object[] { "SelectAllOccurrences", "CS", VirtualKey.L, "SelectAllOccurrences()" },
+            new object[] { "AddCursorAbove", "CA", VirtualKey.Up, "AddCursorAbove()" },
+            new object[] { "AddCursorBelow", "CA", VirtualKey.Down, "AddCursorBelow()" },
+            new object[] { "DuplicateLines", "CS", VirtualKey.D, "DuplicateLines()" },
+            new object[] { "MoveLinesUp", "A", VirtualKey.Up, "MoveLines(-1)" },
+            new object[] { "MoveLinesDown", "A", VirtualKey.Down, "MoveLines(1)" },
+            new object[] { "DeleteLines", "CS", VirtualKey.K, "DeleteLines()" },
+            new object[] { "ToggleComment", "C", VirtualKey.OemQuestion, "ToggleComment()" },
+            new object[] { "ToggleCommentNumpad", "C", VirtualKey.Divide, "ToggleComment()" },
+            new object[] { "ToggleCommentShiftedDigit", "CS", VirtualKey.D7, "ToggleComment()" },
+            new object[] { "ZoomIn", "C", VirtualKey.Oemplus, "ZoomBy(1)" },
+            new object[] { "ZoomInShifted", "CS", VirtualKey.Oemplus, "ZoomBy(1)" },
+            new object[] { "ZoomInNumpad", "C", VirtualKey.Add, "ZoomBy(1)" },
+            new object[] { "ZoomOut", "C", VirtualKey.OemMinus, "ZoomBy(-1)" },
+            new object[] { "ZoomOutNumpad", "C", VirtualKey.Subtract, "ZoomBy(-1)" },
+            new object[] { "ZoomReset", "C", VirtualKey.D0, "ResetZoom()" },
+            new object[] { "ZoomResetNumpad", "C", VirtualKey.NumPad0, "ResetZoom()" },
+        };
+        Equal(CommandCount(), expected.Length, "the editor has " + expected.Length + " commands");
+        foreach (object[] row in expected)
+        {
+            string name = (string)row[0];
+            string modifiers = (string)row[1];
+            VirtualKey key = (VirtualKey)row[2];
+            KeyBindingMap.EditorCommand command = new KeyBindingMap().FindCommand(name);
+            KeyBindingMap.KeyShortcut shortcut = command.DefaultShortcut;
+            string actualModifiers = (shortcut.Ctrl ? "C" : "") + (shortcut.Alt ? "A" : "") + (shortcut.Shift ? "S" : "");
+            if (actualModifiers != modifiers || shortcut.Key != key)
+            {
+                throw new Exception("FAIL: shortcut of " + name + " is " + actualModifiers + "+" + shortcut.Key + ", expected " + modifiers + "+" + key);
+            }
+            RecordingTarget target = new RecordingTarget();
+            command.Execute(target);
+            if (string.Join(";", target.Calls) != (string)row[3])
+            {
+                throw new Exception("FAIL: " + name + " did " + string.Join(";", target.Calls) + ", expected " + (string)row[3]);
+            }
+        }
+        Check(true, "every editor command keeps its name, its shortcut and what it does with the editor (" + expected.Length + " commands)");
+
+        // The shortcuts are bound in the order of the commands, a shortcut maps to one command.
+        var map = new KeyBindingMap();
+        Equal(map.Bindings.Count, expected.Length, "every command has its own shortcut");
+        KeyBindingMap.EditorCommand found;
+        found = map.Bindings[new KeyBindingMap.KeyShortcut(new KeyStroke(VirtualKey.Control | VirtualKey.Space))];
+        Equal(found.Name, "ShowCompletion", "Ctrl+Space is bound to ShowCompletion");
+        found = map.Bindings[new KeyBindingMap.KeyShortcut(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.K))];
+        Equal(found.Name, "DeleteLines", "Ctrl+Shift+K is bound to DeleteLines");
+        Check(!map.Bindings.ContainsKey(new KeyBindingMap.KeyShortcut(new KeyStroke(VirtualKey.Space))), "Space alone is not a shortcut");
+        Check(Throws<InvalidOperationException>(() => map.FindCommand("NoSuchCommand")), "an unknown command is an error");
+
+        // A command called with something that is not an editor does what it did before: fails.
+        Check(Throws<NullReferenceException>(() => new KeyBindingMap().FindCommand("ShowCompletion").Execute("not an editor")), "a command needs an editor to work on");
+    }
+
+    private static int CommandCount()
+    {
+        return EditorCommands.All.Count;
+    }
+
+    private static void KeyShortcutChecks()
+    {
+        var shortcut = new KeyBindingMap.KeyShortcut { Ctrl = true, Shift = true, Key = VirtualKey.F5 };
+        Check(shortcut.Matches(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.F5)), "a shortcut matches its key press");
+        Check(!shortcut.Matches(new KeyStroke(VirtualKey.Control | VirtualKey.F5)), "a missing Shift does not match");
+        Check(!shortcut.Matches(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.Alt | VirtualKey.F5)), "an extra Alt does not match");
+        Check(!shortcut.Matches(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.F6)), "another key does not match");
+        Check(shortcut.Matches(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.F5, 'x')), "the typed character does not matter");
+
+        var fromKey = new KeyBindingMap.KeyShortcut(new KeyStroke(VirtualKey.Control | VirtualKey.Shift | VirtualKey.F5));
+        Check(fromKey.Equals(shortcut), "a shortcut made of a key press equals the same shortcut");
+        Equal(fromKey.GetHashCode(), shortcut.GetHashCode(), "equal shortcuts have equal hash codes");
+        Check(!fromKey.Equals(new KeyBindingMap.KeyShortcut(new KeyStroke(VirtualKey.F5))), "shortcuts with other modifiers differ");
+        Check(!fromKey.Equals("Ctrl+Shift+F5"), "a shortcut is not equal to text");
+        Check(fromKey.Ctrl && fromKey.Shift && !fromKey.Alt && fromKey.Key == VirtualKey.F5, "a shortcut takes the modifiers and the key code of a key press");
+    }
+
     private static void Main()
     {
+        EditorCommandChecks();
+        KeyShortcutChecks();
         HighlightStyleChecks();
         RgbColorChecks();
         GridPointChecks();

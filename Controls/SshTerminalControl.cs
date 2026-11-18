@@ -1462,7 +1462,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         CompletionSession completionSession = _completion;
         ICompletionPopup completionPopup = _popup;
         CompletionSession.AppliedEventArgs appliedBefore = completionSession?.LastApplied;
-        if ((completionPopup != null && completionPopup.TryHandleKeyEvent(e)) || (completionSession != null && completionSession.HandleKey(e)))
+        if ((completionPopup != null && completionPopup.TryHandleKeyEvent(e.ToKeyStroke())) || (completionSession != null && completionSession.HandleKey(e.ToKeyStroke())))
         {
             e.Handled = true;
             e.SuppressKeyPress = true;
@@ -1640,7 +1640,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         _popup = popup;
         if (popup != null)
         {
-            popup.ItemSelected += (CompletionItem completionItem, Keys keys) =>
+            popup.ItemSelected += (CompletionItem completionItem, VirtualKey keys) =>
             {
                 if (_popup == popup)
                 {
@@ -1651,7 +1651,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
                     return;
                 }
                 _inputLine.SetText(completionItem.Text);
-                if (keys == Keys.Return)
+                if (keys == VirtualKey.Return)
                 {
                     SubmitInput();
                 }

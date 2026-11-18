@@ -26,6 +26,11 @@
     <Compile Include="../../Controls/ModelInterop.cs" Link="ModelInterop.cs" />
     <Compile Include="../../TextEditing/HighlightStyle.cs" Link="HighlightStyle.cs" />
     <Compile Include="../../Controls/TextView/HighlightBrushes.cs" Link="HighlightBrushes.cs" />
+    <Compile Include="../../CodeEditing/KeyBindingMap.cs" Link="KeyBindingMap.cs" />
+    <Compile Include="../../CodeEditing/EditorCommands.cs" Link="EditorCommands.cs" />
+    <Compile Include="../../CodeEditing/IEditorCommandTarget.cs" Link="IEditorCommandTarget.cs" />
+    <Compile Include="../../Controls/KeyShortcutText.cs" Link="KeyShortcutText.cs" />
+    <None Include="KeyShortcutGolden.txt" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />

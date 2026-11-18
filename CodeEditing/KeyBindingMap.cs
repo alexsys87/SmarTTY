@@ -1,6 +1,6 @@
+using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 
 namespace SmarTTY.CodeEditing;
 
@@ -31,7 +31,7 @@ public class KeyBindingMap
 
     public class KeyShortcut
     {
-        public Keys Key;
+        public VirtualKey Key;
 
         public bool Ctrl;
 
@@ -39,7 +39,7 @@ public class KeyBindingMap
 
         public bool Shift;
 
-        public bool Matches(KeyEventArgs e)
+        public bool Matches(KeyStroke e)
         {
             if (e.Alt != Alt)
             {
@@ -56,7 +56,7 @@ public class KeyBindingMap
             return e.KeyCode == Key;
         }
 
-        public KeyShortcut(KeyEventArgs e)
+        public KeyShortcut(KeyStroke e)
         {
             Ctrl = e.Control;
             Alt = e.Alt;
@@ -85,73 +85,6 @@ public class KeyBindingMap
                 return keyShortcut.Key == Key;
             }
             return false;
-        }
-
-        public static bool TryParse(string str, out KeyShortcut keyShortcut)
-        {
-            keyShortcut = new KeyShortcut();
-            try
-            {
-                bool ctrl = false;
-                bool alt = false;
-                bool shift = false;
-                Keys key = Keys.None;
-                KeysConverter keysConverter = new KeysConverter();
-                string[] parts = str.Split(new char[2] { '+', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string part in parts)
-                {
-                    switch (part)
-                    {
-                        case "Control":
-                            ctrl = true;
-                            break;
-                        case "Alt":
-                            alt = true;
-                            break;
-                        case "Shift":
-                            shift = true;
-                            break;
-                        default:
-                            key = (Keys)keysConverter.ConvertFromString(part);
-                            break;
-                    }
-                }
-                if (key == Keys.None)
-                {
-                    return false;
-                }
-                keyShortcut = new KeyShortcut
-                {
-                    Ctrl = ctrl,
-                    Alt = alt,
-                    Shift = shift,
-                    Key = key
-                };
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        public override string ToString()
-        {
-            KeysConverter keysConverter = new KeysConverter();
-            string text = "";
-            if (Ctrl)
-            {
-                text += "Control + ";
-            }
-            if (Alt)
-            {
-                text += "Alt + ";
-            }
-            if (Shift)
-            {
-                text += "Shift + ";
-            }
-            return text + keysConverter.ConvertToString(Key);
         }
     }
 
