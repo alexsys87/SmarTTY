@@ -449,6 +449,7 @@ internal static class Program
         rig.Host.TitleSet = "keep";
         Equal(rig.Scan("\u001b]0;never\u0018x"), 10, "CAN cancels an OSC string");
         Equal(rig.Scan("\u001b]0;never\u001a"), 10, "and so does SUB");
+        Equal(rig.Scan("\u001b]0;never\u001ax"), 10, "...and the text after SUB is not part of the string");
         Equal(rig.Scan("\u001b]0;ti\u001b[31m"), 6, "an ESC that is no terminator aborts it and begins the next sequence");
         Equal(rig.Host.TitleSet, "keep", "...without carrying it out");
         Equal(rig.Scan("\u001bPdata\u001b\\x"), 8, "a DCS string is skipped up to its terminator");
@@ -503,6 +504,9 @@ internal static class Program
         rig.Screen.Cursor = new GridPoint(3, 7);
         rig.Scan("\u001bD");
         Equal(rig.Log, "scrollup 2,1", "...and at the bottom of a region it scrolls the region");
+        rig.Screen.Cursor = new GridPoint(3, 4);
+        rig.Scan("\u001bD");
+        Equal(rig.Log, "move 0,1 scroll", "...but inside the region, away from its bottom, it only moves down");
         rig.Screen.Cursor = new GridPoint(3, 2);
         rig.Scan("\u001bM");
         Equal(rig.Log, "insertlines 2,1", "ESC M at the top of the region scrolls it down");
@@ -532,6 +536,8 @@ internal static class Program
         Check(csi.Screen.CurrentStyle.Bold && csi.Screen.Log.Count == 0, "intermediate bytes make another command: CSI 2 SP q is no scroll region and no erase");
         csi.Scan("\u001b[1\"p");
         Check(csi.Modes.ApplicationCursorKeys, "...and CSI 1 \" p is not a soft reset");
+        csi.Scan("\u001b[?!p");
+        Check(csi.Modes.ApplicationCursorKeys, "...nor is CSI ? ! p (a private prefix makes it another command)");
 
         csi.Modes.ApplicationKeypad = true;
         csi.Screen.Cursor = new GridPoint(7, 3);
