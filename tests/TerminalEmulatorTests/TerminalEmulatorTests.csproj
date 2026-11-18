@@ -7,7 +7,7 @@
     <NoWarn>$(NoWarn);CS0649</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../Terminal/Emulation/*.cs" Exclude="../../Terminal/Emulation/LineInfo.cs;../../Terminal/Emulation/LineInfoStore.cs;../../Terminal/Emulation/ScreenBuffer.cs;../../Terminal/Emulation/ILineInfoHost.cs;../../Terminal/Emulation/LinkTracker.cs" />
+    <Compile Include="../../Terminal/Emulation/*.cs" Exclude="../../Terminal/Emulation/LineInfo.cs;../../Terminal/Emulation/LineInfoStore.cs;../../Terminal/Emulation/ScreenBuffer.cs;../../Terminal/Emulation/ILineInfoHost.cs;../../Terminal/Emulation/LinkTracker.cs;../../Terminal/Emulation/TerminalScreen.cs;../../Terminal/Emulation/ITerminalScreenView.cs" />
     <Compile Include="../../Terminal/AnsiEscapeUtils.cs" Link="AnsiEscapeUtils.cs" />
     <Compile Include="../../Terminal/CsiRepeatLimit.cs" Link="CsiRepeatLimit.cs" />
     <Compile Include="../../Terminal/DecCharsets.cs" Link="DecCharsets.cs" />

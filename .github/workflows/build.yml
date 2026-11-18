@@ -264,6 +264,9 @@ jobs:
       - name: Run terminal emulator checks (what the CSI commands, the modes and the OSC strings do, with a fake screen and host)
         run: dotnet run --project tests/TerminalEmulatorTests -c Release
 
+      - name: Run terminal screen checks (the cursor, writing with wrap and scroll, the scroll region, erasing, the two buffers, the batch, the scrollback, resize)
+        run: dotnet run --project tests/TerminalScreenTests -c Release
+
       - name: Run terminal line information checks (which lines are kept, the styles of the cells, shifting cells, inserted and removed lines)
         run: dotnet run --project tests/LineInfoStoreTests -c Release
 
