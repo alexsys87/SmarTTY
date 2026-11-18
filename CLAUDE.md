@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out, next the save flow (`Save`, `SaveInBackground`, `FinishBackgroundSave`, `CompleteSave`) and the rest |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done, next the status bar, then A6 (hex editor model) |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -220,6 +220,17 @@ needs through `IRemoteSaveSource` (implemented explicitly: the text, the hex vie
 `RemoteSaveOptions` (the settings and `IsNewFile`/`IsWindowsHost`, read after the questions as the old code did). `tests/RemoteFileSessionTests` (net8.0)
 drives it with a fake editor. Next, A4g: the flow around it (`Save`, `SaveInBackground`, `FinishBackgroundSave`, `CompleteSave`, the reload and the encodings), which
 moves the rest of the fields (`_loaded`, `_reloading`, `_rawBytes`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`).
+
+A4 ends here: what is left in `RemoteFileEditor` is the orchestration that the rules keep in the view (the threads of `Save` and `SaveInBackground`, `FinishBackgroundSave`,
+the timers, the questions with their icons, the hex view switching, `FinishLoading`/`ApplyContent` on the document, the caret and the folds). The state it still keeps in
+fields (`_loaded`, `_reloading`, `_rawBytes`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`) can move to `RemoteFileSession` when the WPF/AvalonEdit editor of stage 3 needs it.
+
+Done in A5a: `TextSearcher` (the WPF view model of the search bar) works on `TextEditing/ISearchTarget` instead of `TextEditorControl`: the selection, `Find`,
+`ReplaceText`, `ReplaceAll`, the highlight of the matches and of the range the search is limited to, `GetLineText`/`GetRangeText`, and `RangeChanged` as a
+`TextRangeChangedHandler` without the control in its arguments. `EditableTextBrowser` implements it (the event and the two text getters explicitly; the rest are the
+members it already had). `FindSelectMode` moved from `ReadonlyTextBrowser` to `TextEditing/`. `RemoteFileEditorIntegrationTests` has a scenario that drives the real control
+through the interface (the `search-target` scenario). `IByteSearchTarget` (the HEX terminal) was already such a seam. Next: the status bar (`RemoteFileEditorStatusBar` reads
+about 35 members of the editor and the hex view: its seam, `IEditorStatusSource`, is designed together with the hex editor model of A6).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20

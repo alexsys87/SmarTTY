@@ -321,6 +321,61 @@ internal static class Program
         o.Close();
     }
 
+    // The editor as the text of a search bar: what TextSearcher asks of it goes through ISearchTarget, on the real control.
+    private static void SearchTarget(Server server)
+    {
+        Console.WriteLine("-- the editor as the text of a search bar (ISearchTarget)");
+        WriteRemote(server, "search.txt", Bytes("one two\nthree two\nfour\n"));
+        Opened o = Open(server, "search.txt");
+        ISearchTarget target = o.Editor;
+        TextMatcher two = TextMatcher.Literal("two", ignoreCase: false);
+        TextDocument.TextPosition none = TextDocument.TextPosition.Invalid;
+        Check(!target.HasSelection, "nothing is selected in a file that was just opened");
+        Equal(target.GetLineText(1), "three two", "the text of a line");
+        TextDocument.TextPosition found = target.Find(new TextDocument.TextPosition(0, 0), two, false, true, FindSelectMode.SelectOrClear, none, none);
+        Check(found.IsValid && found.Line == 0 && found.Column == 4, "the first match is found from the start of the text");
+        Check(target.HasSelection, "the match is selected");
+        Equal(target.GetRangeText(target.SelectionStart, target.SelectionEnd), "two", "the selection is the match");
+        // A match is selected with the caret at its beginning, as the search bar knows: it goes on from the later end of the selection (forwards) or the earlier one (backwards).
+        TextDocument.TextPosition from = target.SelectionEnd > target.SelectionStart ? target.SelectionEnd : target.SelectionStart;
+        found = target.Find(from, two, false, true, FindSelectMode.SelectOrClear, none, none);
+        Check(found.IsValid && found.Line == 1 && found.Column == 6, "the next match is on the next line");
+        from = target.SelectionEnd < target.SelectionStart ? target.SelectionEnd : target.SelectionStart;
+        found = target.Find(from, two, true, true, FindSelectMode.SelectOrClear, none, none);
+        Check(found.IsValid && found.Line == 0 && found.Column == 4, "searching backwards goes to the match before");
+        found = target.Find(new TextDocument.TextPosition(0, 0), TextMatcher.Literal("absent", ignoreCase: false), false, true, FindSelectMode.SelectOrClear, none, none);
+        Check(!found.IsValid, "a text that is not there is not found");
+        Check(!target.HasSelection, "and the selection is cleared by that search (SelectOrClear)");
+
+        // The search can be limited to a range.
+        found = target.Find(new TextDocument.TextPosition(0, 1), two, false, true, FindSelectMode.None, new TextDocument.TextPosition(0, 1), new TextDocument.TextPosition(9, 1));
+        Check(found.IsValid && found.Line == 1, "a search in a range stays in it, also when it wraps");
+
+        // The editor reports the edits that span lines (an edit inside one line is a change of the line, which the search bar never learned of).
+        List<string> ranges = new List<string>();
+        TextRangeChangedHandler handler = (start, oldEnd, newEnd) => ranges.Add(start.Line + ":" + start.Column + "-" + newEnd.Line + ":" + newEnd.Column);
+        target.RangeChanged += handler;
+        target.ReplaceText(new TextDocument.TextPosition(7, 0), new TextDocument.TextPosition(7, 0), select: false, "\n");
+        Equal(string.Join(",", ranges), "0:7-1:0", "an edit that adds a line is reported with its range");
+        Equal(Text(o), "one two\n\nthree two\nfour\n", "and made");
+        TextDocument.TextPosition newEnd;
+        int count = target.ReplaceAll(two, "2", none, none, out newEnd);
+        Equal(count, 2, "replace all counts the matches");
+        Equal(Text(o), "one 2\n\nthree 2\nfour\n", "and replaces them");
+        target.RangeChanged -= handler;
+        int reported = ranges.Count;
+        target.ReplaceText(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(0, 0), select: false, "\n");
+        Equal(ranges.Count, reported, "a handler that was removed is not called");
+
+        int id = target.AddHighlight(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(3, 0), new HighlightStyle(RgbColor.FromArgb(40, 90, 140, 255), RgbColor.Empty, RgbColor.Empty));
+        Equal(target.SetHighlight(id, new TextDocument.TextPosition(0, 1), new TextDocument.TextPosition(5, 1), new HighlightStyle(RgbColor.FromArgb(40, 90, 140, 255), RgbColor.Empty, RgbColor.Empty)), id, "a highlighted range can be moved and keeps its number");
+        target.RemoveHighlight(id);
+        target.SetMatchHighlight(two);
+        target.SetMatchHighlight(null);
+        Check(true, "highlights and the marks of the matches can be set and removed");
+        o.Close();
+    }
+
     private static void Encodings(Server server)
     {
         Console.WriteLine("-- encodings and line endings kept by a save");
@@ -704,6 +759,7 @@ internal static class Program
     {
         RunScenario(server, "load-save", LoadAndSave);
         RunScenario(server, "encodings", Encodings);
+        RunScenario(server, "search-target", SearchTarget);
         RunScenario(server, "format", ChangeFormat);
         RunScenario(server, "questions", ConvertCrLf);
         RunScenario(server, "new-file", NewFile);
