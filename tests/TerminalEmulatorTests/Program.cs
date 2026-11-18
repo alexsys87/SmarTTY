@@ -61,7 +61,11 @@ internal static class Program
 
         private int _buffer;
 
+        public bool HasScrollRegion { get; set; }
+
         public int ScrollTop { get; set; }
+
+        public int ScrollBottom { get; set; } = 23;
 
         public bool InsertMode
         {
@@ -131,6 +135,14 @@ internal static class Program
 
         public void SendReply(string reply) => Replies.Add(reply);
 
+        public int ByteStateResets;
+
+        public int StreamResets;
+
+        public void ResetByteState() => ByteStateResets++;
+
+        public void ResetFromStream() => StreamResets++;
+
         public void MoveForwardBytes(int bytes) => Log.Add("bytes forward " + bytes);
 
         public void MoveBackBytes(int bytes) => Log.Add("bytes back " + bytes);
@@ -173,6 +185,13 @@ internal static class Program
         }
 
         public string Log => string.Join("; ", Screen.Log);
+
+        // Scans the sequence that starts at the position; returns the number of characters it takes.
+        public int Scan(string text, int position = 0)
+        {
+            Screen.Log.Clear();
+            return Emulator.ParseEscapeSequence(text, position, out _);
+        }
     }
 
     private static void Main()
@@ -184,6 +203,7 @@ internal static class Program
         Replies();
         Style();
         Osc();
+        Scanner();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " terminal emulator checks passed.");
     }
@@ -401,6 +421,132 @@ internal static class Program
         byteMode.Csi('m');
         Equal(byteMode.Host.ByteOffsetSet, 5, "...but not the ones for colours, erasing, modes and replies");
         Check(!byteMode.Csi('y') && byteMode.Host.ByteOffsetSet == 0, "an unknown command is no command, and it resets the offset too");
+    }
+
+    private static void Scanner()
+    {
+        Rig rig = new Rig();
+        Equal(rig.Scan("\u001b[5Ahello"), 4, "a whole CSI sequence takes its characters");
+        Equal(rig.Log, "move 0,-5", "...and is carried out");
+        Equal(rig.Scan("ab\u001b[2Jc", 2), 4, "from a position inside the text");
+        Equal(rig.Log, "erase display All; invalidate", "...CSI 2 J");
+
+        Equal(rig.Scan("\u001b[5"), 3, "a CSI sequence that has not ended takes the rest");
+        Equal(rig.Modes.IncompleteEscape, "\u001b[5", "...and is kept for the next chunk");
+        rig.Modes.IncompleteEscape = null;
+        Equal(rig.Scan("ab\u001b", 2), 1, "an ESC at the very end takes itself");
+        Equal(rig.Modes.IncompleteEscape, "\u001b", "...and is kept");
+        rig.Modes.IncompleteEscape = null;
+        Equal(rig.Scan("\u001b[31\nA"), 4, "a CSI cut short by a control character leaves that character to be dealt with");
+        Equal(rig.Log, "", "...and carries out nothing");
+        Equal(rig.Scan("\u001b[3\u0018A"), 4, "CAN cancels the sequence and belongs to it");
+        Equal(rig.Scan("\u001b[31\u001b[0m"), 4, "an ESC cuts a CSI short and begins the next one");
+
+        Equal(rig.Scan("\u001b]0;t\u0007x"), 6, "an OSC string ends at BEL");
+        Equal(rig.Host.TitleSet, "t", "...and is carried out");
+        Equal(rig.Scan("\u001b]2;u\u001b\\x"), 7, "or at ESC \\");
+        Equal(rig.Host.TitleSet, "u", "...and is carried out too");
+        rig.Host.TitleSet = "keep";
+        Equal(rig.Scan("\u001b]0;never\u0018x"), 10, "CAN cancels an OSC string");
+        Equal(rig.Scan("\u001b]0;never\u001a"), 10, "and so does SUB");
+        Equal(rig.Scan("\u001b]0;ti\u001b[31m"), 6, "an ESC that is no terminator aborts it and begins the next sequence");
+        Equal(rig.Host.TitleSet, "keep", "...without carrying it out");
+        Equal(rig.Scan("\u001bPdata\u001b\\x"), 8, "a DCS string is skipped up to its terminator");
+        Equal(rig.Scan("\u001b^pm\u0007"), 5, "PM too");
+        Equal(rig.Scan("\u001b_apc\u0007"), 6, "APC too");
+        Equal(rig.Scan("\u001bXsos\u0007"), 6, "SOS too");
+        rig.Modes.IncompleteEscape = null;
+        Equal(rig.Scan("\u001b]0;ti"), 6, "an OSC string that has not ended takes the rest");
+        Equal(rig.Modes.IncompleteEscape, "\u001b]0;ti", "...and is kept");
+        rig.Modes.IncompleteEscape = null;
+        Equal(rig.Scan("\u001b]" + new string('a', 20000)), 1, "one that grows past the limit gives up its ESC, so that the rest is text");
+        Check(rig.Modes.IncompleteEscape == null, "...and keeps nothing");
+
+        Equal(rig.Scan("\u001b(0"), 3, "ESC ( 0 takes three characters");
+        Equal(rig.Modes.Charsets.Translate("q"), "\u2500", "...and selects the line drawing set for G0");
+        Equal(rig.Scan("\u001b(B"), 3, "ESC ( B");
+        Equal(rig.Modes.Charsets.Translate("q"), "q", "...the plain set again");
+        rig.Scan("\u001b)0");
+        Equal(rig.Modes.Charsets.Translate("q"), "q", "ESC ) 0 designates G1, which is not shifted in");
+        Equal(rig.Scan("\u001b#8"), 3, "ESC # 8 is taken and does nothing");
+        Equal(rig.Scan("\u001b("), 2, "ESC ( at the end of the chunk takes what there is");
+        Equal(rig.Modes.IncompleteEscape, "\u001b(", "...and keeps it");
+        rig.Modes.IncompleteEscape = null;
+        Equal(rig.Scan("\u001b(\u001b[31m"), 2, "ESC ( cut short by an ESC takes two characters and leaves the ESC");
+
+        Equal(rig.Scan("\u001b="), 2, "ESC =");
+        Check(rig.Modes.ApplicationKeypad, "...is the application keypad");
+        rig.Scan("\u001b>");
+        Check(!rig.Modes.ApplicationKeypad, "ESC > is the numeric keypad");
+
+        rig.Screen.Cursor = new GridPoint(4, 2);
+        rig.Host.ByteOffsetSet = 5;
+        rig.Scan("\u001b7");
+        Equal(rig.Host.ByteOffsetSet, 0, "an ESC sequence that is no CSI or OSC puts the byte offset at the start of a cell");
+        rig.Screen.Cursor = new GridPoint(9, 9);
+        rig.Scan("\u001b8");
+        Equal(rig.Screen.Cursor, new GridPoint(4, 2), "ESC 7 / ESC 8 save and restore the cursor");
+        rig.Host.ByteOffsetSet = 5;
+        rig.Scan("\u001b[m");
+        Equal(rig.Host.ByteOffsetSet, 5, "a CSI sequence leaves it to the command");
+
+        rig.Screen.Cursor = new GridPoint(5, 0);
+        rig.Scan("\u001bH");
+        Equal(rig.Screen.Tabs.NextDistance(0, 8), 5, "ESC H sets a tab stop at the cursor");
+
+        rig.Screen.Cursor = new GridPoint(3, 7);
+        rig.Scan("\u001bD");
+        Equal(rig.Log, "move 0,1 scroll", "ESC D moves down one row, scrolling at the bottom");
+        rig.Screen.HasScrollRegion = true;
+        rig.Screen.ScrollTop = 2;
+        rig.Screen.ScrollBottom = 7;
+        rig.Screen.Cursor = new GridPoint(3, 7);
+        rig.Scan("\u001bD");
+        Equal(rig.Log, "scrollup 2,1", "...and at the bottom of a region it scrolls the region");
+        rig.Screen.Cursor = new GridPoint(3, 2);
+        rig.Scan("\u001bM");
+        Equal(rig.Log, "insertlines 2,1", "ESC M at the top of the region scrolls it down");
+        rig.Screen.Cursor = new GridPoint(3, 5);
+        rig.Scan("\u001bM");
+        Equal(rig.Log, "move 0,-1 scroll", "...and elsewhere moves up one row");
+        rig.Screen.Cursor = new GridPoint(6, 5);
+        rig.Scan("\u001bE");
+        Equal(rig.Log, "move -6,1 scroll", "ESC E goes to the start of the next row");
+
+        Equal(rig.Scan("\u001bc"), 2, "ESC c takes two characters");
+        Equal(rig.Host.StreamResets, 1, "...and asks the control for a full reset");
+        Equal(rig.Scan("\u001bZ"), 2, "an ESC sequence that is not known takes two characters");
+        Equal(rig.Scan("\u001b\u001b[1m"), 1, "ESC ESC takes the first ESC only");
+        Equal(rig.Scan("\u001b\r"), 1, "ESC and a control character: the ESC only");
+
+        Rig csi = new Rig();
+        csi.Scan("\u001b[?1h");
+        Check(csi.Modes.ApplicationCursorKeys, "CSI ? 1 h is carried out as a DEC mode");
+        csi.Screen.Log.Clear();
+        csi.Scan("\u001b[>4;2m");
+        csi.Scan("\u001b[<u");
+        csi.Scan("\u001b[=1c");
+        Check(csi.Screen.CurrentStyle.IsDefault && csi.Host.Replies.Count == 0, "a private prefix other than ? is not the standard command (CSI > 4 ; 2 m is no SGR reset, = c is no attribute request)");
+        csi.Scan("\u001b[1m");
+        csi.Scan("\u001b[2 q");
+        Check(csi.Screen.CurrentStyle.Bold && csi.Screen.Log.Count == 0, "intermediate bytes make another command: CSI 2 SP q is no scroll region and no erase");
+        csi.Scan("\u001b[1\"p");
+        Check(csi.Modes.ApplicationCursorKeys, "...and CSI 1 \" p is not a soft reset");
+
+        csi.Modes.ApplicationKeypad = true;
+        csi.Screen.Cursor = new GridPoint(7, 3);
+        csi.Screen.HasScrollRegion = true;
+        csi.Host.Mouse = MouseReportingMode.Normal;
+        csi.Screen.Log.Clear();
+        csi.Scan("\u001b[!p");
+        Check(!csi.Modes.ApplicationCursorKeys && !csi.Modes.ApplicationKeypad, "CSI ! p (soft reset): the keys are normal");
+        Check(csi.Screen.CurrentStyle.IsDefault && csi.Host.Mouse == MouseReportingMode.Off, "...the style is plain and the mouse is off");
+        Equal(csi.Screen.Cursor, new GridPoint(7, 3), "...the cursor stays where it was");
+        Check(csi.Screen.Log.Contains("region cleared") && csi.Screen.Log.Contains("insert False") && csi.Screen.Log.Contains("hide False"), "...the region is cleared, the insert mode and the caret are normal");
+        Check(csi.Host.ByteStateResets >= 1, "...and the byte state is forgotten");
+        csi.Modes.ApplicationCursorKeys = true;
+        csi.Emulator.ResetModes();
+        Check(!csi.Modes.ApplicationCursorKeys, "ResetModes does the same without the region and the cursor");
     }
 
     private static void Replies()

@@ -16,6 +16,10 @@ internal sealed class TerminalEmulator
 
     private readonly TerminalModes _modes;
 
+    // An escape sequence (an OSC title, say) that has not ended after this many characters is dropped, so that a
+    // stray ESC ] in binary output cannot swallow everything that follows while waiting for its terminator.
+    private const int MaxPendingEscapeLength = 16384;
+
     public TerminalEmulator(ITerminalScreen screen, ITerminalHost host, TerminalModes modes)
     {
         _screen = screen;
@@ -428,5 +432,252 @@ internal sealed class TerminalEmulator
                     break;
                 }
         }
+    }
+
+    public int ParseEscapeSequence(string text, int position, out string parsedText, IEscapeTrace escapeTrace = null)
+    {
+        parsedText = null;
+        escapeTrace?.SetPosition(position);
+        if (position + 1 >= text.Length)
+        {
+            _modes.IncompleteEscape = text.Substring(position);
+            return 1;
+        }
+        if (text[position + 1] != '[' && text[position + 1] != ']')
+        {
+            // ESC 7/8, ESC D/E/M, ESC c and the like place the cursor on a cell boundary.
+            _host.ByteOffset = 0;
+        }
+        switch (text[position + 1])
+        {
+            case ']':
+                {
+                    int consumed = ParseControlString(text, position, out string content, escapeTrace);
+                    if (content != null)
+                    {
+                        ExecuteOsc(content, escapeTrace);
+                    }
+                    return consumed;
+                }
+            case 'P':
+            case 'X':
+            case '^':
+            case '_':
+                // DCS, SOS, PM and APC strings are not supported, but their contents must not be shown as text.
+                escapeTrace?.SetDescription("Ignored control string");
+                return ParseControlString(text, position, out _, escapeTrace);
+            case '[':
+                {
+                    switch (AnsiEscapeUtils.ScanCsi(text, position + 2, out int csiEnd))
+                    {
+                        case CsiScanResult.Incomplete:
+                            escapeTrace?.SetWarning("Invalid CSI");
+                            return KeepIncompleteEscape(text, position, escapeTrace);
+                        case CsiScanResult.Cancelled:
+                            // Cut short by ESC or a control character: that one is dealt with as the next thing in the stream.
+                            escapeTrace?.SetWarning("CSI cancelled");
+                            return csiEnd - position;
+                    }
+                    ExecuteCsiSequence(text[csiEnd], text.Substring(position + 2, csiEnd - position - 2), escapeTrace);
+                    return csiEnd - position + 1;
+                }
+            case ' ':
+            case '#':
+            case '%':
+            case '(':
+            case ')':
+            case '*':
+            case '+':
+                if (text.Length - position < 3)
+                {
+                    _modes.IncompleteEscape = text.Substring(position);
+                    return _modes.IncompleteEscape.Length;
+                }
+                if (AnsiEscapeUtils.InterruptsEscape(text[position + 2]))
+                {
+                    // ESC ( cut short by ESC or a control character: that one is no final character, it is not swallowed.
+                    escapeTrace?.SetWarning("Escape sequence cut short");
+                    return 2;
+                }
+                if (text[position + 1] == '(' || text[position + 1] == ')')
+                {
+                    // Character set designation: ESC ( 0 = DEC Special Graphics (line drawing) for G0, ESC ( B = ASCII.
+                    _modes.Charsets.Designate(text[position + 1], text[position + 2]);
+                }
+                escapeTrace?.SetRaw("[ESC]" + text.Substring(position, 2));
+                return 3;
+            case '>':
+                _modes.ApplicationKeypad = false;
+                escapeTrace?.SetDescription("DECPNM");
+                return 2;
+            case '=':
+                _modes.ApplicationKeypad = true;
+                escapeTrace?.SetDescription("DECPNM");
+                return 2;
+            case '7':
+                escapeTrace?.SetDescription("Save cursor");
+                SaveCursor();
+                return 2;
+            case '8':
+                escapeTrace?.SetDescription("Restore cursor");
+                RestoreCursor();
+                return 2;
+            case 'H':
+                escapeTrace?.SetDescription("Set tab");
+                _screen.Tabs.SetStop(_screen.Cursor.X);
+                return 2;
+            case 'c':
+                escapeTrace?.SetDescription("Reset");
+                _host.ResetFromStream();
+                return 2;
+            case 'D':
+                escapeTrace?.SetDescription("Remove lines");
+                if (_screen.HasScrollRegion && _screen.Cursor.Y == _screen.ScrollBottom)
+                {
+                    _screen.ScrollRegionUp(_screen.ScrollTop, 1);
+                }
+                else
+                {
+                    _screen.MoveCursorBy(0, 1, scroll: true);
+                }
+                return 2;
+            case 'M':
+                escapeTrace?.SetDescription("Add lines");
+                if (_screen.Cursor.Y == _screen.ScrollTop)
+                {
+                    _screen.InsertBlankLines(_screen.ScrollTop, 1);
+                }
+                else
+                {
+                    _screen.MoveCursorBy(0, -1, scroll: true);
+                }
+                return 2;
+            case 'E':
+                escapeTrace?.SetDescription("Got to next line");
+                _screen.MoveCursorBy(-_screen.Cursor.X, 1, scroll: true);
+                return 2;
+            default:
+                if (AnsiEscapeUtils.InterruptsEscape(text[position + 1]))
+                {
+                    // ESC ESC starts the next sequence, ESC CR is an ESC and a CR: only this ESC goes.
+                    escapeTrace?.SetWarning("Lone ESC");
+                    return 1;
+                }
+                return 2;
+        }
+    }
+
+    /// <summary>
+    /// Keeps an escape sequence that has not ended yet for the next chunk of output, or drops its ESC once it has
+    /// grown beyond <see cref="MaxPendingEscapeLength"/>, so the rest is shown as text instead of being swallowed.
+    /// Returns the number of characters consumed.
+    /// </summary>
+    private int KeepIncompleteEscape(string text, int position, IEscapeTrace escapeTrace)
+    {
+        if (text.Length - position > MaxPendingEscapeLength)
+        {
+            escapeTrace?.SetWarning("Unterminated escape sequence dropped");
+            return 1;
+        }
+        _modes.IncompleteEscape = text.Substring(position);
+        return _modes.IncompleteEscape.Length;
+    }
+
+    /// <summary>
+    /// Parses an OSC/DCS-style string (ESC x ... BEL or ESC x ... ESC \). As in xterm, CAN or SUB cancel the string
+    /// and an ESC that does not start the terminator aborts it and begins the next sequence.
+    /// <paramref name="content"/> receives the text between the introducer and the terminator, or null when the
+    /// string was cancelled or is not complete yet. Returns the number of characters consumed.
+    /// </summary>
+    private int ParseControlString(string text, int position, out string content, IEscapeTrace escapeTrace)
+    {
+        content = null;
+        for (int index = position + 2; index < text.Length; index++)
+        {
+            char ch = text[index];
+            if (ch == '\a')
+            {
+                content = text.Substring(position + 2, index - position - 2);
+                return index - position + 1;
+            }
+            if (ch == '\u0018' || ch == '\u001a')
+            {
+                return index - position + 1;
+            }
+            if (ch == '\u001b')
+            {
+                if (index + 1 >= text.Length)
+                {
+                    break;
+                }
+                if (text[index + 1] == '\\')
+                {
+                    content = text.Substring(position + 2, index - position - 2);
+                    return index - position + 2;
+                }
+                escapeTrace?.SetWarning("Control string aborted by ESC");
+                return index - position;
+            }
+        }
+        escapeTrace?.SetWarning("Invalid ST/BEL");
+        return KeepIncompleteEscape(text, position, escapeTrace);
+    }
+
+    /// <summary>
+    /// Splits a CSI sequence into its private prefix (? > = <), parameters and intermediate bytes before running it.
+    /// Sequences with a prefix other than '?' or with intermediates are xterm extensions that mostly are not
+    /// supported; they must not be run as the standard sequence with the same final character
+    /// (vim's "CSI > 4 ; 2 m" is not an SGR reset, "CSI 2 SP q" is not a scroll-region command).
+    /// </summary>
+    private void ExecuteCsiSequence(char final, string body, IEscapeTrace escapeTrace)
+    {
+        char prefix = '\0';
+        if (body.Length > 0 && body[0] >= '<' && body[0] <= '?')
+        {
+            prefix = body[0];
+            body = body.Substring(1);
+        }
+        int intermediateStart = body.Length;
+        while (intermediateStart > 0 && body[intermediateStart - 1] >= ' ' && body[intermediateStart - 1] <= '/')
+        {
+            intermediateStart--;
+        }
+        string intermediates = body.Substring(intermediateStart);
+        body = body.Substring(0, intermediateStart);
+        if (intermediates.Length != 0)
+        {
+            if (prefix == '\0' && intermediates == "!" && final == 'p')
+            {
+                escapeTrace?.SetDescription("Soft reset");
+                SoftReset();
+            }
+            return;
+        }
+        if (prefix != '\0' && prefix != '?')
+        {
+            escapeTrace?.SetDescription($"Ignored private CSI {prefix}{body}{final}");
+            return;
+        }
+        ExecuteCsi(final, body.Split(';'), prefix == '?', escapeTrace);
+    }
+
+    /// <summary>DECSTR: resets the modes and attributes, but keeps the screen contents and the cursor position.</summary>
+    private void SoftReset()
+    {
+        GridPoint cursor = _screen.Cursor;
+        _screen.ClearScrollRegion();
+        _screen.Cursor = cursor;
+        ResetModes();
+    }
+
+    /// <summary>The modes and attributes back to those of a new terminal (the screen contents are not touched).</summary>
+    public void ResetModes()
+    {
+        _host.ResetByteState();
+        _modes.Reset();
+        _screen.InsertMode = false;
+        _screen.HideCaret = false;
+        _host.MouseMode = MouseReportingMode.Off;
+        _screen.CurrentStyle = CellStyle.Default;
     }
 }

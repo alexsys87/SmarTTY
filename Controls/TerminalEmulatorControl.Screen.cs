@@ -32,7 +32,11 @@ public partial class TerminalEmulatorControl : ITerminalScreen, ITerminalHost
         set => ActiveBufferIndex = value;
     }
 
+    bool ITerminalScreen.HasScrollRegion => HasScrollRegion;
+
     int ITerminalScreen.ScrollTop => ScrollTop;
+
+    int ITerminalScreen.ScrollBottom => ScrollBottom;
 
     bool ITerminalScreen.InsertMode
     {
@@ -124,6 +128,16 @@ public partial class TerminalEmulatorControl : ITerminalScreen, ITerminalHost
     int ITerminalHost.ByteOffset
     {
         set => _byteOffset = value;
+    }
+
+    void ITerminalHost.ResetByteState()
+    {
+        ResetByteState();
+    }
+
+    void ITerminalHost.ResetFromStream()
+    {
+        ResetFromStream();
     }
 
     void ITerminalHost.MoveForwardBytes(int bytes)
