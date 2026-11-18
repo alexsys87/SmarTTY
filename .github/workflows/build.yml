@@ -258,6 +258,9 @@ jobs:
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
+      - name: Run terminal line information checks (which lines are kept, the styles of the cells, shifting cells, inserted and removed lines)
+        run: dotnet run --project tests/LineInfoStoreTests -c Release
+
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 

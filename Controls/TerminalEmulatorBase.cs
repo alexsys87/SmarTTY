@@ -11,210 +11,8 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class TerminalEmulatorBase : TextEditorControl
+public partial class TerminalEmulatorBase : TextEditorControl, ILineInfoHost
 {
-    protected class LineInfo
-    {
-        public CellStyle[] Cells;
-
-        public bool IsDimmed;
-
-        public bool IsWrapped;
-
-        public DateTime Timestamp;
-    }
-
-    protected class LineInfoStore
-    {
-        private TerminalEmulatorBase _terminal;
-
-        private List<LineInfo> _lines = new List<LineInfo>();
-
-        public LineInfoStore(TerminalEmulatorBase terminalEmulatorBase)
-        {
-            _terminal = terminalEmulatorBase;
-        }
-
-        public LineInfo GetLine(int line)
-        {
-            if (line >= _lines.Count)
-            {
-                return null;
-            }
-            return _lines[line];
-        }
-
-        internal void SetCells(int row, int startColumn, int count, CellStyle cellStyle, LinkCell[] items = null)
-        {
-            TextDocument.TextPosition textPosition = this._terminal.ToDocumentPosition(new Point(0, row));
-            while (textPosition.Line >= this._lines.Count)
-            {
-                if (cellStyle.IsDefault && items == null && !this._terminal.AlwaysTrackLines && this._terminal.HideMargins)
-                {
-                    return;
-                }
-                this._lines.Add(null);
-            }
-            if (this._lines[textPosition.Line] == null)
-            {
-                if (cellStyle.IsDefault && items == null && !this._terminal.AlwaysTrackLines && this._terminal.HideMargins)
-                {
-                    return;
-                }
-                this._lines[textPosition.Line] = new LineInfo();
-            }
-            LineInfo lineInfo = this._lines[textPosition.Line];
-            lineInfo.IsDimmed = false;
-            lineInfo.IsWrapped = false;
-            lineInfo.Timestamp = DateTime.Now;
-            if (lineInfo.Cells == null || lineInfo.Cells.Length < this._terminal._visibleColumns)
-            {
-                CellStyle[] cellStyles = new CellStyle[this._terminal._visibleColumns];
-                if (lineInfo.Cells != null)
-                {
-                    lineInfo.Cells.CopyTo(cellStyles, 0);
-                }
-                lineInfo.Cells = cellStyles;
-            }
-            if (startColumn == -1 || startColumn > this._terminal._visibleColumns)
-            {
-                startColumn = this._terminal._visibleColumns;
-            }
-            int remainingColumns = this._terminal._visibleColumns - startColumn;
-            if (count == -1 || count > remainingColumns)
-            {
-                count = remainingColumns;
-            }
-            for (int cellOffset = 0; cellOffset < count; cellOffset++)
-            {
-                lineInfo.Cells[startColumn + cellOffset] = cellStyle;
-                if (items != null && cellOffset < items.Length)
-                {
-                    lineInfo.Cells[startColumn + cellOffset]._link = items[cellOffset];
-                }
-                else
-                {
-                    lineInfo.Cells[startColumn + cellOffset]._link = default;
-                }
-            }
-        }
-
-        public void ClearLine(int line)
-        {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
-            if (textPosition.Line < _lines.Count)
-            {
-                _lines[textPosition.Line] = null;
-            }
-        }
-
-        public void RemoveLines(int line, int count)
-        {
-            if (line < this._lines.Count)
-            {
-                count = Math.Min(count, this._lines.Count - line);
-                this._lines.RemoveRange(line, count);
-            }
-        }
-
-        public void InsertLines(int line, int count)
-        {
-            if (line < this._lines.Count)
-            {
-                this._lines.InsertRange(line, new LineInfo[count]);
-            }
-        }
-
-        public void DeleteCells(Point point, int count)
-        {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
-            if (textPosition.Line >= this._lines.Count || this._lines[textPosition.Line] == null)
-            {
-                return;
-            }
-            LineInfo lineInfo = this._lines[textPosition.Line];
-            lineInfo.IsDimmed = false;
-            lineInfo.IsWrapped = false;
-            if (lineInfo.Cells == null)
-            {
-                // A line that was only marked (wrapped or dimmed) has no cell styles yet: there is nothing to shift.
-                return;
-            }
-            for (int column = textPosition.Column; column < lineInfo.Cells.Length; column++)
-            {
-                int targetColumn = column + count;
-                if (targetColumn < lineInfo.Cells.Length)
-                {
-                    lineInfo.Cells[column] = lineInfo.Cells[targetColumn];
-                }
-                else
-                {
-                    lineInfo.Cells[column] = CellStyle.Default;
-                }
-            }
-        }
-
-        public void InsertCells(Point point, int count)
-        {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
-            if (textPosition.Line < this._lines.Count && this._lines[textPosition.Line] != null)
-            {
-                LineInfo lineInfo = this._lines[textPosition.Line];
-                lineInfo.IsDimmed = false;
-                lineInfo.IsWrapped = false;
-                if (lineInfo.Cells == null || textPosition.Column >= lineInfo.Cells.Length || count <= 0)
-                {
-                    return;
-                }
-                // Shift right-to-left so that every cell is moved before it is overwritten.
-                for (int column = lineInfo.Cells.Length - 1; column >= textPosition.Column + count; column--)
-                {
-                    lineInfo.Cells[column] = lineInfo.Cells[column - count];
-                }
-                CellStyle insertedStyle = lineInfo.Cells[textPosition.Column];
-                for (int offset = 0; offset < count && textPosition.Column + offset < lineInfo.Cells.Length; offset++)
-                {
-                    lineInfo.Cells[textPosition.Column + offset] = insertedStyle;
-                }
-            }
-        }
-
-        internal void Clear()
-        {
-            _lines.Clear();
-        }
-
-        internal void DimLines(int lineCount)
-        {
-            for (int line = 0; line < lineCount; line++)
-            {
-                if (line == _lines.Count)
-                {
-                    _lines.Add(new LineInfo());
-                }
-                else if (_lines[line] == null)
-                {
-                    _lines[line] = new LineInfo();
-                }
-                _lines[line].IsDimmed = true;
-            }
-        }
-
-        public void MarkWrapped(int line)
-        {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
-            while (textPosition.Line >= _lines.Count)
-            {
-                _lines.Add(null);
-            }
-            if (_lines[textPosition.Line] == null)
-            {
-                _lines[textPosition.Line] = new LineInfo();
-            }
-            _lines[textPosition.Line].IsWrapped = true;
-        }
-    }
-
     private class BrushPalette
     {
         public Brush[] NormalBrushes;
@@ -243,27 +41,6 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 return null;
             }
             return brushes[colorIndex - 1];
-        }
-    }
-
-    protected class ScreenBuffer
-    {
-        public EditableTextDocument Document = new EditableTextDocument();
-
-        public readonly LineInfoStore Lines;
-
-        public Point Cursor;
-
-        public int SavedTopLine;
-
-        public int MaxScrollback;
-
-        public int FirstRow { get; set; }
-
-        public ScreenBuffer(TerminalEmulatorBase terminalEmulatorBase, int maxScrollback = int.MaxValue)
-        {
-            Lines = new LineInfoStore(terminalEmulatorBase);
-            this.MaxScrollback = maxScrollback;
         }
     }
 
@@ -488,11 +265,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
             {
                 value = _buffers.Length - 1;
             }
-            ActiveBuffer.Cursor = CursorPosition;
+            ActiveBuffer.Cursor = CursorPosition.ToGridPoint();
             ActiveBuffer.SavedTopLine = TopLine;
             _activeBufferIndex = value;
             SetDocument(_buffers[value].Document);
-            CursorPosition = _buffers[_activeBufferIndex].Cursor;
+            CursorPosition = _buffers[_activeBufferIndex].Cursor.ToPoint();
             TopLine = ActiveBuffer.SavedTopLine;
             SetSelection(select: false, SelectionStart);
         }
@@ -607,6 +384,17 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     /// <summary>The line of the text the cursor is in (the rows scrolled off the screen are counted).</summary>
     public int CursorDocumentLine => ToDocumentPosition(_cursor).Line;
+
+    TextDocument.TextPosition ILineInfoHost.ToDocumentPosition(GridPoint point)
+    {
+        return ToDocumentPosition(point.ToPoint());
+    }
+
+    bool ILineInfoHost.AlwaysTrackLines => AlwaysTrackLines;
+
+    bool ILineInfoHost.HideMargins => HideMargins;
+
+    int ILineInfoHost.VisibleColumns => _visibleColumns;
 
     protected TextDocument.TextPosition ToDocumentPosition(Point point)
     {
@@ -838,7 +626,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         count = Math.Min(count, lineLength - textPosition.Column);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, count, "");
-        ActiveBuffer.Lines.DeleteCells(CursorPosition, count);
+        ActiveBuffer.Lines.DeleteCells(CursorPosition.ToGridPoint(), count);
         Redraw();
     }
 
@@ -846,7 +634,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
     {
         TextDocument.TextPosition textPosition = EnsureCursorPosition(CursorPosition);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, count));
-        ActiveBuffer.Lines.InsertCells(CursorPosition, count);
+        ActiveBuffer.Lines.InsertCells(CursorPosition.ToGridPoint(), count);
         TruncateToScreenWidth(textPosition.Line);
         Redraw();
     }
@@ -919,7 +707,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         if (insert)
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);
-            ActiveBuffer.Lines.InsertCells(point, text.Length);
+            ActiveBuffer.Lines.InsertCells(point.ToGridPoint(), text.Length);
             TruncateToScreenWidth(textPosition.Line);
         }
         else
