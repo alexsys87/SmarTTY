@@ -240,6 +240,9 @@ jobs:
       - name: Run remote file server checks (probes of a file on the server, its version and the conflict text, with a fake connection)
         run: dotnet run --project tests/RemoteFileServerTests -c Release
 
+      - name: Run remote file draft checks (draft keys of two editors, the draft an earlier editor left, when a text is taken, latest write wins, cleanup)
+        run: dotnet run --project tests/RemoteFileDraftsTests -c Release
+
       - name: Run local OpenWrt repository checks (opkg and apk feeds, HTTP server, feed scripts, signature check, tunnel host)
         run: dotnet run --project tests/LocalRepoTests -c Release
 

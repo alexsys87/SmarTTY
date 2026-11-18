@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes are out (A4b: `RemoteFileServer`), next the drafts and the load |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) and the drafts (A4c: `RemoteFileDrafts`) are out, next the load |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -187,6 +187,14 @@ download stream, the signature that tells whether somebody else changed the file
 `Controls/SessionRemoteFileHost` is the adapter and reads `ITerminalSessionContext.Session` on every call, because a reconnect replaces it).
 `tests/RemoteFileServerTests` (net8.0) drives it with a fake connection; `tests/RemoteFileEditorIntegrationTests` passes unchanged. Next, A4c:
 the drafts (`ClaimDraftKey`, the write schedule, `QueueDraft`), then the load, the save pipeline and the rest of `RemoteFileSession`.
+
+Done in A4c: the draft of the unsaved changes is in `CodeEditing/RemoteFileDrafts.cs` (the key, the base hash, when a text is taken with the
+`DraftSchedule`, the writes and removals of which the latest wins, finding the draft an earlier editor left, the cleanup of old drafts once per
+run) and `CodeEditing/DraftKeyClaims.cs` (the numbered key and its lock file, with the folder as a parameter). The editor keeps the static
+`EditorDraftStore` (with the Windows encryption) and `DraftKeyClaims` instances, the timer that asks for a draft, the reading of the text and of
+the hex view, and the question "restore the draft?". `tests/RemoteFileDraftsTests` (net8.0) runs them on a real `EditorDraftStore` in a temporary
+folder; `tests/RemoteFileEditorIntegrationTests` passes unchanged. Next, A4d: the load (`LoadFile`, `FinishLoading`, `ApplyContent`) with
+`IUiDispatcher` and `IUserPrompt`, then the save pipeline.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
