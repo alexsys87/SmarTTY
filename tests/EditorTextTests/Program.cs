@@ -3851,10 +3851,12 @@ internal static class Program
             "the dialog is short and no longer lists the problems it points at");
         Check(remote.Contains("RefreshMessageColors()"),
             "the messages take the colours of the current theme");
+        // The clearing before a save moved with the taking of the bytes to save, to CodeEditing/RemoteFileSession.cs (A4f).
+        string session = File.ReadAllText(Path.Combine(root, "CodeEditing", "RemoteFileSession.cs"));
         int clears = 0;
         foreach (string snippet in new[] { "// The problems the previous check named", "// The messages name lines of the text", "// The messages are rows of the text view" })
         {
-            if (remote.Contains(snippet))
+            if (remote.Contains(snippet) || session.Contains(snippet))
             {
                 clears++;
             }
