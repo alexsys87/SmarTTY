@@ -110,8 +110,11 @@ internal static class Program
         string source = File.ReadAllText(path);
         string modesPath = typeof(Program).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(item => item.Key == "ModesSource").Value;
         string modesSource = File.ReadAllText(modesPath);
-        Check(!source.Contains("_privateModes[") && !source.Contains("_savedPrivateModes") && !source.Contains("_privateModes.Length") && !modesSource.Contains("PrivateModes["), "the emulator does not index the modes itself");
-        Check(source.Contains("_privateModes.Set(") && source.Contains("_privateModes.Save(") && source.Contains("_privateModes.TryGetSaved(") && source.Contains("_privateModes.IsSet(") && modesSource.Contains("PrivateModes.Clear()"),
+        string parserPath = typeof(Program).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(item => item.Key == "ParserSource").Value;
+        string parserSource = File.ReadAllText(parserPath);
+        Check(!source.Contains("_privateModes[") && !source.Contains("_savedPrivateModes") && !source.Contains("_privateModes.Length") && !modesSource.Contains("PrivateModes[")
+            && !parserSource.Contains("_privateModes[") && !parserSource.Contains("_savedPrivateModes") && !parserSource.Contains("_privateModes.Length"), "the emulator does not index the modes itself");
+        Check(parserSource.Contains("_privateModes.Set(") && parserSource.Contains("_privateModes.Save(") && parserSource.Contains("_privateModes.TryGetSaved(") && source.Contains("_privateModes.IsSet(") && modesSource.Contains("PrivateModes.Clear()"),
             "the emulator sets, saves, restores and reads the modes through the table, and the reset of the modes clears it");
 
         Console.WriteLine();

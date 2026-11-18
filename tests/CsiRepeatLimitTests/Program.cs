@@ -108,7 +108,7 @@ internal static class Program
         // The emulator applies the limit to the count before any command is carried out.
         string path = typeof(Program).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(item => item.Key == "EmulatorSource").Value;
         string source = File.ReadAllText(path);
-        int limitAt = source.IndexOf("repeatCount = CsiRepeatLimit.Clamp(ch, repeatCount, _visibleRows, _visibleColumns);", StringComparison.Ordinal);
+        int limitAt = source.IndexOf("repeatCount = CsiRepeatLimit.Clamp(ch, repeatCount, _screen.Rows, _screen.Columns);", StringComparison.Ordinal);
         int switchAt = source.IndexOf("switch (ch)", Math.Max(limitAt, 0), StringComparison.Ordinal);
         int declaredAt = source.IndexOf("int repeatCount = 1;", StringComparison.Ordinal);
         Check(declaredAt >= 0 && limitAt > declaredAt && switchAt > limitAt, "the emulator limits the count after it is read and before the commands are carried out");
