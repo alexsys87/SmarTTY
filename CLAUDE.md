@@ -94,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done; A6 (hex editor model) started: its safety net is in (A6a), next the move itself (A6b), then the status bar |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5a (`TextSearcher` on `ISearchTarget`) done; A6 (hex editor model): the safety net (A6a) and the model of the editing (A6b: `HexEditingModel`) are in, next the value decoding of `HexDataInspector` (A6c), then the status bar |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -234,10 +234,19 @@ about 35 members of the editor and the hex view: its seam, `IEditorStatusSource`
 
 Done in A6a (before any move of the hex editor's logic): `tests/HexEditorControlTests` (net48, Mono + xvfb) drives the real `HexEditorControl` with a seeded random script of keys
 (`OnKeyDown`/`OnKeyPress` by reflection: the control is sealed) and calls (typing in both columns, arrows with and without Shift, Backspace/Delete/Insert, fill, insert pattern, swap,
-write value, search both ways, highlights, undo/redo, view options, read-only) and compares what it does after each of 2204 steps (caret, selection, mode, area, bytes, undo history,
-answers, `StateChanged` and `SearchFinished` events) with `HexEditorControlGolden.txt`, which the code before the move wrote (`--record <file>`; never re-recorded). Not in the script:
+write value, search both ways, highlights, undo/redo, view options, read-only) and compares what it does after each of 3608 steps (2204 of the first scripts, then 1404 of two that search again from a caret on a match; caret, selection, mode, area, bytes, undo history,
+answers, `StateChanged` and `SearchFinished` events) with `HexEditorControlGolden.txt`, which the code before the move wrote (`--record <file>`; the 1404 steps added in A6b were written by that same code, on a worktree of the commit before the move, and the first 2204 lines did not change). Not in the script:
 the mouse, the clipboard and the page keys (they need the layout or the system clipboard). A hook, `HexEditorControl.AsciiAreaActive` (internal), puts the caret in the ASCII column
 without a mouse. It must keep passing unchanged while the editing logic moves to `TextEditing/HexEditingModel.cs`.
+
+Done in A6b: the state and the editing of the hex editor are `TextEditing/HexEditingModel.cs`: the caret, the anchor, the nibble, the column (`HexEditArea`), the typing mode,
+read-only, big endian, bytes per row, the last search, what the keys and the commands do to the bytes (typing in both columns with the UTF-8 surrogate pairs, Backspace and
+Delete, `InsertBytes`, fill, insert pattern, swap byte order, write value, undo and redo, go to, search, go to the next colour block, the movements by key). The control keeps
+the painting, the scrolling and the layout, the mouse (it sets `Anchor`, `CaretOffset`, `Area`, `Nibble` on the model and calls `AfterCaretChange`), the clipboard and its dialogs,
+the timers, the tool tip, the view options and the events. The model raises `Changed(HexChangeEffects)` where the old code called `AfterContentChange` / `AfterCaretChange`
+(or did the same by hand): `ShowCaret`, `RestartCaretBlink`, `EnsureCaretVisible`; the view does those, then always redraws and raises `StateChanged`. `HexEditorControlTests` (3608
+steps, the first 2204 written by the code before the move, the last 1404 by that code too with a script that searches again from a caret on a match) passes unchanged; the
+net8.0 `HexEditingModelTests` check the model and what it tells the view without Mono. Not covered by either: the mouse, the clipboard and the page keys.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
