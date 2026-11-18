@@ -6,7 +6,7 @@ using System.Text;
 
 namespace SmarTTY.Controls;
 
-public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
+public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget
 {
     private abstract class EditCommand
     {
@@ -405,6 +405,31 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
 
     public event RangeChangedHandler RangeChanged;
 
+    // The text range changes as ISearchTarget reports them: the searcher does not need the control in the arguments.
+    private TextRangeChangedHandler _searchRangeChanged;
+
+    event TextRangeChangedHandler ISearchTarget.RangeChanged
+    {
+        add
+        {
+            _searchRangeChanged += value;
+        }
+        remove
+        {
+            _searchRangeChanged -= value;
+        }
+    }
+
+    string ISearchTarget.GetLineText(int line)
+    {
+        return EditableDocument.GetLineText(line);
+    }
+
+    string ISearchTarget.GetRangeText(TextDocument.TextPosition start, TextDocument.TextPosition end)
+    {
+        return EditableDocument.GetRangeText(start, end);
+    }
+
     private void ExecuteCommand(EditCommand editCommand)
     {
         if (_compoundCommand != null)
@@ -704,6 +729,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser
         {
             RangeChanged(this, start, oldEnd, newEnd);
         }
+        _searchRangeChanged?.Invoke(start, oldEnd, newEnd);
         OnTextChangedOutsideCommand();
     }
 
