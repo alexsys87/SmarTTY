@@ -251,6 +251,19 @@ public sealed class HexEditorControl : Control
 
     public int CaretOffset => _caretOffset;
 
+    // The ASCII column is where typing goes (set by a click there); tests/HexEditorControlTests puts the caret in it without a mouse.
+    internal bool AsciiAreaActive
+    {
+        get
+        {
+            return _area == EditArea.Ascii;
+        }
+        set
+        {
+            _area = value ? EditArea.Ascii : EditArea.Hex;
+        }
+    }
+
     /// <summary>The text cannot be changed (a read-only file, a preview of a huge file).</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ReadOnly
