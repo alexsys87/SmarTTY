@@ -265,6 +265,76 @@ internal static class Program
             },
             new Step
             {
+                // The history is "uname -a", "uptime", "ls -la /tmp" (oldest first); "t" is in the last two.
+                Name = "Ctrl+R shows the newest command that contains the typed text",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "t");
+                    Key(terminal, Keys.Control | Keys.R);
+                },
+                Done = () => InputText(terminal) == "ls -la /tmp"
+            },
+            new Step
+            {
+                Name = "Ctrl+R again shows the command before it",
+                Act = () => Key(terminal, Keys.Control | Keys.R),
+                Done = () => InputText(terminal) == "uptime"
+            },
+            new Step
+            {
+                Name = "Ctrl+R after the oldest match goes round to the newest",
+                Act = () => Key(terminal, Keys.Control | Keys.R),
+                Done = () => InputText(terminal) == "ls -la /tmp"
+            },
+            new Step
+            {
+                Name = "Esc ends the search and brings the typed text back",
+                Act = () => Key(terminal, Keys.Escape),
+                Done = () => InputText(terminal) == "t"
+            },
+            new Step
+            {
+                Name = "Ctrl+R finds nothing for a text that no command contains: the line stays",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "zzz");
+                    Key(terminal, Keys.Control | Keys.R);
+                },
+                Done = () => InputText(terminal) == "zzz"
+            },
+            new Step
+            {
+                Name = "Esc ends that search too",
+                Act = () => Key(terminal, Keys.Escape),
+                Done = () => InputText(terminal) == "zzz"
+            },
+            new Step
+            {
+                Name = "Ctrl+R ignores the case of the typed text",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "UNAME");
+                    Key(terminal, Keys.Control | Keys.R);
+                },
+                Done = () => InputText(terminal) == "uname -a"
+            },
+            new Step
+            {
+                Name = "Up after a search starts from the typed text, not from the match",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                    Type(terminal, "up");
+                    Key(terminal, Keys.Up);
+                },
+                Done = () => InputText(terminal) == "uptime"
+            },
+            new Step
+            {
                 Name = "the device asks for a password",
                 Act = () =>
                 {
