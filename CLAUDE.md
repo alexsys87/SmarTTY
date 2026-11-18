@@ -16,12 +16,16 @@ PR that changes them.
 - Tests: 97 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
-- Mono tests (net48, need `mono` + `xvfb`): `SmartTerminalIntegrationTests`, `NetconsoleTerminalTests`,
+- Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
+  `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
   `DeviceLineEditorTests`. They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
-- `SshNetIntegrationTests` needs a real sshd and Dropbear (`tests/SshNetIntegrationTests/setup-*.sh`, CI only).
+- `SshNetIntegrationTests`, `SmartTerminalIntegrationTests` and `RemoteFileEditorIntegrationTests` need a real sshd and Dropbear
+  (`tests/SshNetIntegrationTests/setup-*.sh`; apt `openssh-server dropbear-bin busybox`; as root they also run in a sandbox:
+  `set -a; source <(setup-sshd.sh); source <(setup-dropbear.sh); set +a`). Mono cannot open its sockets on a kernel without
+  IPv6: build `tests/RemoteFileEditorIntegrationTests/mono-ipv4-shim.c` (command in its csproj) and run mono with `LD_PRELOAD`.
 
 ## Conventions
 
@@ -90,7 +94,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done: part 1A of A3 is complete; next A4 (`RemoteFileSession`) |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), next the move itself |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -168,6 +172,14 @@ column goes, the text of a duplicate and of a move), `CodeEditing/AnalysisText.c
 `FoldingManager.RestoreFolds` (which line a saved fold goes back to) hold what was in `CodeEditorPP.LineEditing.cs` and `CodeEditorPP.cs`;
 the control reads the lines, asks the model and makes the edits. `tests/LineEditingTests` compares 300 random cases and 60 documents around
 the analysis budget with golden files written by the old code of the control. Next, A4: `RemoteFileSession`.
+
+Done in A4a (before any move of the editor's logic): `tests/RemoteFileEditorIntegrationTests` (net48, Mono + xvfb) runs the real
+`RemoteFileEditor` against OpenSSH and Dropbear: load, change, save and read back for UTF-8, BOM, ISO-8859-1/Windows-1251, LF/CRLF, a new file,
+the file mode, the backup copy, conflicts (save on close and background save), a background save with a second save asked for meanwhile,
+reload, the shell script check, the offer to reload a service, drafts; the questions the editor asks are caught through
+`ThemedMessageBox.ShowImpl` and answered. It was written against the code before the move and must keep passing unchanged. The SSH layer
+sometimes drops the connection after a command (an end of file for a closed channel, seen with OpenSSH 9.6): a scenario cut short by it is
+run again on a new connection (printed in the log), anything else fails the run.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
