@@ -11,7 +11,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class TerminalEmulatorBase : TextEditorControl
+public partial class TerminalEmulatorBase : TextEditorControl, ILineInfoHost
 {
     protected class LineInfo
     {
@@ -26,13 +26,13 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     protected class LineInfoStore
     {
-        private TerminalEmulatorBase _terminal;
+        private ILineInfoHost _host;
 
         private List<LineInfo> _lines = new List<LineInfo>();
 
-        public LineInfoStore(TerminalEmulatorBase terminalEmulatorBase)
+        public LineInfoStore(ILineInfoHost host)
         {
-            _terminal = terminalEmulatorBase;
+            _host = host;
         }
 
         public LineInfo GetLine(int line)
@@ -46,10 +46,10 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         internal void SetCells(int row, int startColumn, int count, CellStyle cellStyle, LinkCell[] items = null)
         {
-            TextDocument.TextPosition textPosition = this._terminal.ToDocumentPosition(new Point(0, row));
+            TextDocument.TextPosition textPosition = this._host.ToDocumentPosition(new GridPoint(0, row));
             while (textPosition.Line >= this._lines.Count)
             {
-                if (cellStyle.IsDefault && items == null && !this._terminal.AlwaysTrackLines && this._terminal.HideMargins)
+                if (cellStyle.IsDefault && items == null && !this._host.AlwaysTrackLines && this._host.HideMargins)
                 {
                     return;
                 }
@@ -57,7 +57,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
             }
             if (this._lines[textPosition.Line] == null)
             {
-                if (cellStyle.IsDefault && items == null && !this._terminal.AlwaysTrackLines && this._terminal.HideMargins)
+                if (cellStyle.IsDefault && items == null && !this._host.AlwaysTrackLines && this._host.HideMargins)
                 {
                     return;
                 }
@@ -67,20 +67,20 @@ public partial class TerminalEmulatorBase : TextEditorControl
             lineInfo.IsDimmed = false;
             lineInfo.IsWrapped = false;
             lineInfo.Timestamp = DateTime.Now;
-            if (lineInfo.Cells == null || lineInfo.Cells.Length < this._terminal._visibleColumns)
+            if (lineInfo.Cells == null || lineInfo.Cells.Length < this._host.VisibleColumns)
             {
-                CellStyle[] cellStyles = new CellStyle[this._terminal._visibleColumns];
+                CellStyle[] cellStyles = new CellStyle[this._host.VisibleColumns];
                 if (lineInfo.Cells != null)
                 {
                     lineInfo.Cells.CopyTo(cellStyles, 0);
                 }
                 lineInfo.Cells = cellStyles;
             }
-            if (startColumn == -1 || startColumn > this._terminal._visibleColumns)
+            if (startColumn == -1 || startColumn > this._host.VisibleColumns)
             {
-                startColumn = this._terminal._visibleColumns;
+                startColumn = this._host.VisibleColumns;
             }
-            int remainingColumns = this._terminal._visibleColumns - startColumn;
+            int remainingColumns = this._host.VisibleColumns - startColumn;
             if (count == -1 || count > remainingColumns)
             {
                 count = remainingColumns;
@@ -101,7 +101,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public void ClearLine(int line)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
+            TextDocument.TextPosition textPosition = _host.ToDocumentPosition(new GridPoint(0, line));
             if (textPosition.Line < _lines.Count)
             {
                 _lines[textPosition.Line] = null;
@@ -125,9 +125,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
             }
         }
 
-        public void DeleteCells(Point point, int count)
+        public void DeleteCells(GridPoint point, int count)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
+            TextDocument.TextPosition textPosition = _host.ToDocumentPosition(point);
             if (textPosition.Line >= this._lines.Count || this._lines[textPosition.Line] == null)
             {
                 return;
@@ -154,9 +154,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
             }
         }
 
-        public void InsertCells(Point point, int count)
+        public void InsertCells(GridPoint point, int count)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(point);
+            TextDocument.TextPosition textPosition = _host.ToDocumentPosition(point);
             if (textPosition.Line < this._lines.Count && this._lines[textPosition.Line] != null)
             {
                 LineInfo lineInfo = this._lines[textPosition.Line];
@@ -202,7 +202,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public void MarkWrapped(int line)
         {
-            TextDocument.TextPosition textPosition = _terminal.ToDocumentPosition(new Point(0, line));
+            TextDocument.TextPosition textPosition = _host.ToDocumentPosition(new GridPoint(0, line));
             while (textPosition.Line >= _lines.Count)
             {
                 _lines.Add(null);
@@ -252,7 +252,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public readonly LineInfoStore Lines;
 
-        public Point Cursor;
+        public GridPoint Cursor;
 
         public int SavedTopLine;
 
@@ -260,9 +260,9 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
         public int FirstRow { get; set; }
 
-        public ScreenBuffer(TerminalEmulatorBase terminalEmulatorBase, int maxScrollback = int.MaxValue)
+        public ScreenBuffer(ILineInfoHost host, int maxScrollback = int.MaxValue)
         {
-            Lines = new LineInfoStore(terminalEmulatorBase);
+            Lines = new LineInfoStore(host);
             this.MaxScrollback = maxScrollback;
         }
     }
@@ -488,11 +488,11 @@ public partial class TerminalEmulatorBase : TextEditorControl
             {
                 value = _buffers.Length - 1;
             }
-            ActiveBuffer.Cursor = CursorPosition;
+            ActiveBuffer.Cursor = CursorPosition.ToGridPoint();
             ActiveBuffer.SavedTopLine = TopLine;
             _activeBufferIndex = value;
             SetDocument(_buffers[value].Document);
-            CursorPosition = _buffers[_activeBufferIndex].Cursor;
+            CursorPosition = _buffers[_activeBufferIndex].Cursor.ToPoint();
             TopLine = ActiveBuffer.SavedTopLine;
             SetSelection(select: false, SelectionStart);
         }
@@ -607,6 +607,17 @@ public partial class TerminalEmulatorBase : TextEditorControl
 
     /// <summary>The line of the text the cursor is in (the rows scrolled off the screen are counted).</summary>
     public int CursorDocumentLine => ToDocumentPosition(_cursor).Line;
+
+    TextDocument.TextPosition ILineInfoHost.ToDocumentPosition(GridPoint point)
+    {
+        return ToDocumentPosition(point.ToPoint());
+    }
+
+    bool ILineInfoHost.AlwaysTrackLines => AlwaysTrackLines;
+
+    bool ILineInfoHost.HideMargins => HideMargins;
+
+    int ILineInfoHost.VisibleColumns => _visibleColumns;
 
     protected TextDocument.TextPosition ToDocumentPosition(Point point)
     {
@@ -838,7 +849,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         }
         count = Math.Min(count, lineLength - textPosition.Column);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, count, "");
-        ActiveBuffer.Lines.DeleteCells(CursorPosition, count);
+        ActiveBuffer.Lines.DeleteCells(CursorPosition.ToGridPoint(), count);
         Redraw();
     }
 
@@ -846,7 +857,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
     {
         TextDocument.TextPosition textPosition = EnsureCursorPosition(CursorPosition);
         base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, count));
-        ActiveBuffer.Lines.InsertCells(CursorPosition, count);
+        ActiveBuffer.Lines.InsertCells(CursorPosition.ToGridPoint(), count);
         TruncateToScreenWidth(textPosition.Line);
         Redraw();
     }
@@ -919,7 +930,7 @@ public partial class TerminalEmulatorBase : TextEditorControl
         if (insert)
         {
             base.EditableDocument.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);
-            ActiveBuffer.Lines.InsertCells(point, text.Length);
+            ActiveBuffer.Lines.InsertCells(point.ToGridPoint(), text.Length);
             TruncateToScreenWidth(textPosition.Line);
         }
         else
