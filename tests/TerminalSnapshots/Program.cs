@@ -20,7 +20,11 @@ using System.Windows.Forms;
 //
 //   dotnet build tests/TerminalSnapshots -c Release
 //   xvfb-run -a mono tests/TerminalSnapshots/bin/Release/net48/TerminalSnapshots.exe
-//   ... TerminalSnapshots.exe --record <file>      writes the golden file (old code only)
+//   ... TerminalSnapshots.exe --record <state file> <colours file>      writes the two golden files (old code only)
+//
+// TerminalSpansGolden.txt (what the view paints with: the brushes of the colour spans of every line, and the cases that use the foreground
+// override of the HEX terminal) was written by the code before the colour override of a cell was made a colour (stage 1B, B3a); the state
+// golden was written before that and does not change.
 //
 // The cases are hand-written (full dumps) and generated from a seeded random script (one line each: a summary and a hash of the
 // whole dump). The terminal is made 80 x 24 whatever the fonts are.
@@ -44,6 +48,11 @@ internal static class Program
 
     private static readonly List<string> Prompts = new List<string>();
 
+    // The painted colours of the cases, in the order of the cases (the file TerminalSpansGolden.txt), and of the case that ran last.
+    private static readonly List<string> SpanLines = new List<string>();
+
+    private static string LastSpans;
+
     private sealed class Case
     {
         public string Name;
@@ -58,6 +67,9 @@ internal static class Program
 
         // The keys and pastes are tried after the output (the answer depends on the modes that the output set).
         public bool Probe = true;
+
+        // The case is in the file of the painted colours only (it was added after TerminalSnapshotsGolden.txt was written).
+        public bool SpansOnly;
     }
 
     // Counts the bells (OnBell is the place where the terminal rings, whatever the settings say about the sound).
@@ -142,13 +154,22 @@ internal static class Program
         }
         lines.AddRange(RunRandomCases(seedCount: 6, casesPerSeed: 60));
 
-        if (args.Length == 2 && args[0] == "--record")
+        if (args.Length == 3 && args[0] == "--record")
         {
             File.WriteAllLines(args[1], lines);
-            Console.WriteLine("recorded " + lines.Count + " lines to " + args[1]);
+            File.WriteAllLines(args[2], SpanLines);
+            Console.WriteLine("recorded " + lines.Count + " lines to " + args[1] + " and " + SpanLines.Count + " lines to " + args[2]);
             return 0;
         }
-        string goldenPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TerminalSnapshotsGolden.txt");
+        int failed = Compare("terminal state", "TerminalSnapshotsGolden.txt", lines);
+        failed += Compare("painted colours", "TerminalSpansGolden.txt", SpanLines);
+        return failed == 0 ? 0 : 1;
+    }
+
+    // Compares the lines with a golden file next to the program; returns 0 when they are equal.
+    private static int Compare(string what, string goldenFile, List<string> lines)
+    {
+        string goldenPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, goldenFile);
         if (!File.Exists(goldenPath))
         {
             Console.WriteLine("FAIL: " + goldenPath + " is missing");
@@ -171,10 +192,10 @@ internal static class Program
         }
         if (differences == 0)
         {
-            Console.WriteLine("PASS: " + lines.Count + " lines of terminal state equal the golden file");
+            Console.WriteLine("PASS: " + lines.Count + " lines of " + what + " equal the golden file");
             return 0;
         }
-        Console.WriteLine("FAIL: " + differences + " of " + Math.Max(golden.Length, lines.Count) + " lines differ from the golden file");
+        Console.WriteLine("FAIL: " + differences + " of " + Math.Max(golden.Length, lines.Count) + " lines of " + what + " differ from the golden file");
         return 1;
     }
 
@@ -266,6 +287,12 @@ internal static class Program
             Console.WriteLine("case " + testCase.Name);
         }
         string whole = Run(testCase, byChar: false, probe: testCase.Probe);
+        SpanLines.Add("=== " + testCase.Name);
+        SpanLines.AddRange(LastSpans.Split('\n'));
+        if (testCase.SpansOnly)
+        {
+            return output;
+        }
         output.Add("=== " + testCase.Name);
         if (full)
         {
@@ -306,6 +333,7 @@ internal static class Program
         Application.DoEvents();
         StringBuilder text = new StringBuilder();
         Dump(harness, text);
+        LastSpans = DumpSpans(harness);
         Step("probe");
         if (probe)
         {
@@ -313,6 +341,48 @@ internal static class Program
             Probe(harness, text);
         }
         return text.ToString().TrimEnd('\n');
+    }
+
+    // What the view paints with: the brushes of the colour spans of every line (GetLineColorSpans is what the control asks for
+    // when it draws a line), as colours.
+    private static string DumpSpans(Harness harness)
+    {
+        TerminalEmulatorControl terminal = harness.Terminal;
+        EditableTextDocument document = (EditableTextDocument)typeof(EditableTextBrowser).GetProperty("EditableDocument", AllInstance).GetValue(terminal);
+        MethodInfo getSpans = typeof(TerminalEmulatorBase).GetMethod("GetLineColorSpans", AllInstance);
+        StringBuilder text = new StringBuilder();
+        for (int line = 0; line < document.LineCount; line++)
+        {
+            ReadonlyTextBrowser.ColorSpan[] spans = (ReadonlyTextBrowser.ColorSpan[])getSpans.Invoke(terminal, new object[] { line });
+            text.Append(line.ToString("D3")).Append('|');
+            if (spans == null)
+            {
+                text.Append("none");
+            }
+            else
+            {
+                foreach (ReadonlyTextBrowser.ColorSpan span in spans)
+                {
+                    text.Append(span.Start).Append('-').Append(span.End).Append(" fg=").Append(DescribeBrush(span.Foreground)).Append(" bg=").Append(DescribeBrush(span.Background))
+                        .Append(span.Underline ? " underline" : "").Append("; ");
+                }
+            }
+            text.Append('\n');
+        }
+        return text.ToString().TrimEnd('\n');
+    }
+
+    private static string DescribeBrush(Brush brush)
+    {
+        if (brush == null)
+        {
+            return "null";
+        }
+        if (brush is SolidBrush solid)
+        {
+            return "#" + solid.Color.ToArgb().ToString("X8");
+        }
+        return brush.GetType().Name;
     }
 
     private static void Feed(Harness harness, string chunk, int index)
@@ -865,9 +935,71 @@ internal static class Program
         };
         yield return new Case
         {
+            Name = "override colour",
+            Chunks = new[] { "echo text" + Csi + "1m" + "bold" + Csi + "0m" + "plain\r\nsecond" },
+            Setup = terminal => terminal.CurrentStyle = OverrideStyle(0xFFCC8800u),
+            SpansOnly = true
+        };
+        yield return new Case
+        {
+            Name = "override with transparent colour",
+            Chunks = new[] { "echo text" },
+            Setup = terminal => terminal.CurrentStyle = OverrideStyle(0x00000000u),
+            SpansOnly = true
+        };
+        yield return new Case
+        {
+            Name = "override without a colour",
+            Chunks = new[] { "echo text\r\n" + Csi + "31mred" },
+            Setup = terminal => terminal.CurrentStyle = OverrideStyle(null),
+            SpansOnly = true
+        };
+        yield return new Case
+        {
+            Name = "override over log levels and colours",
+            Chunks = new[] { "ERROR failed\r\nWARNING careful\r\n" + Csi + "7m" + "inverse" + Csi + "0m" + "\r\n" + Csi + "38;5;196m" + "red" },
+            Setup = terminal =>
+            {
+                terminal.HighlightLogLevels = true;
+                terminal.CurrentStyle = OverrideStyle(0xFF00AA55u);
+            },
+            SpansOnly = true
+        };
+        yield return new Case
+        {
+            Name = "two override colours",
+            Chunks = new[] { "first" },
+            Setup = terminal => terminal.CurrentStyle = OverrideStyle(0xFF112233u),
+            SpansOnly = true
+        };
+        yield return new Case
+        {
             Name = "progress bar redraw",
             Chunks = new[] { "[=     ] 10%\r", "[===   ] 50%\r", "[======] 100%\r\ndone\r\n" + Csi + "2K" + "\rnext" + Csi + "1A" + Csi + "2K" + "up" }
         };
+    }
+
+    // A style with the foreground override that the HEX terminal sets for the echo of what was typed. The override holds a brush
+    // in the code before stage 1B and a colour after it; this makes either.
+    private static TerminalEmulatorBase.CellStyle OverrideStyle(uint? argb)
+    {
+        Type type = typeof(TerminalEmulatorBase.CellStyle.ForegroundOverride);
+        object value = Activator.CreateInstance(type);
+        if (argb.HasValue)
+        {
+            FieldInfo brush = type.GetField("Brush");
+            if (brush != null)
+            {
+                brush.SetValue(value, new SolidBrush(Color.FromArgb(unchecked((int)argb.Value))));
+            }
+            else
+            {
+                type.GetField("Color").SetValue(value, new RgbColor(argb.Value));
+            }
+        }
+        TerminalEmulatorBase.CellStyle style = default;
+        style.Override = (TerminalEmulatorBase.CellStyle.ForegroundOverride)value;
+        return style;
     }
 
     // ---- generated cases ------------------------------------------------------------------------------------------------
@@ -943,6 +1075,7 @@ internal static class Program
             foreach (Case testCase in RandomCases(seed, casesPerSeed))
             {
                 string dump = Run(testCase, byChar: false, probe: true);
+                SpanLines.Add(testCase.Name + " " + Hash(LastSpans));
                 string[] dumpLines = dump.Split('\n');
                 output.Add(testCase.Name + " " + dumpLines[0] + " lines " + dumpLines.Count(line => line.Length > 3 && char.IsDigit(line[0]) && line[3] == '|') + " " + Hash(dump));
             }

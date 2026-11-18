@@ -29,6 +29,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <None Include="TerminalSnapshotsGolden.txt" CopyToOutputDirectory="PreserveNewest" Condition="Exists('TerminalSnapshotsGolden.txt')" />
+    <None Include="TerminalSpansGolden.txt" CopyToOutputDirectory="PreserveNewest" Condition="Exists('TerminalSpansGolden.txt')" />
     <!-- The xterm key layout: without it the terminal sends nothing for the arrows and function keys. -->
     <EmbeddedResource Include="../../VisualTTY/XTermKeys.xml" LogicalName="VisualTTY.XTermKeys.xml" />
     <!-- ThemeManager keeps WPF resources, which Mono does not have: ThemeManagerStub.cs stands in for it. -->
