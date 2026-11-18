@@ -16,7 +16,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class RemoteFileEditor : CodeEditorPP
+public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView
 {
 
     private ITerminalSessionContext _context;
@@ -33,12 +33,12 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private Thread _loadThread;
 
+    // The loading of the file (the questions about the write permission and the size, the download): its flags are the ones of the editor.
+    private RemoteFileLoader _loader;
+
     private GlobalSettings _settings;
 
     private Action<Exception> _errorHandler;
-
-    // Minimal interval between previews of a file that is still being downloaded.
-    private const int PreviewIntervalMs = 500;
 
     // Permissions of the temporary copy uploaded on save: it may hold a file only root can read.
     private const int TemporaryFileMode = 0x180; // 0600
@@ -145,22 +145,19 @@ public partial class RemoteFileEditor : CodeEditorPP
     public bool CanReopenWithEncoding => _loaded && !_reloading && _rawBytes != null && !IsNewFile && !IsPreview;
 
     /// <summary>The file did not exist when the editor was opened: it is created by the first save.</summary>
-    public bool IsNewFile { get; private set; }
+    public bool IsNewFile { get => _loader.IsNewFile; private set => _loader.IsNewFile = value; }
 
     /// <summary>
     /// The text cannot be changed: the user chose to read a file that is big or that he has no right to write, or only
     /// the beginning of a huge file is shown (<see cref="IsPreview"/>).
     /// </summary>
-    public bool IsReadOnlyMode { get; private set; }
+    public bool IsReadOnlyMode { get => _loader.IsReadOnlyMode; private set => _loader.IsReadOnlyMode = value; }
 
     /// <summary>The file has been loaded completely and is not being loaded again: only then the text can be saved.</summary>
     public bool CanSave => !IsReadOnlyMode && _loaded && !_reloading;
 
     /// <summary>Only the first <see cref="EditorFilePolicy.PreviewBytes"/> of a file that is too big to edit are shown.</summary>
-    public bool IsPreview { get; private set; }
-
-    // The user agreed to write the file with sudo (asked when the file was opened): a save does not try the plain write first.
-    private bool _sudoOnSave;
+    public bool IsPreview { get => _loader.IsPreview; private set => _loader.IsPreview = value; }
 
     // Unsaved changes are written to a draft on this computer every few seconds (see EditorDraftStore), so that they
     // survive a lost connection and a closed program. The drafts of all editors live in one folder.
@@ -553,6 +550,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         this._context = terminalSessionContext;
         RemotePath = text;
         _server = new RemoteFileServer(new SessionRemoteFileHost(terminalSessionContext), text);
+        _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         _drafts = new RemoteFileDrafts(Drafts, _draftKey);
         RemoteFileDrafts.StartCleanupOnce(Drafts);
@@ -563,7 +561,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         };
         ((EditableTextBrowser)this).ReadOnly = true;
         _initialCaret = textPosition;
-        _loadThread = new Thread(LoadFile);
+        _loadThread = new Thread(_loader.Run);
         _loadThread.Start();
         this._settings = globalSettings;
         _errorHandler = action;
@@ -579,44 +577,6 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
         }
-    }
-
-    /// <summary>
-    /// Runs <paramref name="action"/> on the UI thread from a worker thread. When the tab has been closed meanwhile
-    /// the action is dropped: BeginInvoke on a disposed control throws, and an exception that leaves a worker thread ends the program.
-    /// </summary>
-    private bool PostToUi(Action action)
-    {
-        if (!WaitForHandle())
-        {
-            return false;
-        }
-        try
-        {
-            BeginInvoke((ThreadStart)(() =>
-            {
-                if (!IsDisposed)
-                {
-                    action();
-                }
-            }));
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            // The handle was destroyed between the check and the call (ObjectDisposedException is one of these too): the tab is closing.
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// For a worker thread: waits (30 seconds at the most) until the tab has its window handle. The loading thread is started in the
-    /// constructor and can be faster than the creation of the handle of a tab that has just been opened, and Invoke and BeginInvoke
-    /// throw before that. False when the tab was closed meanwhile or the handle did not come.
-    /// </summary>
-    private bool WaitForHandle()
-    {
-        return UiHandleWait.Until(() => IsDisposed || Disposing, () => IsHandleCreated);
     }
 
     /// <summary>Shows a loading error; a failed reload keeps the tab with the text of the user.</summary>
@@ -642,231 +602,37 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
-    private void LoadFile()
+    // What the loading thread (RemoteFileLoader) tells the editor: these run on the UI thread.
+    bool IRemoteFileLoadView.IsReloading => _reloading;
+
+    bool IRemoteFileLoadView.IsClosed => IsDisposed;
+
+    void IRemoteFileLoadView.ShowPreview(string text)
     {
-        try
+        EditableTextDocument editableTextDocument = new EditableTextDocument
         {
-            if (!_server.Exists(RemotePath))
-            {
-                // Opening a path that does not exist starts a new file, as in vi or nano.
-                string directory = RemotePathUtils.GetDirectoryName(RemotePath);
-                if (!string.IsNullOrEmpty(directory) && !_server.Exists(directory))
-                {
-                    throw new RemoteOperationException("Cannot create " + RemotePath + ": the directory " + directory + " does not exist.");
-                }
-                CheckWriteAccess(string.IsNullOrEmpty(directory) ? "/" : directory, forNewFile: true);
-                IsNewFile = true;
-                PostToUi(() => FinishLoading(null, null));
-                return;
-            }
-            IsNewFile = false;
-            // A reload keeps the answers given when the file was opened (the permission and the size questions).
-            if (!_reloading)
-            {
-                CheckWriteAccess(RemotePath, forNewFile: false);
-            }
-            // Taken before the download: a change made while it runs is then noticed by the next save.
-            string signature = _server.FetchSignature();
-            MemoryStream downloaded = new MemoryStream();
-            // Only the text of the preview is decoded as it arrives; the file is decoded once it is complete.
-            StringBuilder content = new StringBuilder();
-            bool showPreview = !_reloading;
-            using (Stream scpDownloadStream = _server.OpenForReading(out long remoteLength))
-            {
-                // The size is known from the first SCP header (or from SFTP), before any data is read.
-                long limit = _reloading ? (IsPreview ? EditorFilePolicy.PreviewBytes : 0) : ChooseLoadLimit(remoteLength);
-                long received = 0;
-                Utf8StreamDecoder utf8StreamDecoder = new Utf8StreamDecoder();
-                byte[] bytes = new byte[65536];
-                DateTime lastPreview = DateTime.Now;
-                while (true)
-                {
-                    if (IsDisposed)
-                    {
-                        // The tab was closed: nothing is waiting for the file any more.
-                        return;
-                    }
-                    int value = scpDownloadStream.Read(bytes, 0, bytes.Length);
-                    if (value <= 0)
-                    {
-                        break;
-                    }
-                    if (limit > 0 && received + value > limit)
-                    {
-                        // A preview of a huge file ends at the limit; the rest is not downloaded.
-                        value = (int)(limit - received);
-                    }
-                    received += value;
-                    if (value > 0)
-                    {
-                        downloaded.Write(bytes, 0, value);
-                        if (showPreview)
-                        {
-                            content.Append(utf8StreamDecoder.Decode(bytes, 0, value));
-                        }
-                    }
-                    if (limit > 0 && received >= limit)
-                    {
-                        break;
-                    }
-                    // Show the partially downloaded text now and then. Re-parsing and re-highlighting the
-                    // whole document after every 64 KB block made opening large files quadratic.
-                    if (showPreview && (DateTime.Now - lastPreview).TotalMilliseconds >= PreviewIntervalMs)
-                    {
-                        lastPreview = DateTime.Now;
-                        string preview = content.ToString().TrimStart('\uFEFF');
-                        PostToUi(() =>
-                        {
-                            try
-                            {
-                                EditableTextDocument editableTextDocument = new EditableTextDocument
-                                {
-                                    DefaultLineEnding = TextDocument.LineEnding.Lf
-                                };
-                                editableTextDocument.SetText(preview);
-                                SetDocument(editableTextDocument);
-                            }
-                            catch
-                            {
-                            }
-                        });
-                    }
-                }
-            }
-            byte[] file = downloaded.ToArray();
-            PostToUi(() => FinishLoading(file, signature));
-        }
-        catch (OperationCanceledException)
-        {
-            // The user chose not to open the file: the tab closes without an error message.
-            PostToUi(() => LoadFailed?.Invoke(this, EventArgs.Empty));
-        }
-        catch (Exception exception)
-        {
-            // A closed tab needs no message about the file it was loading.
-            PostToUi(() => HandleLoadError(exception));
-        }
+            DefaultLineEnding = TextDocument.LineEnding.Lf
+        };
+        editableTextDocument.SetText(text);
+        SetDocument(editableTextDocument);
+    }
+
+    void IRemoteFileLoadView.Finish(byte[] file, string signature)
+    {
+        FinishLoading(file, signature);
+    }
+
+    void IRemoteFileLoadView.Cancelled()
+    {
+        LoadFailed?.Invoke(this, EventArgs.Empty);
+    }
+
+    void IRemoteFileLoadView.Failed(Exception exception)
+    {
+        HandleLoadError(exception);
     }
 
     private bool IsWindowsHost => _server.IsWindows;
-
-    /// <summary>
-    /// Shows a question from the loading thread; the answer of an editor that was closed (before or while the question is asked) is "cancel".
-    /// The first question can come before the tab has its window handle (a file that cannot be written, a large file: two to four calls to the
-    /// server after the thread was started), so the handle is waited for like in <see cref="PostToUi"/>: Invoke would throw, LoadFile would show
-    /// the user that technical message and the tab would close without the question.
-    /// </summary>
-    private DialogResult Ask(string text, MessageBoxButtons buttons)
-    {
-        if (!WaitForHandle())
-        {
-            return DialogResult.Cancel;
-        }
-        try
-        {
-            return (DialogResult)Invoke((Func<DialogResult>)(() => ThemedMessageBox.Show(this, text, "SmarTTY", buttons, MessageBoxIcon.Warning)));
-        }
-        catch (InvalidOperationException)
-        {
-            // The tab was closed between the wait and the call, or while the question was open (ObjectDisposedException is one of these too).
-            return DialogResult.Cancel;
-        }
-    }
-
-    /// <summary>
-    /// Warns when the user cannot write the file (or, for a new file, its directory) before he types anything: he may
-    /// choose to save with sudo (asked for at the save), to read only, or not to open the file. Loading thread.
-    /// </summary>
-    private void CheckWriteAccess(string target, bool forNewFile)
-    {
-        if (IsWindowsHost)
-        {
-            // A new file: its folder is not probed (that would mean creating a file to delete it), a refused save says so then.
-            if (forNewFile || _server.IsWritable(target))
-            {
-                return;
-            }
-            // No sudo on Windows: the choice is to read the file or not to open it.
-            if (Ask("You do not have permission to write to " + target + ".\n\n"
-                + "Yes: open the file read-only.\n"
-                + "No: do not open the file.", MessageBoxButtons.YesNo) != DialogResult.Yes)
-            {
-                throw new OperationCanceledException();
-            }
-            IsReadOnlyMode = true;
-            return;
-        }
-        // No answer is not "not writable": IsWritable checks the connection before it says no.
-        if (_server.IsWritable(target))
-        {
-            return;
-        }
-        if (_context.AutoConfirmSudo)
-        {
-            // The connection asks to save with sudo without the question: the save goes through sudo directly.
-            _sudoOnSave = true;
-            return;
-        }
-        string what = forNewFile ? "the directory " + target + ", where this new file would be created" : target;
-        switch (Ask("You do not have permission to write to " + what + ".\n\n"
-            + "Yes: edit the text and save it with sudo (the password is asked when you save).\n"
-            + "No: open the file read-only.\n"
-            + "Cancel: do not open the file.", MessageBoxButtons.YesNoCancel))
-        {
-            case DialogResult.Yes:
-                _sudoOnSave = true;
-                break;
-            case DialogResult.No:
-                IsReadOnlyMode = true;
-                break;
-            default:
-                throw new OperationCanceledException();
-        }
-    }
-
-    /// <summary>
-    /// Decides how much of a file of <paramref name="length"/> bytes is loaded: 0 for all of it, otherwise the number of
-    /// bytes of a read-only preview. A big file is opened only after a question. Loading thread.
-    /// </summary>
-    private long ChooseLoadLimit(long length)
-    {
-        string size = StringUtils.FormatSize(length, appendUnit: true);
-        switch (EditorFilePolicy.Classify(length))
-        {
-            case LargeFileAction.Warn:
-                if (IsReadOnlyMode)
-                {
-                    if (Ask(RemotePath + " is " + size + ". A large file makes the editor slow and takes a lot of memory.\n\nOpen it read-only?", MessageBoxButtons.OKCancel) != DialogResult.OK)
-                    {
-                        throw new OperationCanceledException();
-                    }
-                    return 0;
-                }
-                switch (Ask(RemotePath + " is " + size + ". A large file makes the editor slow and takes a lot of memory.\n\n"
-                    + "Yes: open it for editing.\n"
-                    + "No: open it read-only (safer).\n"
-                    + "Cancel: do not open it.", MessageBoxButtons.YesNoCancel))
-                {
-                    case DialogResult.Yes:
-                        return 0;
-                    case DialogResult.No:
-                        IsReadOnlyMode = true;
-                        return 0;
-                    default:
-                        throw new OperationCanceledException();
-                }
-            case LargeFileAction.PreviewOnly:
-                if (Ask(RemotePath + " is " + size + ", too large to edit here.\n\nOpen the first " + StringUtils.FormatSize(EditorFilePolicy.PreviewBytes, appendUnit: true) + " read-only?", MessageBoxButtons.YesNo) != DialogResult.Yes)
-                {
-                    throw new OperationCanceledException();
-                }
-                IsReadOnlyMode = true;
-                IsPreview = true;
-                return EditorFilePolicy.PreviewBytes;
-            default:
-                return 0;
-        }
-    }
 
     /// <summary>
     /// Shows the downloaded file (UI thread) and makes the editor editable. <paramref name="file"/> is null for a
@@ -1092,7 +858,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         ((EditableTextBrowser)this).ReadOnly = true;
         FormatChanged?.Invoke(this, EventArgs.Empty);
-        _loadThread = new Thread(LoadFile);
+        _loadThread = new Thread(_loader.Run);
         _loadThread.Start();
     }
 
@@ -1717,7 +1483,7 @@ public partial class RemoteFileEditor : CodeEditorPP
                 return false;
             }
         }
-        if (_sudoOnSave)
+        if (_loader.SudoOnSave)
         {
             // The user said at opening that this file is written with sudo: no failing plain attempt first.
             return false;
@@ -1767,7 +1533,7 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
     private void SaveWithSudo(SaveJob job)
     {
-        if (!_sudoOnSave && ThemedMessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (!_loader.SudoOnSave && ThemedMessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
         {
             throw new OperationCanceledException();
         }
