@@ -1,5 +1,6 @@
 using SmarTTY.Controls;
 using SmarTTY.CodeEditing;
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -443,12 +444,12 @@ internal static class Program
         for (int line = 0; line < document.LineCount; line++)
         {
             object info = getLine.Invoke(store, new object[] { line });
-            TerminalEmulatorBase.CellStyle[] cells = info == null ? null : (TerminalEmulatorBase.CellStyle[])info.GetType().GetField("Cells").GetValue(info);
+            CellStyle[] cells = info == null ? null : (CellStyle[])info.GetType().GetField("Cells").GetValue(info);
             if (cells == null)
             {
                 continue;
             }
-            foreach (TerminalEmulatorBase.CellStyle cell in cells)
+            foreach (CellStyle cell in cells)
             {
                 object target = cell._link.Target;
                 if (target != null && target.GetType().Name == "LinkCandidate" && cell._link.Target.IsActive && clicked.Add(target))
@@ -464,7 +465,7 @@ internal static class Program
     private static string DescribeLine(object info)
     {
         Type type = info.GetType();
-        TerminalEmulatorBase.CellStyle[] cells = (TerminalEmulatorBase.CellStyle[])type.GetField("Cells").GetValue(info);
+        CellStyle[] cells = (CellStyle[])type.GetField("Cells").GetValue(info);
         StringBuilder text = new StringBuilder();
         text.Append(((bool)type.GetField("IsDimmed").GetValue(info)) ? "dim " : "").Append(((bool)type.GetField("IsWrapped").GetValue(info)) ? "wrap " : "");
         if (cells == null)
@@ -501,7 +502,7 @@ internal static class Program
         return "";
     }
 
-    private static string DescribeStyle(TerminalEmulatorBase.CellStyle style)
+    private static string DescribeStyle(CellStyle style)
     {
         StringBuilder text = new StringBuilder();
         text.Append("fg").Append(style.Foreground).Append(" bg").Append(style.Background);
@@ -981,9 +982,9 @@ internal static class Program
 
     // A style with the foreground override that the HEX terminal sets for the echo of what was typed. The override holds a brush
     // in the code before stage 1B and a colour after it; this makes either.
-    private static TerminalEmulatorBase.CellStyle OverrideStyle(uint? argb)
+    private static CellStyle OverrideStyle(uint? argb)
     {
-        Type type = typeof(TerminalEmulatorBase.CellStyle.ForegroundOverride);
+        Type type = typeof(CellStyle.ForegroundOverride);
         object value = Activator.CreateInstance(type);
         if (argb.HasValue)
         {
@@ -997,8 +998,8 @@ internal static class Program
                 type.GetField("Color").SetValue(value, new RgbColor(argb.Value));
             }
         }
-        TerminalEmulatorBase.CellStyle style = default;
-        style.Override = (TerminalEmulatorBase.CellStyle.ForegroundOverride)value;
+        CellStyle style = default;
+        style.Override = (CellStyle.ForegroundOverride)value;
         return style;
     }
 
