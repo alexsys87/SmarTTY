@@ -27,6 +27,11 @@ internal static class Program
         Console.WriteLine("PASS: " + name);
     }
 
+    private static void Equal<T>(T actual, T expected, string name)
+    {
+        Check(EqualityComparer<T>.Default.Equals(actual, expected), name + (EqualityComparer<T>.Default.Equals(actual, expected) ? "" : " (expected '" + expected + "', got '" + actual + "')"));
+    }
+
     // What the script asks of the model; the label of a folded line is drawn gray by the view, which the script writes as True.
     private sealed class Model
     {
@@ -168,8 +173,42 @@ internal static class Program
         return sb.ToString();
     }
 
+    // The blocks that were folded before the text was loaded again: each goes back to its line when the line has its text, or to the one line
+    // that has its text (this is the part of the editor's RestoreFoldState that needs no control).
+    private static string RestoredFolds(string text, SyntaxHighlighting.Language language, params FoldedLineInfo[] items)
+    {
+        EditableTextDocument doc = Doc(text);
+        TokenCache cache = new TokenCache(doc, SyntaxHighlighting.GetTokenizer(language));
+        FoldingManager manager = new FoldingManager(cache);
+        manager.RestoreFolds(items);
+        return string.Join(";", manager.GetCollapsedRegions().Select(x => x.Line + "=" + x.Text)) + " hidden=" + manager.GetTotalHiddenLines();
+    }
+
+    private static FoldedLineInfo Info(int line, string text)
+    {
+        return new FoldedLineInfo { Line = line, Text = text };
+    }
+
+    private static void RestoreChecks()
+    {
+        string python = "def f(x):\n    return x\n\n\nclass A:\n    def m(self):\n        pass\n\n    def n(self):\n        return 1\n\nprint(1)\n";
+        L py = L.Python;
+        Equal(RestoredFolds(python, py, Info(0, "def f(x):"), Info(4, "class A:")), "0=def f(x):;4=class A: hidden=6", "folds go back to the lines that still have their text");
+        Equal(RestoredFolds(python, py, Info(2, "class A:")), "4=class A: hidden=5", "a line that moved is found by its text when it is the only one with it");
+        Equal(RestoredFolds(python, py, Info(99, "def f(x):")), "0=def f(x): hidden=1", "a line past the end of the text is found by its text");
+        Equal(RestoredFolds(python, py, Info(0, "no such line")), " hidden=0", "a text that is nowhere in the document folds nothing");
+        Equal(RestoredFolds(python, py, Info(1, "")), " hidden=0", "an empty text has several lines (and a line that does not fold): nothing is folded");
+        Equal(RestoredFolds(python, py), " hidden=0", "no blocks, no folds");
+
+        string twice = "int a() {\n  x;\n}\nint a() {\n  y;\n}\nint b() {\n  z;\n}\n";
+        Equal(RestoredFolds(twice, L.CLike, Info(5, "int a() {")), " hidden=0", "a text that two lines have, asked for at a line that does not have it, folds nothing");
+        Equal(RestoredFolds(twice, L.CLike, Info(3, "int a() {")), "3=int a() { hidden=2", "a text that two lines have is folded at the line that was asked for, when it has the text");
+        Equal(RestoredFolds(twice, L.CLike, Info(1, "int b() {")), "6=int b() { hidden=2", "a line with another text is found by its own text");
+    }
+
     private static void Main()
     {
+        RestoreChecks();
         string expected = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FoldingGolden.txt")).Replace("\r\n", "\n");
         string actual = RunScript().Replace("\r\n", "\n");
         string[] expectedLines = expected.Split('\n');

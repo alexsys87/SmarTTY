@@ -653,71 +653,10 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         }
     }
 
-    /// <summary>
-    /// The most text the completion list and the parameter hint read at a time. They went through a copy of the whole
-    /// document on every trigger and typed bracket, which for a file of tens of megabytes (the editor opens up to 64 MB) took
-    /// seconds each time and used up the address space of a 32-bit process.
-    /// </summary>
-    private const int AnalysisBudgetChars = 500000;
-
-    /// <summary>
-    /// The text the completion and the parameter hint work on, and where the caret is in it. A document up to
-    /// <see cref="AnalysisBudgetChars"/> is given whole; a larger one as the lines around the caret (the words and the
-    /// functions of the rest are then not offered).
-    /// </summary>
+    /// <summary>The text the completion and the parameter hint work on, and where the caret is in it (see <see cref="AnalysisText"/>).</summary>
     private string GetAnalysisText(out int caretLine, out int caretColumn)
     {
-        TextDocument document = base.EditableDocument;
-        caretLine = CaretPosition.Line;
-        caretColumn = CaretPosition.Column;
-        int count = document.LineCount;
-        long total = 0;
-        for (int i = 0; i < count && total <= AnalysisBudgetChars; i++)
-        {
-            total += document.GetLineLengthWithTerminator(i);
-        }
-        if (total <= AnalysisBudgetChars)
-        {
-            return document.GetText();
-        }
-
-        int line = Math.Max(0, Math.Min(caretLine, count - 1));
-        string lineText = document.GetLineText(line);
-        if (lineText.Length > AnalysisBudgetChars)
-        {
-            // One huge line (a minified file): the part of it around the caret.
-            int start = Math.Max(0, Math.Min(caretColumn - AnalysisBudgetChars / 2, lineText.Length - AnalysisBudgetChars));
-            caretLine = 0;
-            caretColumn = caretColumn - start;
-            return lineText.Substring(start, AnalysisBudgetChars);
-        }
-        int first = line;
-        int last = line;
-        long size = lineText.Length;
-        while (size < AnalysisBudgetChars && (first > 0 || last < count - 1))
-        {
-            if (first > 0 && (last >= count - 1 || line - first <= last - line))
-            {
-                first--;
-                size += document.GetLineLengthWithTerminator(first);
-            }
-            else
-            {
-                last++;
-                size += document.GetLineLengthWithTerminator(last);
-            }
-        }
-        StringBuilder window = new StringBuilder((int)Math.Min(size + 16, int.MaxValue));
-        for (int i = first; i <= last; i++)
-        {
-            window.Append(document.GetLineText(i));
-            if (i < last)
-            {
-                window.Append('\n');
-            }
-        }
-        caretLine = line - first;
-        return window.ToString();
+        return AnalysisText.Get(base.EditableDocument, CaretPosition.Line, CaretPosition.Column, out caretLine, out caretColumn);
     }
 
     /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
@@ -1051,36 +990,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     public void RestoreFoldState(FoldedLineInfo[] items)
     {
-        foreach (FoldedLineInfo foldedLineInfo in items)
-        {
-            int foldedLine = foldedLineInfo.Line;
-            if (foldedLine >= _tokenCache.LineCount || _tokenCache.Document.GetLineText(foldedLine) != foldedLineInfo.Text)
-            {
-                int matchIndex = -1;
-                bool foundMatch = false;
-                for (int documentLine = 0; documentLine < _tokenCache.Document.LineCount; documentLine++)
-                {
-                    if (_tokenCache.Document.GetLineText(documentLine) == foldedLineInfo.Text)
-                    {
-                        if (matchIndex != -1)
-                        {
-                            foundMatch = true;
-                            break;
-                        }
-                        matchIndex = documentLine;
-                    }
-                }
-                if (foundMatch)
-                {
-                    continue;
-                }
-                foldedLine = matchIndex;
-            }
-            if (foldedLine != -1)
-            {
-                _foldingManager.CollapseLine(foldedLine);
-            }
-        }
+        _foldingManager.RestoreFolds(items);
         UpdateLayout();
         Redraw();
     }

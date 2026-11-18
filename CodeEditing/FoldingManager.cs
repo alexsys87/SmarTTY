@@ -459,6 +459,44 @@ internal class FoldingManager
         return ToggleFold(lineIndex, out endToken, collapseOnly: true);
     }
 
+    /// <summary>
+    /// Folds again the blocks that were folded (see <see cref="GetCollapsedRegions"/>): each at the line it was on, when that line still has
+    /// its text, or else at the line of the text that is the same as its text, when there is exactly one such line.
+    /// </summary>
+    public void RestoreFolds(FoldedLineInfo[] items)
+    {
+        foreach (FoldedLineInfo foldedLineInfo in items)
+        {
+            int foldedLine = foldedLineInfo.Line;
+            if (foldedLine >= _tokenCache.LineCount || _tokenCache.Document.GetLineText(foldedLine) != foldedLineInfo.Text)
+            {
+                int matchIndex = -1;
+                bool foundMatch = false;
+                for (int documentLine = 0; documentLine < _tokenCache.Document.LineCount; documentLine++)
+                {
+                    if (_tokenCache.Document.GetLineText(documentLine) == foldedLineInfo.Text)
+                    {
+                        if (matchIndex != -1)
+                        {
+                            foundMatch = true;
+                            break;
+                        }
+                        matchIndex = documentLine;
+                    }
+                }
+                if (foundMatch)
+                {
+                    continue;
+                }
+                foldedLine = matchIndex;
+            }
+            if (foldedLine != -1)
+            {
+                CollapseLine(foldedLine);
+            }
+        }
+    }
+
     public FoldedLineInfo[] GetCollapsedRegions()
     {
         List<FoldedLineInfo> items = new List<FoldedLineInfo>();

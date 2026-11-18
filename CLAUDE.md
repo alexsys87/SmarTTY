@@ -90,7 +90,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | Stage | Content | Status |
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
-| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages) and A3c (`Completion/`) done; next A3d (line transforms) |
+| 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done: part 1A of A3 is complete; next A4 (`RemoteFileSession`) |
 | 1B | Terminal emulator core out of WinForms | Planned |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
@@ -162,6 +162,12 @@ a window, so there is no model half of it). `SuggestionController` works through
 windows in `Controls/TextView/SuggestionPopupFactory` and `HintViewFactory`. The list background is an `RgbColor` in the controller.
 `tests/CompletionControllersTests` drives the controllers and `SuggestionCatalog` with fake windows. Next, A3d: the pure line
 transforms of `CodeEditorPP` (`.LineEditing`) to `CodeEditing/`.
+
+Done in A3d: `CodeEditing/LineEditing.cs` (the lines a line command works on, the smallest replacements between old and new lines, where a
+column goes, the text of a duplicate and of a move), `CodeEditing/AnalysisText.cs` (the text and the caret the completion works on) and
+`FoldingManager.RestoreFolds` (which line a saved fold goes back to) hold what was in `CodeEditorPP.LineEditing.cs` and `CodeEditorPP.cs`;
+the control reads the lines, asks the model and makes the edits. `tests/LineEditingTests` compares 300 random cases and 60 documents around
+the analysis budget with golden files written by the old code of the control. Next, A4: `RemoteFileSession`.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20

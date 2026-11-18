@@ -1,0 +1,4386 @@
+#0 doc=''|'}bb{'|'   abb)}'|'{}( ' caretLine=2 sel=True start=2:4 caret=2:4
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 2:0-2:8=') 	';3:1-3:4=''
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,0,0,1,3, prefix=0 suffix=0
+  shift[3]: 0,1,1,1,1, prefix=1 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: '}bb{
+'
+#1 doc=' \t)\ta('|')'|')() }b'|'b({  '|'aa '|') )(()(\t'|' ' caretLine=1 sel=False start=1:5 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:4-0:6='';2:1-2:3='';3:0-3:0='  ';4:1-4:3='';5:0-5:0='('
+  shift[0]: 0,1,3,4,4, prefix=4 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,1,1,4,4, prefix=1 suffix=3
+  shift[3]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[4]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[5]: 0,2,4,7,9, prefix=0 suffix=8
+  shift[6]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[1,6]: '
+)
+)() }b
+b({  
+aa 
+) )(()(\t
+ '
+  moved[-1]: ')
+)() }b
+b({  
+aa 
+) )(()(\t
+ 
+ \t)\ta('
+  moved[1]: -
+#2 doc='aa{a}{{ '|'aaa\tb\t '|'ab '|'{'|' aab}\tb '|'\t}b\t}{}' caretLine=4 sel=False start=3:9 caret=4:5
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 4:1-4:1='  '
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[4]: 0,1,5,8,10, prefix=1 suffix=7
+  shift[5]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[0,2]: '
+aa{a}{{ 
+aaa\tb\t 
+ab '
+  moved[-1]: -
+  moved[1]: '{
+aa{a}{{ 
+aaa\tb\t 
+ab '
+#3 doc=')}}))b\t' caretLine=0 sel=True start=0:3 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[0,0]: '
+)}}))b\t'
+  moved[-1]: -
+  moved[1]: -
+#4 doc='b }'|' '|'ab'|'} '|'{ba'|' '|'} ' caretLine=0 sel=True start=6:3 caret=0:8
+  lines: 0,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: ok 0,6;  SortDescending: ok 0,6;  RemoveDuplicateLines: ok 0,6;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0=' {';1:0-1:1='';2:2-2:2='  a';4:0-4:0='  ';6:0-6:0='  '
+  shift[0]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,1,5,5,5, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[5]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[6]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[6,6]: '
+} '
+  moved[-1]: '} 
+ '
+  moved[1]: -
+#5 doc=') ) ) a'|'}'|')}'|')\t{b('|' \t}\tb('|'{b'|')aab{( {' caretLine=1 sel=True start=3:8 caret=1:0
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:4-0:4='b ';2:0-2:2='';3:0-3:0='  ';4:0-4:6='{({		{ ';5:0-5:2='(';6:0-6:0='  '
+  shift[0]: 0,1,3,8,9, prefix=4 suffix=3
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[4]: 0,2,4,7,7, prefix=0 suffix=0
+  shift[5]: 0,0,1,1,1, prefix=0 suffix=0
+  shift[6]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[5,5]: '
+{b'
+  moved[-1]: '{b
+ \t}\tb('
+  moved[1]: ')aab{( {
+{b'
+#6 doc='' caretLine=0 sel=True start=0:0 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: -
+#7 doc=''|'b{\t \t)'|'   (a'|'a}' caretLine=3 sel=True start=0:0 caret=3:0
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='  ';1:0-1:2='';2:1-2:1='}';3:0-3:0='  '
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[1]: 0,0,1,4,4, prefix=0 suffix=4
+  shift[2]: 0,1,4,6,6, prefix=1 suffix=4
+  shift[3]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[3,3]: '
+a}'
+  moved[-1]: 'a}
+   (a'
+  moved[1]: -
+#8 doc='b b '|' '|'{\t a'|')\t'|'{ { '|'(\tb\t}b\t'|' ' caretLine=5 sel=True start=5:1 caret=5:4
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 5,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 5,5;  IndentationToTabs: ok 5,5;  EnsureFinalNewline: ok 5,5;
+  edits: 0:0-0:0='  ';1:1-1:1='( b';2:0-2:4='b()}a a)';5:0-5:0='  '
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=0
+  shift[2]: 0,5,7,8,8, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[6]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[4,5]: '
+{ { 
+(\tb\t}b\t'
+  moved[-1]: '{ { 
+(\tb\t}b\t
+)\t'
+  moved[1]: ' 
+{ { 
+(\tb\t}b\t'
+#9 doc='  )) a}'|'}bab  '|' }'|')\t{ '|' ('|'b{b a})a'|'}\t' caretLine=4 sel=True start=0:5 caret=4:7
+  lines: 0,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: ok 0,4;  SortDescending: ok 0,4;  RemoveDuplicateLines: ok 0,4;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:1-0:7=')(	 b)	';4:0-4:2='';6:1-6:2=''
+  shift[0]: 0,1,4,7,8, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[6]: 0,1,1,1,1, prefix=1 suffix=0
+  duplicated[0,3]: '
+  )) a}
+}bab  
+ }
+)\t{ '
+  moved[-1]: -
+  moved[1]: ' (
+  )) a}
+}bab  
+ }
+)\t{ '
+#10 doc=' ) }({) '|'b)) '|'(' caretLine=0 sel=True start=0:2 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:1='  ';1:0-1:4='a 		'
+  shift[0]: 0,1,5,8,10, prefix=1 suffix=7
+  shift[1]: 0,1,3,4,4, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[1,2]: '
+b)) 
+('
+  moved[-1]: 'b)) 
+(
+ ) }({) '
+  moved[1]: -
+#11 doc=')}'|'b('|')('|''|'{\ta'|'  }  )\t\t' caretLine=4 sel=True start=1:1 caret=4:7
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 1:0-1:2='({} (a';2:1-2:2='';5:1-5:8='	}	bb('
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,5,6,6,6, prefix=0 suffix=0
+  shift[2]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[5]: 0,1,2,5,7, prefix=1 suffix=0
+  duplicated[0,4]: '
+)}
+b(
+)(
+
+{\ta'
+  moved[-1]: -
+  moved[1]: '  }  )\t\t
+)}
+b(
+)(
+
+{\ta'
+#12 doc=' '|'b}{{aaa' caretLine=1 sel=False start=1:1 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:1='';1:4-1:4=' a'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,8,9, prefix=4 suffix=3
+  duplicated[1,1]: '
+b}{{aaa'
+  moved[-1]: 'b}{{aaa
+ '
+  moved[1]: -
+#13 doc='aa })a '|'\t)'|' aab}' caretLine=0 sel=True start=1:6 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:2-1:2='{ '
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,2]: '
+aa })a 
+\t)
+ aab}'
+  moved[-1]: -
+  moved[1]: -
+#14 doc='a'|''|' bb '|'a{(}' caretLine=1 sel=True start=3:0 caret=1:0
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:0-0:0=' ';2:2-2:3='';3:1-3:4=''
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,2,3,3, prefix=2 suffix=1
+  shift[3]: 0,1,1,1,1, prefix=1 suffix=0
+  duplicated[1,2]: '
+
+ bb '
+  moved[-1]: '
+ bb 
+a'
+  moved[1]: 'a{(}
+
+ bb '
+#15 doc='}ab\t} ('|'{\t  '|' }(}'|'} a'|'(a})b\t'|'){b(b \tb'|'' caretLine=6 sel=True start=4:9 caret=6:5
+  lines: 4,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 4,6;  SortAscending: ok 4,6;  SortDescending: ok 4,6;  RemoveDuplicateLines: ok 4,6;  IndentationToSpaces: ok 4,6;  IndentationToTabs: ok 4,6;  EnsureFinalNewline: ok 4,6;
+  edits: 0:0-0:7=')({{})()';1:0-1:4='a	b';2:0-2:4='';3:0-3:3='';5:0-5:0='  ';6:0-6:0='x'
+  shift[0]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[1]: 0,0,2,3,3, prefix=0 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[6]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[6,6]: '
+'
+  moved[-1]: '
+){b(b \tb'
+  moved[1]: -
+#16 doc='\t}\tba)\t)'|'\t}b{{\t'|' aba\t)){' caretLine=1 sel=True start=1:4 caret=1:6
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 1:6-1:6=')b';2:2-2:4=''
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,3,6,8, prefix=6 suffix=0
+  shift[2]: 0,1,2,4,6, prefix=2 suffix=4
+  duplicated[1,2]: '
+\t}b{{\t
+ aba\t)){'
+  moved[-1]: '\t}b{{\t
+ aba\t)){
+\t}\tba)\t)'
+  moved[1]: -
+#17 doc='a  }()'|''|'   ) ){)' caretLine=1 sel=True start=2:1 caret=1:6
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 1:0-1:0='{){		) '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[2,2]: '
+   ) ){)'
+  moved[-1]: '   ) ){)
+'
+  moved[1]: -
+#18 doc='{{' caretLine=0 sel=True start=0:0 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:2-0:2='a('
+  shift[0]: 0,1,4,4,4, prefix=2 suffix=0
+  duplicated[0,0]: '
+{{'
+  moved[-1]: -
+  moved[1]: -
+#19 doc='(\t' caretLine=0 sel=True start=0:1 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,0]: '
+(\t'
+  moved[-1]: -
+  moved[1]: -
+#20 doc='( b ({}' caretLine=0 sel=False start=0:2 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:6-0:7=''
+  shift[0]: 0,1,3,6,6, prefix=6 suffix=0
+  duplicated[0,0]: '
+( b ({}'
+  moved[-1]: -
+  moved[1]: -
+#21 doc='(('|'a {bb{  '|'}}('|' (b ' caretLine=3 sel=False start=1:2 caret=3:0
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:2='';1:4-1:5='';2:1-2:3='';3:1-3:1='  '
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,5,7, prefix=4 suffix=3
+  shift[2]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[3]: 0,1,5,6,6, prefix=1 suffix=3
+  duplicated[0,1]: '
+((
+a {bb{  '
+  moved[-1]: -
+  moved[1]: '}}(
+((
+a {bb{  '
+#22 doc=''|'\t\tbaa} ' caretLine=1 sel=True start=1:3 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:0='x';1:3-1:5=''
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[1]: 0,1,3,4,5, prefix=3 suffix=2
+  duplicated[1,1]: '
+\t\tbaa} '
+  moved[-1]: '\t\tbaa} 
+'
+  moved[1]: -
+#23 doc=' b}a{ a{'|'} ' caretLine=0 sel=True start=0:6 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:2-0:2=' ';1:0-1:0='  '
+  shift[0]: 0,1,4,7,9, prefix=2 suffix=6
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[1,1]: '
+} '
+  moved[-1]: '} 
+ b}a{ a{'
+  moved[1]: -
+#24 doc='  '|') {{b '|'}'|'(' caretLine=1 sel=True start=0:3 caret=1:4
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:2='';2:1-2:1='('
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,2,2,2, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[2,3]: '
+}
+('
+  moved[-1]: '}
+(
+) {{b '
+  moved[1]: -
+#25 doc=''|' b)\t(ba'|'(b' caretLine=1 sel=True start=2:1 caret=1:3
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:0-0:0='{	{ 	}{ ';1:6-1:7='';2:0-2:2='bb{	(		)'
+  shift[0]: 0,8,8,8,8, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,6, prefix=6 suffix=0
+  shift[2]: 0,7,8,8,8, prefix=0 suffix=0
+  duplicated[2,2]: '
+(b'
+  moved[-1]: '(b
+ b)\t(ba'
+  moved[1]: -
+#26 doc='\t( b}a'|'('|'b \t{'|'('|'{\t  } )'|'   }'|'b{}}(}' caretLine=2 sel=True start=6:2 caret=2:0
+  lines: 2,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,6;  SortAscending: ok 2,6;  SortDescending: ok 2,6;  RemoveDuplicateLines: ok 2,6;  IndentationToSpaces: ok 2,6;  IndentationToTabs: ok 2,6;  EnsureFinalNewline: ok 2,6;
+  edits: 0:0-0:0='  ';1:1-1:1=' ( ';3:0-3:0='  ';5:1-5:1='{a'
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[4]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[5]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[6]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[5,6]: '
+   }
+b{}}(}'
+  moved[-1]: '   }
+b{}}(}
+{\t  } )'
+  moved[1]: -
+#27 doc='b{   \t'|' '|' ('|' ab}))'|'' caretLine=3 sel=True start=1:7 caret=3:5
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:5-0:5=' { '
+  shift[0]: 0,1,3,9,9, prefix=5 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[1,3]: '
+ 
+ (
+ ab}))'
+  moved[-1]: ' 
+ (
+ ab}))
+b{   \t'
+  moved[1]: '
+ 
+ (
+ ab}))'
+#28 doc='\tb(\t )'|'\t(b a)}'|'b{}}{b  ' caretLine=2 sel=True start=0:5 caret=2:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:7='b(	';2:0-2:0=')}'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,0,0,2,3, prefix=0 suffix=0
+  shift[2]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[0,2]: '
+\tb(\t )
+\t(b a)}
+b{}}{b  '
+  moved[-1]: -
+  moved[1]: -
+#29 doc='(b {} ' caretLine=0 sel=True start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[0,0]: '
+(b {} '
+  moved[-1]: -
+  moved[1]: -
+#30 doc='  '|' ) ) }'|'a '|')' caretLine=3 sel=True start=3:1 caret=3:0
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 1:1-1:1='  ';2:0-2:0='  '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[2]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[3]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[3,3]: '
+)'
+  moved[-1]: ')
+a '
+  moved[1]: -
+#31 doc='(a } {a '|'}b\t'|'\t( ' caretLine=2 sel=False start=1:1 caret=2:5
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[1,2]: '
+}b\t
+\t( '
+  moved[-1]: '}b\t
+\t( 
+(a } {a '
+  moved[1]: -
+#32 doc='a})}{ \t}'|' a}}{a'|'b  )}}' caretLine=1 sel=True start=2:0 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:0='  ';1:0-1:1='';2:4-2:6=''
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,0,2,5,5, prefix=0 suffix=5
+  shift[2]: 0,1,3,4,4, prefix=4 suffix=0
+  duplicated[0,1]: '
+a})}{ \t}
+ a}}{a'
+  moved[-1]: -
+  moved[1]: 'b  )}}
+a})}{ \t}
+ a}}{a'
+#33 doc='(\t((})b'|') a} '|'  (}a\t)'|')  b' caretLine=2 sel=True start=2:3 caret=2:4
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:0-0:0='  ';1:4-1:5=''
+  shift[0]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[1]: 0,1,3,4,4, prefix=4 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[1,2]: '
+) a} 
+  (}a\t)'
+  moved[-1]: ') a} 
+  (}a\t)
+(\t((})b'
+  moved[1]: ')  b
+) a} 
+  (}a\t)'
+#34 doc=')} \tb '|'}  '|'bb{  {a ' caretLine=1 sel=False start=1:7 caret=1:3
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:4-0:4='a)'
+  shift[0]: 0,1,3,8,8, prefix=4 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[1,2]: '
+}  
+bb{  {a '
+  moved[-1]: '}  
+bb{  {a 
+)} \tb '
+  moved[1]: -
+#35 doc='\t{\t '|'() a )b '|'}\t}b{}{{'|'  ({) '|'} b\t{(' caretLine=3 sel=True start=4:6 caret=3:3
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 0:3-0:3='	b	';1:0-1:8='b';2:0-2:8=')(aa}';3:0-3:6='}a 	 }';4:0-4:0='  '
+  shift[0]: 0,1,3,7,7, prefix=3 suffix=1
+  shift[1]: 0,0,0,0,1, prefix=0 suffix=0
+  shift[2]: 0,0,0,3,5, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,6, prefix=0 suffix=0
+  shift[4]: 0,3,5,8,8, prefix=0 suffix=6
+  duplicated[0,1]: '
+\t{\t 
+() a )b '
+  moved[-1]: -
+  moved[1]: '}\t}b{}{{
+\t{\t 
+() a )b '
+#36 doc=' }b'|'\t )\tb) '|'\t'|'b\t) \t)'|'(b}}'|'' caretLine=5 sel=True start=0:1 caret=5:0
+  lines: 0,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: ok 0,4;  SortDescending: ok 0,4;  RemoveDuplicateLines: ok 0,4;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:2-0:3='';1:0-1:5='}a';2:0-2:1='';3:5-3:6='';4:0-4:0='  '
+  shift[0]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[1]: 0,0,0,3,4, prefix=0 suffix=2
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,5,5, prefix=5 suffix=0
+  shift[4]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[5]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[2,2]: '
+\t'
+  moved[-1]: '\t
+\t )\tb) '
+  moved[1]: 'b\t) \t)
+\t'
+#37 doc='}}){ }'|'\t \t '|'b()}}'|''|'b{ }\ta '|'' caretLine=0 sel=False start=4:3 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:3-0:3='a	 ';1:0-1:4='';2:1-2:2='';4:0-4:0='  ';5:0-5:0='x'
+  shift[0]: 0,1,3,9,9, prefix=3 suffix=3
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,1,2,4,4, prefix=1 suffix=3
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[5]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[3,3]: '
+'
+  moved[-1]: '
+b()}}'
+  moved[1]: 'b{ }\ta 
+'
+#38 doc='b  )}(}' caretLine=0 sel=True start=0:7 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[0,0]: '
+b  )}(}'
+  moved[-1]: -
+  moved[1]: -
+#39 doc='b}{\t){'|'( }{'|'){a a'|' ' caretLine=1 sel=True start=3:2 caret=1:2
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 3:0-3:1=''
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[3,3]: '
+ '
+  moved[-1]: ' 
+){a a'
+  moved[1]: -
+#40 doc='}' caretLine=0 sel=True start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,0]: '
+}'
+  moved[-1]: -
+  moved[1]: -
+#41 doc=''|'}{' caretLine=1 sel=False start=0:1 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:0='  '
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,1]: '
+
+}{'
+  moved[-1]: -
+  moved[1]: -
+#42 doc='ba{)}'|'}  (} ' caretLine=0 sel=True start=1:2 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[0,0]: '
+ba{)}'
+  moved[-1]: -
+  moved[1]: '}  (} 
+ba{)}'
+#43 doc='} }}{' caretLine=0 sel=False start=0:6 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,0]: '
+} }}{'
+  moved[-1]: -
+  moved[1]: -
+#44 doc=' \t'|'  ( ' caretLine=0 sel=True start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:2='';1:0-1:4='	{}	 	'
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,3,5,6,6, prefix=0 suffix=0
+  duplicated[0,0]: '
+ \t'
+  moved[-1]: -
+  moved[1]: '  ( 
+ \t'
+#45 doc='{(b){'|'\t{{  b\t'|'a}) }' caretLine=0 sel=False start=2:3 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 1:0-1:0='  ';2:0-2:5='{{'
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[2]: 0,0,0,2,2, prefix=0 suffix=0
+  duplicated[1,1]: '
+\t{{  b\t'
+  moved[-1]: '\t{{  b\t
+{(b){'
+  moved[1]: 'a}) }
+\t{{  b\t'
+#46 doc=') a}}}'|'   '|' ){ '|' )'|'\t'|''|' ()' caretLine=0 sel=True start=4:2 caret=0:0
+  lines: 0,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: ok 0,4;  SortDescending: ok 0,4;  RemoveDuplicateLines: ok 0,4;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 3:1-3:2='';4:0-4:1='';5:0-5:0='x';6:0-6:3='bb	'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[6]: 0,1,3,3,3, prefix=0 suffix=0
+  duplicated[5,5]: '
+'
+  moved[-1]: '
+\t'
+  moved[1]: ' ()
+'
+#47 doc='\t\t)} ( '|'\t }a a(b'|' ) ) '|'' caretLine=2 sel=True start=0:6 caret=2:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:2='';3:0-3:0='x'
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,0,1,4,6, prefix=0 suffix=6
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[0,3]: '
+\t\t)} ( 
+\t }a a(b
+ ) ) 
+'
+  moved[-1]: -
+  moved[1]: -
+#48 doc='}) b' caretLine=0 sel=True start=0:1 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:3-0:4=''
+  shift[0]: 0,1,3,3,3, prefix=3 suffix=0
+  duplicated[0,0]: '
+}) b'
+  moved[-1]: -
+  moved[1]: -
+#49 doc=''|'\ta' caretLine=0 sel=False start=1:0 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:1=''
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  duplicated[1,1]: '
+\ta'
+  moved[-1]: '\ta
+'
+  moved[1]: -
+#50 doc=' ba{a\t'|'  ('|'b('|' a\t( )'|' {ba)' caretLine=1 sel=True start=4:0 caret=1:0
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:0-0:5='}}a 	';1:0-1:2='';2:1-2:2='';3:1-3:1='  ';4:0-4:5='} aa} '
+  shift[0]: 0,1,3,6,6, prefix=0 suffix=1
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[2]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[3]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[4]: 0,2,4,6,6, prefix=0 suffix=0
+  duplicated[4,4]: '
+ {ba)'
+  moved[-1]: ' {ba)
+ a\t( )'
+  moved[1]: -
+#51 doc='(}'|''|'}}}) }' caretLine=0 sel=False start=2:6 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='  ';1:0-1:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[0,1]: '
+(}
+'
+  moved[-1]: -
+  moved[1]: '}}}) }
+(}
+'
+#52 doc='aab('|'' caretLine=1 sel=False start=0:0 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:0='  ';1:0-1:0='  '
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[1,1]: '
+'
+  moved[-1]: '
+aab('
+  moved[1]: -
+#53 doc='\ta \t{ '|'b' caretLine=0 sel=False start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:4='()}';1:0-1:1=''
+  shift[0]: 0,0,2,5,5, prefix=0 suffix=2
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[1,1]: '
+b'
+  moved[-1]: 'b
+\ta \t{ '
+  moved[1]: -
+#54 doc='b}  \t'|'\t {'|' )}\t)(a('|'a}ab \t  '|' (}{((}\t' caretLine=3 sel=True start=3:8 caret=3:7
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 0:3-0:4='';1:0-1:0='  ';2:1-2:1='  '
+  shift[0]: 0,1,3,4,4, prefix=3 suffix=1
+  shift[1]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[2]: 0,1,5,8,10, prefix=1 suffix=7
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[3,4]: '
+a}ab \t  
+ (}{((}\t'
+  moved[-1]: 'a}ab \t  
+ (}{((}\t
+ )}\t)(a('
+  moved[1]: -
+#55 doc=')a)b}' caretLine=0 sel=False start=0:6 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,0]: '
+)a)b}'
+  moved[-1]: -
+  moved[1]: -
+#56 doc=' aa a \t{'|'(\t' caretLine=1 sel=True start=1:0 caret=1:7
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:1='';1:0-1:0='  '
+  shift[0]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,1]: '
+ aa a \t{
+(\t'
+  moved[-1]: -
+  moved[1]: -
+#57 doc='b}\t(}} '|')a'|'}} (' caretLine=2 sel=False start=1:2 caret=2:5
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:2-0:5='';1:0-1:0='  ';2:0-2:4='(			)'
+  shift[0]: 0,1,2,3,4, prefix=2 suffix=2
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[2]: 0,2,4,5,5, prefix=0 suffix=0
+  duplicated[0,0]: '
+b}\t(}} '
+  moved[-1]: -
+  moved[1]: ')a
+b}\t(}} '
+#58 doc='}{   b ' caretLine=0 sel=False start=0:5 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,2,5,6, prefix=0 suffix=6
+  duplicated[0,0]: '
+}{   b '
+  moved[-1]: -
+  moved[1]: -
+#59 doc='a( '|'{( \t} )'|'\t'|' (     a' caretLine=3 sel=False start=2:0 caret=3:0
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:1-0:1='{))';1:0-1:0='  ';2:1-2:1=' (}';3:1-3:1='  '
+  shift[0]: 0,1,6,6,6, prefix=1 suffix=2
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[2]: 0,1,4,4,4, prefix=1 suffix=0
+  shift[3]: 0,1,5,8,10, prefix=1 suffix=7
+  duplicated[1,3]: '
+{( \t} )
+\t
+ (     a'
+  moved[-1]: '{( \t} )
+\t
+ (     a
+a( '
+  moved[1]: -
+#60 doc=')b \t'|'(baba{'|' '|'bbb\t'|'{ {'|'}a'|'{(\t\t\taa' caretLine=0 sel=True start=6:2 caret=0:2
+  lines: 0,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: ok 0,6;  SortDescending: ok 0,6;  RemoveDuplicateLines: ok 0,6;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='  ';1:3-1:5='';2:0-2:1='';4:3-4:3='}	'
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,3,4,4, prefix=3 suffix=1
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[4]: 0,1,3,5,5, prefix=3 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[6,6]: '
+{(\t\t\taa'
+  moved[-1]: '{(\t\t\taa
+}a'
+  moved[1]: -
+#61 doc='})\t('|'()ab}{' caretLine=0 sel=False start=0:1 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:0='  ';1:4-1:4='ab'
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,3,8,8, prefix=4 suffix=2
+  duplicated[1,1]: '
+()ab}{'
+  moved[-1]: '()ab}{
+})\t('
+  moved[1]: -
+#62 doc='a})\t'|' )\t '|''|'a) a}( ' caretLine=1 sel=False start=1:5 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:0='  ';1:1-1:1='  ';2:0-2:0=' {{a a';3:0-3:7=' }'
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[2]: 0,6,6,6,6, prefix=0 suffix=0
+  shift[3]: 0,0,0,1,2, prefix=0 suffix=0
+  duplicated[3,3]: '
+a) a}( '
+  moved[-1]: 'a) a}( 
+'
+  moved[1]: -
+#63 doc='(()) (a('|'\t  '|''|'b\t)( '|'} }}\tb)' caretLine=3 sel=True start=0:1 caret=3:0
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='  ';1:0-1:3='';2:0-2:0='x';4:7-4:7='	)'
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[4]: 0,1,3,6,9, prefix=7 suffix=0
+  duplicated[1,3]: '
+\t  
+
+b\t)( '
+  moved[-1]: '\t  
+
+b\t)( 
+(()) (a('
+  moved[1]: '} }}\tb)
+\t  
+
+b\t)( '
+#64 doc='(a{b ({}'|'() '|'{'|'babb'|'a} a)'|') '|')(' caretLine=2 sel=True start=4:0 caret=2:1
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 1:2-1:3='';2:0-2:1='()';6:0-6:1=''
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[2]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[6]: 0,0,1,1,1, prefix=0 suffix=1
+  duplicated[3,4]: '
+babb
+a} a)'
+  moved[-1]: 'babb
+a} a)
+{'
+  moved[1]: ') 
+babb
+a} a)'
+#65 doc='{)\ta}\t'|'(a )})'|'\t{a({})'|' }a)b(  '|'b  )}(}'|'  (  '|'' caretLine=1 sel=False start=3:0 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 1:0-1:1='';2:0-2:1='';3:0-3:7='a  a';4:3-4:5='';5:2-5:2='  '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,0,2,5,5, prefix=0 suffix=5
+  shift[2]: 0,0,2,5,6, prefix=0 suffix=6
+  shift[3]: 0,0,0,3,5, prefix=0 suffix=1
+  shift[4]: 0,1,3,4,5, prefix=3 suffix=2
+  shift[5]: 0,1,5,7,7, prefix=2 suffix=3
+  shift[6]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[4,4]: '
+b  )}(}'
+  moved[-1]: 'b  )}(}
+ }a)b(  '
+  moved[1]: '  (  
+b  )}(}'
+#66 doc='' caretLine=0 sel=True start=0:1 caret=0:8
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='x'
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: -
+#67 doc='a(b'|'{(a'|' }  ))\t '|'b\t }{a(}'|'a)'|'{' caretLine=3 sel=True start=3:2 caret=3:5
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 1:0-1:3='ba((b{}	';2:6-2:6=')';5:0-5:1=''
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,6,8,8,8, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,9, prefix=6 suffix=2
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[3,4]: '
+b\t }{a(}
+a)'
+  moved[-1]: 'b\t }{a(}
+a)
+ }  ))\t '
+  moved[1]: '{
+b\t }{a(}
+a)'
+#68 doc='( {)\tb\t'|'a}\tb{b'|'\ta ' caretLine=1 sel=False start=2:2 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 2:2-2:2='{'
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,4,4,4, prefix=2 suffix=1
+  duplicated[0,0]: '
+( {)\tb\t'
+  moved[-1]: -
+  moved[1]: 'a}\tb{b
+( {)\tb\t'
+#69 doc='b\t'|'})\t' caretLine=1 sel=True start=1:1 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 1:0-1:0='a  '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,4,6,6,6, prefix=0 suffix=3
+  duplicated[1,1]: '
+})\t'
+  moved[-1]: '})\t
+b\t'
+  moved[1]: -
+#70 doc=')b(\tb'|''|'(b'|'b'|'}b {{a)' caretLine=3 sel=True start=0:1 caret=3:0
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:2-0:5='';2:0-2:0='  ';3:0-3:0='  ';4:0-4:0='  '
+  shift[0]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[3]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[4]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[2,4]: '
+(b
+b
+}b {{a)'
+  moved[-1]: '(b
+b
+}b {{a)
+'
+  moved[1]: -
+#71 doc='b}(\ta{'|'}{\tb{) '|'\t{}'|' '|'(\t()\t( \t' caretLine=2 sel=True start=2:4 caret=2:8
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:1-0:1='((';1:0-1:7='	';3:0-3:1=''
+  shift[0]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[1]: 0,0,0,0,1, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[2,4]: '
+\t{}
+ 
+(\t()\t( \t'
+  moved[-1]: '\t{}
+ 
+(\t()\t( \t
+}{\tb{) '
+  moved[1]: -
+#72 doc='\t\ta{(b '|'\tbb '|')' caretLine=1 sel=False start=1:2 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,1]: '
+\t\ta{(b 
+\tbb '
+  moved[-1]: -
+  moved[1]: ')
+\t\ta{(b 
+\tbb '
+#73 doc='b)'|'\t'|' } '|'{)'|'b '|'{}a  b(' caretLine=1 sel=False start=4:3 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 1:0-1:1='}';3:0-3:1='';4:0-4:0='  '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[4]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[5]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[2,4]: '
+ } 
+{)
+b '
+  moved[-1]: ' } 
+{)
+b 
+\t'
+  moved[1]: '{}a  b(
+ } 
+{)
+b '
+#74 doc='}{( b'|' '|'a\t a}'|'({ }'|')} a '|'} }' caretLine=5 sel=True start=2:4 caret=5:8
+  lines: 2,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,5;  SortAscending: ok 2,5;  SortDescending: ok 2,5;  RemoveDuplicateLines: ok 2,5;  IndentationToSpaces: ok 2,5;  IndentationToTabs: ok 2,5;  EnsureFinalNewline: ok 2,5;
+  edits: 3:0-3:0='  ';5:0-5:0='  '
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[4]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[5]: 0,3,5,5,5, prefix=0 suffix=3
+  duplicated[3,3]: '
+({ }'
+  moved[-1]: '({ }
+a\t a}'
+  moved[1]: ')} a 
+({ }'
+#75 doc=''|')\t'|'\ta})() ' caretLine=2 sel=False start=2:3 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='x';1:0-1:0='  ';2:0-2:0='  '
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[2,2]: '
+\ta})() '
+  moved[-1]: '\ta})() 
+)\t'
+  moved[1]: -
+#76 doc='\t{('|''|''|'\tb}{'|''|' ' caretLine=0 sel=True start=1:2 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 3:0-3:0='  ';4:0-4:0='b) '
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[4]: 0,3,3,3,3, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[4,4]: '
+'
+  moved[-1]: '
+\tb}{'
+  moved[1]: ' 
+'
+#77 doc='( ' caretLine=0 sel=True start=0:1 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,0]: '
+( '
+  moved[-1]: -
+  moved[1]: -
+#78 doc='  )b( '|'a )}{'|'{ '|'bb {}a'|'(b{}a'|' b'|')\ta  ( )' caretLine=4 sel=True start=5:1 caret=4:0
+  lines: 4,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 4,5;  SortAscending: ok 4,5;  SortDescending: ok 4,5;  RemoveDuplicateLines: ok 4,5;  IndentationToSpaces: ok 4,5;  IndentationToTabs: ok 4,5;  EnsureFinalNewline: ok 4,5;
+  edits: 1:0-1:5='{(a{b';2:0-2:0='  ';3:1-3:6='}{ ()';5:0-5:1='';6:0-6:0='  '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,5,5, prefix=0 suffix=0
+  shift[2]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[3]: 0,1,3,6,6, prefix=1 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[5]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[6]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[5,6]: '
+ b
+)\ta  ( )'
+  moved[-1]: ' b
+)\ta  ( )
+(b{}a'
+  moved[1]: -
+#79 doc='))b a'|'{{{'|' \t{aa(' caretLine=2 sel=True start=1:0 caret=2:3
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 1:0-1:0='  ';2:0-2:2=''
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[2]: 0,0,1,4,4, prefix=0 suffix=4
+  duplicated[1,2]: '
+{{{
+ \t{aa('
+  moved[-1]: '{{{
+ \t{aa(
+))b a'
+  moved[1]: -
+#80 doc='\t('|'} b}' caretLine=0 sel=False start=0:1 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:1='';1:1-1:3='	a'
+  shift[0]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[1]: 0,1,3,4,4, prefix=1 suffix=1
+  duplicated[0,0]: '
+\t('
+  moved[-1]: -
+  moved[1]: '} b}
+\t('
+#81 doc=''|'b('|'}'|'('|'b)}{'|'{) ) {'|'(){\t' caretLine=5 sel=False start=1:6 caret=5:2
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='x';2:0-2:1='{)} b		 ';3:0-3:0=')';5:0-5:0='  ';6:0-6:0='  '
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,8,8,8,8, prefix=0 suffix=0
+  shift[3]: 0,2,2,2,2, prefix=0 suffix=1
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[6]: 0,3,5,6,6, prefix=0 suffix=4
+  duplicated[1,6]: '
+b(
+}
+(
+b)}{
+{) ) {
+(){\t'
+  moved[-1]: 'b(
+}
+(
+b)}{
+{) ) {
+(){\t
+'
+  moved[1]: -
+#82 doc='\t\t '|' ' caretLine=1 sel=True start=1:1 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:0='  ';1:1-1:1='()}'
+  shift[0]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=0
+  duplicated[1,1]: '
+ '
+  moved[-1]: ' 
+\t\t '
+  moved[1]: -
+#83 doc=' b ' caretLine=0 sel=True start=0:1 caret=0:1
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:2-0:3=''
+  shift[0]: 0,1,2,2,2, prefix=2 suffix=0
+  duplicated[0,0]: '
+ b '
+  moved[-1]: -
+  moved[1]: -
+#84 doc='{)a{}'|'( b}b a'|'\t b{'|'}\t{}a a '|'' caretLine=3 sel=True start=0:8 caret=3:8
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:5='';1:3-1:5='';2:0-2:2='';4:0-4:0='x'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,4,5, prefix=3 suffix=2
+  shift[2]: 0,0,1,2,2, prefix=0 suffix=2
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[0,1]: '
+{)a{}
+( b}b a'
+  moved[-1]: -
+  moved[1]: '\t b{
+{)a{}
+( b}b a'
+#85 doc='(b '|'(('|'aa{a\t{'|'\t))'|'b (('|' '|'\t(a( ' caretLine=6 sel=True start=5:6 caret=6:2
+  lines: 5,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 5,6;  SortAscending: ok 5,6;  SortDescending: ok 5,6;  RemoveDuplicateLines: ok 5,6;  IndentationToSpaces: ok 5,6;  IndentationToTabs: ok 5,6;  EnsureFinalNewline: ok 5,6;
+  edits: 0:0-0:3='   }	}a';1:1-1:2='';2:0-2:6='	a))}a';3:0-3:1='';4:0-4:1='';5:1-5:1='  ';6:3-6:3='  b'
+  shift[0]: 0,5,7,7,7, prefix=0 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,6, prefix=0 suffix=0
+  shift[3]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[4]: 0,0,2,3,3, prefix=0 suffix=3
+  shift[5]: 0,1,3,3,3, prefix=1 suffix=0
+  shift[6]: 0,1,3,8,8, prefix=3 suffix=2
+  duplicated[3,5]: '
+\t))
+b ((
+ '
+  moved[-1]: '\t))
+b ((
+ 
+aa{a\t{'
+  moved[1]: '\t(a( 
+\t))
+b ((
+ '
+#86 doc='){}'|'))'|'(}((' caretLine=1 sel=True start=1:2 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 2:1-2:3=' (} '
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,1,5,6,6, prefix=1 suffix=1
+  duplicated[1,2]: '
+))
+(}(('
+  moved[-1]: '))
+(}((
+){}'
+  moved[1]: -
+#87 doc='{{ '|' )\tb \ta'|' a' caretLine=0 sel=True start=1:5 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:1-0:2='';1:1-1:1='  '
+  shift[0]: 0,1,2,2,2, prefix=1 suffix=1
+  shift[1]: 0,1,5,8,9, prefix=1 suffix=6
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[1,1]: '
+ )\tb \ta'
+  moved[-1]: ' )\tb \ta
+{{ '
+  moved[1]: ' a
+ )\tb \ta'
+#88 doc='b{{\t'|'{'|' (\t{' caretLine=1 sel=True start=2:2 caret=1:8
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:3-0:4=''
+  shift[0]: 0,1,3,3,3, prefix=3 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[0,0]: '
+b{{\t'
+  moved[-1]: -
+  moved[1]: '{
+b{{\t'
+#89 doc=')'|'))\tb)'|'('|')'|' '|')}a)' caretLine=3 sel=True start=0:0 caret=3:4
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:0='  ';2:0-2:0='  ';3:0-3:0='  ';4:0-4:1='({('
+  shift[0]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[3]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[4]: 0,3,3,3,3, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[4,4]: '
+ '
+  moved[-1]: ' 
+)'
+  moved[1]: ')}a)
+ '
+#90 doc='\tb\t({  ('|''|' ){b\t(a ' caretLine=2 sel=True start=2:1 caret=2:4
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:0-0:0='  ';1:0-1:0='  ';2:1-2:1='  '
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[2]: 0,1,5,8,10, prefix=1 suffix=7
+  duplicated[0,0]: '
+\tb\t({  ('
+  moved[-1]: -
+  moved[1]: '
+\tb\t({  ('
+#91 doc='ba('|''|'a) b' caretLine=1 sel=False start=1:1 caret=1:4
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:3='';2:2-2:4=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,2,2,2, prefix=2 suffix=0
+  duplicated[1,2]: '
+
+a) b'
+  moved[-1]: '
+a) b
+ba('
+  moved[1]: -
+#92 doc='aa(((}(}'|')( b}'|' (a{' caretLine=0 sel=False start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:8='}()a)	';2:3-2:4=''
+  shift[0]: 0,0,1,4,6, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,1,3,3,3, prefix=3 suffix=0
+  duplicated[2,2]: '
+ (a{'
+  moved[-1]: ' (a{
+)( b}'
+  moved[1]: -
+#93 doc='{}'|'{}}aaa ' caretLine=1 sel=False start=0:8 caret=1:1
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:1-0:2=''
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[0,1]: '
+{}
+{}}aaa '
+  moved[-1]: -
+  moved[1]: -
+#94 doc='(a}(aa'|'{} b '|'a ){\t'|'  )' caretLine=3 sel=True start=1:2 caret=3:2
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:0-0:6='} b {a	';2:0-2:5='';3:3-3:3='{a'
+  shift[0]: 0,2,4,7,7, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,5,5, prefix=3 suffix=0
+  duplicated[2,2]: '
+a ){\t'
+  moved[-1]: 'a ){\t
+{} b '
+  moved[1]: '  )
+a ){\t'
+#95 doc=' '|'(b {'|' ' caretLine=0 sel=True start=1:0 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:1='{	) (a ';2:0-2:1=''
+  shift[0]: 0,1,8,8,8, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[0,2]: '
+ 
+(b {
+ '
+  moved[-1]: -
+  moved[1]: -
+#96 doc='}bb}   '|' ))  ){'|'b (ab({'|'}{\t' caretLine=2 sel=True start=2:4 caret=2:8
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:0-0:0='  ';1:0-1:1=''
+  shift[0]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[1]: 0,0,2,5,6, prefix=0 suffix=6
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[2,3]: '
+b (ab({
+}{\t'
+  moved[-1]: 'b (ab({
+}{\t
+ ))  ){'
+  moved[1]: -
+#97 doc='}a  \ta)'|'a (  )}\t'|'\t  )b\t '|'} \t ) (b' caretLine=0 sel=True start=0:4 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:7='a	';1:3-1:3='(';2:0-2:0='  ';3:0-3:0='  '
+  shift[0]: 0,0,0,1,2, prefix=0 suffix=0
+  shift[1]: 0,1,3,7,9, prefix=3 suffix=5
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[3]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[1,1]: '
+a (  )}\t'
+  moved[-1]: 'a (  )}\t
+}a  \ta)'
+  moved[1]: '\t  )b\t 
+a (  )}\t'
+#98 doc='a'|'' caretLine=1 sel=True start=1:1 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[0,0]: '
+a'
+  moved[-1]: -
+  moved[1]: '
+a'
+#99 doc=''|'' caretLine=1 sel=True start=1:0 caret=1:1
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[0,1]: '
+
+'
+  moved[-1]: -
+  moved[1]: -
+#100 doc=')b\tb}) '|'((('|''|'b  '|' ('|'  {a}' caretLine=1 sel=False start=5:4 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:5-0:7='';2:0-2:0='x';4:2-4:2='b(';5:2-5:2='  '
+  shift[0]: 0,1,3,5,5, prefix=5 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[2]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[5]: 0,1,5,7,7, prefix=2 suffix=3
+  duplicated[3,3]: '
+b  '
+  moved[-1]: 'b  
+'
+  moved[1]: ' (
+b  '
+#101 doc='}) }'|''|'' caretLine=1 sel=True start=0:0 caret=1:6
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:0='x';2:0-2:0='  '
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[0,1]: '
+}) }
+'
+  moved[-1]: -
+  moved[1]: '
+}) }
+'
+#102 doc='( { }'|'}'|'aa\t{a\t '|'(' caretLine=1 sel=False start=0:1 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:0='  ';1:0-1:0='  ';2:0-2:0='  ';3:0-3:1=''
+  shift[0]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[1]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[2,3]: '
+aa\t{a\t 
+('
+  moved[-1]: 'aa\t{a\t 
+(
+}'
+  moved[1]: -
+#103 doc='}(}}a{'|'\t'|' } '|'b)ba{' caretLine=1 sel=False start=3:4 caret=1:4
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 1:0-1:0='(	';2:0-2:1='';3:4-3:5=''
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[2]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[3]: 0,1,3,4,4, prefix=4 suffix=0
+  duplicated[2,2]: '
+ } '
+  moved[-1]: ' } 
+\t'
+  moved[1]: 'b)ba{
+ } '
+#104 doc='{('|'a\t' caretLine=0 sel=True start=0:3 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:1='{';1:0-1:2='}	)'
+  shift[0]: 0,1,3,3,3, prefix=1 suffix=1
+  shift[1]: 0,2,3,3,3, prefix=0 suffix=0
+  duplicated[1,1]: '
+a\t'
+  moved[-1]: 'a\t
+{('
+  moved[1]: -
+#105 doc='a \t}'|' \t ) }\t)'|''|'{\t) {}{{'|'aa'|' )' caretLine=3 sel=True start=3:1 caret=3:7
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 1:0-1:3='';5:0-5:2='a	 	 }'
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,0,0,3,5, prefix=0 suffix=5
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[5]: 0,5,6,6,6, prefix=0 suffix=0
+  duplicated[3,3]: '
+{\t) {}{{'
+  moved[-1]: '{\t) {}{{
+'
+  moved[1]: 'aa
+{\t) {}{{'
+#106 doc='}\tb'|'b}}' caretLine=0 sel=False start=0:1 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:1-1:3=')() )'
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,6,6,6, prefix=1 suffix=0
+  duplicated[1,1]: '
+b}}'
+  moved[-1]: 'b}}
+}\tb'
+  moved[1]: -
+#107 doc=')(a\ta )'|'\tab\t'|'aa)a)\t)'|'  ('|'}(\t} {b'|' b b\t' caretLine=3 sel=True start=2:5 caret=3:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:5-0:5='()(';1:3-1:4='';3:2-3:2=' ';4:0-4:0='  '
+  shift[0]: 0,1,3,9,10, prefix=5 suffix=2
+  shift[1]: 0,1,3,3,3, prefix=3 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,1,4,4,4, prefix=2 suffix=1
+  shift[4]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[5]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[3,3]: '
+  ('
+  moved[-1]: '  (
+aa)a)\t)'
+  moved[1]: '}(\t} {b
+  ('
+#108 doc=' a'|'\t{((\tb('|''|'{bbbaa{' caretLine=1 sel=True start=2:5 caret=1:6
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 1:0-1:0='  ';3:1-3:1='a'
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,4,7,8, prefix=1 suffix=6
+  duplicated[0,3]: '
+ a
+\t{((\tb(
+
+{bbbaa{'
+  moved[-1]: -
+  moved[1]: -
+#109 doc=' )aaa{{'|''|')b (' caretLine=0 sel=True start=1:0 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:7='a(})';2:2-2:2='( '
+  shift[0]: 0,0,0,3,4, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,5,6,6, prefix=2 suffix=2
+  duplicated[2,2]: '
+)b ('
+  moved[-1]: ')b (
+'
+  moved[1]: -
+#110 doc=') ('|')\t a}   '|'b}( }('|'(\ta }\t('|'a{( \tb(' caretLine=3 sel=True start=3:5 caret=3:0
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 1:4-1:6='';2:4-2:5='';3:0-3:0='  '
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,3,4,6, prefix=4 suffix=2
+  shift[2]: 0,1,3,5,5, prefix=4 suffix=1
+  shift[3]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[4]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[0,4]: '
+) (
+)\t a}   
+b}( }(
+(\ta }\t(
+a{( \tb('
+  moved[-1]: -
+  moved[1]: -
+#111 doc=')   a '|'(}a{})\t('|'('|'b{{({\t}'|')b' caretLine=0 sel=False start=3:6 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:2-0:6='	{';1:0-1:0=')	';3:0-3:7='	  ({}a';4:2-4:2=')'
+  shift[0]: 0,1,2,4,4, prefix=2 suffix=0
+  shift[1]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,7, prefix=0 suffix=0
+  shift[4]: 0,1,3,3,3, prefix=2 suffix=0
+  duplicated[2,4]: '
+(
+b{{({\t}
+)b'
+  moved[-1]: '(
+b{{({\t}
+)b
+(}a{})\t('
+  moved[1]: -
+#112 doc=' a a} )'|' )a ( {\t'|'\t \t{'|'b{)\t'|') )ab{b' caretLine=0 sel=True start=1:6 caret=0:7
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:7='})(	ba{ ';1:0-1:1='';2:0-2:4=''
+  shift[0]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[1]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[4,4]: '
+) )ab{b'
+  moved[-1]: ') )ab{b
+b{)\t'
+  moved[1]: -
+#113 doc=' a()'|'{\t ab '|'b{)\t( ' caretLine=0 sel=False start=2:6 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 2:0-2:0='  '
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,3,5,8,8, prefix=0 suffix=6
+  duplicated[0,1]: '
+ a()
+{\t ab '
+  moved[-1]: -
+  moved[1]: 'b{)\t( 
+ a()
+{\t ab '
+#114 doc=' {b)'|' b{aaa'|' ({  ( '|'\tb\t( a'|')a' caretLine=3 sel=True start=4:4 caret=3:0
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 0:0-0:4='}) ab';2:0-2:1='';3:0-3:0='  '
+  shift[0]: 0,2,4,5,5, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,0,2,5,6, prefix=0 suffix=6
+  shift[3]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[4]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[0,3]: '
+ {b)
+ b{aaa
+ ({  ( 
+\tb\t( a'
+  moved[-1]: -
+  moved[1]: ')a
+ {b)
+ b{aaa
+ ({  ( 
+\tb\t( a'
+#115 doc='  a'|'ab ( (}\t' caretLine=1 sel=False start=0:2 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:2-0:3=''
+  shift[0]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[1,1]: '
+ab ( (}\t'
+  moved[-1]: 'ab ( (}\t
+  a'
+  moved[1]: -
+#116 doc=''|'{\t}\t\t'|'\t}(({' caretLine=0 sel=True start=0:0 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='b	((	)(';1:0-1:0='  ';2:0-2:1=''
+  shift[0]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[1]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[2]: 0,0,2,4,4, prefix=0 suffix=4
+  duplicated[2,2]: '
+\t}(({'
+  moved[-1]: '\t}(({
+{\t}\t\t'
+  moved[1]: -
+#117 doc='})\ta )'|'())b\t)'|''|'\t }b  }'|'})}'|' \t aa ' caretLine=1 sel=True start=2:1 caret=1:0
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 1:5-1:5='{ b';3:0-3:0='  ';4:0-4:0='  ';5:1-5:1='  '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,9,9, prefix=5 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[4]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[5]: 0,1,5,8,8, prefix=1 suffix=5
+  duplicated[0,4]: '
+})\ta )
+())b\t)
+
+\t }b  }
+})}'
+  moved[-1]: -
+  moved[1]: ' \t aa 
+})\ta )
+())b\t)
+
+\t }b  }
+})}'
+#118 doc=' }'|'\t '|'a '|' '|'a \t\t \t'|'}aa\ta(('|'b})) ' caretLine=1 sel=False start=4:6 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='aa)';1:0-1:0='{';2:0-2:0='b';3:0-3:1='{ {{({)';4:0-4:6='(';5:1-5:1='}';6:0-6:5='{ba{'
+  shift[0]: 0,4,5,5,5, prefix=0 suffix=2
+  shift[1]: 0,2,3,3,3, prefix=0 suffix=2
+  shift[2]: 0,2,3,3,3, prefix=0 suffix=2
+  shift[3]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[4]: 0,0,0,1,1, prefix=0 suffix=0
+  shift[5]: 0,1,4,7,8, prefix=1 suffix=6
+  shift[6]: 0,0,2,4,4, prefix=0 suffix=0
+  duplicated[1,1]: '
+\t '
+  moved[-1]: '\t 
+ }'
+  moved[1]: 'a 
+\t '
+#119 doc='(\t ))( '|'a\t )b'|'\t) (} '|' ( '|'{\tbb'|'() '|'bb\t} \t )' caretLine=0 sel=False start=2:2 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='  ';1:2-1:2='b(';2:2-2:2='ab{';5:1-5:3='';6:3-6:4=''
+  shift[0]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[1]: 0,1,5,7,7, prefix=2 suffix=3
+  shift[2]: 0,1,6,9,9, prefix=2 suffix=4
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[6]: 0,1,3,5,7, prefix=3 suffix=4
+  duplicated[4,5]: '
+{\tbb
+() '
+  moved[-1]: '{\tbb
+() 
+ ( '
+  moved[1]: 'bb\t} \t )
+{\tbb
+() '
+#120 doc='b a'|'b({}\t' caretLine=0 sel=True start=0:6 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:3-0:3='	';1:0-1:0='  '
+  shift[0]: 0,1,3,4,4, prefix=3 suffix=0
+  shift[1]: 0,3,5,7,7, prefix=0 suffix=5
+  duplicated[1,1]: '
+b({}\t'
+  moved[-1]: 'b({}\t
+b a'
+  moved[1]: -
+#121 doc=' b'|'b \t ba\t)' caretLine=1 sel=True start=0:0 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:2-0:2='))';1:0-1:0='  '
+  shift[0]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[1]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[1,1]: '
+b \t ba\t)'
+  moved[-1]: 'b \t ba\t)
+ b'
+  moved[1]: -
+#122 doc='a)((a{'|'{\t{'|' }b(}({'|'('|'a \tb)' caretLine=3 sel=True start=0:1 caret=3:4
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:0='  ';1:0-1:3=' })';2:1-2:1='  ';3:0-3:1=''
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,1,3,3,3, prefix=0 suffix=0
+  shift[2]: 0,1,5,8,9, prefix=1 suffix=6
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[3,3]: '
+('
+  moved[-1]: '(
+ }b(}({'
+  moved[1]: 'a \tb)
+('
+#123 doc='ba(ab}'|'b  b' caretLine=1 sel=False start=0:6 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:4=')a	a '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,2,4,5,5, prefix=0 suffix=0
+  duplicated[0,1]: '
+ba(ab}
+b  b'
+  moved[-1]: -
+  moved[1]: -
+#124 doc='' caretLine=0 sel=False start=0:0 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='x'
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: -
+#125 doc='\t '|') )(a'|'  }b'|'}ba{'|')a  {'|'a{{( '|'(  b){' caretLine=2 sel=True start=0:0 caret=2:5
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:2='';1:1-1:5='}( ))b ';4:0-4:0='  ';6:0-6:5='{  ()('
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,6,8,8, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[4]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[5]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[6]: 0,2,4,7,7, prefix=0 suffix=1
+  duplicated[2,3]: '
+  }b
+}ba{'
+  moved[-1]: '  }b
+}ba{
+) )(a'
+  moved[1]: ')a  {
+  }b
+}ba{'
+#126 doc='}}(}{{'|'' caretLine=0 sel=False start=1:6 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[0,1]: '
+}}(}{{
+'
+  moved[-1]: -
+  moved[1]: -
+#127 doc='))'|') ' caretLine=1 sel=False start=0:0 caret=1:3
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:1-0:2='';1:0-1:1=''
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  duplicated[0,1]: '
+))
+) '
+  moved[-1]: -
+  moved[1]: -
+#128 doc=')'|''|' ({'|') )'|''|' b  '|'{}(a)' caretLine=0 sel=True start=1:0 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  ';1:0-1:0='x';2:1-2:3='';4:0-4:0='{ ';5:2-5:4=''
+  shift[0]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[5]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[2,2]: '
+ ({'
+  moved[-1]: ' ({
+'
+  moved[1]: ') )
+ ({'
+#129 doc='ba) {'|'a}'|'{b ()a\t '|'b)baa' caretLine=2 sel=True start=2:3 caret=2:1
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 0:0-0:5='';2:3-2:6=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,1,3,3,5, prefix=3 suffix=2
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,2]: '
+ba) {
+a}
+{b ()a\t '
+  moved[-1]: -
+  moved[1]: 'b)baa
+ba) {
+a}
+{b ()a\t '
+#130 doc='a  ' caretLine=0 sel=False start=0:2 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,5,5,5, prefix=0 suffix=3
+  duplicated[0,0]: '
+a  '
+  moved[-1]: -
+  moved[1]: -
+#131 doc='}'|'{ba  {(b'|'a  '|' {a' caretLine=1 sel=False start=0:3 caret=1:8
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:0='  ';1:8-1:8='	'
+  shift[0]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[1]: 0,1,3,6,9, prefix=8 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[0,1]: '
+}
+{ba  {(b'
+  moved[-1]: -
+  moved[1]: 'a  
+}
+{ba  {(b'
+#132 doc='b'|'aa)\t'|' )(ba \t'|'}    { '|'b}'|' ab' caretLine=1 sel=True start=1:2 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:1='';1:0-1:4='b)(';2:1-2:3='';3:5-3:5='(a)';5:0-5:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,0,2,3,3, prefix=0 suffix=0
+  shift[2]: 0,1,1,4,5, prefix=1 suffix=4
+  shift[3]: 0,1,3,9,10, prefix=5 suffix=2
+  shift[4]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[5]: 0,0,2,2,2, prefix=0 suffix=2
+  duplicated[2,3]: '
+ )(ba \t
+}    { '
+  moved[-1]: ' )(ba \t
+}    { 
+aa)\t'
+  moved[1]: 'b}
+ )(ba \t
+}    { '
+#133 doc='{b'|'b{ '|'{ \t'|''|'\t}b}'|'(b' caretLine=4 sel=True start=3:0 caret=4:3
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 1:2-1:3='';4:0-4:4='';5:0-5:2='a'
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,0,1,1,1, prefix=0 suffix=0
+  duplicated[0,5]: '
+{b
+b{ 
+{ \t
+
+\t}b}
+(b'
+  moved[-1]: -
+  moved[1]: -
+#134 doc=' '|'}( '|'b' caretLine=1 sel=True start=0:3 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1='))';1:1-1:2='';2:0-2:0='  '
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[1]: 0,1,2,2,2, prefix=1 suffix=1
+  shift[2]: 0,3,3,3,3, prefix=0 suffix=1
+  duplicated[2,2]: '
+b'
+  moved[-1]: 'b
+}( '
+  moved[1]: -
+#135 doc=' '|')a{b'|'{(\t \t' caretLine=0 sel=False start=0:2 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:1-0:1=')} ';1:1-1:1='	';2:0-2:5='	b)'
+  shift[0]: 0,1,4,4,4, prefix=1 suffix=0
+  shift[1]: 0,1,4,5,5, prefix=1 suffix=3
+  shift[2]: 0,0,1,3,3, prefix=0 suffix=0
+  duplicated[1,1]: '
+)a{b'
+  moved[-1]: ')a{b
+ '
+  moved[1]: '{(\t \t
+)a{b'
+#136 doc='\ta\ta'|' {'|' ( bb){)'|' a{)( )b'|'b}b)' caretLine=3 sel=False start=2:4 caret=3:8
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:2-0:2='}ab';1:1-1:1='  ';3:0-3:0=')	';4:0-4:0='  '
+  shift[0]: 0,1,6,7,7, prefix=2 suffix=2
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[3]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[4]: 0,3,5,6,6, prefix=0 suffix=4
+  duplicated[4,4]: '
+b}b)'
+  moved[-1]: 'b}b)
+ a{)( )b'
+  moved[1]: -
+#137 doc='}))}) '|'{\t} \t)b'|')\t{ {)\t('|')\t  ('|')a{)( b '|'\tbb({{{' caretLine=2 sel=True start=1:6 caret=2:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 4:0-4:8='}	';5:0-5:7='  )}'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[4]: 0,0,0,0,2, prefix=0 suffix=0
+  shift[5]: 0,0,0,3,4, prefix=0 suffix=0
+  duplicated[2,4]: '
+)\t{ {)\t(
+)\t  (
+)a{)( b '
+  moved[-1]: ')\t{ {)\t(
+)\t  (
+)a{)( b 
+{\t} \t)b'
+  moved[1]: '\tbb({{{
+)\t{ {)\t(
+)\t  (
+)a{)( b '
+#138 doc='a'|')\t{{)}'|''|'(})\tb{)'|'b' caretLine=4 sel=False start=3:1 caret=4:0
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 1:3-1:4='';2:0-2:0='x'
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[1]: 0,1,3,5,5, prefix=3 suffix=2
+  shift[2]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,0]: '
+a'
+  moved[-1]: -
+  moved[1]: ')\t{{)}
+a'
+#139 doc=' ' caretLine=0 sel=True start=0:1 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,0]: '
+ '
+  moved[-1]: -
+  moved[1]: -
+#140 doc='b}  \t('|'(ba\t)b }'|'(({)\ta'|' (}(}'|'\t)'|' { bb{\t' caretLine=3 sel=False start=0:7 caret=3:7
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 1:0-1:8='		';2:0-2:6='a ';4:0-4:1=')	aa ( ';5:2-5:2=')	{'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,0,0,0,2, prefix=0 suffix=0
+  shift[2]: 0,0,0,2,2, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[4]: 0,7,8,8,8, prefix=0 suffix=1
+  shift[5]: 0,1,6,9,10, prefix=2 suffix=5
+  duplicated[0,2]: '
+b}  \t(
+(ba\t)b }
+(({)\ta'
+  moved[-1]: -
+  moved[1]: ' (}(}
+b}  \t(
+(ba\t)b }
+(({)\ta'
+#141 doc=''|''|' )} '|')a \t '|' {bb}' caretLine=2 sel=False start=3:0 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:0='x';3:0-3:0='  ';4:1-4:5=' a{)}(('
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[4]: 0,1,6,8,8, prefix=1 suffix=0
+  duplicated[2,3]: '
+ )} 
+)a \t '
+  moved[-1]: ' )} 
+)a \t 
+'
+  moved[1]: ' {bb}
+ )} 
+)a \t '
+#142 doc='ba)\t} (b'|'({()}  '|''|'' caretLine=2 sel=True start=3:5 caret=2:2
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 1:2-1:2='{'
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,4,7,8, prefix=2 suffix=5
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[3,3]: '
+'
+  moved[-1]: '
+'
+  moved[1]: -
+#143 doc='}{(' caretLine=0 sel=False start=0:0 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:3=') ( {b'
+  shift[0]: 0,4,6,6,6, prefix=0 suffix=0
+  duplicated[0,0]: '
+}{('
+  moved[-1]: -
+  moved[1]: -
+#144 doc=' }{'|'{}a' caretLine=0 sel=True start=1:4 caret=0:1
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:0='b'
+  shift[0]: 0,2,4,4,4, prefix=0 suffix=3
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[1,1]: '
+{}a'
+  moved[-1]: '{}a
+ }{'
+  moved[1]: -
+#145 doc='a  {'|'a\tb\t('|'{( b)b'|' {{{'|'{){('|'}' caretLine=2 sel=True start=5:0 caret=2:6
+  lines: 2,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,4;  SortAscending: ok 2,4;  SortDescending: ok 2,4;  RemoveDuplicateLines: ok 2,4;  IndentationToSpaces: ok 2,4;  IndentationToTabs: ok 2,4;  EnsureFinalNewline: ok 2,4;
+  edits: 0:0-0:0='  ';1:1-1:1=' ({';2:4-2:5='';3:1-3:1='  ';5:0-5:0='{ 	'
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,6,8,8, prefix=1 suffix=4
+  shift[2]: 0,1,3,5,5, prefix=4 suffix=1
+  shift[3]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,4,4,4,4, prefix=0 suffix=1
+  duplicated[3,3]: '
+ {{{'
+  moved[-1]: ' {{{
+{( b)b'
+  moved[1]: '{){(
+ {{{'
+#146 doc='a) '|' b '|')(\t\t'|'{ \t\tb}}a'|'b{{\t\t'|'' caretLine=3 sel=False start=5:2 caret=3:2
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:1-0:1=' ) ';1:0-1:3='a {	';5:0-5:0='x'
+  shift[0]: 0,1,6,6,6, prefix=1 suffix=2
+  shift[1]: 0,2,4,4,4, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[5]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[2,3]: '
+)(\t\t
+{ \t\tb}}a'
+  moved[-1]: ')(\t\t
+{ \t\tb}}a
+ b '
+  moved[1]: 'b{{\t\t
+)(\t\t
+{ \t\tb}}a'
+#147 doc='\t('|'\t)(b}'|' a(\t('|'b\t{ ({b'|' '|''|'(a))}a}b' caretLine=5 sel=True start=5:0 caret=5:0
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 5,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 5,5;  IndentationToTabs: ok 5,5;  EnsureFinalNewline: ok 5,5;
+  edits: 1:5-1:5=' ba';2:0-2:0='}(a';3:3-3:3='	';4:0-4:1=')aa';5:0-5:0=' a) {a '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,3,8,8, prefix=5 suffix=0
+  shift[2]: 0,4,6,8,8, prefix=0 suffix=5
+  shift[3]: 0,1,3,7,8, prefix=3 suffix=4
+  shift[4]: 0,3,3,3,3, prefix=0 suffix=0
+  shift[5]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[0,1]: '
+\t(
+\t)(b}'
+  moved[-1]: -
+  moved[1]: ' a(\t(
+\t(
+\t)(b}'
+#148 doc='  b}'|'b}}{ a()'|' (' caretLine=0 sel=False start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:1-0:1='(';1:0-1:2='';2:1-2:1='  '
+  shift[0]: 0,1,4,5,5, prefix=1 suffix=3
+  shift[1]: 0,0,1,4,6, prefix=0 suffix=6
+  shift[2]: 0,1,4,4,4, prefix=1 suffix=1
+  duplicated[1,2]: '
+b}}{ a()
+ ('
+  moved[-1]: 'b}}{ a()
+ (
+  b}'
+  moved[1]: -
+#149 doc='bb}\t){b'|'}{'|'a)\t))aa '|' b}'|'\t (}\ta}b'|'{b (\t '|'' caretLine=6 sel=True start=1:2 caret=6:8
+  lines: 1,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,6;  SortAscending: ok 1,6;  SortDescending: ok 1,6;  RemoveDuplicateLines: ok 1,6;  IndentationToSpaces: ok 1,6;  IndentationToTabs: ok 1,6;  EnsureFinalNewline: ok 1,6;
+  edits: 1:2-1:2=' ((';2:0-2:1='';6:0-6:0='  '
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,5,5,5, prefix=2 suffix=0
+  shift[2]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[6]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[6,6]: '
+'
+  moved[-1]: '
+{b (\t '
+  moved[1]: -
+#150 doc='{ \t'|''|'{b \t'|' )a\t(() '|'(a a'|'(\t}{(a (' caretLine=2 sel=False start=5:3 caret=2:2
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:1-0:2='';3:0-3:1='';4:4-4:4='()a';5:3-5:4=''
+  shift[0]: 0,1,2,2,2, prefix=1 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[4]: 0,1,3,7,7, prefix=4 suffix=0
+  shift[5]: 0,1,3,5,7, prefix=3 suffix=4
+  duplicated[1,3]: '
+
+{b \t
+ )a\t(() '
+  moved[-1]: '
+{b \t
+ )a\t(() 
+{ \t'
+  moved[1]: '(a a
+
+{b \t
+ )a\t(() '
+#151 doc='\t}{ '|' )( a '|'' caretLine=2 sel=True start=0:1 caret=2:2
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 2:0-2:0='a }}('
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,5,5,5,5, prefix=0 suffix=0
+  duplicated[0,0]: '
+\t}{ '
+  moved[-1]: -
+  moved[1]: ' )( a 
+\t}{ '
+#152 doc='    )'|' '|'  a}(('|'b((b b  '|' ' caretLine=4 sel=False start=0:3 caret=4:1
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:4-0:4=' )(';2:0-2:2='';3:5-3:8='';4:1-4:1='  '
+  shift[0]: 0,1,3,8,8, prefix=4 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,0,1,4,4, prefix=0 suffix=4
+  shift[3]: 0,1,3,5,5, prefix=5 suffix=0
+  shift[4]: 0,1,3,3,3, prefix=1 suffix=0
+  duplicated[0,3]: '
+    )
+ 
+  a}((
+b((b b  '
+  moved[-1]: -
+  moved[1]: ' 
+    )
+ 
+  a}((
+b((b b  '
+#153 doc='}{a\t}'|' }'|'a}}a(  {'|'\t{{( }(b' caretLine=3 sel=True start=0:6 caret=3:3
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:4-0:4='a';1:0-1:1=''
+  shift[0]: 0,1,3,6,6, prefix=4 suffix=1
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[1,3]: '
+ }
+a}}a(  {
+\t{{( }(b'
+  moved[-1]: ' }
+a}}a(  {
+\t{{( }(b
+}{a\t}'
+  moved[1]: -
+#154 doc=')b}}b'|'} b'|'{ \ta}' caretLine=2 sel=True start=0:2 caret=2:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:5='({{ }';1:0-1:0='  '
+  shift[0]: 0,1,3,5,5, prefix=0 suffix=0
+  shift[1]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,2]: '
+)b}}b
+} b
+{ \ta}'
+  moved[-1]: -
+  moved[1]: -
+#155 doc=' }\t'|'{'|'()( a}' caretLine=2 sel=True start=1:1 caret=2:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:1-0:3='';1:0-1:1=' ';2:0-2:6='	(})b))	'
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,3,5,8,8, prefix=0 suffix=0
+  duplicated[1,2]: '
+{
+()( a}'
+  moved[-1]: '{
+()( a}
+ }\t'
+  moved[1]: -
+#156 doc='\t'|'({'|' { } {a(' caretLine=0 sel=False start=2:9 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:1='';1:0-1:0='  ';2:0-2:8='{{    {a'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[2]: 0,1,3,6,8, prefix=0 suffix=0
+  duplicated[0,0]: '
+\t'
+  moved[-1]: -
+  moved[1]: '({
+\t'
+#157 doc='{)'|'{\t}'|''|''|'{bb({('|'{bb(a' caretLine=3 sel=False start=3:0 caret=3:5
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:1-0:2='';1:1-1:1='ab(';5:0-5:0='  '
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,1,6,6,6, prefix=1 suffix=2
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,3,5,7,7, prefix=0 suffix=5
+  duplicated[0,1]: '
+{)
+{\t}'
+  moved[-1]: -
+  moved[1]: '
+{)
+{\t}'
+#158 doc='b( )b '|''|''|''|'b)'|')}'|'' caretLine=3 sel=True start=5:1 caret=3:7
+  lines: 3,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,5;  SortAscending: ok 3,5;  SortDescending: ok 3,5;  RemoveDuplicateLines: ok 3,5;  IndentationToSpaces: ok 3,5;  IndentationToTabs: ok 3,5;  EnsureFinalNewline: ok 3,5;
+  edits: 0:0-0:0='  ';1:0-1:0='x';3:0-3:0='  ';4:0-4:2='';6:0-6:0='x'
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[6]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[0,2]: '
+b( )b 
+
+'
+  moved[-1]: -
+  moved[1]: '
+b( )b 
+
+'
+#159 doc='\t{ \t{  \t'|'\t  (} ('|'}'|' )( b\t }'|' '|'({{}\t('|' ' caretLine=1 sel=True start=6:3 caret=1:6
+  lines: 1,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,6;  SortAscending: ok 1,6;  SortDescending: ok 1,6;  RemoveDuplicateLines: ok 1,6;  IndentationToSpaces: ok 1,6;  IndentationToTabs: ok 1,6;  EnsureFinalNewline: ok 1,6;
+  edits: 0:0-0:1='';1:2-1:3='';4:0-4:1=''
+  shift[0]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[1]: 0,1,2,5,6, prefix=2 suffix=4
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[1,1]: '
+\t  (} ('
+  moved[-1]: '\t  (} (
+\t{ \t{  \t'
+  moved[1]: '}
+\t  (} ('
+#160 doc='\t(\t('|'{{\t{'|'(  '|' )(a\t(  '|'(b} )a'|'b{ab'|'' caretLine=3 sel=True start=3:1 caret=3:0
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 0:0-0:1='';1:0-1:0='  ';2:0-2:0='  ';3:0-3:8='';4:0-4:0='  ';5:0-5:4='';6:0-6:0='  '
+  shift[0]: 0,0,2,3,3, prefix=0 suffix=3
+  shift[1]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[2]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[6]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[2,2]: '
+(  '
+  moved[-1]: '(  
+{{\t{'
+  moved[1]: ' )(a\t(  
+(  '
+#161 doc='a '|'{\t\t\ta  '|'{ '|'{}'|'' caretLine=3 sel=False start=2:1 caret=3:8
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 2:0-2:1='';4:0-4:0='b{({  '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,6,6,6,6, prefix=0 suffix=0
+  duplicated[4,4]: '
+'
+  moved[-1]: '
+{}'
+  moved[1]: -
+#162 doc='(\t)\t'|'b('|'{(a()}'|'    '|'bb((aa  ' caretLine=1 sel=True start=3:1 caret=1:0
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:4-0:4='(';1:0-1:0='  ';2:4-2:5='';3:0-3:4=')	a)';4:0-4:8='a())  {a'
+  shift[0]: 0,1,3,5,5, prefix=4 suffix=0
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[2]: 0,1,3,5,5, prefix=4 suffix=1
+  shift[3]: 0,1,3,4,4, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,8, prefix=0 suffix=0
+  duplicated[2,2]: '
+{(a()}'
+  moved[-1]: '{(a()}
+b('
+  moved[1]: '    
+{(a()}'
+#163 doc=' {('|'{(\t(a)('|'a{{a}(}('|' }\t\ta{}a'|'b\t'|' a\t}{(' caretLine=2 sel=False start=2:9 caret=2:6
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:1-0:3='';1:0-1:0='  ';3:0-3:1='';4:0-4:0='}';5:0-5:1=''
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[3]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[4]: 0,2,3,3,3, prefix=0 suffix=2
+  shift[5]: 0,0,2,5,5, prefix=0 suffix=5
+  duplicated[0,2]: '
+ {(
+{(\t(a)(
+a{{a}(}('
+  moved[-1]: -
+  moved[1]: ' }\t\ta{}a
+ {(
+{(\t(a)(
+a{{a}(}('
+#164 doc='(({\ta )'|' ba}\t\t'|' ('|')\t  '|'b '|'\t' caretLine=5 sel=False start=3:5 caret=5:5
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:1-0:2='';1:0-1:1='';2:0-2:1='';3:3-3:4='';4:0-4:2='a}{)b';5:0-5:1=''
+  shift[0]: 0,1,2,5,6, prefix=1 suffix=5
+  shift[1]: 0,0,2,5,5, prefix=0 suffix=5
+  shift[2]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[3]: 0,1,3,3,3, prefix=3 suffix=0
+  shift[4]: 0,4,5,5,5, prefix=0 suffix=0
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[3,3]: '
+)\t  '
+  moved[-1]: ')\t  
+ ('
+  moved[1]: 'b 
+)\t  '
+#165 doc=' '|'b}))('|' \ta{{  '|'(b\t(b(' caretLine=0 sel=True start=3:4 caret=0:1
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:1='	b (	(})';3:2-3:2='{}'
+  shift[0]: 0,8,8,8,8, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,1,5,8,8, prefix=2 suffix=4
+  duplicated[3,3]: '
+(b\t(b('
+  moved[-1]: '(b\t(b(
+ \ta{{  '
+  moved[1]: -
+#166 doc='} {{a'|'({(a}b'|'}(\t)\t' caretLine=1 sel=True start=1:4 caret=1:4
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:0='  ';1:3-1:3=' {'
+  shift[0]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[1]: 0,1,3,8,8, prefix=3 suffix=3
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,1]: '
+} {{a
+({(a}b'
+  moved[-1]: -
+  moved[1]: '}(\t)\t
+} {{a
+({(a}b'
+#167 doc=')  }'|'{ )b}{ '|' b  (\t a' caretLine=1 sel=True start=0:2 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:4='ba';2:1-2:4=''
+  shift[0]: 0,0,1,2,2, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,1,1,3,5, prefix=1 suffix=4
+  duplicated[1,1]: '
+{ )b}{ '
+  moved[-1]: '{ )b}{ 
+)  }'
+  moved[1]: ' b  (\t a
+{ )b}{ '
+#168 doc='  ) (}a\t'|'b '|'\tb}\t '|'a\t)\ta\ta{'|'({\t) ()' caretLine=0 sel=False start=3:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 1:0-1:2='(	{() (';4:0-4:6='bbb)b '
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,6,7,7,7, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,7, prefix=0 suffix=1
+  duplicated[3,3]: '
+a\t)\ta\ta{'
+  moved[-1]: 'a\t)\ta\ta{
+\tb}\t '
+  moved[1]: '({\t) ()
+a\t)\ta\ta{'
+#169 doc='{a{bbb)b' caretLine=0 sel=True start=0:6 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[0,0]: '
+{a{bbb)b'
+  moved[-1]: -
+  moved[1]: -
+#170 doc='\t' caretLine=0 sel=False start=0:0 caret=0:1
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[0,0]: '
+\t'
+  moved[-1]: -
+  moved[1]: -
+#171 doc='((){\tb'|'\t}a\t'|'()'|'b ('|' }  {'|'a b\tbb}b' caretLine=5 sel=True start=1:2 caret=5:7
+  lines: 1,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,5;  SortAscending: ok 1,5;  SortDescending: ok 1,5;  RemoveDuplicateLines: ok 1,5;  IndentationToSpaces: ok 1,5;  IndentationToTabs: ok 1,5;  EnsureFinalNewline: ok 1,5;
+  edits: 0:3-0:5='';1:4-1:4='b	';2:0-2:2='';3:0-3:3=' )b {{';4:4-4:5=''
+  shift[0]: 0,1,3,4,4, prefix=3 suffix=1
+  shift[1]: 0,1,3,6,6, prefix=4 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,4,6,6,6, prefix=0 suffix=0
+  shift[4]: 0,1,3,4,4, prefix=4 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[4,5]: '
+ }  {
+a b\tbb}b'
+  moved[-1]: ' }  {
+a b\tbb}b
+b ('
+  moved[1]: -
+#172 doc=')'|'({b}){ {'|'b \ta(\t({'|'{a' caretLine=2 sel=True start=0:3 caret=2:2
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='  ';2:1-2:3='';3:0-3:0='  '
+  shift[0]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[2]: 0,1,1,4,6, prefix=1 suffix=5
+  shift[3]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[1,3]: '
+({b}){ {
+b \ta(\t({
+{a'
+  moved[-1]: '({b}){ {
+b \ta(\t({
+{a
+)'
+  moved[1]: -
+#173 doc=' }\t '|' )' caretLine=1 sel=False start=0:2 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:2=') b'
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,2,3,3,3, prefix=0 suffix=0
+  duplicated[0,1]: '
+ }\t 
+ )'
+  moved[-1]: -
+  moved[1]: -
+#174 doc='((a\t}))'|') a\t  ('|' )'|'aa( )\t'|'ba}){)\tb'|'{ {{} a'|'aa\t}aaa}' caretLine=4 sel=False start=6:6 caret=4:0
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:7='}(){}	 a';2:2-2:2=' })';3:0-3:0='  ';5:0-5:0='  ';6:1-6:5='}'
+  shift[0]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,1,5,5,5, prefix=2 suffix=0
+  shift[3]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[4]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[5]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[6]: 0,1,1,3,5, prefix=1 suffix=3
+  duplicated[6,6]: '
+aa\t}aaa}'
+  moved[-1]: 'aa\t}aaa}
+{ {{} a'
+  moved[1]: -
+#175 doc='\t}\ta{{'|'(b}'|')\t}(b'|''|'( a(' caretLine=1 sel=False start=0:1 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:1='';2:0-2:2=' (	 ';3:0-3:0='x'
+  shift[0]: 0,0,2,5,5, prefix=0 suffix=5
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[2]: 0,3,5,7,7, prefix=0 suffix=3
+  shift[3]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[4,4]: '
+( a('
+  moved[-1]: '( a(
+'
+  moved[1]: -
+#176 doc='(a\t{} (b'|'{)\t }'|'{} { }a'|'a{'|'' caretLine=4 sel=True start=3:1 caret=4:2
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 0:0-0:0='  ';1:5-1:5='{})';2:4-2:7='';3:0-3:0='  '
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,1,3,8,8, prefix=5 suffix=0
+  shift[2]: 0,1,3,4,4, prefix=4 suffix=0
+  shift[3]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[4,4]: '
+'
+  moved[-1]: '
+a{'
+  moved[1]: -
+#177 doc='(b'|'{ a\t{\t'|'}\ta )bbb'|'({{b '|')' caretLine=1 sel=True start=4:1 caret=1:2
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 0:0-0:2=')a(';2:0-2:0='  ';4:0-4:1='{a 	'
+  shift[0]: 0,2,3,3,3, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[4]: 0,4,4,4,4, prefix=0 suffix=0
+  duplicated[1,4]: '
+{ a\t{\t
+}\ta )bbb
+({{b 
+)'
+  moved[-1]: '{ a\t{\t
+}\ta )bbb
+({{b 
+)
+(b'
+  moved[1]: -
+#178 doc=')}a\t)}'|')()'|''|' a\t'|'{' caretLine=4 sel=False start=0:4 caret=4:6
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:1-0:3='';1:0-1:3=' } )	 	 ';2:0-2:0='  ';3:1-3:1='  ';4:0-4:0='  '
+  shift[0]: 0,1,1,4,4, prefix=1 suffix=3
+  shift[1]: 0,6,8,8,8, prefix=0 suffix=0
+  shift[2]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[3]: 0,1,5,5,5, prefix=1 suffix=2
+  shift[4]: 0,3,3,3,3, prefix=0 suffix=1
+  duplicated[3,4]: '
+ a\t
+{'
+  moved[-1]: ' a\t
+{
+'
+  moved[1]: -
+#179 doc=''|'{ {(b('|'}(b\t' caretLine=0 sel=False start=1:2 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:0='  ';1:0-1:6=')){)}{'
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,6, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: '{ {(b(
+'
+#180 doc=')}}{'|''|'()(\t\t'|'' caretLine=1 sel=True start=3:1 caret=1:0
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:0-0:4='ba a';2:0-2:0=' 	';3:0-3:0='x'
+  shift[0]: 0,1,3,4,4, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[3]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[2,2]: '
+()(\t\t'
+  moved[-1]: '()(\t\t
+'
+  moved[1]: '
+()(\t\t'
+#181 doc='b a }('|''|'bb(\t}('|' {a} (\t'|')(\t}\tba' caretLine=4 sel=True start=1:0 caret=4:7
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 1:0-1:0='b b}(}ba';2:1-2:1='	 ';3:0-3:7='(';4:3-4:3='(		'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,8,8,8,8, prefix=0 suffix=0
+  shift[2]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[3]: 0,0,0,0,1, prefix=0 suffix=0
+  shift[4]: 0,1,3,9,10, prefix=3 suffix=4
+  duplicated[2,2]: '
+bb(\t}('
+  moved[-1]: 'bb(\t}(
+'
+  moved[1]: ' {a} (\t
+bb(\t}('
+#182 doc='}} b\t'|''|'a b }b) ' caretLine=2 sel=False start=0:3 caret=2:2
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 1:0-1:0='  ';2:1-2:8=') ('
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[2]: 0,1,1,2,4, prefix=1 suffix=0
+  duplicated[2,2]: '
+a b }b) '
+  moved[-1]: 'a b }b) 
+'
+  moved[1]: -
+#183 doc='} ) (\t(b'|''|'b\tbbb(\t\t'|'}}(a('|'}}b)(   ' caretLine=1 sel=True start=4:2 caret=1:0
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 0:0-0:0='  ';2:0-2:8='	) }()b ';3:3-3:3='  b';4:0-4:8='(		 ('
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,8, prefix=0 suffix=0
+  shift[3]: 0,1,3,8,8, prefix=3 suffix=2
+  shift[4]: 0,0,0,3,5, prefix=0 suffix=0
+  duplicated[3,3]: '
+}}(a('
+  moved[-1]: '}}(a(
+b\tbbb(\t\t'
+  moved[1]: '}}b)(   
+}}(a('
+#184 doc='a ('|''|' \t a'|''|'(a'|'}\t{})'|' {' caretLine=0 sel=True start=1:3 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:0='x';2:1-2:1='  ';3:0-3:0='x';4:1-4:1=' 	';5:5-5:5='	';6:0-6:1=''
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[2]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[3]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[4]: 0,1,4,4,4, prefix=1 suffix=1
+  shift[5]: 0,1,3,6,6, prefix=5 suffix=0
+  shift[6]: 0,0,1,1,1, prefix=0 suffix=1
+  duplicated[1,1]: '
+'
+  moved[-1]: '
+a ('
+  moved[1]: ' \t a
+'
+#185 doc='\t{\t}){\t('|'  } aa \t'|' { \ta'|'}\tb {'|'\ta))'|' \t}(}}{\t'|'a(' caretLine=6 sel=True start=3:0 caret=6:6
+  lines: 3,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,6;  SortAscending: ok 3,6;  SortDescending: ok 3,6;  RemoveDuplicateLines: ok 3,6;  IndentationToSpaces: ok 3,6;  IndentationToTabs: ok 3,6;  EnsureFinalNewline: ok 3,6;
+  edits: 1:2-1:2='  ';3:0-3:0='  ';4:0-4:1='';5:0-5:2='';6:0-6:2='b{	{ '
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,1,5,8,10, prefix=2 suffix=6
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[4]: 0,0,2,3,3, prefix=0 suffix=3
+  shift[5]: 0,0,1,4,6, prefix=0 suffix=6
+  shift[6]: 0,4,5,5,5, prefix=0 suffix=0
+  duplicated[2,5]: '
+ { \ta
+}\tb {
+\ta))
+ \t}(}}{\t'
+  moved[-1]: ' { \ta
+}\tb {
+\ta))
+ \t}(}}{\t
+  } aa \t'
+  moved[1]: 'a(
+ { \ta
+}\tb {
+\ta))
+ \t}(}}{\t'
+#186 doc='}\t} } '|'{( ( a)a' caretLine=1 sel=False start=1:9 caret=1:4
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:2-1:2='}a'
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,5,8,10, prefix=2 suffix=6
+  duplicated[0,1]: '
+}\t} } 
+{( ( a)a'
+  moved[-1]: -
+  moved[1]: -
+#187 doc='(('|'' caretLine=1 sel=True start=0:0 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 1:0-1:0='x'
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=0 suffix=0
+  duplicated[1,1]: '
+'
+  moved[-1]: '
+(('
+  moved[1]: -
+#188 doc='b'|'}a(('|'b\t' caretLine=1 sel=True start=1:0 caret=1:3
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 2:0-2:1=' (aba'
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,5,6,6,6, prefix=0 suffix=1
+  duplicated[1,2]: '
+}a((
+b\t'
+  moved[-1]: '}a((
+b\t
+b'
+  moved[1]: -
+#189 doc='\t'|'a\t{\t\t('|'(  ( '|'b' caretLine=3 sel=True start=1:1 caret=3:3
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:0-0:1='';2:0-2:5='	( a)a)(';3:1-3:1='	'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,4,6,8,8, prefix=0 suffix=0
+  shift[3]: 0,1,2,2,2, prefix=1 suffix=0
+  duplicated[2,2]: '
+(  ( '
+  moved[-1]: '(  ( 
+a\t{\t\t('
+  moved[1]: 'b
+(  ( '
+#190 doc='(}{\t{(})'|''|' { '|''|'( ({{ '|' a '|'))' caretLine=0 sel=True start=5:1 caret=0:6
+  lines: 0,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: ok 0,5;  SortDescending: ok 0,5;  RemoveDuplicateLines: ok 0,5;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 1:0-1:0='b})	}';2:3-2:3=' b ';5:0-5:1='';6:0-6:2=''
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,5,5,5,5, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,6, prefix=3 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[6]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[1,4]: '
+
+ { 
+
+( ({{ '
+  moved[-1]: '
+ { 
+
+( ({{ 
+(}{\t{(})'
+  moved[1]: ' a 
+
+ { 
+
+( ({{ '
+#191 doc='({'|'('|'('|'a'|' { )\t{a' caretLine=4 sel=True start=1:1 caret=4:3
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 0:0-0:2='';1:0-1:0='  ';2:0-2:0='  ';3:0-3:1='';4:1-4:7='(a	'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[2]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,1,3,4, prefix=1 suffix=0
+  duplicated[4,4]: '
+ { )\t{a'
+  moved[-1]: ' { )\t{a
+a'
+  moved[1]: -
+#192 doc='{\ta '|' \t'|'b))\t '|'(\t)b { '|'{{\t}'|'{{(' caretLine=0 sel=True start=3:6 caret=0:2
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 1:1-1:2='b  ';2:0-2:0='  ';3:0-3:0='  ';4:0-4:4='}	{)'
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=0
+  shift[2]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[3]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[4]: 0,1,3,4,4, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[2,4]: '
+b))\t 
+(\t)b { 
+{{\t}'
+  moved[-1]: 'b))\t 
+(\t)b { 
+{{\t}
+ \t'
+  moved[1]: '{{(
+b))\t 
+(\t)b { 
+{{\t}'
+#193 doc=' }({\t)a'|' ' caretLine=0 sel=False start=1:4 caret=0:5
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:7='';1:0-1:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[1,1]: '
+ '
+  moved[-1]: ' 
+ }({\t)a'
+  moved[1]: -
+#194 doc=') '|'\t)'|'}'|''|'{\t('|'}\t'|'({b{ ' caretLine=2 sel=True start=6:1 caret=2:8
+  lines: 2,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,6;  SortAscending: ok 2,6;  SortDescending: ok 2,6;  RemoveDuplicateLines: ok 2,6;  IndentationToSpaces: ok 2,6;  IndentationToTabs: ok 2,6;  EnsureFinalNewline: ok 2,6;
+  edits: 0:0-0:2='';1:0-1:0='  ';3:0-3:0='  ';4:2-4:3='';6:3-6:4=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[3]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[4]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[6]: 0,1,3,4,4, prefix=3 suffix=1
+  duplicated[1,2]: '
+\t)
+}'
+  moved[-1]: '\t)
+}
+) '
+  moved[1]: '
+\t)
+}'
+#195 doc=''|'a}' caretLine=0 sel=False start=1:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:1-1:1=' {'
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,1,4,4,4, prefix=1 suffix=1
+  duplicated[1,1]: '
+a}'
+  moved[-1]: 'a}
+'
+  moved[1]: -
+#196 doc='b '|')ab{ab}'|'ab( b'|' {{}{\t)('|'{b '|'\t \t{}{  ' caretLine=0 sel=True start=4:0 caret=0:4
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 1:0-1:7=' b{	a}  ';5:0-5:0='  '
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[5]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[2,4]: '
+ab( b
+ {{}{\t)(
+{b '
+  moved[-1]: 'ab( b
+ {{}{\t)(
+{b 
+)ab{ab}'
+  moved[1]: '\t \t{}{  
+ab( b
+ {{}{\t)(
+{b '
+#197 doc='\t '|' ) }'|' } }b'|'b(b}{b'|'' caretLine=0 sel=False start=3:3 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:2='(}';1:2-1:2='b';4:0-4:0=' b'
+  shift[0]: 0,1,2,2,2, prefix=0 suffix=0
+  shift[1]: 0,1,4,5,5, prefix=2 suffix=2
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[4]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[3,3]: '
+b(b}{b'
+  moved[-1]: 'b(b}{b
+ } }b'
+  moved[1]: '
+b(b}{b'
+#198 doc='} ' caretLine=0 sel=True start=0:1 caret=0:1
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[0,0]: '
+} '
+  moved[-1]: -
+  moved[1]: -
+#199 doc=' }  \t)\t'|''|' '|'{}))a' caretLine=3 sel=False start=0:1 caret=3:6
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 2:0-2:1='';3:0-3:5='} b 	 }'
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,3,5,7,7, prefix=0 suffix=0
+  duplicated[1,3]: '
+
+ 
+{}))a'
+  moved[-1]: '
+ 
+{}))a
+ }  \t)\t'
+  moved[1]: -
+#200 doc=' ){b )a'|'\t(bb'|' }(\tb' caretLine=0 sel=False start=2:2 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:1='';2:2-2:2='{	'
+  shift[0]: 0,0,2,5,6, prefix=0 suffix=6
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,1,5,7,7, prefix=2 suffix=3
+  duplicated[0,1]: '
+ ){b )a
+\t(bb'
+  moved[-1]: -
+  moved[1]: ' }(\tb
+ ){b )a
+\t(bb'
+#201 doc='{ '|'  }\t)' caretLine=0 sel=True start=0:2 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='a ';1:0-1:2=''
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[1]: 0,0,1,3,3, prefix=0 suffix=3
+  duplicated[0,1]: '
+{ 
+  }\t)'
+  moved[-1]: -
+  moved[1]: -
+#202 doc=' )'|')b{) }a'|'})' caretLine=2 sel=False start=1:2 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:1-0:1='  ';1:2-1:5='';2:0-2:0='  '
+  shift[0]: 0,1,4,4,4, prefix=1 suffix=1
+  shift[1]: 0,1,2,3,4, prefix=2 suffix=2
+  shift[2]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[1,1]: '
+)b{) }a'
+  moved[-1]: ')b{) }a
+ )'
+  moved[1]: '})
+)b{) }a'
+#203 doc='}\t)('|'b}'|'(a'|'}\tba\t\t\t '|')bb(\t)' caretLine=3 sel=False start=1:0 caret=3:1
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:3='	 ';1:1-1:2='';3:5-3:5='  ';4:2-4:2=' '
+  shift[0]: 0,0,2,3,3, prefix=0 suffix=1
+  shift[1]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[3]: 0,1,3,8,10, prefix=5 suffix=3
+  shift[4]: 0,1,4,7,7, prefix=2 suffix=4
+  duplicated[4,4]: '
+)bb(\t)'
+  moved[-1]: ')bb(\t)
+}\tba\t\t\t '
+  moved[1]: -
+#204 doc=') bb(\t}'|'\t{b'|' )(b}}'|'{()\t}b'|' )({'|'{  ('|'b' caretLine=3 sel=False start=5:8 caret=3:7
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:5-0:5=') (';1:3-1:3='a';2:0-2:6='';4:0-4:4='b b))  	'
+  shift[0]: 0,1,3,9,10, prefix=5 suffix=2
+  shift[1]: 0,1,3,4,4, prefix=3 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[4]: 0,5,7,8,8, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[3,6]: '
+{()\t}b
+ )({
+{  (
+b'
+  moved[-1]: '{()\t}b
+ )({
+{  (
+b
+ )(b}}'
+  moved[1]: -
+#205 doc='(}}{)\t('|'(a  '|'\tbb('|'}\t' caretLine=3 sel=True start=0:5 caret=3:1
+  lines: 0,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: ok 0,3;  SortDescending: ok 0,3;  RemoveDuplicateLines: ok 0,3;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 2:2-2:3=''
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,1,2,3,3, prefix=2 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[0,2]: '
+(}}{)\t(
+(a  
+\tbb('
+  moved[-1]: -
+  moved[1]: '}\t
+(}}{)\t(
+(a  
+\tbb('
+#206 doc='bb' caretLine=0 sel=True start=0:2 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,0]: '
+bb'
+  moved[-1]: -
+  moved[1]: -
+#207 doc='ba}}'|' }(b ( '|')'|''|'\t}a}' caretLine=2 sel=False start=1:0 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:2-0:4='';1:1-1:1='  ';2:1-2:1='}';4:0-4:4='b{{ (} {'
+  shift[0]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[1]: 0,1,5,8,9, prefix=1 suffix=6
+  shift[2]: 0,1,2,2,2, prefix=1 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,5,7,8,8, prefix=0 suffix=0
+  duplicated[1,2]: '
+ }(b ( 
+)'
+  moved[-1]: ' }(b ( 
+)
+ba}}'
+  moved[1]: '
+ }(b ( 
+)'
+#208 doc=') {'|'{a'|''|'}(() )' caretLine=1 sel=False start=0:0 caret=1:7
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[0,0]: '
+) {'
+  moved[-1]: -
+  moved[1]: '{a
+) {'
+#209 doc=''|'abb \t ' caretLine=1 sel=True start=0:1 caret=1:2
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:0='{	 }  )	';1:0-1:6=''
+  shift[0]: 0,8,8,8,8, prefix=0 suffix=0
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[1,1]: '
+abb \t '
+  moved[-1]: 'abb \t 
+'
+  moved[1]: -
+#210 doc='{'|'(({( (' caretLine=0 sel=True start=0:3 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[1,1]: '
+(({( ('
+  moved[-1]: '(({( (
+{'
+  moved[1]: -
+#211 doc=' {  (}'|'{b'|')b{'|'} \t'|'b ) {'|'b' caretLine=1 sel=True start=1:3 caret=1:1
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 2:0-2:3='  ()))';3:0-3:3='';4:2-4:2='b';5:0-5:0='  '
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,4,6,6,6, prefix=0 suffix=0
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,4,6,6, prefix=2 suffix=3
+  shift[5]: 0,3,3,3,3, prefix=0 suffix=1
+  duplicated[3,4]: '
+} \t
+b ) {'
+  moved[-1]: '} \t
+b ) {
+)b{'
+  moved[1]: 'b
+} \t
+b ) {'
+#212 doc=' a}} b ' caretLine=0 sel=False start=0:0 caret=0:1
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,2,5,6, prefix=0 suffix=6
+  duplicated[0,0]: '
+ a}} b '
+  moved[-1]: -
+  moved[1]: -
+#213 doc='a\t'|'}a{))'|'\t( )\t ('|' {bb \t)'|' b} (}'|'\tb} {'|'' caretLine=5 sel=False start=3:3 caret=5:3
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='  ';1:0-1:5=' 	a';2:0-2:0='  ';4:1-4:1='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[1]: 0,0,1,3,3, prefix=0 suffix=0
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[3]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[4]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[5]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[2,5]: '
+\t( )\t (
+ {bb \t)
+ b} (}
+\tb} {'
+  moved[-1]: '\t( )\t (
+ {bb \t)
+ b} (}
+\tb} {
+}a{))'
+  moved[1]: '
+\t( )\t (
+ {bb \t)
+ b} (}
+\tb} {'
+#214 doc='\t \t})('|'}{{\t'|')))) '|'a)()\tbb{'|'' caretLine=0 sel=False start=0:1 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:3='';1:0-1:3='';3:0-3:0='  '
+  shift[0]: 0,0,0,3,3, prefix=0 suffix=3
+  shift[1]: 0,0,0,1,1, prefix=0 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[1,3]: '
+}{{\t
+)))) 
+a)()\tbb{'
+  moved[-1]: '}{{\t
+)))) 
+a)()\tbb{
+\t \t})('
+  moved[1]: '
+}{{\t
+)))) 
+a)()\tbb{'
+#215 doc='{a'|'b \t' caretLine=0 sel=True start=1:0 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[0,0]: '
+{a'
+  moved[-1]: -
+  moved[1]: 'b \t
+{a'
+#216 doc='a a}{ ('|'{ { } }'|'))a'|'   ((a\t{'|'bb(){b' caretLine=4 sel=True start=3:4 caret=4:6
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 0:2-0:3='';2:0-2:0='  ';3:3-3:3='b';4:0-4:0='  '
+  shift[0]: 0,1,2,5,6, prefix=2 suffix=4
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[3]: 0,1,3,7,9, prefix=3 suffix=5
+  shift[4]: 0,3,5,8,8, prefix=0 suffix=6
+  duplicated[1,3]: '
+{ { } }
+))a
+   ((a\t{'
+  moved[-1]: '{ { } }
+))a
+   ((a\t{
+a a}{ ('
+  moved[1]: 'bb(){b
+{ { } }
+))a
+   ((a\t{'
+#217 doc='b\t {{)'|')'|' ' caretLine=1 sel=False start=2:0 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:1-0:1=')}	';1:0-1:0='  '
+  shift[0]: 0,1,6,9,9, prefix=1 suffix=5
+  shift[1]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,2]: '
+b\t {{)
+)
+ '
+  moved[-1]: -
+  moved[1]: -
+#218 doc='a '|')b}'|'{a\t} ' caretLine=2 sel=True start=0:1 caret=2:5
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:1-0:2='';1:0-1:1=''
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[1]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[1,2]: '
+)b}
+{a\t} '
+  moved[-1]: ')b}
+{a\t} 
+a '
+  moved[1]: -
+#219 doc='{)'|'} )) \t'|'(\t b{'|'( \t}b'|' } ){'|'\tb ' caretLine=0 sel=False start=1:5 caret=0:8
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 4:0-4:1='';5:0-5:0='b'
+  shift[0]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[4]: 0,0,2,4,4, prefix=0 suffix=4
+  shift[5]: 0,2,4,4,4, prefix=0 suffix=3
+  duplicated[3,4]: '
+( \t}b
+ } ){'
+  moved[-1]: '( \t}b
+ } ){
+(\t b{'
+  moved[1]: '\tb 
+( \t}b
+ } ){'
+#220 doc=''|'bb {\t)' caretLine=1 sel=True start=0:2 caret=1:4
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[1,1]: '
+bb {\t)'
+  moved[-1]: 'bb {\t)
+'
+  moved[1]: -
+#221 doc='b  a'|''|' b{)'|'' caretLine=3 sel=True start=3:3 caret=3:4
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 0:0-0:4=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[2,2]: '
+ b{)'
+  moved[-1]: ' b{)
+'
+  moved[1]: '
+ b{)'
+#222 doc='}\t {{'|'ba{a'|'\tb(ba( '|'aa}{\tb'|'\t'|'b ()'|'' caretLine=6 sel=False start=5:1 caret=6:0
+  lines: 6,6 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='(';1:0-1:0='  ';2:0-2:0='  ';5:4-5:4=' 	(';6:0-6:0='  '
+  shift[0]: 0,2,4,6,6, prefix=0 suffix=5
+  shift[1]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[5]: 0,1,3,7,7, prefix=4 suffix=0
+  shift[6]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[3,3]: '
+aa}{\tb'
+  moved[-1]: 'aa}{\tb
+\tb(ba( '
+  moved[1]: '\t
+aa}{\tb'
+#223 doc='))a){\t\t'|''|'  \t'|'{a }('|'b)' caretLine=0 sel=False start=1:5 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 1:0-1:0='  ';2:0-2:3='';3:0-3:2='';4:1-4:1='bb'
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,0,1,3,3, prefix=0 suffix=3
+  shift[4]: 0,1,4,4,4, prefix=1 suffix=1
+  duplicated[3,4]: '
+{a }(
+b)'
+  moved[-1]: '{a }(
+b)
+  \t'
+  moved[1]: -
+#224 doc=' '|'( '|'{a'|'\tb((}b'|'  {a{'|'\t})({\t}a' caretLine=5 sel=True start=5:2 caret=5:0
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 5,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 5,5;  IndentationToTabs: ok 5,5;  EnsureFinalNewline: ok 5,5;
+  edits: 0:0-0:1='';1:2-1:2='  	';2:1-2:1='{';4:2-4:2='  ';5:0-5:0='  '
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,5,5,5, prefix=2 suffix=0
+  shift[2]: 0,1,3,3,3, prefix=1 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[4]: 0,1,5,7,7, prefix=2 suffix=3
+  shift[5]: 0,3,5,8,10, prefix=0 suffix=8
+  duplicated[5,5]: '
+\t})({\t}a'
+  moved[-1]: '\t})({\t}a
+  {a{'
+  moved[1]: -
+#225 doc='}'|'{{ '|'a)'|'ba aa'|'}(}(\t\t'|''|' )\t ' caretLine=5 sel=False start=0:0 caret=5:5
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:1='(}	b ';1:0-1:0='  ';3:3-3:3=' ';4:1-4:6='b}';5:0-5:0='  ';6:3-6:3='{(a'
+  shift[0]: 0,5,5,5,5, prefix=0 suffix=0
+  shift[1]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,6, prefix=3 suffix=2
+  shift[4]: 0,1,1,3,3, prefix=1 suffix=0
+  shift[5]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[6]: 0,1,3,7,7, prefix=3 suffix=1
+  duplicated[6,6]: '
+ )\t '
+  moved[-1]: ' )\t 
+'
+  moved[1]: -
+#226 doc=' a}'|'\t{b )\t\t ' caretLine=1 sel=False start=0:4 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[0,0]: '
+ a}'
+  moved[-1]: -
+  moved[1]: '\t{b )\t\t 
+ a}'
+#227 doc=' )a{\ta} '|'  \t{'|' (  '|' a'|'))){a{'|''|'})a' caretLine=3 sel=True start=6:1 caret=3:0
+  lines: 3,6 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,6;  SortAscending: ok 3,6;  SortDescending: ok 3,6;  RemoveDuplicateLines: ok 3,6;  IndentationToSpaces: ok 3,6;  IndentationToTabs: ok 3,6;  EnsureFinalNewline: ok 3,6;
+  edits: 0:2-0:2=')';1:0-1:3='';2:4-2:4='	';3:0-3:2='()})}(';5:0-5:0='('
+  shift[0]: 0,1,4,7,9, prefix=2 suffix=6
+  shift[1]: 0,0,0,1,1, prefix=0 suffix=1
+  shift[2]: 0,1,3,5,5, prefix=4 suffix=0
+  shift[3]: 0,5,6,6,6, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[1,2]: '
+  \t{
+ (  '
+  moved[-1]: '  \t{
+ (  
+ )a{\ta} '
+  moved[1]: ' a
+  \t{
+ (  '
+#228 doc=') ' caretLine=0 sel=True start=0:1 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  duplicated[0,0]: '
+) '
+  moved[-1]: -
+  moved[1]: -
+#229 doc=' }((( )'|')'|'({ '|') \taa(\t)'|'}\t '|'b b'|'b(b}b' caretLine=0 sel=True start=2:9 caret=0:0
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:1='';2:0-2:0='  ';4:1-4:3='';6:0-6:5=')  )	(a '
+  shift[0]: 0,0,2,5,6, prefix=0 suffix=6
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,3,5,5,5, prefix=0 suffix=3
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[6]: 0,4,6,8,8, prefix=0 suffix=0
+  duplicated[6,6]: '
+b(b}b'
+  moved[-1]: 'b(b}b
+b b'
+  moved[1]: -
+#230 doc=')\t b}'|' b\tab'|')  '|'){ '|'{)\tb'|' (\t  }) ' caretLine=2 sel=False start=2:6 caret=2:1
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:0-0:2='';1:2-1:5='';4:4-4:4=' b';5:0-5:8='a}ab)}'
+  shift[0]: 0,0,1,3,3, prefix=0 suffix=3
+  shift[1]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,1,3,6,6, prefix=4 suffix=0
+  shift[5]: 0,0,1,4,6, prefix=0 suffix=0
+  duplicated[5,5]: '
+ (\t  }) '
+  moved[-1]: ' (\t  }) 
+{)\tb'
+  moved[1]: -
+#231 doc=' '|'' caretLine=0 sel=False start=0:1 caret=0:1
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:1='';1:0-1:0='  '
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[0,1]: '
+ 
+'
+  moved[-1]: -
+  moved[1]: -
+#232 doc=''|'\ta'|'){\tb('|' '|'b)b(  \t'|'{(} bb)'|'' caretLine=1 sel=False start=0:0 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='x';1:2-1:2='	';2:0-2:5='{)a))b)}';3:0-3:1='{ bb';4:0-4:0='  ';5:4-5:6=''
+  shift[0]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[1]: 0,1,3,3,3, prefix=2 suffix=0
+  shift[2]: 0,4,6,8,8, prefix=0 suffix=0
+  shift[3]: 0,4,4,4,4, prefix=0 suffix=0
+  shift[4]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[5]: 0,1,3,4,5, prefix=4 suffix=1
+  shift[6]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[0,3]: '
+
+\ta
+){\tb(
+ '
+  moved[-1]: -
+  moved[1]: 'b)b(  \t
+
+\ta
+){\tb(
+ '
+#233 doc=' b{a '|'{}{ }}'|'}(\taaa}'|'a{{}'|'{b}}b\t'|'b{({a b\t'|'ab b}' caretLine=4 sel=False start=0:3 caret=4:8
+  lines: 4,4 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 1:0-1:6='}b(';3:0-3:0='  ';5:0-5:0='  '
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,0,0,3,3, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[6]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[3,3]: '
+a{{}'
+  moved[-1]: 'a{{}
+}(\taaa}'
+  moved[1]: '{b}}b\t
+a{{}'
+#234 doc='a'|'}){\t}'|')(){ b}\t'|''|'' caretLine=0 sel=False start=4:2 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:1='( a{b 	';2:4-2:4='	'
+  shift[0]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,1,3,7,9, prefix=4 suffix=4
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  duplicated[1,3]: '
+}){\t}
+)(){ b}\t
+'
+  moved[-1]: '}){\t}
+)(){ b}\t
+
+a'
+  moved[1]: '
+}){\t}
+)(){ b}\t
+'
+#235 doc=')(\t'|''|'} ' caretLine=0 sel=True start=2:1 caret=0:0
+  lines: 0,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: ok 0,2;  SortDescending: ok 0,2;  RemoveDuplicateLines: ok 0,2;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 2:0-2:2=''
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[1,2]: '
+
+} '
+  moved[-1]: '
+} 
+)(\t'
+  moved[1]: -
+#236 doc=')b(a'|'(\ta (('|'}( (}'|''|'b{} ' caretLine=3 sel=True start=4:6 caret=3:5
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 1:5-1:6='';3:0-3:0='x';4:2-4:2='{'
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,3,5,5, prefix=5 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[4]: 0,1,4,5,5, prefix=2 suffix=2
+  duplicated[2,3]: '
+}( (}
+'
+  moved[-1]: '}( (}
+
+(\ta (('
+  moved[1]: 'b{} 
+}( (}
+'
+#237 doc='a'|'}} )'|'(  ))}' caretLine=2 sel=True start=1:1 caret=2:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:1='';1:0-1:0='  ';2:0-2:0='  '
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[2]: 0,3,5,8,8, prefix=0 suffix=6
+  duplicated[2,2]: '
+(  ))}'
+  moved[-1]: '(  ))}
+}} )'
+  moved[1]: -
+#238 doc=')((\t(a' caretLine=0 sel=True start=0:0 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[0,0]: '
+)((\t(a'
+  moved[-1]: -
+  moved[1]: -
+#239 doc=' \t(('|''|'{' caretLine=0 sel=True start=2:0 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:4='(}{)';1:0-1:0='  '
+  shift[0]: 0,1,3,4,4, prefix=0 suffix=0
+  shift[1]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,2]: '
+ \t((
+
+{'
+  moved[-1]: -
+  moved[1]: -
+#240 doc='b )b)'|' \t\t'|'b(\t{'|'{(\t '|'{a ' caretLine=4 sel=True start=1:3 caret=4:0
+  lines: 1,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,3;  SortAscending: ok 1,3;  SortDescending: ok 1,3;  RemoveDuplicateLines: ok 1,3;  IndentationToSpaces: ok 1,3;  IndentationToTabs: ok 1,3;  EnsureFinalNewline: ok 1,3;
+  edits: 0:1-0:4='';1:2-1:2=')a';2:1-2:1='}';3:0-3:0='  '
+  shift[0]: 0,1,1,2,2, prefix=1 suffix=1
+  shift[1]: 0,1,5,5,5, prefix=2 suffix=1
+  shift[2]: 0,1,4,5,5, prefix=1 suffix=3
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[4]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[0,4]: '
+b )b)
+ \t\t
+b(\t{
+{(\t 
+{a '
+  moved[-1]: -
+  moved[1]: -
+#241 doc='})'|' )' caretLine=0 sel=False start=1:0 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:1-0:2=' {b  {'
+  shift[0]: 0,1,7,7,7, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[1,1]: '
+ )'
+  moved[-1]: ' )
+})'
+  moved[1]: -
+#242 doc='}'|'a} a' caretLine=0 sel=False start=1:3 caret=0:5
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:0='	{ '
+  shift[0]: 0,4,4,4,4, prefix=0 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[0,0]: '
+}'
+  moved[-1]: -
+  moved[1]: 'a} a
+}'
+#243 doc='b}\t'|' {}\tb(\t)'|'b()a}'|' '|'\t\tab'|')}\t a\t\t)'|' (\t{{) ' caretLine=1 sel=False start=2:3 caret=1:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:3='{a ){';1:1-1:1='  ';2:2-2:5='';4:0-4:2='';6:7-6:7='{'
+  shift[0]: 0,3,5,5,5, prefix=0 suffix=0
+  shift[1]: 0,1,5,8,10, prefix=1 suffix=7
+  shift[2]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[4]: 0,0,1,2,2, prefix=0 suffix=2
+  shift[5]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[6]: 0,1,3,6,8, prefix=7 suffix=0
+  duplicated[2,3]: '
+b()a}
+ '
+  moved[-1]: 'b()a}
+ 
+ {}\tb(\t)'
+  moved[1]: '\t\tab
+b()a}
+ '
+#244 doc='a (b ' caretLine=0 sel=False start=0:4 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[0,0]: '
+a (b '
+  moved[-1]: -
+  moved[1]: -
+#245 doc='b) )(  ' caretLine=0 sel=True start=0:3 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:2=''
+  shift[0]: 0,1,2,5,6, prefix=1 suffix=5
+  duplicated[0,0]: '
+b) )(  '
+  moved[-1]: -
+  moved[1]: -
+#246 doc='b a{'|' b \t) '|''|'\t}'|')(}){) '|' \t(  ' caretLine=5 sel=False start=3:0 caret=5:7
+  lines: 5,5 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:2-0:3='';1:0-1:6='}b';2:0-2:0=' (((  ';4:2-4:3=''
+  shift[0]: 0,1,2,3,3, prefix=2 suffix=1
+  shift[1]: 0,0,0,2,2, prefix=0 suffix=0
+  shift[2]: 0,6,6,6,6, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,1,2,5,6, prefix=2 suffix=4
+  shift[5]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[5,5]: '
+ \t(  '
+  moved[-1]: ' \t(  
+)(}){) '
+  moved[1]: -
+#247 doc='\t(}('|'bbb\t) }' caretLine=1 sel=False start=1:7 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:1='';1:0-1:0='  '
+  shift[0]: 0,0,2,3,3, prefix=0 suffix=3
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[1,1]: '
+bbb\t) }'
+  moved[-1]: 'bbb\t) }
+\t(}('
+  moved[1]: -
+#248 doc='' caretLine=0 sel=True start=0:1 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:0='  '
+  shift[0]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[0,0]: '
+'
+  moved[-1]: -
+  moved[1]: -
+#249 doc='}{\tb' caretLine=0 sel=True start=0:3 caret=0:8
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:3-0:3='{'
+  shift[0]: 0,1,3,5,5, prefix=3 suffix=1
+  duplicated[0,0]: '
+}{\tb'
+  moved[-1]: -
+  moved[1]: -
+#250 doc='}{(\t a'|') '|'b} } }ba'|'\t{   ('|')b\t\tb\t}'|'' caretLine=0 sel=True start=1:1 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:2='';2:4-2:7='';3:4-3:5='';4:0-4:7='b( {)	';5:0-5:0='  ab{{('
+  shift[0]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,1,3,4,5, prefix=4 suffix=1
+  shift[3]: 0,1,3,5,5, prefix=4 suffix=1
+  shift[4]: 0,0,2,5,6, prefix=0 suffix=0
+  shift[5]: 0,7,7,7,7, prefix=0 suffix=0
+  duplicated[0,2]: '
+}{(\t a
+) 
+b} } }ba'
+  moved[-1]: -
+  moved[1]: '\t{   (
+}{(\t a
+) 
+b} } }ba'
+#251 doc='){{(() '|')) b{ '|'a{(b ba'|'{{{}'|'{}'|'b)\t(} a'|'a )(a' caretLine=0 sel=False start=6:7 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:1-0:1=')(';1:0-1:6='';2:0-2:0='  ';3:0-3:0='  ';4:0-4:0='  '
+  shift[0]: 0,1,5,8,9, prefix=1 suffix=6
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[4]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[5]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[5,6]: '
+b)\t(} a
+a )(a'
+  moved[-1]: 'b)\t(} a
+a )(a
+{}'
+  moved[1]: -
+#252 doc=' (}'|'{ab}\t\t ' caretLine=1 sel=True start=0:0 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[1,1]: '
+{ab}\t\t '
+  moved[-1]: '{ab}\t\t 
+ (}'
+  moved[1]: -
+#253 doc=' '|'  ))b{)'|' }}} a('|'b}'|'aa)' caretLine=3 sel=True start=1:2 caret=3:0
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:0-0:1='';1:3-1:4='';2:1-2:1='  ';3:1-3:2='';4:0-4:3='}}) bba}'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,5,6, prefix=3 suffix=3
+  shift[2]: 0,1,5,8,9, prefix=1 suffix=6
+  shift[3]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[4]: 0,6,8,8,8, prefix=0 suffix=0
+  duplicated[2,3]: '
+ }}} a(
+b}'
+  moved[-1]: ' }}} a(
+b}
+  ))b{)'
+  moved[1]: 'aa)
+ }}} a(
+b}'
+#254 doc='{ {)(}'|''|'( b(('|'  '|'}('|')\tab' caretLine=5 sel=True start=2:1 caret=5:0
+  lines: 2,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,4;  SortAscending: ok 2,4;  SortDescending: ok 2,4;  RemoveDuplicateLines: ok 2,4;  IndentationToSpaces: ok 2,4;  IndentationToTabs: ok 2,4;  EnsureFinalNewline: ok 2,4;
+  edits: 0:0-0:0='  ';3:2-3:2='  ';4:0-4:0='  ';5:0-5:4='aa'
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[4]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[5]: 0,0,1,2,2, prefix=0 suffix=0
+  duplicated[4,5]: '
+}(
+)\tab'
+  moved[-1]: '}(
+)\tab
+  '
+  moved[1]: -
+#255 doc='\t)'|')'|'{{)(} a'|' ))'|' ' caretLine=3 sel=False start=0:2 caret=3:8
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:0='b}{';4:0-4:0='))('
+  shift[0]: 0,4,5,5,5, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[4]: 0,4,4,4,4, prefix=0 suffix=1
+  duplicated[3,4]: '
+ ))
+ '
+  moved[-1]: ' ))
+ 
+{{)(} a'
+  moved[1]: -
+#256 doc=')' caretLine=0 sel=True start=0:1 caret=0:3
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  duplicated[0,0]: '
+)'
+  moved[-1]: -
+  moved[1]: -
+#257 doc='\t) ({\t'|'a } { '|' (a\t(){}'|'a '|'}a\t'|')a)) } ' caretLine=5 sel=True start=0:3 caret=5:0
+  lines: 0,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: ok 0,4;  SortDescending: ok 0,4;  RemoveDuplicateLines: ok 0,4;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:0-0:0='  ';1:0-1:6='';2:0-2:8='	{';5:1-5:1='		 '
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,0,0,0,2, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[5]: 0,1,6,9,10, prefix=1 suffix=6
+  duplicated[2,3]: '
+ (a\t(){}
+a '
+  moved[-1]: ' (a\t(){}
+a 
+a } { '
+  moved[1]: '}a\t
+ (a\t(){}
+a '
+#258 doc='(\t bb'|')  a)'|' {)\t'|'ba(((}{' caretLine=2 sel=True start=1:7 caret=2:0
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:1-0:3='';1:0-1:0='  ';2:3-2:3='a}';3:0-3:0='  '
+  shift[0]: 0,1,1,3,3, prefix=1 suffix=2
+  shift[1]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[2]: 0,1,3,6,6, prefix=3 suffix=1
+  shift[3]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[2,2]: '
+ {)\t'
+  moved[-1]: ' {)\t
+)  a)'
+  moved[1]: 'ba(((}{
+ {)\t'
+#259 doc=' {{}{a(b'|'}a}('|'\t(('|'a \t {\t ' caretLine=3 sel=True start=1:1 caret=3:0
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:0-0:1='';1:3-1:4='';2:0-2:1=''
+  shift[0]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[1]: 0,1,3,3,3, prefix=3 suffix=0
+  shift[2]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[3]: 0,1,3,6,12, prefix=7 suffix=0
+  duplicated[1,2]: '
+}a}(
+\t(('
+  moved[-1]: '}a}(
+\t((
+ {{}{a(b'
+  moved[1]: 'a \t {\t 
+}a}(
+\t(('
+#260 doc='))  b( '|')'|''|'\t}' caretLine=0 sel=True start=0:1 caret=0:7
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:7='	{	}(}){';1:0-1:0='  ';2:0-2:0='  '
+  shift[0]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[1]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[2]: 0,2,2,2,2, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[1,1]: '
+)'
+  moved[-1]: ')
+))  b( '
+  moved[1]: '
+)'
+#261 doc='))bab \t{'|'({  b'|'('|'({ ()'|'}'|' {' caretLine=2 sel=True start=5:1 caret=2:5
+  lines: 2,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,5;  SortAscending: ok 2,5;  SortDescending: ok 2,5;  RemoveDuplicateLines: ok 2,5;  IndentationToSpaces: ok 2,5;  IndentationToTabs: ok 2,5;  EnsureFinalNewline: ok 2,5;
+  edits: 0:1-0:8='{a';1:0-1:1='';3:1-3:5=' )(b {';4:1-4:1='}';5:0-5:2=''
+  shift[0]: 0,1,1,1,3, prefix=1 suffix=0
+  shift[1]: 0,0,2,4,4, prefix=0 suffix=4
+  shift[2]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[3]: 0,1,5,7,7, prefix=1 suffix=0
+  shift[4]: 0,1,2,2,2, prefix=1 suffix=0
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[4,4]: '
+}'
+  moved[-1]: '}
+({ ()'
+  moved[1]: ' {
+}'
+#262 doc='bb' caretLine=0 sel=True start=0:3 caret=0:6
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:1-0:2=''
+  shift[0]: 0,1,1,1,1, prefix=1 suffix=0
+  duplicated[0,0]: '
+bb'
+  moved[-1]: -
+  moved[1]: -
+#263 doc=''|'ab{ a)'|'b b}'|'a  }'|'{a}}))}'|'(b'|' ' caretLine=6 sel=False start=0:0 caret=6:2
+  lines: 6,6 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='b		( ))';3:0-3:4='}{b)  ';6:0-6:0='{'
+  shift[0]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[3]: 0,3,5,6,6, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[6]: 0,2,2,2,2, prefix=0 suffix=1
+  duplicated[2,6]: '
+b b}
+a  }
+{a}}))}
+(b
+ '
+  moved[-1]: 'b b}
+a  }
+{a}}))}
+(b
+ 
+ab{ a)'
+  moved[1]: -
+#264 doc='a)a'|'}((   '|'' caretLine=0 sel=True start=0:1 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:3='){';1:0-1:6='{ )';2:0-2:0='  '
+  shift[0]: 0,0,2,2,2, prefix=0 suffix=0
+  shift[1]: 0,0,0,3,3, prefix=0 suffix=0
+  shift[2]: 0,2,2,2,2, prefix=0 suffix=0
+  duplicated[2,2]: '
+'
+  moved[-1]: '
+}((   '
+  moved[1]: -
+#265 doc=')\t}(\t}()'|' )'|'} {'|' \t'|')b)(\t) b'|'b}' caretLine=3 sel=False start=1:1 caret=3:8
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:0-0:8=' 		';1:0-1:1='';2:0-2:3='';3:0-3:2='';4:2-4:4='';5:0-5:2=''
+  shift[0]: 0,0,0,1,3, prefix=0 suffix=0
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[4]: 0,1,2,4,6, prefix=2 suffix=4
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[4,4]: '
+)b)(\t) b'
+  moved[-1]: ')b)(\t) b
+ \t'
+  moved[1]: 'b}
+)b)(\t) b'
+#266 doc='} )'|'( '|'\t{\tbb'|'ba('|')'|'a ))){'|'\tba\t(' caretLine=1 sel=True start=1:1 caret=1:2
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 1:1-1:2='';2:0-2:5='  bb (}a';3:0-3:3='}b	a }{';4:1-4:1='}';6:5-6:5='}}{'
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[2]: 0,4,6,8,8, prefix=0 suffix=0
+  shift[3]: 0,5,7,7,7, prefix=0 suffix=0
+  shift[4]: 0,1,2,2,2, prefix=1 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[6]: 0,1,3,8,8, prefix=5 suffix=0
+  duplicated[5,5]: '
+a ))){'
+  moved[-1]: 'a ))){
+)'
+  moved[1]: '\tba\t(
+a ))){'
+#267 doc='({  \t )'|'\t\t}' caretLine=1 sel=True start=1:5 caret=1:8
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:0='  ';1:0-1:0='a }'
+  shift[0]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[1]: 0,4,6,6,6, prefix=0 suffix=3
+  duplicated[0,0]: '
+({  \t )'
+  moved[-1]: -
+  moved[1]: '\t\t}
+({  \t )'
+#268 doc='b a)b('|'(}\t\t{b'|'\ta\t ( '|'}}' caretLine=2 sel=True start=3:2 caret=2:0
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 0:1-0:1='( b';1:0-1:6='b ({a{ ';2:0-2:5='}a( '
+  shift[0]: 0,1,6,9,9, prefix=1 suffix=5
+  shift[1]: 0,2,4,7,7, prefix=0 suffix=0
+  shift[2]: 0,0,2,5,5, prefix=0 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[3,3]: '
+}}'
+  moved[-1]: '}}
+\ta\t ( '
+  moved[1]: -
+#269 doc=' '|'} {}('|' ((\t'|'b  ' caretLine=3 sel=False start=0:1 caret=3:2
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,3;  IndentationToTabs: ok 0,3;  EnsureFinalNewline: ok 0,3;
+  edits: 1:0-1:0='  ';2:0-2:3=''
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[1]: 0,3,5,7,7, prefix=0 suffix=5
+  shift[2]: 0,0,0,1,1, prefix=0 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[0,0]: '
+ '
+  moved[-1]: -
+  moved[1]: '} {}(
+ '
+#270 doc=' '|'  a)}  a'|'}\t) a'|''|''|'{ba{ {'|' {{\t' caretLine=1 sel=True start=0:0 caret=1:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 3:0-3:0='{) )';5:5-5:5='(}a';6:0-6:4='}'
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,4,4,4,4, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[5]: 0,1,3,9,9, prefix=5 suffix=1
+  shift[6]: 0,0,0,1,1, prefix=0 suffix=0
+  duplicated[1,1]: '
+  a)}  a'
+  moved[-1]: '  a)}  a
+ '
+  moved[1]: '}\t) a
+  a)}  a'
+#271 doc='\t\tb'|'}{a '|'('|''|''|''|'\t' caretLine=2 sel=False start=3:1 caret=2:1
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 1:0-1:1='';2:0-2:1='';5:0-5:0='x';6:0-6:1=''
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,0,2,3,3, prefix=0 suffix=3
+  shift[2]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[5]: 0,1,1,1,1, prefix=0 suffix=0
+  shift[6]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[2,3]: '
+(
+'
+  moved[-1]: '(
+
+}{a '
+  moved[1]: '
+(
+'
+#272 doc='({bb{'|'}}{{('|')\t) ab'|' ('|'){)}a (('|'}({{{a b' caretLine=3 sel=True start=4:1 caret=3:2
+  lines: 3,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 3,4;  SortAscending: ok 3,4;  SortDescending: ok 3,4;  RemoveDuplicateLines: ok 3,4;  IndentationToSpaces: ok 3,4;  IndentationToTabs: ok 3,4;  EnsureFinalNewline: ok 3,4;
+  edits: 0:5-0:5='bb{';2:6-2:6='a ';3:2-3:2='	 ';4:0-4:8='(a}({ {'
+  shift[0]: 0,1,3,8,8, prefix=5 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,1,3,6,8, prefix=6 suffix=0
+  shift[3]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[4]: 0,0,2,5,7, prefix=0 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[4,5]: '
+){)}a ((
+}({{{a b'
+  moved[-1]: '){)}a ((
+}({{{a b
+ ('
+  moved[1]: -
+#273 doc='}b\t\t '|'\t){}'|'{a' caretLine=2 sel=True start=0:0 caret=2:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 
+  shift[0]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=2 suffix=0
+  duplicated[0,0]: '
+}b\t\t '
+  moved[-1]: -
+  moved[1]: '\t){}
+}b\t\t '
+#274 doc='a}ab \t\ta'|''|'a'|'ba{\t' caretLine=0 sel=True start=2:0 caret=0:0
+  lines: 0,1 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: ok 0,1;  SortDescending: ok 0,1;  RemoveDuplicateLines: ok 0,1;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:3='';2:0-2:0='  '
+  shift[0]: 0,0,0,3,5, prefix=0 suffix=5
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,3,3,3,3, prefix=0 suffix=1
+  shift[3]: 0,1,3,6,12, prefix=4 suffix=0
+  duplicated[0,1]: '
+a}ab \t\ta
+'
+  moved[-1]: -
+  moved[1]: 'a
+a}ab \t\ta
+'
+#275 doc=' ())'|') a)\t)'|'}}b\t}  '|' a '|' ()b\taa)'|')(b{'|'}a' caretLine=5 sel=True start=2:1 caret=5:0
+  lines: 2,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,4;  SortAscending: ok 2,4;  SortDescending: ok 2,4;  RemoveDuplicateLines: ok 2,4;  IndentationToSpaces: ok 2,4;  IndentationToTabs: ok 2,4;  EnsureFinalNewline: ok 2,4;
+  edits: 0:1-0:1='  ';1:0-1:0='  ';2:0-2:7='a';3:1-3:1='  ';4:0-4:1='';5:0-5:2='';6:0-6:2=' a}b	)'
+  shift[0]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[1]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[2]: 0,0,0,0,1, prefix=0 suffix=0
+  shift[3]: 0,1,5,5,5, prefix=1 suffix=2
+  shift[4]: 0,0,2,5,7, prefix=0 suffix=7
+  shift[5]: 0,0,1,2,2, prefix=0 suffix=2
+  shift[6]: 0,5,6,6,6, prefix=0 suffix=0
+  duplicated[2,2]: '
+}}b\t}  '
+  moved[-1]: '}}b\t}  
+) a)\t)'
+  moved[1]: ' a 
+}}b\t}  '
+#276 doc=' }'|'(  (}' caretLine=1 sel=False start=1:2 caret=1:8
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:0-0:2='';1:0-1:4='a(b}a'
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,2,4,6,6, prefix=0 suffix=1
+  duplicated[1,1]: '
+(  (}'
+  moved[-1]: '(  (}
+ }'
+  moved[1]: -
+#277 doc='({ )\t b\t'|' ){'|''|'baabab'|')b' caretLine=1 sel=False start=0:0 caret=1:6
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 1:0-1:1='';3:0-3:6='	 ';4:1-4:2=''
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,0,0,2,2, prefix=0 suffix=0
+  shift[4]: 0,1,1,1,1, prefix=1 suffix=0
+  duplicated[2,4]: '
+
+baabab
+)b'
+  moved[-1]: '
+baabab
+)b
+ ){'
+  moved[1]: -
+#278 doc='\t'|')}{{'|''|'){(a'|'}bb}'|'a({a\t}'|'\t{\t \ta ' caretLine=2 sel=False start=2:2 caret=2:8
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:1='';1:1-1:4='b';3:2-3:2='}{';4:0-4:0='  ';5:2-5:2='}';6:0-6:0='  '
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,1,2,2, prefix=1 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[3]: 0,1,5,6,6, prefix=2 suffix=2
+  shift[4]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[5]: 0,1,4,7,7, prefix=2 suffix=4
+  shift[6]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[0,1]: '
+\t
+)}{{'
+  moved[-1]: -
+  moved[1]: '
+\t
+)}{{'
+#279 doc='ab{ '|' }\t{ )'|'  {'|'b('|' b{)'|'('|'{()\t\t(((' caretLine=3 sel=False start=3:1 caret=3:4
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='  ';1:1-1:1='  ';2:0-2:0='}';4:2-4:4='';5:0-5:1='';6:0-6:8='	'
+  shift[0]: 0,3,5,6,6, prefix=0 suffix=4
+  shift[1]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[2]: 0,2,4,4,4, prefix=0 suffix=3
+  shift[3]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[4]: 0,1,2,2,2, prefix=2 suffix=0
+  shift[5]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[6]: 0,0,0,0,1, prefix=0 suffix=0
+  duplicated[4,5]: '
+ b{)
+('
+  moved[-1]: ' b{)
+(
+b('
+  moved[1]: '{()\t\t(((
+ b{)
+('
+#280 doc=' { }b'|')))))b'|'} abab}'|'}}}}{a '|'({{'|'ab}\t(' caretLine=0 sel=True start=5:1 caret=0:7
+  lines: 0,5 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,5;  SortAscending: ok 0,5;  SortDescending: ok 0,5;  RemoveDuplicateLines: ok 0,5;  IndentationToSpaces: ok 0,5;  IndentationToTabs: ok 0,5;  EnsureFinalNewline: ok 0,5;
+  edits: 0:5-0:5='}b';1:0-1:6='	}{ {';2:7-2:7=')'
+  shift[0]: 0,1,3,7,7, prefix=5 suffix=0
+  shift[1]: 0,0,2,5,5, prefix=0 suffix=0
+  shift[2]: 0,1,3,6,8, prefix=7 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=5 suffix=0
+  duplicated[3,5]: '
+}}}}{a 
+({{
+ab}\t('
+  moved[-1]: '}}}}{a 
+({{
+ab}\t(
+} abab}'
+  moved[1]: -
+#281 doc='\t(}\t'|'(aaa(}'|' b'|'  '|' {ab()' caretLine=4 sel=True start=0:6 caret=4:7
+  lines: 0,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: ok 0,4;  SortDescending: ok 0,4;  RemoveDuplicateLines: ok 0,4;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 2:2-2:2='(}';3:1-3:2='{';4:1-4:6=' a'
+  shift[0]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[2]: 0,1,4,4,4, prefix=2 suffix=0
+  shift[3]: 0,1,2,2,2, prefix=1 suffix=0
+  shift[4]: 0,1,1,3,3, prefix=1 suffix=0
+  duplicated[1,4]: '
+(aaa(}
+ b
+  
+ {ab()'
+  moved[-1]: '(aaa(}
+ b
+  
+ {ab()
+\t(}\t'
+  moved[1]: -
+#282 doc='{({  a'|'(}'|'ba )) '|''|'(( \t' caretLine=4 sel=True start=1:3 caret=4:5
+  lines: 1,4 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,4;  SortAscending: ok 1,4;  SortDescending: ok 1,4;  RemoveDuplicateLines: ok 1,4;  IndentationToSpaces: ok 1,4;  IndentationToTabs: ok 1,4;  EnsureFinalNewline: ok 1,4;
+  edits: 0:0-0:0='  ';1:0-1:1='';4:1-4:2=''
+  shift[0]: 0,3,5,8,8, prefix=0 suffix=6
+  shift[1]: 0,0,1,1,1, prefix=0 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[4]: 0,1,2,3,3, prefix=1 suffix=2
+  duplicated[2,3]: '
+ba )) 
+'
+  moved[-1]: 'ba )) 
+
+(}'
+  moved[1]: '(( \t
+ba )) 
+'
+#283 doc=' \tb'|'}((a})b'|'  ( b {{' caretLine=2 sel=False start=1:0 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=8 suffix=0
+  duplicated[0,0]: '
+ \tb'
+  moved[-1]: -
+  moved[1]: '}((a})b
+ \tb'
+#284 doc='\t'|'\t}'|')\t){{'|'{{a'|'}b{\t b'|'ab'|'}\t{})b)' caretLine=2 sel=False start=4:0 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 1:1-1:1='b';3:0-3:0='b)	';5:0-5:1=' ';6:1-6:3=''
+  shift[0]: 0,1,3,6,12, prefix=1 suffix=0
+  shift[1]: 0,1,3,3,3, prefix=1 suffix=1
+  shift[2]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[3]: 0,4,6,6,6, prefix=0 suffix=3
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  shift[5]: 0,1,2,2,2, prefix=0 suffix=1
+  shift[6]: 0,1,1,4,5, prefix=1 suffix=4
+  duplicated[5,5]: '
+ab'
+  moved[-1]: 'ab
+}b{\t b'
+  moved[1]: '}\t{})b)
+ab'
+#285 doc=' )}( {'|' })})'|''|'b  {'|'}}}}})' caretLine=1 sel=False start=4:5 caret=1:1
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,4;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,4;  IndentationToTabs: ok 0,4;  EnsureFinalNewline: ok 0,4;
+  edits: 0:2-0:5='';2:0-2:0='{a( (  ';3:0-3:2=''
+  shift[0]: 0,1,2,3,3, prefix=2 suffix=1
+  shift[1]: 0,1,3,6,12, prefix=5 suffix=0
+  shift[2]: 0,7,7,7,7, prefix=0 suffix=0
+  shift[3]: 0,0,1,2,2, prefix=0 suffix=2
+  shift[4]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[4,4]: '
+}}}}})'
+  moved[-1]: '}}}}})
+b  {'
+  moved[1]: -
+#286 doc='\t)a}{(}'|'aa)b'|'\t}a\t}'|' \t ((b'|'\t'|'{' caretLine=3 sel=True start=3:2 caret=3:3
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 3,3;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 3,3;  IndentationToTabs: ok 3,3;  EnsureFinalNewline: ok 3,3;
+  edits: 0:0-0:7='a ({( ( ';1:0-1:2='';2:0-2:1='';3:1-3:1='  ';4:0-4:1='';5:0-5:0='  '
+  shift[0]: 0,2,4,7,8, prefix=0 suffix=0
+  shift[1]: 0,0,1,2,2, prefix=0 suffix=2
+  shift[2]: 0,0,2,4,4, prefix=0 suffix=4
+  shift[3]: 0,1,5,8,8, prefix=1 suffix=5
+  shift[4]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[5]: 0,3,3,3,3, prefix=0 suffix=1
+  duplicated[2,2]: '
+\t}a\t}'
+  moved[-1]: '\t}a\t}
+aa)b'
+  moved[1]: ' \t ((b
+\t}a\t}'
+#287 doc=' '|'(b))  ' caretLine=1 sel=True start=1:0 caret=1:5
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 1,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 1,1;  IndentationToTabs: ok 1,1;  EnsureFinalNewline: ok 1,1;
+  edits: 0:0-0:1='';1:0-1:6=')(ba{('
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[1]: 0,1,3,6,6, prefix=0 suffix=0
+  duplicated[0,1]: '
+ 
+(b))  '
+  moved[-1]: -
+  moved[1]: -
+#288 doc='{a\t  b{ '|' }b'|'b('|'(a{aa}\t('|'(a {'|''|'a)  {{' caretLine=3 sel=True start=2:0 caret=3:8
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 0:0-0:0='  ';1:1-1:2='';2:2-2:2=' }}'
+  shift[0]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[1]: 0,1,2,2,2, prefix=1 suffix=1
+  shift[2]: 0,1,5,5,5, prefix=2 suffix=0
+  shift[3]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[6]: 0,1,3,6,12, prefix=6 suffix=0
+  duplicated[6,6]: '
+a)  {{'
+  moved[-1]: 'a)  {{
+'
+  moved[1]: -
+#289 doc='  ({' caretLine=0 sel=True start=0:5 caret=0:0
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:4='a( '
+  shift[0]: 0,0,2,3,3, prefix=0 suffix=0
+  duplicated[0,0]: '
+  ({'
+  moved[-1]: -
+  moved[1]: -
+#290 doc='a}'|'a b)\t b}'|'b \t}b'|'}a'|' \t){'|'\t'|' \taa} b(' caretLine=3 sel=False start=5:5 caret=3:3
+  lines: 3,3 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,6;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,6;  IndentationToTabs: ok 0,6;  EnsureFinalNewline: ok 0,6;
+  edits: 0:0-0:0='  ';2:0-2:0='	(b';3:1-3:2='))  ba(';4:1-4:1='  ';5:0-5:0='b})) }';6:0-6:2=''
+  shift[0]: 0,3,4,4,4, prefix=0 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[2]: 0,4,6,8,8, prefix=0 suffix=5
+  shift[3]: 0,1,8,8,8, prefix=1 suffix=0
+  shift[4]: 0,1,5,6,6, prefix=1 suffix=3
+  shift[5]: 0,7,7,7,7, prefix=0 suffix=1
+  shift[6]: 0,0,1,4,6, prefix=0 suffix=6
+  duplicated[6,6]: '
+ \taa} b('
+  moved[-1]: ' \taa} b(
+\t'
+  moved[1]: -
+#291 doc='{'|'\t b\t\t( '|'a}( bb' caretLine=0 sel=False start=0:2 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,2;  IndentationToTabs: ok 0,2;  EnsureFinalNewline: ok 0,2;
+  edits: 0:0-0:1=' )	bb ';1:0-1:0='  ';2:3-2:6=''
+  shift[0]: 0,6,6,6,6, prefix=0 suffix=0
+  shift[1]: 0,3,5,8,9, prefix=0 suffix=7
+  shift[2]: 0,1,3,3,3, prefix=3 suffix=0
+  duplicated[1,2]: '
+\t b\t\t( 
+a}( bb'
+  moved[-1]: '\t b\t\t( 
+a}( bb
+{'
+  moved[1]: -
+#292 doc='a )\t {{b'|'{ })a a '|' ){'|'}\tb   }'|'(\t  '|'' caretLine=3 sel=True start=2:0 caret=3:1
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 1:0-1:0='  ';2:1-2:1='  ';3:0-3:7=')b(	b';5:0-5:0='  }'
+  shift[0]: 0,1,3,6,12, prefix=8 suffix=0
+  shift[1]: 0,3,5,8,10, prefix=0 suffix=8
+  shift[2]: 0,1,5,5,5, prefix=1 suffix=2
+  shift[3]: 0,0,1,4,5, prefix=0 suffix=0
+  shift[4]: 0,1,3,6,12, prefix=4 suffix=0
+  shift[5]: 0,3,3,3,3, prefix=0 suffix=0
+  duplicated[2,3]: '
+ ){
+}\tb   }'
+  moved[-1]: ' ){
+}\tb   }
+{ })a a '
+  moved[1]: '(\t  
+ ){
+}\tb   }'
+#293 doc=' {)'|'}{)' caretLine=0 sel=False start=1:3 caret=0:2
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 0:1-0:1='  '
+  shift[0]: 0,1,5,5,5, prefix=1 suffix=2
+  shift[1]: 0,1,3,6,12, prefix=3 suffix=0
+  duplicated[1,1]: '
+}{)'
+  moved[-1]: '}{)
+ {)'
+  moved[1]: -
+#294 doc='} b'|'b' caretLine=1 sel=False start=0:3 caret=1:4
+  lines: 1,1 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,1;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,1;  IndentationToTabs: ok 0,1;  EnsureFinalNewline: ok 0,1;
+  edits: 1:0-1:0='( )'
+  shift[0]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[1]: 0,4,4,4,4, prefix=0 suffix=1
+  duplicated[0,1]: '
+} b
+b'
+  moved[-1]: -
+  moved[1]: -
+#295 doc='  \t a(\t ' caretLine=0 sel=False start=0:4 caret=0:4
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:8='('
+  shift[0]: 0,0,0,0,1, prefix=0 suffix=0
+  duplicated[0,0]: '
+  \t a(\t '
+  moved[-1]: -
+  moved[1]: -
+#296 doc=' ' caretLine=0 sel=True start=0:2 caret=0:8
+  lines: 0,0 hasLineSel=False
+  TrimTrailingWhitespace: ok 0,0;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 0,0;  IndentationToTabs: ok 0,0;  EnsureFinalNewline: ok 0,0;
+  edits: 0:0-0:1=''
+  shift[0]: 0,0,0,0,0, prefix=0 suffix=0
+  duplicated[0,0]: '
+ '
+  moved[-1]: -
+  moved[1]: -
+#297 doc='{(\tb\tb{'|''|' }('|'aa' caretLine=2 sel=True start=3:0 caret=2:0
+  lines: 2,2 hasLineSel=False
+  TrimTrailingWhitespace: ok 2,2;  SortAscending: no;  SortDescending: no;  RemoveDuplicateLines: no;  IndentationToSpaces: ok 2,2;  IndentationToTabs: ok 2,2;  EnsureFinalNewline: ok 2,2;
+  edits: 2:0-2:1='';3:0-3:2=' {{b 	 '
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,1,3,6,12, prefix=0 suffix=0
+  shift[2]: 0,0,2,2,2, prefix=0 suffix=2
+  shift[3]: 0,6,7,7,7, prefix=0 suffix=0
+  duplicated[3,3]: '
+aa'
+  moved[-1]: 'aa
+ }('
+  moved[1]: -
+#298 doc='\tb( b{'|'\t '|'b  '|' )'|'){((a' caretLine=3 sel=True start=1:1 caret=3:0
+  lines: 1,2 hasLineSel=True
+  TrimTrailingWhitespace: ok 1,2;  SortAscending: ok 1,2;  SortDescending: ok 1,2;  RemoveDuplicateLines: ok 1,2;  IndentationToSpaces: ok 1,2;  IndentationToTabs: ok 1,2;  EnsureFinalNewline: ok 1,2;
+  edits: 0:1-0:1=' ';3:1-3:2='';4:0-4:5=' } a 	'
+  shift[0]: 0,1,4,7,7, prefix=1 suffix=5
+  shift[1]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[2]: 0,1,3,6,12, prefix=3 suffix=0
+  shift[3]: 0,1,1,1,1, prefix=1 suffix=0
+  shift[4]: 0,2,4,6,6, prefix=0 suffix=0
+  duplicated[4,4]: '
+){((a'
+  moved[-1]: '){((a
+ )'
+  moved[1]: -
+#299 doc='b}}a \t)'|'}'|' aa})'|'\taab}((}'|'ab'|')) }(  ' caretLine=2 sel=True start=3:7 caret=2:4
+  lines: 2,3 hasLineSel=True
+  TrimTrailingWhitespace: ok 2,3;  SortAscending: ok 2,3;  SortDescending: ok 2,3;  RemoveDuplicateLines: ok 2,3;  IndentationToSpaces: ok 2,3;  IndentationToTabs: ok 2,3;  EnsureFinalNewline: ok 2,3;
+  edits: 1:0-1:1='';2:0-2:1='';3:2-3:4='';5:0-5:0='  '
+  shift[0]: 0,1,3,6,12, prefix=7 suffix=0
+  shift[1]: 0,0,0,0,0, prefix=0 suffix=0
+  shift[2]: 0,0,2,4,4, prefix=0 suffix=4
+  shift[3]: 0,1,2,4,6, prefix=2 suffix=4
+  shift[4]: 0,1,3,6,12, prefix=2 suffix=0
+  shift[5]: 0,3,5,8,9, prefix=0 suffix=7
+  duplicated[5,5]: '
+)) }(  '
+  moved[-1]: ')) }(  
+ab'
+  moved[1]: -
