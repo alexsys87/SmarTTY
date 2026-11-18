@@ -1,4 +1,5 @@
-﻿using SmarTTY.Terminal;
+﻿using SmarTTY.Terminal.Emulation;
+using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -12,13 +13,6 @@ namespace SmarTTY.Controls;
 
 public partial class TerminalEmulatorBase : TextEditorControl
 {
-    public enum EraseMode
-    {
-        ToEnd,
-        ToStart,
-        All
-    }
-
     public struct CellStyle
     {
         public class ForegroundOverride
@@ -95,97 +89,6 @@ public partial class TerminalEmulatorBase : TextEditorControl
                 text += " [inverse]";
             }
             return text;
-        }
-    }
-
-    internal interface ILinkTarget
-    {
-        bool IsActive { get; }
-
-        void Activate();
-    }
-
-    internal struct LinkCell
-    {
-        public ILinkTarget Target;
-
-        /// <summary>
-        /// 0: none; 1: the text is a note, 2: a warning, 3: an error (<see cref="Terminal.DiagnosticHighlighter"/>). The
-        /// cell is drawn in the colour of that kind unless the program that wrote it chose a colour of its own.
-        /// </summary>
-        public byte Severity;
-    }
-
-    internal interface ILinkScanner
-    {
-        LinkCell[] Scan(string text);
-
-        void Finish();
-    }
-
-    /// <summary>A scanner that is also told where on the screen each piece of text goes (column 0 is the start of a line).</summary>
-    internal interface IColumnAwareLinkScanner : ILinkScanner
-    {
-        LinkCell[] Scan(string text, int column);
-    }
-
-    private class LinkTracker
-    {
-        private ILinkScanner _scanner;
-
-        private TextDocument.TextPosition _expectedPosition;
-
-        public bool IsActive { get; private set; } = true;
-
-        public TextDocument.TextPosition ExpectedPosition
-        {
-            get
-            {
-                return _expectedPosition;
-            }
-            set
-            {
-                _expectedPosition = value;
-            }
-        }
-
-        public LinkTracker(ILinkScanner linkScanner, TextDocument.TextPosition textPosition)
-        {
-            _scanner = linkScanner;
-            _expectedPosition = textPosition;
-        }
-
-        private static TextDocument.TextPosition NextLineStart(TextDocument.TextPosition textPosition)
-        {
-            return new TextDocument.TextPosition(0, textPosition.Line + 1);
-        }
-
-        /// <param name="wrapped">The text goes on in the next row because the one above it was full (auto-wrap), not after a line break.</param>
-        public LinkCell[] Scan(string text, TextDocument.TextPosition textPosition, bool wrapped = false)
-        {
-            if (!this.IsActive || text == null)
-            {
-                return null;
-            }
-            bool nextLine = textPosition == NextLineStart(_expectedPosition);
-            if (textPosition != _expectedPosition && !nextLine)
-            {
-                _scanner?.Finish();
-                this.IsActive = false;
-                return null;
-            }
-            _expectedPosition = new TextDocument.TextPosition(textPosition.Column + text.Length, textPosition.Line);
-            if (_scanner is IColumnAwareLinkScanner columnAware)
-            {
-                // A wrapped row is the rest of the same line of output: a long address goes on in it (column -1: "not a new line").
-                return columnAware.Scan(text, wrapped && nextLine ? -1 : textPosition.Column);
-            }
-            return _scanner.Scan(text);
-        }
-
-        public void Finish()
-        {
-            _scanner?.Finish();
         }
     }
 
@@ -440,101 +343,6 @@ public partial class TerminalEmulatorBase : TextEditorControl
         {
             Lines = new LineInfoStore(terminalEmulatorBase);
             this.MaxScrollback = maxScrollback;
-        }
-    }
-
-    public class TabStops
-    {
-        private bool[] _stops = new bool[0];
-
-        public void SetStop(int column)
-        {
-            if (column > 65536)
-            {
-                column = 65536;
-            }
-            if (column >= _stops.Length)
-            {
-                Array.Resize(ref _stops, column + 1);
-            }
-            _stops[column] = true;
-        }
-
-        public int NextDistance(int column, int tabSize)
-        {
-            if (column >= this._stops.Length)
-            {
-                if (tabSize <= 0)
-                {
-                    tabSize = 8;
-                }
-                return tabSize - column % tabSize;
-            }
-            for (int nextColumn = column + 1; nextColumn < this._stops.Length; nextColumn++)
-            {
-                if (this._stops[nextColumn])
-                {
-                    return nextColumn - column;
-                }
-            }
-            return 1;
-        }
-
-        public void ClearAll()
-        {
-            for (int column = 0; column < _stops.Length; column++)
-            {
-                _stops[column] = false;
-            }
-        }
-
-        internal void ClearStop(int column)
-        {
-            if (column < _stops.Length)
-            {
-                _stops[column] = false;
-            }
-        }
-
-        internal int PreviousDistance(int column)
-        {
-            if (column >= _stops.Length)
-            {
-                column = _stops.Length - 1;
-            }
-            if (column <= 0)
-            {
-                return 0;
-            }
-            for (int previousColumn = column - 1; previousColumn > 0; previousColumn--)
-            {
-                if (_stops[previousColumn])
-                {
-                    return column - previousColumn;
-                }
-            }
-            return column;
-        }
-    }
-
-    private class ScrollRegion
-    {
-        public int Top;
-
-        public int Bottom;
-
-        public override string ToString()
-        {
-            return $"Lines {Top}-{Bottom}";
-        }
-
-        public bool Contains(int line)
-        {
-            if (line >= Top)
-            {
-                return line <= Bottom;
-            }
-            return false;
         }
     }
 

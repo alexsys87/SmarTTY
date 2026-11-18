@@ -1,6 +1,7 @@
 using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Native;
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;

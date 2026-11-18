@@ -1,9 +1,9 @@
+using SmarTTY.Terminal.Emulation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using SmarTTY.CodeEditing;
-using SmarTTY.Controls;
 using SmarTTY.Terminal;
 
 // Regression harness for the links in the output of build commands in a Smart Terminal tab: which names become links, where a
@@ -77,22 +77,22 @@ internal static class Program
         {
             OutputLinkScanner scanner = new OutputLinkScanner(Host, workingDirectory, command, links: links, strictAbsolute: strictAbsolute, urls: urls);
             StringBuilder text = new StringBuilder();
-            List<TerminalEmulatorBase.LinkCell> cells = new List<TerminalEmulatorBase.LinkCell>();
+            List<LinkCell> cells = new List<LinkCell>();
             foreach (string piece in pieces)
             {
                 text.Append(piece);
                 cells.AddRange(scanner.Scan(piece));
             }
             scanner.Finish();
-            List<TerminalEmulatorBase.ILinkTarget> seen = new List<TerminalEmulatorBase.ILinkTarget>();
-            foreach (TerminalEmulatorBase.LinkCell cell in cells)
+            List<ILinkTarget> seen = new List<ILinkTarget>();
+            foreach (LinkCell cell in cells)
             {
                 if (cell.Target != null && cell.Target.IsActive && !seen.Contains(cell.Target))
                 {
                     seen.Add(cell.Target);
                 }
             }
-            foreach (TerminalEmulatorBase.ILinkTarget target in seen)
+            foreach (ILinkTarget target in seen)
             {
                 StringBuilder covered = new StringBuilder();
                 for (int i = 0; i < cells.Count; i++)
@@ -179,7 +179,7 @@ internal static class Program
     {
         Host host = new Host();
         OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", command, links: true, highlight: false, logLevels: false, columnSetting: setting);
-        TerminalEmulatorBase.LinkCell[] cells = scanner.Scan(output);
+        LinkCell[] cells = scanner.Scan(output);
         scanner.Finish();
         cells.First(cell => cell.Target != null && cell.Target.IsActive).Target.Activate();
         return host.Units[0];
@@ -440,7 +440,7 @@ internal static class Program
             int column = 0;
             foreach (string piece in pieces)
             {
-                TerminalEmulatorBase.LinkCell[] cells = _scanner.Scan(piece, column);
+                LinkCell[] cells = _scanner.Scan(piece, column);
                 for (int i = 0; i < cells.Length; i++)
                 {
                     marked[cells[i].Severity].Append(piece[i]);
@@ -603,8 +603,8 @@ internal static class Program
         // A new line (column 0) starts without the address of the line before it, though that had no line break.
         Host host = new Host();
         OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", "x");
-        TerminalEmulatorBase.LinkCell[] first = scanner.Scan("https://example.com/a", 0);
-        TerminalEmulatorBase.LinkCell[] second = scanner.Scan("b.c:5:1", 0);
+        LinkCell[] first = scanner.Scan("https://example.com/a", 0);
+        LinkCell[] second = scanner.Scan("b.c:5:1", 0);
         Check(first.All(cell => cell.Target == null) && second.Count(cell => cell.Target != null) == 7, "a piece that starts a new line is looked at as a name, not as the rest of an address");
 
         // The classic terminal (absolute names are strict) is no different.
@@ -666,8 +666,8 @@ internal static class Program
         // A new line ends an address; a row that only continues a full row above it (auto-wrap, column -1) does not.
         Host host = new Host();
         OutputLinkScanner scanner = new OutputLinkScanner(host, "/w", "x", urls: true);
-        TerminalEmulatorBase.LinkCell[] row1 = scanner.Scan("open https://example.com/very/long/pa", 0);
-        TerminalEmulatorBase.LinkCell[] row2 = scanner.Scan("th/to/file.c done", -1);
+        LinkCell[] row1 = scanner.Scan("open https://example.com/very/long/pa", 0);
+        LinkCell[] row2 = scanner.Scan("th/to/file.c done", -1);
         scanner.Finish();
         Check(ReferenceEquals(row1[10].Target, row2[0].Target) && row2[0].Target.IsActive, "a wrapped row goes on with the address of the row above it");
         row2[0].Target.Activate();
@@ -675,8 +675,8 @@ internal static class Program
 
         Host host2 = new Host();
         OutputLinkScanner scanner2 = new OutputLinkScanner(host2, "/w", "x", urls: true);
-        TerminalEmulatorBase.LinkCell[] line1 = scanner2.Scan("https://example.com/a", 0);
-        TerminalEmulatorBase.LinkCell[] line2 = scanner2.Scan("b.c:5:1", 0);
+        LinkCell[] line1 = scanner2.Scan("https://example.com/a", 0);
+        LinkCell[] line2 = scanner2.Scan("b.c:5:1", 0);
         scanner2.Finish();
         Check(line1[0].Target != null && line1[0].Target.IsActive && !ReferenceEquals(line1[0].Target, line2[0].Target), "a new line (column 0) starts without the address of the line above");
         line2[0].Target.Activate();

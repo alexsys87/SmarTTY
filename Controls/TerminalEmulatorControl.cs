@@ -1,5 +1,6 @@
 ﻿using SmarTTY.IO;
 using SmarTTY.Native;
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using SmarTTY.Terminal;
 using SmarTTY.Utilities;
