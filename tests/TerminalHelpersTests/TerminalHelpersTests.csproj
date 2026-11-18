@@ -11,8 +11,12 @@
     <Compile Include="../../Terminal/Emulation/CsiParameters.cs" Link="CsiParameters.cs" />
     <Compile Include="../../Terminal/Emulation/LinkTypes.cs" Link="LinkTypes.cs" />
     <Compile Include="../../Terminal/Emulation/OscString.cs" Link="OscString.cs" />
+    <Compile Include="../../Terminal/Emulation/TerminalModes.cs" Link="TerminalModes.cs" />
     <Compile Include="../../Terminal/Emulation/SgrStyle.cs" Link="SgrStyle.cs" />
+    <Compile Include="../../Terminal/DecCharsets.cs" Link="DecCharsets.cs" />
+    <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
     <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
     <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
   </ItemGroup>
 </Project>

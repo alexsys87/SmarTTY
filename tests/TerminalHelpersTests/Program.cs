@@ -4,7 +4,7 @@ using SmarTTY.Terminal;
 using SmarTTY.Terminal.Emulation;
 
 // Checks of the helpers of the terminal's escape sequence parser that need no screen (Terminal/Emulation/): what the SGR attributes do to
-// a style, the numbers of a CSI sequence and the parts of an OSC string.
+// a style, the numbers of a CSI sequence, the parts of an OSC string, and the state that the escape sequences set (TerminalModes).
 internal static class Program
 {
     private static int _passed;
@@ -46,6 +46,7 @@ internal static class Program
         Sgr();
         Csi();
         Osc();
+        Modes();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " terminal helper checks passed.");
     }
@@ -127,6 +128,33 @@ internal static class Program
             }
             Check(threw, "an item past the defaults that is empty or not a number reads past the end: '" + string.Join(";", items) + "'");
         }
+    }
+
+    private static void Modes()
+    {
+        TerminalModes modes = new TerminalModes();
+        Check(!modes.ApplicationKeypad && !modes.ApplicationCursorKeys && modes.IncompleteEscape == null && modes.SavedCursor.IsEmpty && modes.SavedStyle.IsDefault, "a new terminal has no modes set");
+        Check(!modes.PrivateModes.IsSet(1049) && !modes.Charsets.GraphicsActive, "...no private modes and the plain character set");
+
+        modes.ApplicationKeypad = true;
+        modes.ApplicationCursorKeys = true;
+        modes.PrivateModes.Set(1049, true);
+        modes.PrivateModes.Set(2004, true);
+        modes.PrivateModes.Save(2004);
+        Check(modes.PrivateModes.TryGetSaved(2004, out bool wasSaved) && wasSaved, "a private mode can be saved");
+        modes.Charsets.Designate('(', '0');
+        modes.SavedCursor = new SmarTTY.TextEditing.GridPoint(3, 4);
+        modes.SavedStyle = Apply(default, 31);
+        modes.IncompleteEscape = "\u001b[3";
+        Equal(modes.Charsets.Translate("q"), "\u2500", "the line drawing set is active once designated");
+
+        modes.Reset();
+        Check(!modes.ApplicationKeypad && !modes.ApplicationCursorKeys, "Reset: the keypad and the cursor keys are normal again");
+        Check(!modes.PrivateModes.IsSet(1049) && !modes.PrivateModes.IsSet(2004), "Reset: the private modes are off");
+        Check(modes.PrivateModes.TryGetSaved(2004, out bool saved) && !saved, "Reset: the saved private modes are gone (a saved value reads as off)");
+        Equal(modes.Charsets.Translate("q"), "q", "Reset: the character set is plain again");
+        Check(modes.SavedCursor.IsEmpty && modes.SavedStyle.IsDefault, "Reset: the saved cursor and style are forgotten");
+        Equal(modes.IncompleteEscape, "\u001b[3", "Reset leaves the start of an escape sequence alone (it is not a mode)");
     }
 
     private static void Osc()

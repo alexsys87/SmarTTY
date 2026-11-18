@@ -290,7 +290,9 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     public static readonly string ResetSequence = "\u001b[0m";
 
-    private string _incompleteEscape;
+    // The state that the escape sequences set and that is not the screen: the modes, the character sets, the saved cursor and the start of
+    // an escape sequence that has not arrived whole.
+    private readonly TerminalModes _modes = new TerminalModes();
 
     // An escape sequence (an OSC title, say) that has not ended after this many characters is dropped, so that a
     // stray ESC ] in binary output cannot swallow everything that follows while waiting for its terminator.
@@ -299,10 +301,6 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     private const int BracketedPasteMode = 2004;
 
     private const int SgrMouseMode = 1006;
-
-    private Point _savedCursor;
-
-    private CellStyle _savedStyle;
 
     // Set while Reset() runs for an ESC c received from the remote side: the output queued after it is still valid.
     private bool _resetFromStream;
@@ -320,14 +318,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private System.Collections.Generic.List<byte> _partialBytes;
 
-    private readonly DecCharsets _charsets = new DecCharsets();
-
-    private bool _applicationKeypad;
-
-    private bool _applicationCursorKeys;
+    private DecCharsets _charsets => _modes.Charsets;
 
     // The numbers come from the output of the remote side, negative ones included: see PrivateModeTable.
-    private readonly PrivateModeTable _privateModes = new PrivateModeTable();
+    private PrivateModeTable _privateModes => _modes.PrivateModes;
 
     private bool _keyMappingEnabled = true;
 
@@ -591,10 +585,10 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     public void ProcessOutput(string output)
     {
         OutputReceived?.Invoke(output);
-        if (_incompleteEscape != null)
+        if (_modes.IncompleteEscape != null)
         {
-            output = _incompleteEscape + output;
-            _incompleteEscape = null;
+            output = _modes.IncompleteEscape + output;
+            _modes.IncompleteEscape = null;
         }
         if (output == null)
         {
@@ -761,7 +755,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         escapeTrace?.SetPosition(position);
         if (position + 1 >= text.Length)
         {
-            _incompleteEscape = text.Substring(position);
+            _modes.IncompleteEscape = text.Substring(position);
             return 1;
         }
         if (text[position + 1] != '[' && text[position + 1] != ']')
@@ -811,8 +805,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             case '+':
                 if (text.Length - position < 3)
                 {
-                    _incompleteEscape = text.Substring(position);
-                    return _incompleteEscape.Length;
+                    _modes.IncompleteEscape = text.Substring(position);
+                    return _modes.IncompleteEscape.Length;
                 }
                 if (AnsiEscapeUtils.InterruptsEscape(text[position + 2]))
                 {
@@ -828,11 +822,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 escapeTrace?.SetRaw("[ESC]" + text.Substring(position, 2));
                 return 3;
             case '>':
-                _applicationKeypad = false;
+                _modes.ApplicationKeypad = false;
                 escapeTrace?.SetDescription("DECPNM");
                 return 2;
             case '=':
-                _applicationKeypad = true;
+                _modes.ApplicationKeypad = true;
                 escapeTrace?.SetDescription("DECPNM");
                 return 2;
             case '7':
@@ -900,8 +894,8 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             escapeTrace?.SetWarning("Unterminated escape sequence dropped");
             return 1;
         }
-        _incompleteEscape = text.Substring(position);
-        return _incompleteEscape.Length;
+        _modes.IncompleteEscape = text.Substring(position);
+        return _modes.IncompleteEscape.Length;
     }
 
     /// <summary>
@@ -1256,7 +1250,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             switch (mode)
             {
                 case 1:
-                    this._applicationCursorKeys = enabled;
+                    _modes.ApplicationCursorKeys = enabled;
                     break;
                 case 25:
                     HideCaret = !enabled;
@@ -1628,14 +1622,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
 
     private void SaveCursor()
     {
-        _savedCursor = base.CursorPosition;
-        _savedStyle = CurrentStyle;
+        _modes.SavedCursor = base.CursorPosition.ToGridPoint();
+        _modes.SavedStyle = CurrentStyle;
     }
 
     private void RestoreCursor()
     {
-        base.CursorPosition = _savedCursor;
-        CurrentStyle = _savedStyle;
+        base.CursorPosition = _modes.SavedCursor.ToPoint();
+        CurrentStyle = _modes.SavedStyle;
     }
 
     /// <summary>DECSTR: resets the modes and attributes, but keeps the screen contents and the cursor position.</summary>
@@ -1650,16 +1644,11 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     private void ResetModes()
     {
         ResetByteState();
-        _applicationCursorKeys = false;
-        _applicationKeypad = false;
+        _modes.Reset();
         _insertMode = false;
         HideCaret = false;
         MouseMode = MouseReportingMode.Off;
-        _privateModes.Clear();
         CurrentStyle = CellStyle.Default;
-        _savedCursor = Point.Empty;
-        _savedStyle = CellStyle.Default;
-        _charsets.Reset();
     }
 
     private void ResetFromStream()
@@ -1771,7 +1760,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
             return;
         }
         bool numPad = _keyMap.IsNumPadKey(e.KeyCode, _extendedKey);
-        string text = _keyMap.GetEscapeSequence(e.KeyCode, _applicationKeypad, this._applicationCursorKeys, numPad);
+        string text = _keyMap.GetEscapeSequence(e.KeyCode, _modes.ApplicationKeypad, _modes.ApplicationCursorKeys, numPad);
         if (text != null)
         {
             // Ctrl+Left must be ESC [ 1 ; 5 D: inserting ";5" into ESC [ D used to give ESC [ ; 5 D, which shells
@@ -2359,7 +2348,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
         }
         else if ((Control.ModifierKeys & Keys.Alt) != Keys.Alt && AppSettings != null && AppSettings.EmulateDirectionKeysWithMouseWheel)
         {
-            string text = _keyMap?.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _applicationKeypad, this._applicationCursorKeys, isNumPadKey: false);
+            string text = _keyMap?.GetEscapeSequence((e.Delta < 0) ? Keys.Down : Keys.Up, _modes.ApplicationKeypad, _modes.ApplicationCursorKeys, isNumPadKey: false);
             if (text != null)
             {
                 text = text.Insert(0, "\u001b");
@@ -2429,7 +2418,7 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
                 _pendingOutput.Clear();
             }
         }
-        _incompleteEscape = null;
+        _modes.IncompleteEscape = null;
     }
 
     protected override bool ProcessDialogKey(Keys keyData)

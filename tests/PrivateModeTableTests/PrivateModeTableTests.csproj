@@ -9,5 +9,7 @@
     <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
     <!-- The emulator is read as text: it must reach the modes only through the table. -->
     <AssemblyMetadata Include="EmulatorSource" Value="$(MSBuildProjectDirectory)/../../Controls/TerminalEmulatorControl.cs" />
+    <!-- ...and so is the class that holds the modes (the reset clears the table there since stage 1B, B4b). -->
+    <AssemblyMetadata Include="ModesSource" Value="$(MSBuildProjectDirectory)/../../Terminal/Emulation/TerminalModes.cs" />
   </ItemGroup>
 </Project>
