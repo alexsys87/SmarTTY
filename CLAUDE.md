@@ -312,6 +312,10 @@ explicitly by `TerminalEmulatorControl` in `Controls/TerminalEmulatorControl.Scr
 named it as `TerminalEmulatorControl.MouseReportingMode` changed). The control still scans the escape sequences and writes the text (B4c-2, B4c-3) and calls `_emulator`. `CsiRepeatLimitTests` and `PrivateModeTableTests` read the source of `TerminalEmulator.cs` now (and of the control and `TerminalModes.cs` where the code stayed). `tests/TerminalEmulatorTests` (net8.0, 96 checks, a fake
 screen and host) says directly what each command does; both goldens of `TerminalSnapshots` pass unchanged.
 
+Done in B4c-2: the scanner of the escape sequences is in `TerminalEmulator` too: `ParseEscapeSequence` (what an ESC at a position is: a CSI sequence, an OSC/DCS/PM/APC/SOS string, a character set designation, ESC = > 7 8 H c D M E, and how many characters it takes, with the rules for a sequence that has not arrived whole, one that is cut short by a control character
+and one that grows too long), `ParseControlString`, `KeepIncompleteEscape`, `ExecuteCsiSequence` (the private prefix and the intermediate bytes, soft reset), `SoftReset` and `ResetModes` (the control's full `Reset()` calls `_emulator.ResetModes()`); the code is as it was. The interfaces got what these call: `ITerminalScreen.HasScrollRegion` and `ScrollBottom`, `ITerminalHost.ResetByteState` and `ResetFromStream` (ESC c),
+`IEscapeTrace.SetPosition`; `MaxPendingEscapeLength` moved with them. `TerminalEmulatorTests` has the checks of the scanner (163 in all); both goldens of `TerminalSnapshots` pass unchanged. What is left of the parser in the control is `ProcessOutput` (the chunking, the control characters, the text) and the writing of the text with the byte mode: B4c-3.
+
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2: the 20
 of the specification plus `Completion/ShellCompletionAnalyzer`, `Terminal/CommandRun`, `Terminal/OutputLinkScanner`, which
