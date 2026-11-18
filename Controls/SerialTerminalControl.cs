@@ -1,3 +1,4 @@
+using SmarTTY.Terminal.Emulation;
 using System.ComponentModel;
 using SmarTTY.Forms;
 using SmarTTY.Native;

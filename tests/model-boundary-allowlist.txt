@@ -13,4 +13,3 @@ Terminal/CompletionSession.cs
 # (SshTerminalControl, TerminalEmulatorBase) of SmarTTY.Controls. They go with the terminal work (stages 1B and 1C).
 Completion/ShellCompletionAnalyzer.cs
 Terminal/CommandRun.cs
-Terminal/OutputLinkScanner.cs

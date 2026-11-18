@@ -1,5 +1,5 @@
 using SmarTTY.CodeEditing;
-using SmarTTY.Controls;
+using SmarTTY.Terminal.Emulation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +36,7 @@ internal interface IOutputLinkHost
 ///
 /// The class is free of any UI dependency, so the test harness can check it without a display.
 /// </summary>
-internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkScanner
+internal sealed class OutputLinkScanner : IColumnAwareLinkScanner
 {
     public const string PathCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-/";
 
@@ -60,7 +60,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         Position
     }
 
-    private sealed class LinkCandidate : TerminalEmulatorBase.ILinkTarget
+    private sealed class LinkCandidate : ILinkTarget
     {
         public CandidateState State;
 
@@ -402,7 +402,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
     /// grows as the address arrives (it may come in several pieces); the scheme decides whether it is opened at all (http, https,
     /// ftp: "s3://bucket/key" or "git+ssh://host/x" are no files and no links either).
     /// </summary>
-    private sealed class UrlLink : TerminalEmulatorBase.ILinkTarget
+    private sealed class UrlLink : ILinkTarget
     {
         private readonly IOutputLinkHost _host;
 
@@ -642,16 +642,16 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         return _current;
     }
 
-    public TerminalEmulatorBase.LinkCell[] Scan(string lineText)
+    public LinkCell[] Scan(string lineText)
     {
         return Scan(lineText, -1);
     }
 
     /// <param name="text">A piece of the output, within one line.</param>
     /// <param name="column">The column of the piece on the screen: 0 starts a new line; -1 when it is not known.</param>
-    public TerminalEmulatorBase.LinkCell[] Scan(string text, int column)
+    public LinkCell[] Scan(string text, int column)
     {
-        TerminalEmulatorBase.LinkCell[] cells = new TerminalEmulatorBase.LinkCell[text.Length];
+        LinkCell[] cells = new LinkCell[text.Length];
         if (column == 0)
         {
             // A new line: an address that was not ended by a blank does not go on in it. A row that only continues the one above it
@@ -703,7 +703,7 @@ internal sealed class OutputLinkScanner : TerminalEmulatorBase.IColumnAwareLinkS
         return cells;
     }
 
-    private void MarkDiagnostics(string text, int column, TerminalEmulatorBase.LinkCell[] cells)
+    private void MarkDiagnostics(string text, int column, LinkCell[] cells)
     {
         if (column == 0)
         {

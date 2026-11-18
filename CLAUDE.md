@@ -95,7 +95,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | --- | --- | --- |
 | 0 | .NET 10, x64, single-file publish instead of Costura | Done in alexsys87/SmarTTY#506 |
 | 1A | Editor logic out of WinForms | In progress: A1 (types, boundary check), A2 (`TextEditing/`) and A3a (keys in `CodeEditing/`) A3b (folding, inline messages), A3c (`Completion/`) and A3d (line editing) done; A4 (`RemoteFileSession`) started: its Mono safety net is in (A4a), the server probes (A4b: `RemoteFileServer`) the drafts (A4c: `RemoteFileDrafts`), the loading thread (A4d: `RemoteFileLoader`) the server side of a save (A4e: `RemoteFileSaver`) and the taking of the bytes to save (A4f: `RemoteFileSession`) are out (the save flow with its threads, timers and questions stays in the view); A5 (`TextSearcher` on `ISearchTarget`, the status bar on `IEditorStatusSource`) and A6 (hex editor: the net, `HexEditingModel`; the value decoding of the data inspector was already `HexValueFormats`) done; A7 (`RemoteFileEditor.Syntax.cs` → `SyntaxChoice`) done: stage 1A is finished (what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here"), next 1B |
-| 1B | Terminal emulator core out of WinForms | In progress: B1 (the golden snapshots of the terminal control, `tests/TerminalSnapshots`) done; next B2 (the screen types to `Terminal/Emulation/`) |
+| 1B | Terminal emulator core out of WinForms | In progress: B1 (the golden snapshots of the terminal control, `tests/TerminalSnapshots`) and B2 (the types of the screen that need no control: `EraseMode`, `TabStops`, `ScrollRegion`, the link types, `LinkTracker`) done; next B3 (`CellStyle`, `LineInfo`, `LineInfoStore`, `ScreenBuffer`) |
 | 1C | SSH/serial/device session controls out of WinForms | Planned |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
@@ -274,8 +274,15 @@ things that may follow a rename. It was checked by mutation: 25 changes of the t
 (reports and selection), painting, scrolling by the view, resize of a terminal with content, and the Smart Terminal and device line input of `SshTerminalControl` / `SerialTerminalControl`. A bug it found, kept as it is (the golden has it): a CSI `H` or `f` with more than two
 parameters (`ESC [ 1;2;3 H`) throws `IndexOutOfRangeException` in `ParseParameters`.
 
+Done in B2: the nested types of `TerminalEmulatorBase` that need nothing of the control are top-level types in `Terminal/Emulation/` (namespace `SmarTTY.Terminal.Emulation`, code as it was, nested `private` became
+`internal`): `EraseMode`, `TabStops`, `ScrollRegion`, `LinkTracker`, and in `LinkTypes.cs` the seam of the link scanners (`ILinkTarget`, `LinkCell`, `ILinkScanner`, `IColumnAwareLinkScanner`). The
+controls (`TerminalEmulatorBase`, `TerminalEmulatorControl`, `SshTerminalControl`, `SerialTerminalControl`) and `Terminal/CommandRun` use them through `using SmarTTY.Terminal.Emulation;`. `Terminal/OutputLinkScanner`
+no longer knows `TerminalEmulatorBase` and left the allowlist (4 files now); `tests/ModelBuildTests` compiles it (with `Utilities/UrlLinks.cs` added to its dependencies), and `tests/OutputLinkTests` links the real `LinkTypes.cs`
+instead of its stub of the three nested types (246 checks before and after). `TerminalSnapshots` passes unchanged. `CellStyle` (it holds a `Brush` override and a `LinkCell`), `LineInfo`, `LineInfoStore` and `ScreenBuffer` use the control
+(`ToDocumentPosition`, the visible columns, `Point`) and are B3.
+
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
-`SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c: the 20
+`SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2: the 20
 of the specification plus `Completion/ShellCompletionAnalyzer`, `Terminal/CommandRun`, `Terminal/OutputLinkScanner`, which
 use the terminal controls). The list only shrinks, and the script fails on a listed file that is already clean.
 `tests/ModelBuildTests` (net8.0, no Windows) compiles the model folders without the listed files; a clean file that needs

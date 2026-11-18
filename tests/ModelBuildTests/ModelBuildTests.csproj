@@ -55,6 +55,7 @@
     <Compile Include="../../Utilities/EnumDisplayText.cs" />
     <Compile Include="../../Utilities/PosixShell.cs" />
     <Compile Include="../../Utilities/StringUtils.cs" />
+    <Compile Include="../../Utilities/UrlLinks.cs" />
     <Compile Include="../../VisualTTY/CommandCompletion.cs" />
     <Compile Include="../../VisualTTY/VirtualTerminalPopupItemIcon.cs" />
     <Compile Include="../../VisualTTY/VirtualTerminalPopupSummary.cs" />
