@@ -170,110 +170,15 @@ public partial class RemoteFileEditor : CodeEditorPP
 
     private const int DraftIntervalMs = 10000;
 
-    // Drafts older than this are removed when an editor starts; a week before that the user is told which ones are about to go.
-    private static readonly TimeSpan DraftMaxAge = TimeSpan.FromDays(30);
-
-    private static readonly TimeSpan DraftWarnBefore = TimeSpan.FromDays(7);
-
-    private static int _draftCleanupDone;
-
     private readonly string _draftKey;
 
-    // Two editors of the same file in one session must not share a draft: the save or the discard of one would remove the
-    // draft of the other, and neither would see the other's text. The first editor of a file has the plain key, the next ones
-    // the key with a number; the number is free again when the editor is closed.
-    // This holds across programs too: SmarTTY may be started more than once, so a key is also claimed with a lock file that
-    // is kept open (and deleted by the system when it is closed, or when the program ends in any way) while the editor lives.
-    // The value is that lock (null when the Drafts folder cannot be used: then only this program's own editors are told apart).
-    private static readonly Dictionary<string, FileStream> ClaimedDraftKeys = new Dictionary<string, FileStream>();
+    // The keys of the drafts the editors of this program have claimed (see DraftKeyClaims).
+    private static readonly DraftKeyClaims DraftKeys = new DraftKeyClaims(DraftsDirectory);
 
-    private static string ClaimDraftKey(string baseKey)
-    {
-        lock (ClaimedDraftKeys)
-        {
-            string key = baseKey;
-            for (int number = 1; ; number++)
-            {
-                key = number == 1 ? baseKey : baseKey + "-" + number.ToString(CultureInfo.InvariantCulture);
-                if (ClaimedDraftKeys.ContainsKey(key))
-                {
-                    continue;
-                }
-                FileStream claim = TryLockDraftKey(key, out bool heldElsewhere);
-                if (heldElsewhere && number < 1000)
-                {
-                    continue;
-                }
-                ClaimedDraftKeys[key] = claim;
-                return key;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Takes the lock file of the key. <paramref name="heldElsewhere"/> is true if another program has it; null with
-    /// false means the lock could not be made at all (the folder is not writable), which is no reason not to edit.
-    /// </summary>
-    private static FileStream TryLockDraftKey(string key, out bool heldElsewhere)
-    {
-        heldElsewhere = false;
-        try
-        {
-            Directory.CreateDirectory(DraftsDirectory);
-            return new FileStream(Path.Combine(DraftsDirectory, key + ".lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
-        }
-        catch (IOException exception) when ((exception.HResult & 0xFFFF) == 32 || (exception.HResult & 0xFFFF) == 33)
-        {
-            // ERROR_SHARING_VIOLATION or ERROR_LOCK_VIOLATION: an editor of another program has the key.
-            heldElsewhere = true;
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static void ReleaseDraftKey(string key)
-    {
-        lock (ClaimedDraftKeys)
-        {
-            if (ClaimedDraftKeys.TryGetValue(key, out FileStream claim))
-            {
-                ClaimedDraftKeys.Remove(key);
-                try
-                {
-                    claim?.Dispose();
-                }
-                catch
-                {
-                }
-            }
-        }
-    }
-
-    private string _baseHash = "";
+    // The draft of this editor: its key, when the text is taken, the writes and removals (see RemoteFileDrafts).
+    private RemoteFileDrafts _drafts;
 
     private System.Windows.Forms.Timer _draftTimer;
-
-    // The text version the draft on disk holds (null version = the text as opened is not a draft).
-    private volatile bool _draftWritten;
-
-    private object _draftVersion;
-
-    private readonly DraftSchedule _draftSchedule = new DraftSchedule();
-
-    // The size of the text as opened or as of the last draft: how large the text is is not known cheaply otherwise.
-    private long _draftSizeEstimate;
-
-    // Said once per run of the program, in the first editor that finishes loading (see the cleanup in the constructor).
-    private static string _pendingDraftNotice;
-
-    // Every draft write or removal takes a number; one that is no longer the latest by the time it runs is skipped, so
-    // a late write cannot bring back the draft of a text that has been saved meanwhile.
-    private int _draftSequence;
-
-    private readonly object _draftLock = new object();
 
     public event EventHandler LoadFailed;
 
@@ -648,19 +553,13 @@ public partial class RemoteFileEditor : CodeEditorPP
         this._context = terminalSessionContext;
         RemotePath = text;
         _server = new RemoteFileServer(new SessionRemoteFileHost(terminalSessionContext), text);
-        _draftKey = ClaimDraftKey(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
-        if (Interlocked.Exchange(ref _draftCleanupDone, 1) == 0)
-        {
-            ThreadPool.QueueUserWorkItem((object state) =>
-            {
-                Drafts.DeleteOlderThan(DraftMaxAge);
-                _pendingDraftNotice = EditorDraftStore.DescribeExpiring(Drafts.FindExpiring(DraftMaxAge, DraftWarnBefore), DateTime.UtcNow);
-            });
-        }
+        _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
+        _drafts = new RemoteFileDrafts(Drafts, _draftKey);
+        RemoteFileDrafts.StartCleanupOnce(Drafts);
         Disposed += (object sender, EventArgs e) =>
         {
             _draftTimer?.Dispose();
-            ReleaseDraftKey(_draftKey);
+            DraftKeys.Release(_draftKey);
         };
         ((EditableTextBrowser)this).ReadOnly = true;
         _initialCaret = textPosition;
@@ -979,9 +878,9 @@ public partial class RemoteFileEditor : CodeEditorPP
         {
             TextFileEncoding encoding = (file == null) ? TextFileEncodings.Utf8 : TextFileEncodings.Detect(file);
             string text = (file == null) ? "" : TextFileEncodings.Decode(file, encoding);
-            _baseHash = EditorDraftStore.HashText(text);
-            _draftSizeEstimate = text.Length;
-            string expiryNotice = System.Threading.Interlocked.Exchange(ref _pendingDraftNotice, null);
+            _drafts.BaseHash = EditorDraftStore.HashText(text);
+            _drafts.SizeEstimate = text.Length;
+            string expiryNotice = RemoteFileDrafts.TakeExpiryNotice();
             if (expiryNotice != null)
             {
                 ThemedMessageBox.Show(this, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1094,21 +993,12 @@ public partial class RemoteFileEditor : CodeEditorPP
     /// </summary>
     private EditorDraft AskToRestoreDraft(byte[] serverBytes, string serverText)
     {
-        EditorDraft draft = Drafts.TryLoad(_draftKey);
+        EditorDraft draft = _drafts.FindUnsaved(serverBytes, serverText);
         if (draft == null)
         {
             return null;
         }
-        bool same = (draft.Bytes != null)
-            ? HexDocument.ByteArraysEqual(draft.Bytes, serverBytes ?? Array.Empty<byte>())
-            : (draft.Text == serverText);
-        if (same)
-        {
-            // Nothing to restore: the changes were saved after all.
-            QueueDraft(null);
-            return null;
-        }
-        string changed = (!draft.IsNewFile && draft.BaseHash != _baseHash)
+        string changed = _drafts.ServerChangedSince(draft)
             ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
             : "";
         string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
@@ -1116,11 +1006,11 @@ public partial class RemoteFileEditor : CodeEditorPP
             + changed
             + "Yes: restore the draft.\n"
             + "No: discard it and open the file from the server.\n\n"
-            + "A draft that is not written to for " + DraftMaxAge.Days + " days is removed automatically.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            + "A draft that is not written to for " + RemoteFileDrafts.MaxAge.Days + " days is removed automatically.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
         {
             return draft;
         }
-        QueueDraft(null);
+        _drafts.Queue(null);
         return null;
     }
 
@@ -1146,27 +1036,18 @@ public partial class RemoteFileEditor : CodeEditorPP
             }
             bool hex = _hexMode && _hexDocument != null;
             object version = hex ? _hexDocument.CurrentVersion : CurrentVersion;
-            if (_draftWritten && ReferenceEquals(version, _draftVersion))
+            if (!_drafts.ShouldCapture(version, hex ? _hexDocument.Length : (long?)null))
             {
                 return;
             }
-            // Reading the text takes the UI thread for as long as the text is large: not while the user is typing in it.
-            long size = hex ? _hexDocument.Length : _draftSizeEstimate;
-            if (!_draftSchedule.ShouldCapture(version, size, DateTime.UtcNow))
-            {
-                return;
-            }
-            _draftWritten = true;
-            _draftVersion = version;
             string draftText = hex ? null : base.EditableDocument.GetText();
             byte[] draftBytes = hex ? _hexDocument.ToArray() : null;
-            _draftSizeEstimate = hex ? draftBytes.Length : draftText.Length;
-            _draftSchedule.Captured(DateTime.UtcNow);
-            QueueDraft(new EditorDraft
+            _drafts.Captured(hex ? draftBytes.Length : draftText.Length);
+            _drafts.Queue(new EditorDraft
             {
                 RemotePath = RemotePath,
                 SavedUtc = DateTime.UtcNow,
-                BaseHash = _baseHash,
+                BaseHash = _drafts.BaseHash,
                 IsNewFile = IsNewFile,
                 Text = draftText,
                 Bytes = draftBytes
@@ -1178,51 +1059,13 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
     }
 
-    /// <summary>Writes <paramref name="draft"/>, or removes the draft when it is null; the latest request wins.</summary>
-    private void QueueDraft(EditorDraft draft)
-    {
-        int sequence = Interlocked.Increment(ref _draftSequence);
-        ThreadPool.QueueUserWorkItem((object state) =>
-        {
-            lock (_draftLock)
-            {
-                if (sequence != Volatile.Read(ref _draftSequence))
-                {
-                    return;
-                }
-                try
-                {
-                    if (draft == null)
-                    {
-                        Drafts.Delete(_draftKey);
-                    }
-                    else
-                    {
-                        Drafts.Save(_draftKey, draft);
-                    }
-                }
-                catch
-                {
-                    // The text on disk is not the one that was meant to be written: let the next timer tick try again (the
-                    // version was marked as written before this ran). A newer request has its own outcome.
-                    if (draft != null && sequence == Volatile.Read(ref _draftSequence))
-                    {
-                        _draftWritten = false;
-                    }
-                }
-            }
-        });
-    }
-
     /// <summary>
     /// The user chose not to save the changes (closing the tab or the program): the draft is removed, otherwise the next
     /// opening of the file would offer them again.
     /// </summary>
     public void DiscardDraft()
     {
-        _draftWritten = false;
-        _draftVersion = null;
-        QueueDraft(null);
+        _drafts.Discard();
     }
 
     /// <summary>
@@ -1297,7 +1140,7 @@ public partial class RemoteFileEditor : CodeEditorPP
         }
         DiscardDraft();
         string text = TextFileEncodings.Decode(_rawBytes, encoding);
-        _baseHash = EditorDraftStore.HashText(text);
+        _drafts.BaseHash = EditorDraftStore.HashText(text);
         ApplyContent(_rawBytes, encoding, text);
     }
 
