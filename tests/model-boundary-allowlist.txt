@@ -8,8 +8,6 @@
 # The list of the stage 1 specification (section 6.1).
 Terminal/CompletionPopupRequest.cs
 Terminal/CompletionSession.cs
-CodeEditing/FoldingManager.cs
-CodeEditing/InlineMessageProvider.cs
 Completion/ICompletionHost.cs
 Completion/SignatureHintController.cs
 Completion/SuggestionCatalog.cs

@@ -1,87 +1,17 @@
-using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 
 namespace SmarTTY.CodeEditing;
 
-internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
+/// <summary>
+/// The folded blocks of a document: which lines are hidden and what a folded line shows instead. It knows nothing of the
+/// control: the rows, the margin and the painting are in <c>Controls/TextView/FoldingLineProvider.cs</c> and
+/// <c>FoldingMarginPainter.cs</c>.
+/// </summary>
+internal class FoldingManager
 {
-    internal class FoldingMargin : IMargin
-    {
-
-        private FoldingManager _manager;
-
-        public FoldingMargin(FoldingManager foldingManager)
-        {
-            _manager = foldingManager;
-        }
-
-        public void Paint(Graphics graphics, Rectangle rectangle, SizeF charSize, int firstLineIndex, int lastLineIndex, int rowCount, ReadonlyTextBrowser readonlyTextBrowser)
-        {
-            float yPos = rectangle.Top;
-            // The text colour: black lines would not be seen on a dark editor.
-            using Pen pen = new Pen(Color.FromArgb(170, readonlyTextBrowser.ForeColor));
-            for (int rowIdx = 0; rowIdx < rowCount; rowIdx++)
-            {
-                int lineIndex = readonlyTextBrowser.DisplayRows[rowIdx].Line;
-                GutterState gutterState = GutterState.Plain;
-                // Folding is not available while long lines are wrapped (see ReadonlyTextBrowser.WordWrap).
-                if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && lineIndex != -1 && !readonlyTextBrowser.IsWrapping)
-                {
-                    gutterState = this._manager.GetGutterState(lineIndex);
-                }
-                int yOffset = ((int)charSize.Height - 10) / 2;
-                int xCenter = rectangle.Left + 1 + 5;
-                switch (gutterState)
-                {
-                    case GutterState.Plain:
-                    case GutterState.SectionEnd:
-                        graphics.DrawLine(pen, xCenter, yPos, xCenter, yPos + charSize.Height);
-                        if (gutterState == GutterState.SectionEnd)
-                        {
-                            graphics.DrawLine(pen, xCenter, yPos + charSize.Height / 2f, rectangle.Right, yPos + charSize.Height / 2f);
-                        }
-                        break;
-                    case GutterState.Expandable:
-                    case GutterState.Collapsed:
-                        graphics.DrawLine(pen, xCenter, yPos, xCenter, yPos + (float)yOffset);
-                        graphics.DrawRectangle(pen, xCenter - 5, yPos + (float)yOffset, 10f, 10f);
-                        graphics.DrawLine(pen, xCenter, yPos + (float)yOffset + 10f, xCenter, yPos + charSize.Height);
-                        graphics.DrawLine(pen, xCenter - 3, yPos + (float)yOffset + 5f, xCenter + 3, yPos + (float)yOffset + 5f);
-                        if (gutterState == GutterState.Collapsed)
-                        {
-                            graphics.DrawLine(pen, xCenter, yPos + (float)yOffset + 2f, xCenter, yPos + (float)yOffset + 10f - 2f);
-                        }
-                        break;
-                }
-                yPos += charSize.Height;
-            }
-        }
-
-        public int MeasureWidth(ReadonlyTextBrowser readonlyTextBrowser, Graphics graphics, int lineCount)
-        {
-            return 12;
-        }
-
-        public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int firstLineIndex, int lastLineIndex, SizeF charSize, int rowIdx)
-        {
-            if (!readonlyTextBrowser.IsWrapping && readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[rowIdx].Line, readonlyTextBrowser, out var endToken, collapseOnly: false))
-            {
-                if (endToken != null && readonlyTextBrowser.CaretPosition.Line <= endToken.LineNumber && readonlyTextBrowser.CaretPosition.Line >= endToken.Partner.LineNumber)
-                {
-                    readonlyTextBrowser.SetCaret(new TextDocument.TextPosition(0, endToken.Partner.LineNumber - 1));
-                }
-                readonlyTextBrowser.RebuildDisplayRows();
-                readonlyTextBrowser.UpdateLayout();
-                readonlyTextBrowser.Redraw();
-            }
-            return true;
-        }
-    }
-
-    private enum GutterState
+    internal enum GutterState
     {
         Plain,
         Expandable,
@@ -89,7 +19,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         SectionEnd
     }
 
-    private class FoldedRegion : ReadonlyTextBrowser.ILineDecorator
+    internal class FoldedRegion
     {
         private FoldingManager _manager;
 
@@ -140,7 +70,11 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             return $"({StartToken}) - ({EndToken})";
         }
 
-        public string Transform(string lineText, out CharacterRange characterRange, out Brush brush)
+        /// <summary>
+        /// The text a folded header line shows instead of its lines, and where the label (the "...") is in it: the first column
+        /// and the length. The view draws the label in gray and a frame around it.
+        /// </summary>
+        public string Transform(string lineText, out int labelStart, out int labelLength)
         {
             int startCol = 0;
             switch (StartToken.Style.StartBoundary)
@@ -156,8 +90,8 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             {
                 // The line of the closing token is not part of the region: only the header line changes.
                 string label = StartToken.Style.Text ?? "...";
-                characterRange = new CharacterRange(StartToken.End, label.Length);
-                brush = Brushes.DarkGray;
+                labelStart = StartToken.End;
+                labelLength = label.Length;
                 return lineText.Substring(0, Math.Min(StartToken.End, lineText.Length)) + label;
             }
             string endLineText = this._manager._tokenCache.Document.GetLineText(EndToken.LineNumber);
@@ -197,18 +131,13 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
                 string headerLineText = this._manager._tokenCache.Document.GetLineText(StartToken.LineNumber);
                 string trimmedText = headerLineText.TrimStart(' ', '\t');
                 int indentLen = headerLineText.Length - trimmedText.Length;
-                characterRange = new CharacterRange(lineText.Length + startCol - indentLen + 1, labelText.Length);
-                brush = Brushes.DarkGray;
+                labelStart = lineText.Length + startCol - indentLen + 1;
+                labelLength = labelText.Length;
                 return string.Format("{3} {0}{1}{2}", headerLineText.Substring(indentLen, startCol - indentLen), labelText, endLineText.Substring(endCol), lineText);
             }
-            characterRange = new CharacterRange(startCol, labelText.Length);
-            brush = Brushes.DarkGray;
+            labelStart = startCol;
+            labelLength = labelText.Length;
             return $"{lineText.Substring(0, startCol)}{labelText}{endLineText.Substring(endCol)}";
-        }
-
-        public void DrawDecoration(Graphics graphics, SizeF sizeF, Rectangle rectangle, CharacterRange characterRange)
-        {
-            graphics.DrawRectangle(Pens.DarkGray, rectangle);
         }
 
         public TextDocument.TextPosition MapPosition(string text, TextDocument.TextPosition textPosition)
@@ -248,7 +177,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         return true;
     }
 
-    private GutterState GetGutterState(int lineIndex)
+    internal GutterState GetGutterState(int lineIndex)
     {
         bool hasPartnerEnd = false;
         if (_regions.ContainsKey(lineIndex))
@@ -355,7 +284,7 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         return maxCount;
     }
 
-    private bool ToggleFold(int lineIndex, ReadonlyTextBrowser readonlyTextBrowser, out TokenCache.Token endToken, bool collapseOnly)
+    internal bool ToggleFold(int lineIndex, out TokenCache.Token endToken, bool collapseOnly)
     {
         endToken = null;
         if (lineIndex >= _tokenCache.LineCount)
@@ -397,11 +326,6 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         return false;
     }
 
-    public int GetTotalVirtualRows()
-    {
-        return 0;
-    }
-
     public int GetTotalHiddenLines()
     {
         // A folded block inside another folded block hides lines the outer one hides already: count each line once.
@@ -434,15 +358,6 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
             }
         }
         return minLine;
-    }
-
-    public int GetVirtualRowCount(int lineIndex)
-    {
-        return 0;
-    }
-
-    public void GetVirtualLines(int lineIndex, List<ReadonlyTextBrowser.IVirtualLine> list)
-    {
     }
 
     public int GetHiddenLineCount(int lineIndex)
@@ -485,7 +400,8 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         modified = toDelete.Count != 0 || relocated.Count != 0;
     }
 
-    public ReadonlyTextBrowser.ILineDecorator GetDecorator(int lineIndex)
+    /// <summary>The folded block whose header is the line, or null.</summary>
+    internal FoldedRegion GetRegion(int lineIndex)
     {
         if (!_regions.TryGetValue(lineIndex, out var region))
         {
@@ -537,10 +453,10 @@ internal class FoldingManager : ReadonlyTextBrowser.IVirtualLineProvider
         return ExpandAt(lineIndex, -1);
     }
 
-    public bool CollapseLine(int lineIndex, ReadonlyTextBrowser readonlyTextBrowser)
+    public bool CollapseLine(int lineIndex)
     {
         TokenCache.Token endToken;
-        return ToggleFold(lineIndex, readonlyTextBrowser, out endToken, collapseOnly: true);
+        return ToggleFold(lineIndex, out endToken, collapseOnly: true);
     }
 
     public FoldedLineInfo[] GetCollapsedRegions()

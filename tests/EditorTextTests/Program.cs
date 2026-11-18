@@ -3818,7 +3818,8 @@ internal static class Program
     }
 
     // The problems a check finds before a save are shown as an inline message under each offending line. The editor
-    // and the message provider are Windows-only, so the wiring is checked by reading the sources, as the checks above.
+    // and the view of the messages are Windows-only, so the wiring is checked by reading the sources, as the checks above.
+    // The painting of the messages is in Controls/TextView/InlineMessageView.cs (it was in CodeEditing/InlineMessageProvider.cs).
     private static void InlineMessageChecks()
     {
         string root = FindRepositoryRoot();
@@ -3827,7 +3828,7 @@ internal static class Program
             Console.WriteLine("SKIP: repository root not found, the inline message wiring is not checked");
             return;
         }
-        string provider = File.ReadAllText(Path.Combine(root, "CodeEditing", "InlineMessageProvider.cs"));
+        string provider = File.ReadAllText(Path.Combine(root, "Controls", "TextView", "InlineMessageView.cs"));
         Check(provider.Contains("EnsureDrawingObjects") && provider.Contains("_fontHeight != rowHeight"),
             "the message provider builds its font and icons once, not on every paint");
         Check(provider.Contains("public Color BackColor") && provider.Contains("public Color ErrorColor") && provider.Contains("public Color WarningColor"),
