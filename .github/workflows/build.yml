@@ -276,6 +276,9 @@ jobs:
       - name: Run history walk checks (Up and Down through the history of a line edited in place, the edits kept on the way)
         run: dotnet run --project tests/HistoryWalkTests -c Release
 
+      - name: Run session environment checks (the variables of a Smart Terminal tab, their order, replacement and unset, the exports put in front of a command)
+        run: dotnet run --project tests/SessionEnvironmentTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
