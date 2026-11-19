@@ -191,10 +191,39 @@ internal static class Program
         input = new NetconsoleLineInput(host);
         input.Process("ab\u0003cd\u0004");
         Equal(string.Join("|", host.Log), "set abcd|bytes 103,104", "control characters go to the device in one write after the text is in the box, in the encoding of the connection");
+        // Escape sequences go to the device whole (the fake host adds 100 to every byte, see Encode).
+        foreach (var test in new[]
+        {
+            new { Text = "\u001b[A", Log = "bytes @27,[,A", Name = "a cursor key typed as text goes whole to the device and nothing goes into the box" },
+            new { Text = "ab\u001b[Acd", Log = "set abcd|bytes @27,[,A", Name = "the letters around it go into the box, the sequence to the device" },
+            new { Text = "\u001b[1;5C", Log = "bytes @27,[,1,;,5,C", Name = "a sequence with parameters (Ctrl+Right) is one piece" },
+            new { Text = "\u001b[200~", Log = "bytes @27,[,2,0,0,~", Name = "its final character may be a tilde" },
+            new { Text = "\u001bOA", Log = "bytes @27,O,A", Name = "ESC O and a character (the application cursor keys) is one piece" },
+            new { Text = "\u001bx", Log = "bytes @27,x", Name = "ESC and a printable character (Alt and a key) is one piece" },
+            new { Text = "\u001b", Log = "bytes @27", Name = "an ESC alone goes by itself" },
+            new { Text = "\u001b[", Log = "bytes @27,[", Name = "a sequence that is cut short takes what there is" },
+            new { Text = "\u001b[12", Log = "bytes @27,[,1,2", Name = "also with some parameters" },
+            new { Text = "\u001bO", Log = "bytes @27,O", Name = "ESC O at the end of the text is the two characters" },
+            new { Text = "\u001b[Ax", Log = "set x|bytes @27,[,A", Name = "what follows the sequence goes into the box" },
+            new { Text = "\u001b[A\u001b[B", Log = "bytes @27,[,A,@27,[,B", Name = "two sequences go in one write" },
+            new { Text = "\u001b\r", Log = "send|bytes @27", Name = "an ESC before Enter stays alone: Enter sends the line" },
+            new { Text = "\u001bO\r", Log = "send|bytes @27,O", Name = "ESC O before Enter: Enter sends the line" },
+            new { Text = "\u001b\u0003", Log = "bytes @27,@3", Name = "an ESC before another control character stays alone" },
+            new { Text = "\u001b[A\r\n", Log = "send|bytes @27,[,A", Name = "CR and LF after a sequence are one line ending" },
+        })
+        {
+            host = new FakeHost();
+            input = new NetconsoleLineInput(host);
+            input.Process(test.Text);
+            // @n is a byte of a character that is not printable, as the fake host makes it: n + 100.
+            string expected = string.Join(",", test.Log.Split('|').Last().Replace("bytes ", "").Split(',').Select((string item) => item.StartsWith("@", StringComparison.Ordinal) ? (int.Parse(item.Substring(1)) + 100).ToString() : ((int)item[0] + 100).ToString()));
+            string log = test.Log.Contains("bytes ") ? string.Join("|", test.Log.Split('|').Select((string part) => part.StartsWith("bytes ", StringComparison.Ordinal) ? "bytes " + expected : part)) : test.Log;
+            Equal(string.Join("|", host.Log), log, test.Name);
+        }
         host = new FakeHost();
         input = new NetconsoleLineInput(host);
-        input.Process("\u001b[A");
-        Equal(string.Join("|", host.Log), "set [A|bytes 127", "an escape sequence is cut: the ESC goes to the device, the rest into the box");
+        input.Process("\u001b[A\r\n");
+        Equal(host.Sent.Count, 1, "(one line was sent)");
         host = new FakeHost();
         input = new NetconsoleLineInput(host);
         input.Process("a\u0003\rb");

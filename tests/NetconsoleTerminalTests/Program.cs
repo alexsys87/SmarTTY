@@ -374,14 +374,14 @@ internal static class Program
             },
             new Step
             {
-                Name = "an escape sequence typed as text is cut: the ESC goes to the device, the rest into the box",
+                Name = "an escape sequence typed as text goes to the device whole and nothing of it goes into the box",
                 Act = () =>
                 {
                     PressInBox(control, Keys.Escape);
                     ClearReceived();
                     terminal.TypeText("\u001b[A");
                 },
-                Done = () => Received() == "\u001b" && control.NetconsoleInputBox.Text == "[A"
+                Done = () => Received() == "\u001b[A" && control.NetconsoleInputBox.Text.Length == 0
             },
             new Step
             {
