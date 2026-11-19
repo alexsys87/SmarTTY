@@ -215,7 +215,7 @@ internal static class Program
 
         using (SshSession session = Connect(host, port, user, password))
         {
-            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps, WrappedInputSteps, HistoryWindowSteps }, serverName);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps, WrappedInputSteps, LinePasteSteps, HistoryWindowSteps }, serverName);
         }
 
         // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
@@ -866,6 +866,77 @@ internal static class Program
 
     // The grey rest of a previously typed command after the caret (Terminal/HistorySuggestion.cs). Runs after
     // CommandSteps, whose commands are the newest in the history.
+    // "Paste line by line" (PasteLineByLine): the commands run one after another, the paste stops at the first one that fails (when the option is on) or
+    // when it is cancelled, and it says so. The clipboard is not used: the run is made as PasteLineByLine makes it, from the commands.
+    private static void StartLinePaste(SshTerminalControl terminal, bool stopOnError, params string[] commands)
+    {
+        Type type = typeof(SshTerminalControl).GetNestedType("LinePaste", BindingFlags.NonPublic);
+        object run = Activator.CreateInstance(type, new object[] { commands.ToList(), stopOnError });
+        typeof(SshTerminalControl).GetField("_linePaste", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(terminal, run);
+        typeof(SshTerminalControl).GetMethod("RunNextPastedLine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(terminal, null);
+    }
+
+    private static bool LinePasteActive(SshTerminalControl terminal)
+    {
+        return typeof(SshTerminalControl).GetField("_linePaste", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal) != null;
+    }
+
+    private static void CancelLinePaste(SshTerminalControl terminal)
+    {
+        typeof(SshTerminalControl).GetMethod("CancelActivePaste", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(terminal, null);
+    }
+
+    private static IEnumerable<Step> LinePasteSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        yield return new Step
+        {
+            Name = "a paste line by line that stops at a failed command: the commands run one after another",
+            Act = () => StartLinePaste(terminal, stopOnError: true, "echo lp-one-a", "sh -c 'exit 3'", "echo lp-three-a", "echo lp-four-a"),
+            Done = () => terminal.IsAtPrompt && !LinePasteActive(terminal) && CountLines(terminal, "lp-one-a") >= 1 && CountLines(terminal, "[exit code 3]") >= 1,
+            TimeoutMs = 15000
+        };
+        yield return new Step
+        {
+            Name = "it stops after the failed command and says how many were not run",
+            Done = () => DocumentText(terminal).Contains("[paste stopped after a failed command, 2 command(s) not run]") && CountLines(terminal, "lp-three-a") == 0,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "a paste line by line that does not stop at a failed command runs them all and says nothing",
+            Act = () => StartLinePaste(terminal, stopOnError: false, "echo lp-one-b", "sh -c 'exit 3'", "echo lp-three-b"),
+            Done = () => terminal.IsAtPrompt && !LinePasteActive(terminal) && CountLines(terminal, "lp-three-b") >= 1,
+            TimeoutMs = 15000
+        };
+        yield return new Step
+        {
+            Name = "no note is printed when every command was run",
+            Done = () => !DocumentText(terminal).Contains("[paste cancelled") && CountOccurrences(DocumentText(terminal), "[paste stopped after a failed command") == 1,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "a paste that is cancelled while a command runs: the command goes on",
+            Act = () => StartLinePaste(terminal, stopOnError: true, "sleep 1", "echo lp-two-c", "echo lp-three-c"),
+            Done = () => !terminal.IsAtPrompt && LinePasteActive(terminal),
+            TimeoutMs = 5000
+        };
+        yield return new Step
+        {
+            Name = "after the command ends it says that the paste was cancelled and how many commands were not run",
+            Act = () => CancelLinePaste(terminal),
+            Done = () => terminal.IsAtPrompt && !LinePasteActive(terminal) && DocumentText(terminal).Contains("[paste cancelled, 2 command(s) not run]") && CountLines(terminal, "lp-two-c") == 0,
+            TimeoutMs = 15000
+        };
+        yield return new Step
+        {
+            Name = "a paste of one command that succeeds ends without a note",
+            Act = () => StartLinePaste(terminal, stopOnError: true, "echo lp-only-d"),
+            Done = () => terminal.IsAtPrompt && !LinePasteActive(terminal) && CountLines(terminal, "lp-only-d") >= 1,
+            TimeoutMs = 15000
+        };
+    }
+
     // A command line that is longer than the screen wraps over several rows of the document: the index of the caret in the text and the place of
     // the caret in the document have to agree across the rows (InputRegion.IndexOf, PositionAt).
     private static IEnumerable<Step> WrappedInputSteps(SshTerminalControl terminal, SessionContext context)
