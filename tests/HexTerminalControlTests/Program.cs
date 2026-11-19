@@ -200,7 +200,7 @@ internal static class Program
 
         Setup(8, timeout: 40);
         Append(Bytes(5));
-        Append(Bytes(3, 10));
+        Append(Bytes(2, 10));
         Dump("no break when the data comes at once");
         Thread.Sleep(90);
         Append(Bytes(4, 20));
