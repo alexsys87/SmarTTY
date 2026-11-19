@@ -17,6 +17,17 @@
     <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
     <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
     <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../Terminal/ByteColumns.cs" Link="ByteColumns.cs" />
+    <Compile Include="../../Terminal/Utf8StreamDecoder.cs" Link="Utf8StreamDecoder.cs" />
+    <Compile Include="../../Terminal/OutputLinkScanner.cs" Link="OutputLinkScanner.cs" />
+    <Compile Include="../../Terminal/DiagnosticHighlighter.cs" Link="DiagnosticHighlighter.cs" />
+    <Compile Include="../../Terminal/BuildDirectories.cs" Link="BuildDirectories.cs" />
+    <Compile Include="../../CodeEditing/CompilerColumns.cs" Link="CompilerColumns.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
+    <Compile Include="../../Utilities/UrlLinks.cs" Link="UrlLinks.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <Compile Include="../../TextEditing/TextMatcher.cs" Link="TextMatcher.cs" />
     <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
     <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
     <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />

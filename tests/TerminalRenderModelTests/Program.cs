@@ -36,6 +36,28 @@ internal static class Program
         return color.HasValue ? "#" + color.Value.Argb.ToString("X8") : "null";
     }
 
+    private sealed class LinkHost : IOutputLinkHost
+    {
+        public string OpenedUrl;
+
+        public string OpenedFile;
+
+        public bool IsLinkExtension(string extension)
+        {
+            return extension == ".c";
+        }
+
+        public void RequestOpenFile(string path, int? line, int? column, SmarTTY.CodeEditing.ColumnUnit unit)
+        {
+            OpenedFile = path + ":" + line;
+        }
+
+        public void RequestOpenUrl(string url)
+        {
+            OpenedUrl = url;
+        }
+    }
+
     private sealed class Target : ILinkTarget
     {
         public bool IsActive { get; set; }
@@ -54,6 +76,8 @@ internal static class Program
             QueueChecks();
             DisplayModelChecks();
             BenchmarkScriptChecks();
+            ClassicTerminalChecks();
+            SearchChecks();
         }
         catch (Exception exception)
         {
@@ -380,5 +404,109 @@ internal static class Program
             }
             Check(model.ActiveBufferIndex == 0 && !model.CaretHidden && (runs > 0 || script == 2), name + ": ends on the normal screen" + (script == 2 ? "" : " with text on it"));
         }
+    }
+
+    // What the WPF view of a classic tab takes over from TerminalEmulatorControl: byte mode, the colours of a log, the links, Clear and a new session.
+    private static void ClassicTerminalChecks()
+    {
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        RowLayout layout = new RowLayout();
+
+        // Byte mode: a Cyrillic letter (two UTF-8 bytes) that the remote editor echoes one byte at a time.
+        TerminalDisplayModel bytes = new TerminalDisplayModel(20, 3) { ByteOrientedLineEditing = true };
+        char first = (char)(Utf8StreamDecoder.EscapedByteBase + 0xD0);
+        char second = (char)(Utf8StreamDecoder.EscapedByteBase + 0xB6);
+        bytes.ProcessOutput("$ a" + first);
+        Equal(bytes.Document.GetLineText(0), "$ a\uFFFD", "byte mode: the first byte of a letter is a cell of its own");
+        bytes.ProcessOutput(second.ToString());
+        Equal(bytes.Document.GetLineText(0), "$ a\u0436", "byte mode: the second byte completes the letter in place");
+        Equal(bytes.CursorPosition.X, 4, "byte mode: the cursor is after the letter");
+        Equal(bytes.ByteKeyCount(VirtualKey.Back), 2, "byte mode: Backspace after the letter is sent once per byte");
+        Equal(bytes.ByteKeyCount(VirtualKey.Back), 1, "byte mode: the next Backspace crosses an ASCII letter");
+        bytes.DropPrediction();
+        bytes.ProcessOutput("\b\b");
+        Equal(bytes.CursorPosition.X, 3, "byte mode: two backspaces of the remote editor cross one letter of two bytes");
+        bytes.ByteOrientedLineEditing = false;
+        Equal(bytes.ByteKeyCount(VirtualKey.Back), 1, "without byte mode a key is sent once");
+        bytes.ProcessOutput("x" + first);
+        Check(bytes.Document.GetLineText(0).EndsWith("x\uFFFD"), "without byte mode an escaped byte is shown as U+FFFD");
+        int flushes = 0;
+        TerminalDisplayModel flushed = new TerminalDisplayModel(20, 3) { ByteOrientedLineEditing = true, FlushPendingOutput = () => flushes++ };
+        flushed.ByteKeyCount(VirtualKey.Left);
+        Equal(flushes, 1, "byte mode: the output that waits is parsed before the keys are counted");
+        flushed.ProcessLocalOutput("ab\b");
+        Equal(flushed.CursorPosition.X, 1, "a local echo steps back one character");
+
+        // The colours of a log.
+        TerminalDisplayModel log = new TerminalDisplayModel(40, 4) { HighlightLogLevels = true };
+        log.ProcessOutput("12:00 ERROR disk full\r\n12:01 info ok\r\n");
+        RowRunBuilder.Build(log.Document.GetLineText(0), log.Lines.GetLine(0), scheme, 40, layout);
+        Check(layout.Texts.Exists(run => run.Foreground.Argb == 0xFFFF5555), "a log: an ERROR line is bright red");
+
+        // Links.
+        LinkHost host = new LinkHost();
+        TerminalDisplayModel links = new TerminalDisplayModel(60, 4) { UrlLinks = true, FileLinks = true, LinkHost = host };
+        links.ProcessOutput("see https://example.com/page now\r\n/src/main.c:12: error\r\n");
+        ILinkTarget url = links.GetLinkAt(0, 6);
+        Check(url != null && url.IsActive, "an address in the output is an active link");
+        url.Activate();
+        Equal(host.OpenedUrl, "https://example.com/page", "a click opens the address");
+        Check(links.GetLinkAt(0, 1) == null, "a word is no link");
+        ILinkTarget file = links.GetLinkAt(1, 3);
+        Check(file != null, "a file name with a known extension is a link");
+        file?.Activate();
+        Equal(host.OpenedFile, "/src/main.c:11", "a click opens the file at its line (counted from 0)");
+        links.ProcessOutput("\u001b[?1000h");
+        Check(!links.LinksAvailable, "no links while the program reads the mouse");
+        links.ProcessOutput("\u001b[?1000l\u001b[?1049h");
+        Check(!links.LinksAvailable, "no links on the alternate screen");
+        links.ProcessOutput("\u001b[?1049l");
+        Check(links.LinksAvailable, "links again on the normal screen");
+
+        // Clear and a new session.
+        TerminalDisplayModel clear = new TerminalDisplayModel(20, 3);
+        clear.ProcessOutput("one\r\ntwo\r\nthree\r\n$ ");
+        clear.ClearOutput();
+        Equal(clear.Document.GetLineText(0) + "|" + clear.CursorPosition.Y + "|" + clear.TopLine, "$ |0|0", "Clear: the line of the cursor goes to the top");
+        clear.ProcessOutput("\u001b[?1049hfull");
+        clear.ClearOutput();
+        Equal(clear.ActiveBufferIndex, 1, "Clear leaves the alternate screen alone");
+        clear.ProcessOutput("\u001b[?1049l");
+
+        TerminalDisplayModel session = new TerminalDisplayModel(20, 3);
+        session.ProcessOutput("old output\r\n$ x\u001b[?1000h\u001b(0");
+        session.BeginNewSession();
+        Check(session.MouseMode == MouseReportingMode.Off, "a new session: the mouse of the old program is off");
+        Equal(session.CursorPosition.X, 0, "a new session starts at the start of a row");
+        RowRunBuilder.Build(session.Document.GetLineText(0), session.Lines.GetLine(0), scheme, 20, layout);
+        Check(layout.Texts.Count == 1 && layout.Texts[0].Foreground == scheme.Inactive, "a new session: the old output is dimmed");
+        session.ProcessOutput("q");
+        Check(session.Document.GetLineText(session.CursorDocumentLine).StartsWith("q"), "a new session: the line drawing set is off");
+        Equal(session.GetScreenLineText(session.CursorPosition.Y), session.Document.GetLineText(session.CursorDocumentLine), "the text of a row of the screen");
+        session.AutoWrap = false;
+        Check(!session.AutoWrap, "auto-wrap can be turned off");
+    }
+
+    // The search bar of the window in the document of a WPF terminal.
+    private static void SearchChecks()
+    {
+        TerminalDisplayModel model = new TerminalDisplayModel(30, 5);
+        model.ProcessOutput("alpha beta\r\ngamma alpha\r\ndelta\r\n");
+        TextMatcher alpha = TextMatcher.Literal("alpha", ignoreCase: true);
+        TextDocument.TextPosition none = TextDocument.TextPosition.Invalid;
+        TextDocument.TextPosition found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), alpha, false, true, none, none, out int length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:0+5", "the first match");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(1, 0), alpha, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column, "1:6", "the next match after the caret");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(7, 1), alpha, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column, "0:0", "the search wraps around");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(7, 1), alpha, false, false, none, none, out length);
+        Check(!found.IsValid, "without wrap-around nothing after the last match");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(5, 1), alpha, true, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column, "0:0", "backwards");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), alpha, false, true, new TextDocument.TextPosition(0, 1), new TextDocument.TextPosition(11, 1), out length);
+        Equal(found.Line + ":" + found.Column, "1:6", "inside a scope");
+        found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("zeta", true), false, true, none, none, out length);
+        Check(!found.IsValid, "no match");
     }
 }

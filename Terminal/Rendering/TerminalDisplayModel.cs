@@ -1,6 +1,9 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace SmarTTY.Terminal.Rendering;
 
@@ -9,7 +12,8 @@ namespace SmarTTY.Terminal.Rendering;
 /// the size of the grid, the line at the top of the view, the caret, the selection, and a version number that changes with everything a view
 /// paints. It is the view of the screen (<see cref="ITerminalScreenView"/>) and the host of the emulator (<see cref="ITerminalHost"/>) for a
 /// view that draws the cells itself (the WPF view of stage 2). The view reads it when it paints and calls it on its own thread; nothing here
-/// knows a window. Byte mode (the line editing of BusyBox without Unicode) and the link scanners stay with the WinForms view for now.
+/// knows a window. It also has what the WinForms <c>TerminalEmulatorControl</c> did that needs no window: the byte mode of the line
+/// editors that count UTF-8 bytes (BusyBox without Unicode), the links in the output and the colours of a log, the start of a new session.
 /// </summary>
 internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 {
@@ -45,6 +49,30 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     private MouseReportingMode _mouseMode;
 
+    private bool _byteOrientedLineEditing;
+
+    // Byte mode: the remote cursor is this many bytes into the character at the cursor.
+    private int _byteOffset;
+
+    // Byte mode: a cell shown as U+FFFD that holds the first bytes of a letter the remote editor printed one byte at a time (document line,
+    // column and the bytes received so far); the next bytes complete it in place.
+    private int _partialLine = -1;
+
+    private int _partialColumn = -1;
+
+    private List<byte> _partialBytes;
+
+    // Set while text the terminal draws on its own (a local echo) is processed: it is measured in characters, not in bytes.
+    private bool _processingLocalOutput;
+
+    // Byte mode: the terminal's copy of the remote command line while the user types (see ByteColumns.LinePrediction).
+    private ByteColumns.LinePrediction _prediction;
+
+    private DateTime _predictionKeyTime;
+
+    // After a pause the screen has caught up with the remote line, and the copy is taken from it again.
+    private static readonly TimeSpan PredictionLifetime = TimeSpan.FromSeconds(1);
+
     public TerminalDisplayModel(int columns, int rows)
     {
         _columns = Math.Max(columns, 1);
@@ -72,6 +100,15 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     /// <summary>Changes with every change that a view paints (the cells, the scroll position, the caret, the selection).</summary>
     public int Version { get; private set; }
+
+    /// <summary>The number of columns of a tab.</summary>
+    public int TabWidth { get; set; } = 8;
+
+    /// <summary>The longest chunk of output that is shown whole; a longer one is cut to this many characters from its end (0: no limit).</summary>
+    public int MaxChunkLength { get; set; }
+
+    /// <summary>A control character that the terminal does nothing about is shown as its number.</summary>
+    public bool ShowUnrecognizedAsHex { get; set; }
 
     /// <summary>The most lines the normal screen keeps above the screen.</summary>
     public int ScrollbackLimit
@@ -154,6 +191,112 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         }
     }
 
+    /// <summary>The cursor on the screen of the remote side (column, row).</summary>
+    public GridPoint CursorPosition => _screen.Cursor;
+
+    /// <summary>The line of the document the cursor is in.</summary>
+    public int CursorDocumentLine => _screen.CursorDocumentLine;
+
+    /// <summary>The text of a row of the screen of the remote side (0 is its top row).</summary>
+    public string GetScreenLineText(int row)
+    {
+        return _screen.GetLineText(row);
+    }
+
+    /// <summary>The text wraps at the right edge (otherwise the line goes on past it).</summary>
+    public bool AutoWrap
+    {
+        get => _screen.AutoWrap;
+        set
+        {
+            _screen.AutoWrap = value;
+            OnChanged();
+        }
+    }
+
+    /// <summary>
+    /// The remote line editor counts UTF-8 bytes rather than characters (BusyBox ash without Unicode support, as on OpenWrt): on the normal
+    /// screen its cursor moves are turned from bytes into cells, and Backspace, Delete, Left and Right are repeated once per byte of the
+    /// letter they cross (<see cref="ByteKeyCount"/>). The output must then be decoded with the stray bytes escaped (Utf8StreamDecoder).
+    /// </summary>
+    public bool ByteOrientedLineEditing
+    {
+        get => _byteOrientedLineEditing;
+        set
+        {
+            _byteOrientedLineEditing = value;
+            ResetByteState();
+        }
+    }
+
+    private bool ByteColumnsActive => _byteOrientedLineEditing && _screen.ActiveBufferIndex == 0 && !_processingLocalOutput;
+
+    /// <summary>Called before the keys of byte mode are counted on the screen: the view parses the output that waits, so that the screen is up to date.</summary>
+    public Action FlushPendingOutput { get; set; }
+
+    /// <summary>The output of a log is coloured from its level (ERROR, WARN, level=warn) to the end of the line.</summary>
+    public bool HighlightLogLevels { get; set; }
+
+    /// <summary>File names in the output are links (Ctrl+click), as in a classic terminal of a Unix host.</summary>
+    public bool FileLinks { get; set; }
+
+    /// <summary>The http, https and ftp addresses in the output are links.</summary>
+    public bool UrlLinks { get; set; }
+
+    /// <summary>What a link does when it is clicked, and which extensions make a file name a link.</summary>
+    internal IOutputLinkHost LinkHost { get; set; }
+
+    /// <summary>How the columns of the compiler messages in the output are counted.</summary>
+    public ColumnUnit CompilerColumns { get; set; } = ColumnUnit.Auto;
+
+    // Only an ordinary screen of a shell has links: a full-screen program draws its own text, and one that takes the mouse needs the clicks.
+    public bool LinksAvailable => (FileLinks || UrlLinks) && _screen.ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
+
+    /// <summary>The link of a cell of the document, or null.</summary>
+    internal ILinkTarget GetLinkAt(int line, int column)
+    {
+        LineInfo lineInfo = Lines.GetLine(line);
+        if (lineInfo?.Cells != null && column >= 0 && column < lineInfo.Cells.Length)
+        {
+            return lineInfo.Cells[column]._link.Target;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// "Clear": removes the scrollback and everything on the screen above the line of the cursor, which moves to the top with its prompt.
+    /// Nothing is sent to the remote side. The alternate screen belongs to the program and is left alone.
+    /// </summary>
+    public void ClearOutput()
+    {
+        DropPrediction();
+        _screen.ClearOutput();
+        OnChanged();
+    }
+
+    /// <summary>A new session starts in this terminal (a reconnect): the old screen is dimmed and kept, the modes of the old program are dropped.</summary>
+    public void BeginNewSession()
+    {
+        _screen.ArchiveScreen();
+        ((ITerminalHost)this).MouseMode = MouseReportingMode.Off;
+        _modes.Charsets.Reset();
+        OnChanged();
+    }
+
+    /// <summary>Draws text that the terminal produces itself (a local echo): in byte mode its "\b" steps back one character, not one byte.</summary>
+    public void ProcessLocalOutput(string output)
+    {
+        _processingLocalOutput = true;
+        try
+        {
+            ProcessOutput(output);
+        }
+        finally
+        {
+            _processingLocalOutput = false;
+        }
+    }
+
     /// <summary>Parses output of the remote side and changes the screen (on the thread of the view).</summary>
     public void ProcessOutput(string output)
     {
@@ -188,6 +331,8 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         _screen.Reset();
         _emulator.ResetModes();
         _modes.IncompleteEscape = null;
+        ResetByteState();
+        DropPrediction();
         OnChanged();
     }
 
@@ -355,6 +500,15 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     ILinkScanner ITerminalScreenView.CreateLinkScanner()
     {
+        if (HighlightLogLevels)
+        {
+            return new OutputLinkScanner(null, "/", null, links: false, highlight: false, logLevels: true);
+        }
+        if (LinksAvailable && LinkHost != null)
+        {
+            return new OutputLinkScanner(LinkHost, ReportedDirectory ?? "", null, links: FileLinks, highlight: false, logLevels: false,
+                columnSetting: CompilerColumns, strictAbsolute: true, urls: UrlLinks);
+        }
         return null;
     }
 
@@ -372,17 +526,18 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         }
     }
 
-    int ITerminalHost.TabWidth => 8;
+    int ITerminalHost.TabWidth => TabWidth;
 
-    bool ITerminalHost.ByteColumnsActive => false;
+    bool ITerminalHost.ByteColumnsActive => ByteColumnsActive;
 
     int ITerminalHost.ByteOffset
     {
-        set { }
+        set => _byteOffset = value;
     }
 
     void ITerminalHost.ResetByteState()
     {
+        ResetByteState();
     }
 
     void ITerminalHost.ResetFromStream()
@@ -392,25 +547,33 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     void ITerminalHost.MoveForwardBytes(int bytes)
     {
-        _screen.MoveCursorBy(bytes, 0);
+        GridPoint cursor = _screen.Cursor;
+        int column = cursor.X;
+        int offset = _byteOffset;
+        ByteColumns.MoveForward(_screen.GetLineText(cursor.Y), ref column, ref offset, bytes, Math.Max(_columns - 1, 0));
+        _screen.Cursor = new GridPoint(column, cursor.Y);
+        _byteOffset = offset;
     }
 
+    // Moves the cursor back by a number of bytes of the remote editor; returns the bytes left at the line start.
     int ITerminalHost.MoveBackBytes(int bytes)
     {
-        _screen.MoveCursorBy(-bytes, 0);
-        return 0;
+        GridPoint cursor = _screen.Cursor;
+        int column = Math.Min(cursor.X, _columns);
+        int offset = _byteOffset;
+        int remaining = ByteColumns.MoveBack(_screen.GetLineText(cursor.Y), ref column, ref offset, bytes);
+        _screen.Cursor = new GridPoint(column, cursor.Y);
+        _byteOffset = offset;
+        return remaining;
     }
 
-    int ITerminalHost.MaxChunkLength => 0;
+    int ITerminalHost.MaxChunkLength => MaxChunkLength;
 
-    bool ITerminalHost.ShowUnrecognizedAsHex => false;
+    bool ITerminalHost.ShowUnrecognizedAsHex => ShowUnrecognizedAsHex;
 
     void ITerminalHost.WriteOutputText(string text)
     {
-        if (!string.IsNullOrEmpty(text))
-        {
-            _screen.WriteText(_modes.Charsets.Translate(text));
-        }
+        WriteOutputText(text);
     }
 
     void ITerminalHost.Bell()
@@ -454,5 +617,215 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     string ITerminalHost.ReportedDirectory
     {
         set => ReportedDirectory = value;
+    }
+
+    // Byte mode (moved from TerminalEmulatorControl as it was, with the screen in place of the control).
+
+    private void ResetByteState()
+    {
+        _byteOffset = 0;
+        _partialLine = -1;
+        _partialColumn = -1;
+        _partialBytes = null;
+    }
+
+    // Writes a text segment of the output. In byte mode stray bytes arrive escaped (U+DC80..U+DCFF, see Utf8StreamDecoder.EscapeInvalidBytes)
+    // and are joined with the bytes before them; otherwise they become U+FFFD.
+    private void WriteOutputText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        if (!ByteColumnsActive)
+        {
+            // Escaped bytes still in the queue when byte mode was turned off, or on the alternate screen.
+            StringBuilder replaced = null;
+            for (int index = 0; index < text.Length; index++)
+            {
+                if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+                {
+                    replaced = replaced ?? new StringBuilder(text);
+                    replaced[index] = '\uFFFD';
+                }
+            }
+            _screen.WriteText(_modes.Charsets.Translate(replaced?.ToString() ?? text));
+            return;
+        }
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+            {
+                WriteByteModeRun(text.Substring(runStart, index - runStart));
+                WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
+                runStart = index + 1;
+            }
+        }
+        WriteByteModeRun(text.Substring(runStart));
+    }
+
+    private void WriteByteModeRun(string text)
+    {
+        if (text.Length == 0)
+        {
+            return;
+        }
+        SplitHalfCrossedCell();
+        GridPoint cursor = _screen.Cursor;
+        if (_partialColumn >= cursor.X && _partialColumn < cursor.X + text.Length && _partialLine == _screen.ToDocumentPosition(cursor).Line)
+        {
+            ResetByteState();
+        }
+        _screen.WriteText(_modes.Charsets.Translate(text));
+        _byteOffset = 0;
+    }
+
+    private void WriteEscapedByte(byte value)
+    {
+        SplitHalfCrossedCell();
+        GridPoint cursor = _screen.Cursor;
+        int line = _screen.ToDocumentPosition(cursor).Line;
+        if (_partialLine == line && _partialColumn == cursor.X - 1 && CellAt(cursor.Y, _partialColumn) == '\uFFFD' && ByteColumns.CanContinue(_partialBytes, value))
+        {
+            // The next byte of a letter echoed one byte at a time: it completes the letter in its own cell.
+            string completed = ByteColumns.TryComplete(_partialBytes, value);
+            if (completed != null)
+            {
+                _screen.WriteAt(new GridPoint(_partialColumn, cursor.Y), completed, _screen.CurrentStyle);
+                ResetByteState();
+            }
+            return;
+        }
+        _screen.WriteText("\uFFFD");
+        _byteOffset = 0;
+        if (ByteColumns.SequenceLength(value) > 0)
+        {
+            _partialLine = line;
+            _partialColumn = cursor.X;
+            _partialBytes = new List<byte> { value };
+        }
+        else
+        {
+            _partialLine = -1;
+            _partialColumn = -1;
+            _partialBytes = null;
+        }
+    }
+
+    // The remote editor prints after the first bytes of a letter it stepped into: those bytes keep the cell (shown as U+FFFD, completed in
+    // place if the rest arrives later) and the text continues in the next cell.
+    private void SplitHalfCrossedCell()
+    {
+        if (_byteOffset <= 0)
+        {
+            return;
+        }
+        GridPoint cursor = _screen.Cursor;
+        byte[] prefix = ByteColumns.CellPrefix(_screen.GetLineText(cursor.Y), cursor.X, _byteOffset);
+        int line = _screen.ToDocumentPosition(cursor).Line;
+        _byteOffset = 0;
+        _screen.WriteText("\uFFFD");
+        if (prefix.Length > 0 && ByteColumns.SequenceLength(prefix[0]) > 0)
+        {
+            _partialLine = line;
+            _partialColumn = cursor.X;
+            _partialBytes = new List<byte>(prefix);
+        }
+    }
+
+    private char CellAt(int row, int column)
+    {
+        string line = _screen.GetLineText(row);
+        return (line != null && column >= 0 && column < line.Length) ? line[column] : ' ';
+    }
+
+    // The prediction for the next key: the current one, or a new one taken from the screen. Null outside byte mode and when the remote cursor
+    // is inside a character (the screen cannot say where).
+    private ByteColumns.LinePrediction GetPrediction()
+    {
+        if (!ByteColumnsActive)
+        {
+            _prediction = null;
+            return null;
+        }
+        DateTime now = DateTime.UtcNow;
+        if (_prediction == null || now - _predictionKeyTime > PredictionLifetime)
+        {
+            FlushPendingOutput?.Invoke();
+            _prediction = null;
+            if (_byteOffset == 0)
+            {
+                GridPoint cursor = _screen.Cursor;
+                _prediction = new ByteColumns.LinePrediction(_screen.GetLineText(cursor.Y), Math.Min(cursor.X, _columns));
+            }
+        }
+        _predictionKeyTime = now;
+        return _prediction;
+    }
+
+    /// <summary>
+    /// How many times Backspace, Left, Right or Delete (without modifiers) must be sent: once per UTF-8 byte of the character it crosses in
+    /// byte mode, once otherwise.
+    /// </summary>
+    public int ByteKeyCount(VirtualKey key)
+    {
+        ByteColumns.LinePrediction prediction = GetPrediction();
+        if (prediction == null)
+        {
+            return KeyRepeatCount(key == VirtualKey.Back || key == VirtualKey.Left);
+        }
+        int count;
+        switch (key)
+        {
+            case VirtualKey.Back:
+                count = prediction.Backspace();
+                break;
+            case VirtualKey.Left:
+                count = prediction.Left();
+                break;
+            case VirtualKey.Right:
+                count = prediction.Right();
+                break;
+            default:
+                count = prediction.Delete();
+                break;
+        }
+        if (count <= 0)
+        {
+            // The start of the line (or of its screen row): the copy cannot follow further.
+            _prediction = null;
+            return 1;
+        }
+        return count;
+    }
+
+    /// <summary>A character was typed: the copy of the command line of byte mode follows it.</summary>
+    public void TypedText(string text)
+    {
+        if (ByteColumnsActive)
+        {
+            GetPrediction()?.Type(text);
+        }
+    }
+
+    /// <summary>A key the copy of the command line cannot follow (Enter, Tab, history, Ctrl+..., a paste).</summary>
+    public void DropPrediction()
+    {
+        _prediction = null;
+    }
+
+    // How many times a key that crosses one character must be sent (byte mode), counted on the screen; 1 otherwise.
+    private int KeyRepeatCount(bool backward)
+    {
+        if (!ByteColumnsActive)
+        {
+            return 1;
+        }
+        FlushPendingOutput?.Invoke();
+        GridPoint cursor = _screen.Cursor;
+        string line = _screen.GetLineText(cursor.Y);
+        int column = Math.Min(cursor.X, _columns);
+        return backward ? ByteColumns.BackwardKeyCount(line, column, _byteOffset) : ByteColumns.ForwardKeyCount(line, column, _byteOffset);
     }
 }

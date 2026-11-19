@@ -182,6 +182,7 @@ internal static class Program
         TerminalKeyOptions o = new TerminalKeyOptions();
         Equal(Down(e, o, VirtualKey.Insert, M.Shift), "Paste", "Shift+Insert pastes");
         Equal(Down(e, o, VirtualKey.Insert, M.Ctrl), "Copy", "Ctrl+Insert copies");
+        Equal(Down(e, o, VirtualKey.Insert, M.Ctrl | M.Shift), "PasteMenu", "Ctrl+Shift+Insert opens the paste menu");
         Equal(Down(e, o, VirtualKey.C, M.Ctrl | M.Shift), "Copy", "Ctrl+Shift+C copies");
         Equal(Down(e, o, VirtualKey.V, M.Ctrl | M.Shift), "Paste", "Ctrl+Shift+V pastes");
         Equal(Down(e, o, VirtualKey.PageUp, M.Shift), "ScrollPageUp", "Shift+PageUp scrolls the view");

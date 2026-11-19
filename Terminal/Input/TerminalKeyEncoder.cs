@@ -48,6 +48,9 @@ public enum TerminalKeyAction
     /// <summary>Paste the clipboard (Shift+Insert, Ctrl+Shift+V).</summary>
     Paste,
 
+    /// <summary>Open the paste menu: the clipboard, the recent pastes and the snippets (Ctrl+Shift+Insert).</summary>
+    PasteMenu,
+
     /// <summary>Copy the selection (Ctrl+Insert, Ctrl+Shift+C).</summary>
     Copy,
 
@@ -178,6 +181,10 @@ public sealed class TerminalKeyEncoder
             if (options.CtrlShiftClipboard && e.Control && e.Shift && key == VirtualKey.C)
             {
                 return TerminalKeyResult.Do(TerminalKeyAction.Copy);
+            }
+            if (key == VirtualKey.Insert && e.Control && e.Shift && !IsKeypad(key, e.Extended, options))
+            {
+                return TerminalKeyResult.Do(TerminalKeyAction.PasteMenu);
             }
             if (options.CtrlShiftClipboard && e.Control && e.Shift && key == VirtualKey.V)
             {
