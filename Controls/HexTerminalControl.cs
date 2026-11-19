@@ -249,6 +249,21 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         RemoveMatchHighlights();
         termHex.Reset();
         termText.Reset();
+        // The selection of the old data goes too: its positions would be where the next search starts, in rows that are not the same any more.
+        // The two views mirror each other's selection, which is switched off while both are reset.
+        bool wasSyncing = _syncingSelection;
+        _syncingSelection = true;
+        try
+        {
+            termHex.SetSelection(select: false, TextDocument.TextPosition.Invalid);
+            termHex.SetSelectionEnd(TextDocument.TextPosition.Invalid);
+            termText.SetSelection(select: false, TextDocument.TextPosition.Invalid);
+            termText.SetSelectionEnd(TextDocument.TextPosition.Invalid);
+        }
+        finally
+        {
+            _syncingSelection = wasSyncing;
+        }
     }
 
     public void ArchiveScreen()

@@ -306,6 +306,15 @@ internal static class Program
         Dump("after Clear");
         Append(Bytes(3));
         Dump("and new bytes after it");
+
+        // The selection of the old data does not decide where the next search starts.
+        Setup(4);
+        Append(Bytes(20));
+        Next("a match near the end", new byte[] { 17, 18 }, false, false);
+        _control.Clear();
+        Dump("cleared after a match near the end");
+        Append(Bytes(20));
+        Next("the first match after Clear, without wrapping", new byte[] { 3 }, false, false);
     }
 
     private static int Main(string[] args)
