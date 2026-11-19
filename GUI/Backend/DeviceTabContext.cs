@@ -1,4 +1,5 @@
 using SmarTTY.Controls;
+using SmarTTY.GUI.DevicePanel;
 using SmarTTY.Ssh;
 using SmarTTY.TextEditing;
 using SmarTTY.Transport;
@@ -13,7 +14,7 @@ using VisualTTY.DeviceTerminal;
 namespace SmarTTY.GUI.Backend;
 
 /// <summary>
-/// A tab that hosts a COM-port or raw-TCP terminal (<see cref="DeviceTerminalControl"/>) inside the main window,
+/// A tab that hosts a COM-port or raw-TCP terminal (<see cref="WpfDeviceTerminal"/>) inside the main window,
 /// next to the SSH sessions. Unlike an SSH session, a device connection is not multiplexed: the tab owns the
 /// transport and a device session never offers "open another terminal tab".
 /// </summary>
@@ -23,7 +24,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     private bool _SettingsApplied;
 
-    public readonly DeviceTerminalControl Terminal;
+    public readonly WpfDeviceTerminal Terminal;
 
     public DeviceTerminalSettings Settings { get; }
 
@@ -68,29 +69,27 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     {
         _Session = session;
         Settings = settings;
-        Terminal = new DeviceTerminalControl();
+        Terminal = new WpfDeviceTerminal();
         Terminal.StatusChanged += OnTerminalStatusChanged;
         Terminal.CloseTabRequested += OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested += OnTerminalFullScreenToggleRequested;
         Terminal.QuickCommandsEditRequested += OnTerminalQuickCommandsEditRequested;
         Terminal.DisplayModeChanged += OnTerminalDisplayModeChanged;
-        WinFormsHostWrapper host = new WinFormsHostWrapper();
-        ((WindowsFormsHost)host).Child = Terminal;
-        Control = host;
+        Control = Terminal;
         // Search resolves the current view and query normalization lazily, so one searcher covers the ASCII text
         // view and the HEX dump editor, switching automatically when the user toggles HEX mode.
         // In the HEX view a query of HEX bytes is searched for in the stream of the bytes (a sequence may go on in the
         // next row of the dump); any other query is searched for in the text of the view, as typed.
-        Searcher = new TextSearcher(() => Terminal.SearchTextEditor, q => q, () => Terminal.ByteSearchTarget, q => Terminal.HexMode ? ParseHexQuery(q) : null);
-        // The transport is opened when the control gets its window, exactly as the standalone terminal window did
-        // in OnShown: output that arrives for a control without a handle is the thing to avoid.
-        if (Terminal.IsHandleCreated)
+        Searcher = new TextSearcher(() => Terminal.SearchTarget, q => q, () => Terminal.ByteSearchTarget, q => Terminal.HexMode ? ParseHexQuery(q) : null);
+        // The transport is opened when the panel is in the window, as the WinForms panel waited for its handle: output that arrives
+        // for a terminal that is not shown yet is the thing to avoid.
+        if (Terminal.IsLoaded)
         {
             ApplySettingsOnce();
         }
         else
         {
-            Terminal.HandleCreated += Terminal_HandleCreated;
+            Terminal.Loaded += Terminal_Loaded;
         }
     }
 
@@ -106,9 +105,9 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         };
     }
 
-    private void Terminal_HandleCreated(object sender, EventArgs e)
+    private void Terminal_Loaded(object sender, RoutedEventArgs e)
     {
-        Terminal.HandleCreated -= Terminal_HandleCreated;
+        Terminal.Loaded -= Terminal_Loaded;
         ApplySettingsOnce();
     }
 
@@ -215,7 +214,7 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void Dispose()
     {
-        Terminal.HandleCreated -= Terminal_HandleCreated;
+        Terminal.Loaded -= Terminal_Loaded;
         Terminal.StatusChanged -= OnTerminalStatusChanged;
         Terminal.CloseTabRequested -= OnTerminalCloseTabRequested;
         Terminal.FullScreenToggleRequested -= OnTerminalFullScreenToggleRequested;

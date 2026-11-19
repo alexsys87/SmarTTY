@@ -115,6 +115,7 @@ public sealed class WpfHexTerminal : Grid, IByteSearchTarget
         {
             pane.AutoWrap = false;
             pane.Model.ScrollbackLimit = int.MaxValue;
+            pane.OpensPasteMenu = false;
             pane.CharacterTyped += ch => CharacterTyped?.Invoke(ch);
             pane.ShortcutKey += (sender, e) => ShortcutKey?.Invoke(this, e);
             pane.ContextMenuRequested += (sender, where) => ContextMenuRequested?.Invoke(this, where);

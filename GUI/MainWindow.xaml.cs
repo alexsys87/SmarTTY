@@ -382,7 +382,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void TftpFirmware_Click(object sender, RoutedEventArgs e)
     {
-        DeviceTerminalControl terminal = Controller.ActiveSession?.DeviceTab?.Terminal;
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal terminal = Controller.ActiveSession?.DeviceTab?.Terminal;
         if (terminal == null)
         {
             return;
@@ -1233,7 +1233,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
         // COM/TCP tabs follow the same F10 and Alt+letter rules as SSH terminals (the shared "Action for Alt+letter" option).
         ITabContext activeTab = Controller.ActiveSession?.ActiveTab;
-        if ((activeTab?.EditorControl as TerminalEmulatorControl ?? (activeTab as DeviceTabContext)?.Terminal.FocusedTextTerminal) is TerminalEmulatorControl terminalEmulatorControl)
+        if (activeTab?.EditorControl is TerminalEmulatorControl terminalEmulatorControl)
         {
             if ((int)e.Key == 156 && (int)e.SystemKey == 99)
             {

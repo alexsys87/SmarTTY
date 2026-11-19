@@ -306,7 +306,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     {
         get
         {
-            DeviceTerminalControl terminal = DeviceTab?.Terminal;
+            SmarTTY.GUI.DevicePanel.WpfDeviceTerminal terminal = DeviceTab?.Terminal;
             if (terminal == null)
             {
                 return null;

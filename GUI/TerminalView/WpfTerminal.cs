@@ -258,7 +258,15 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             System.Drawing.Color text = settings.DefaultTextColor;
             scheme.DefaultForeground = RgbColor.FromArgb(255, text.R, text.G, text.B);
         }
-        ConsolePalette palette = settings.PaletteOverride ?? ConsolePalette.PuTTY;
+        SetPalette(settings.PaletteOverride ?? ConsolePalette.PuTTY, redraw: false);
+        SetFont(font);
+        _panel.ScrollBarVisibility = settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Hide ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>The 16 colours of the ANSI palette.</summary>
+    public void SetPalette(ConsolePalette palette, bool redraw = true)
+    {
+        TerminalColorScheme scheme = _view.ColorScheme;
         for (int index = 0; index < 8; index++)
         {
             if (index < palette.NormalColors.Length)
@@ -272,17 +280,26 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
                 scheme.SetPaletteColor(index, bright: true, RgbColor.FromArgb(bright.A, bright.R, bright.G, bright.B));
             }
         }
+        if (redraw)
+        {
+            _view.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// The font of the settings, as the WinForms terminal used it: the family, the size in points (to device-independent pixels, 1/96 inch;
+    /// WPF scales them to the DPI of the monitor itself), bold and italic. Null keeps the font and draws again.
+    /// </summary>
+    public void SetFont(System.Drawing.Font font)
+    {
         if (font != null)
         {
-            // The font of the settings, as the WinForms terminal used it: the family, the size in points (to device-independent pixels, 1/96
-            // inch; WPF scales them to the DPI of the monitor itself), bold and italic.
             _view.SetFont(new FontFamily(font.FontFamily.Name), Math.Max(4, font.SizeInPoints * 96.0 / 72.0), font.Bold, font.Italic);
         }
         else
         {
             _view.Invalidate();
         }
-        _panel.ScrollBarVisibility = settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Hide ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>
@@ -301,6 +318,12 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         }
         _view.Invalidate();
     }
+
+    /// <summary>
+    /// Ctrl+Shift+V opens the paste menu of this terminal when the settings say so; false leaves the key to <see cref="ShortcutKey"/> (the
+    /// device panel has a paste menu of its own, which sends to the device, and the panes of its HEX view send nothing themselves).
+    /// </summary>
+    public bool OpensPasteMenu { get; set; } = true;
 
     /// <summary>The selection is copied when the mouse button is released.</summary>
     public bool CopyOnSelect
@@ -352,6 +375,16 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     }
 
     public string ReportedDirectory => _model.ReportedDirectory;
+
+    /// <summary>The text of the whole document (the scrollback and the screen), a line per row.</summary>
+    public string DocumentText
+    {
+        get
+        {
+            EditableTextDocument document = _model.Document;
+            return document.LineCount == 0 ? "" : document.GetRangeText(new TextDocument.TextPosition(0, 0), document.EndPosition, line => "\r\n");
+        }
+    }
 
     public bool ByteOrientedLineEditing
     {
@@ -635,7 +668,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             e.Handled = true;
             return;
         }
-        if (key == Key.V && modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && PasteOptions.CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)
+        if (key == Key.V && modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && PasteOptions.CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu && OpensPasteMenu)
         {
             ShowPasteMenu();
             e.Handled = true;

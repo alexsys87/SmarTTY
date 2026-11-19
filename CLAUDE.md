@@ -48,7 +48,8 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
-| `GUI/TerminalView/` | Stage 2: the WPF terminal of every SSH tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
+| `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
+| `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar and menus are still WinForms, hosted) | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
@@ -98,7 +99,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1A | Editor logic out of WinForms | Done in alexsys87/SmarTTY#508–#526 (A1–A7, see the "Done in A…" notes below); what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here" |
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
-| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`) and 2C (the Smart Terminal on `WpfSmartTerminal`) done, see "Stage 2": no SSH tab uses a WinForms terminal now; next 2D, the device terminal and the HEX view, then the removal of `TerminalEmulatorBase` and its subclasses |
+| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) done, see "Stage 2": no tab uses a WinForms terminal now; next the removal of `TerminalEmulatorBase`, its subclasses, `HexTerminalControl` and `DeviceTerminalControl` with the Mono stands that drive them |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
@@ -457,8 +458,32 @@ on a new line after it. `WpfTerminal` got the hooks: `OnTerminalKey` (after the 
 the editor) does nothing in the command line, a selection made with the mouse inside the command line is not replaced by typing (it is dropped and
 the text goes in at the caret), Alt+letter does nothing at the prompt (it did nothing useful before: there was no channel).
 
-Not in 2A/2B/2C: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the
-device terminal use the WinForms control), wide (East Asian) characters taking two cells (the
+Done in 2D: the device tab (COM, TCP, telnet, netconsole) is `GUI/DevicePanel/WpfDeviceTerminal` (a WPF `DockPanel`), the port of
+`DeviceTerminalControl` and its 13 partials: the partial files are copies of the old ones with the terminals replaced and the control's own
+calls (`BeginInvoke`, `Handle`, the owner of a dialog, `IsHandleCreated`) answered by `WpfDeviceTerminal.View.cs`; the static helpers
+(`GetConnectionTitle`, `CreateTransportCallback`, `TestConnection`) and the hooks that `App` sets stay those of `DeviceTerminalControl`.
+The tool bar, the netconsole bar and the context menu are the WinForms ones of the old designer (`WpfDeviceTerminal.Toolbar.cs`), the bars
+hosted in a `WindowsFormsHost` strip above and below the terminals and the menu shown as a popup: they go to WPF in stage 4 with the other
+menus. The "connection closed" prompt is the WPF `ConnectionClosedPopup` over the terminals (no `ElementHost` now). The text view is
+`GUI/TerminalView/WpfSerialTerminal` (the port of `SerialTerminalControl`: the input line, which continues the device's own prompt on its
+row through `PromptLine` with the prompt on the screen, keeping the device's colours, or follows a local prompt; the history, Ctrl+R, the
+grey suggestion, the local completion, the links of a device's text with a plain click, the raw echo, the terminal size command, the text
+the device prints while a line is typed, ESC c through `TerminalDisplayModel.StreamReset`); the HEX view is `GUI/TerminalView/WpfHexTerminal`
+(two WPF terminal panes written row by row from `HexTerminalModel`, scrolled together and mirroring their selections through
+`TerminalDisplayModel.SelectionChanged`, with the byte search, its marks, the echo colour and the layout made again after a resize). The
+TFTP window and the log replay take `Controls/IDeviceConsole` and `IDeviceReplayTarget`, which both panels implement. The old
+`DeviceTerminalControl`, `SerialTerminalControl` and `HexTerminalControl` stay, with `DeviceLineEditorTests`, `NetconsoleTerminalTests`
+and `HexTerminalControlTests` on Mono (all passing), until they are removed. `TerminalRenderModelTests` has 204 checks (the device
+prompt), `HexTerminalModelTests` 89 (the panes). Fixed in the port: the caret after a completion was put the length of the prompt too far
+to the left (`OnCompletionApplied` took it off an index of the text). Not as before: the input line has the editing keys of the Smart
+Terminal (Delete, Ctrl+Backspace, Ctrl+Left/Right, Shift selection); a selection made with the mouse inside it is not replaced by typing.
+Manual check on Windows: a COM port or a TCP device with a shell (the prompt continued, colours kept, Tab, Up/Down, Ctrl+R, the grey
+suggestion, Ctrl+C, Ctrl+L, a line longer than the screen, text printed while typing, `mc`/`vi` taking the keys, "Return to input line"),
+telnet with and without the server's echo, netconsole in line and character mode, the HEX and Text + HEX views (typing into the send box,
+a search for bytes, the marks, a resize), a file dropped on the terminal, XMODEM/ZMODEM, the log and its replay, the TFTP window, the
+paste menu, a reconnect and the prompt over the terminal.
+
+Not in 2A/2B/2C/2D: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl` for the editor tabs), wide (East Asian) characters taking two cells (the
 screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
 slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
 

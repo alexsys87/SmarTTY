@@ -16,7 +16,7 @@ public partial class DeviceTerminalControl
     /// Creates the TFTP/U-Boot window of this terminal (this terminal, its title). Injected by <c>App</c>: this control
     /// is compiled by the Mono test harness, which cannot reference the WPF dialogs. Null when the window is unavailable.
     /// </summary>
-    public static Func<DeviceTerminalControl, string, ITftpFirmwareWindow> TftpFirmwareWindowFactory;
+    public static Func<IDeviceConsole, string, ITftpFirmwareWindow> TftpFirmwareWindowFactory;
 
     private ITftpFirmwareWindow _tftpWindow;
 
@@ -75,16 +75,16 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>True while the connection to the device is open.</summary>
-    internal bool IsDeviceConnected => _connectionState == ConnectionStateEnum.Connected && _asyncTransportConnection != null;
+    public bool IsDeviceConnected => _connectionState == ConnectionStateEnum.Connected && _asyncTransportConnection != null;
 
     /// <summary>True while a file transfer protocol (XMODEM, YMODEM, ZMODEM, Kermit) or a file being sent owns the line.</summary>
-    internal bool IsLineOwnedByTransfer => IsLineClaimed;
+    public bool IsLineOwnedByTransfer => IsLineClaimed;
 
     /// <summary>
     /// Reports what the device sends, as text, until the returned object is disposed. The text is the same the terminal
     /// shows; the calls come on the UI thread, in order.
     /// </summary>
-    internal IDisposable ListenToConsole(Action<string> onText)
+    public IDisposable ListenToConsole(Action<string> onText)
     {
         Decoder decoder = _textEncoding.GetDecoder();
         Encoding encoding = _textEncoding;
@@ -102,13 +102,13 @@ public partial class DeviceTerminalControl
     }
 
     /// <summary>Types a line followed by Enter (a carriage return, which every U-Boot takes). False when it could not be sent.</summary>
-    internal bool SendConsoleLine(string line)
+    public bool SendConsoleLine(string line)
     {
         return SendConsoleBytes(_textEncoding.GetBytes((line ?? string.Empty) + "\r"));
     }
 
     /// <summary>Types Ctrl+C, which stops a running U-Boot command such as a download.</summary>
-    internal bool SendConsoleBreak()
+    public bool SendConsoleBreak()
     {
         return SendConsoleBytes(new byte[] { 0x03 });
     }

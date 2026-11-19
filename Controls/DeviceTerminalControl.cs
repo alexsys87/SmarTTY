@@ -18,7 +18,7 @@ using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
 
-public partial class DeviceTerminalControl : DpiAwareControl
+public partial class DeviceTerminalControl : DpiAwareControl, IDeviceConsole, IDeviceReplayTarget
 {
 
     private ITransportFactory _transportFactory;
@@ -135,7 +135,7 @@ public partial class DeviceTerminalControl : DpiAwareControl
     /// Replays a recorded raw byte log (the bytes, this terminal). The themed WPF window is injected here by
     /// <c>App</c>: this control is compiled by the Mono test harness, which cannot reference the WPF dialogs.
     /// </summary>
-    public static Action<byte[], DeviceTerminalControl> LogReplayPrompt;
+    public static Action<byte[], IDeviceReplayTarget> LogReplayPrompt;
 
     /// <summary>
     /// Lets the user change the serial port settings (the settings to edit, or null to keep the driver's; the port name).

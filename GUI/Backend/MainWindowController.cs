@@ -2065,7 +2065,8 @@ public class MainWindowController : INotifyPropertyChanged
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
         sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
         sessionWrapper.DeviceTab.Terminal.OpenFileRequested += DeviceTab_OpenFileRequested;
-        SubscribeMinimalisticModeMouseTracking(sessionWrapper.DeviceTab.Terminal);
+        sessionWrapper.DeviceTab.Terminal.TextTerminal.MouseMove += WpfTerminal_MouseMove;
+        sessionWrapper.DeviceTab.Terminal.TextTerminal.CtrlTabPressed += (WpfTerminal source, bool shift) => ActiveSession?.OnCtrlTabPressed(shift);
         sessionWrapper.ShowNewSessionTab = AllSessions.Count == 1;
         AllSessions.Insert(firstPseudoPage, sessionWrapper);
         HookSessionCollection();
@@ -2584,29 +2585,6 @@ public class MainWindowController : INotifyPropertyChanged
     /// terminal's client area, so a control that does not fill the window (a label of the "connecting" panel,
     /// for example) cannot make a window edge look nearer than it is.
     /// </summary>
-    private void SubscribeMinimalisticModeMouseTracking(Control terminal)
-    {
-        SubscribeMinimalisticModeMouseTracking(terminal, terminal);
-    }
-
-    private void SubscribeMinimalisticModeMouseTracking(Control control, Control terminal)
-    {
-        control.MouseMove += (sender, e) =>
-        {
-            // No layout change while text is being selected by dragging (see anyctl_MouseMove).
-            if (!(sender is Control source) || terminal.IsDisposed || source.IsDisposed || e.Button != System.Windows.Forms.MouseButtons.None)
-            {
-                return;
-            }
-            Point location = terminal.PointToClient(source.PointToScreen(e.Location));
-            UpdateMinimalisticModeVisibility(ScreenEdgeUtils.GetNearEdges(terminal, location, EdgeMargin));
-        };
-        foreach (Control child in control.Controls)
-        {
-            SubscribeMinimalisticModeMouseTracking(child, terminal);
-        }
-    }
-
     private static Visibility BoolToVisibility(bool v)
     {
         if (v)
