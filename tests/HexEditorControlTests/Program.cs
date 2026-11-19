@@ -13,6 +13,8 @@ using System.Windows.Forms;
 // HexEditorControlGolden.txt is what the code wrote before its editing logic was moved to TextEditing/HexEditingModel.cs; the answers must stay the same.
 // The mouse, the page keys, the wheel, the tool tip and the colours are in a run of their own on a shown control (RunView), whose points are
 // found from the cells of the layout so that the fonts do not matter; the clipboard is not in it.
+// The submenus of the hex view (HexEditorMenu) and the data inspector (HexDataInspector) are in two more runs (RunMenu, RunInspector), written by the
+// code before the hex view went to the WPF tab (3B-3).
 //   xvfb-run -a mono tests/HexEditorControlTests/bin/Release/net48/HexEditorControlTests.exe            compares with the golden file
 //   ... HexEditorControlTests.exe --record <file>                                                        writes the golden file (old code only)
 internal static class Program
@@ -622,6 +624,276 @@ internal static class Program
         form.Dispose();
     }
 
+    // ---- Stage 3B-3: the submenus of the hex view and the data inspector ----
+    // Written by the code before the hex view went to the WPF tab (3B-3), so that the menu and the inspector that the WPF view gets do what these
+    // did. The menu is the real HexEditorMenu on the real control: every item with its text, key, enabled, checked and visible state in a few states
+    // of the control, then the items clicked (not Copy As: it writes to the clipboard), with the dialog asked for, the calls after a command and the
+    // message boxes. The inspector is the real HexDataInspector of the control: the text an edit starts with for each value, Enter with the same, a
+    // new and a wrong text, Esc, an edit while the file is read-only, the keys of its rows, and a click on the byte order and on the link that hides
+    // it (the rows are found from its row height, so that the fonts do not matter).
+
+    private static string _dialogs = "";
+
+    private static int _afterCommands;
+
+    private static string _boxes = "";
+
+    private static string MenuState(HexEditorMenu menu)
+    {
+        List<string> parts = new List<string>();
+        foreach (ToolStripMenuItem submenu in menu.Menus)
+        {
+            List<string> items = new List<string>();
+            foreach (ToolStripItem item in submenu.DropDownItems)
+            {
+                if (item is ToolStripSeparator)
+                {
+                    items.Add("-");
+                    continue;
+                }
+                ToolStripMenuItem menuItem = (ToolStripMenuItem)item;
+                items.Add(menuItem.Text + "[" + (menuItem.Enabled ? "E" : "") + (menuItem.Checked ? "C" : "") + (menuItem.ShortcutKeyDisplayString ?? "") + (menuItem.Image != null ? "I" : "") + "]");
+            }
+            parts.Add(submenu.Text + (submenu.Available ? "" : "(hidden)") + (submenu.Enabled ? "" : "(off)") + ":" + string.Join(",", items));
+        }
+        return string.Join(" | ", parts);
+    }
+
+    private static ToolStripMenuItem MenuItem(HexEditorMenu menu, string submenu, string text)
+    {
+        foreach (ToolStripMenuItem sub in menu.Menus)
+        {
+            if (sub.Text != submenu)
+            {
+                continue;
+            }
+            foreach (ToolStripItem item in sub.DropDownItems)
+            {
+                if (item.Text == text)
+                {
+                    return (ToolStripMenuItem)item;
+                }
+            }
+        }
+        throw new InvalidOperationException("no menu item " + submenu + " > " + text);
+    }
+
+    private static void Click(HexEditorMenu menu, string submenu, string text)
+    {
+        MenuItem(menu, submenu, text).PerformClick();
+        menu.Refresh(hexMode: true);
+        Record("menu " + submenu + " > " + text, "dialogs=" + _dialogs + " after=" + _afterCommands + " boxes=" + _boxes + " bigendian=" + Bool(_hex.BigEndian) + " group=" + _hex.GroupSize + " color=" + Bool(_hex.ColorByValue));
+        _dialogs = "";
+        _afterCommands = 0;
+        _boxes = "";
+    }
+
+    private static void RunMenu()
+    {
+        Lines.Add("== menu");
+        _driver = new Driver();
+        _hex.StateChanged += (sender, e) => _states++;
+        ThemedMessageBox.ShowImpl = (text, caption, buttons, icon, owner) =>
+        {
+            _boxes += "[" + icon + ":" + text + "]";
+            return DialogResult.OK;
+        };
+        HexEditorMenu menu = new HexEditorMenu(_hex, kind => _dialogs += kind + ";", () => _afterCommands++);
+        menu.Refresh(hexMode: false);
+        Lines.Add("text view: " + MenuState(menu));
+        _hex.Document = new HexDocument(new byte[0]);
+        menu.Refresh(hexMode: true);
+        Lines.Add("empty: " + MenuState(menu));
+        _hex.Document = new HexDocument(InitialBytes(), InitialBytes());
+        _hex.GoToOffset(20);
+        menu.Refresh(hexMode: true);
+        Lines.Add("caret: " + MenuState(menu));
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        menu.Refresh(hexMode: true);
+        Lines.Add("selection: " + MenuState(menu));
+        Click(menu, "Highlight", "Green");
+        Lines.Add("highlighted: " + MenuState(menu));
+        Click(menu, "Highlight", "Color and Label...");
+        Click(menu, "Edit Bytes", "Fill Selection...");
+        Click(menu, "Edit Bytes", "Insert Bytes...");
+        Click(menu, "Edit Bytes", "Checksums and Hashes...");
+        Click(menu, "Edit Bytes", "Swap Byte Order (16-bit Words)");
+        Click(menu, "Edit Bytes", "Swap Byte Order (64-bit Words)");
+        _hex.GoToOffset(50);
+        Click(menu, "Highlight", "Yellow");
+        _hex.GoToOffset(60);
+        menu.Refresh(hexMode: true);
+        Lines.Add("blocks, none at the caret: " + MenuState(menu));
+        Click(menu, "Highlight", "Next Highlight");
+        Click(menu, "Highlight", "Next Highlight");
+        Click(menu, "Highlight", "Previous Highlight");
+        Lines.Add("on a block: " + MenuState(menu));
+        Click(menu, "Highlight", "Remove Highlight");
+        Click(menu, "Highlight", "Remove All Highlights");
+        Lines.Add("no blocks: " + MenuState(menu));
+        Click(menu, "Hex View", "Big Endian (Network Order, MIPS, PowerPC)");
+        Click(menu, "Hex View", "Group by 32-bit Words");
+        Click(menu, "Hex View", "8 Bytes per Row");
+        Lines.Add("8 in a row: " + MenuState(menu));
+        Click(menu, "Hex View", "Color Bytes by Value");
+        Click(menu, "Hex View", "Little Endian (x86, ARM)");
+        Click(menu, "Hex View", "Single Bytes");
+        Click(menu, "Hex View", "16 Bytes per Row");
+        _hex.ReadOnly = true;
+        menu.Refresh(hexMode: true);
+        Lines.Add("read-only: " + MenuState(menu));
+        _hex.ReadOnly = false;
+        _hex.GoToOffset(_hex.Length);
+        menu.Refresh(hexMode: true);
+        Lines.Add("at the end: " + MenuState(menu));
+        menu.Dispose();
+        ThemedMessageBox.ShowImpl = null;
+        _driver.Dispose();
+    }
+
+    private static HexDataInspector Inspector => Field<HexDataInspector>("_inspector");
+
+    private static object InspectorField(string name)
+    {
+        return typeof(HexDataInspector).GetField(name, Private).GetValue(Inspector);
+    }
+
+    private static object InspectorCall(string name, params object[] arguments)
+    {
+        return typeof(HexDataInspector).GetMethod(name, Private).Invoke(Inspector, arguments);
+    }
+
+    private static void InspectorKey(Keys keyData)
+    {
+        typeof(HexDataInspector).GetMethod("OnKeyDown", Private).Invoke(Inspector, new object[] { new KeyEventArgs(keyData) });
+    }
+
+    private static void EditBoxKey(Keys key)
+    {
+        InspectorCall("OnEditBoxKeyDown", InspectorField("_editBox"), new KeyEventArgs(key));
+    }
+
+    private static void RecordInspector(string operation)
+    {
+        TextBox box = (TextBox)InspectorField("_editBox");
+        object editing = InspectorField("_editing");
+        Record("inspector " + operation, "editing=" + (editing == null ? "-" : editing.ToString()) + " box=" + (box.Visible ? "[" + box.Text + "]" : "hidden")
+            + " original=" + (InspectorField("_editOriginalText") ?? "-") + " row=" + InspectorField("_selectedRow")
+            + " message=" + InspectorField("_message") + (((bool)InspectorField("_messageIsError")) ? " (error)" : "")
+            + " shown=" + Bool(_hex.ShowDataInspector) + " bigendian=" + Bool(_hex.BigEndian));
+    }
+
+    private static void RunInspector()
+    {
+        Lines.Add("== inspector");
+        _driver = new Driver();
+        Form form = new Form { FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(0, 0) };
+        _hex.Dock = DockStyle.Fill;
+        form.Controls.Add(_hex);
+        byte[] bytes = new byte[64];
+        // 0x0000: a float 1.5, then a time, then "é" and an "A".
+        byte[] start = { 0x00, 0x00, 0xC0, 0x3F, 0x00, 0x2C, 0x5B, 0x65, 0xC3, 0xA9, 0x41, 0x80 };
+        Array.Copy(start, bytes, start.Length);
+        _hex.Document = new HexDocument(bytes, bytes);
+        _hex.LoadViewOptions(16, 1, false, false, true);
+        form.ClientSize = new System.Drawing.Size(1400, 400);
+        form.Show();
+        Application.DoEvents();
+        IReadOnlyList<HexValueType> types = HexValueFormats.InspectorTypes;
+        foreach (int offset in new[] { 0, 4, 8, 10, 11 })
+        {
+            _hex.GoToOffset(offset);
+            for (int row = 0; row < types.Count; row++)
+            {
+                InspectorCall("BeginEdit", row);
+                RecordInspector("edit " + types[row] + " at " + offset);
+                EditBoxKey(Keys.Escape);
+            }
+        }
+        _hex.GoToOffset(0);
+        int floatRow = -1;
+        int byteRow = -1;
+        for (int row = 0; row < types.Count; row++)
+        {
+            if (types[row] == HexValueType.Float32)
+            {
+                floatRow = row;
+            }
+            if (types[row] == HexValueType.UInt8)
+            {
+                byteRow = row;
+            }
+        }
+        InspectorCall("BeginEdit", floatRow);
+        EditBoxKey(Keys.Enter);
+        RecordInspector("Enter on the same text");
+        InspectorCall("BeginEdit", floatRow);
+        ((TextBox)InspectorField("_editBox")).Text = "2.25";
+        EditBoxKey(Keys.Enter);
+        RecordInspector("Enter on 2.25");
+        InspectorCall("BeginEdit", byteRow);
+        ((TextBox)InspectorField("_editBox")).Text = "300";
+        EditBoxKey(Keys.Enter);
+        RecordInspector("Enter on a byte of 300");
+        EditBoxKey(Keys.Escape);
+        RecordInspector("Esc");
+        _hex.GoToOffset(1);
+        InspectorCall("ShowMessage", "x", false);
+        _hex.GoToOffset(2);
+        RecordInspector("message kept until a paint");
+        _hex.ReadOnly = true;
+        InspectorCall("BeginEdit", byteRow);
+        RecordInspector("edit while read-only");
+        _hex.ReadOnly = false;
+        Inspector.Focus();
+        typeof(HexDataInspector).GetField("_selectedRow", Private).SetValue(Inspector, 2);
+        InspectorKey(Keys.Up);
+        RecordInspector("Up");
+        InspectorKey(Keys.Up);
+        InspectorKey(Keys.Up);
+        RecordInspector("Up at the top");
+        InspectorKey(Keys.Down);
+        RecordInspector("Down");
+        for (int i = 0; i < types.Count + 2; i++)
+        {
+            InspectorKey(Keys.Down);
+        }
+        RecordInspector("Down at the end");
+        InspectorKey(Keys.Enter);
+        RecordInspector("Enter on a row");
+        EditBoxKey(Keys.Escape);
+        InspectorKey(Keys.F2);
+        RecordInspector("F2 on a row");
+        EditBoxKey(Keys.Escape);
+        int rowHeight = (int)typeof(HexDataInspector).GetProperty("RowHeight", Private).GetValue(Inspector, null);
+        int valueX = (int)typeof(HexDataInspector).GetProperty("ValueX", Private).GetValue(Inspector, null);
+        List<string> rows = new List<string>();
+        foreach (int y in new[] { 0, 2 + rowHeight + 3, 2 + rowHeight + 4, 2 + 2 * rowHeight + 3, 2 + 2 * rowHeight + 4, 2 + (2 + types.Count) * rowHeight + 3, 2 + (2 + types.Count) * rowHeight + 4 })
+        {
+            rows.Add(((int)InspectorCall("RowAt", y)).ToString(CultureInfo.InvariantCulture));
+        }
+        Record("inspector rows at the edges", string.Join(",", rows));
+        MethodInfo mouseDown = typeof(HexDataInspector).GetMethod("OnMouseDown", Private);
+        mouseDown.Invoke(Inspector, new object[] { new MouseEventArgs(MouseButtons.Left, 1, valueX + 2, 2 + rowHeight + 4 + rowHeight / 2, 0) });
+        RecordInspector("click on the byte order");
+        mouseDown.Invoke(Inspector, new object[] { new MouseEventArgs(MouseButtons.Left, 1, valueX + 2, 2 + rowHeight + 4 + rowHeight + rowHeight / 2, 0) });
+        RecordInspector("click on the first value");
+        mouseDown.Invoke(Inspector, new object[] { new MouseEventArgs(MouseButtons.Right, 1, valueX + 2, 2 + rowHeight + 4 + rowHeight / 2, 0) });
+        RecordInspector("right click on the byte order");
+        Inspector.Focus();
+        InspectorKey(Keys.I | Keys.Control);
+        RecordInspector("Ctrl+I");
+        _hex.ShowDataInspector = true;
+        Application.DoEvents();
+        System.Drawing.Rectangle hide = (System.Drawing.Rectangle)typeof(HexDataInspector).GetProperty("HideLinkBounds", Private).GetValue(Inspector, null);
+        mouseDown.Invoke(Inspector, new object[] { new MouseEventArgs(MouseButtons.Left, 1, hide.X + 1, hide.Y + 1, 0) });
+        RecordInspector("click on Hide");
+        form.Dispose();
+    }
+
     private static int Main(string[] args)
     {
         try
@@ -633,6 +905,8 @@ internal static class Program
             Run(7, 600, focusedSearches: true);
             Run(8, 600, focusedSearches: true);
             RunView();
+            RunMenu();
+            RunInspector();
         }
         catch (Exception exception)
         {
