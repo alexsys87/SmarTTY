@@ -72,6 +72,7 @@ internal static class Program
         Equal(Pos(InputRegionMap.PositionAt(document, 1, 13, -1)), "2,3", "a negative index is the end of the document");
         Equal(Pos(InputRegionMap.PositionAt(Document(), 0, 0, 3)), "0,0", "an empty document: its start");
         Equal(Pos(InputRegionMap.PositionAt(Document("", "ab"), 1, 0, 1)), "1,1", "a region at the start of a line");
+        Equal(Pos(InputRegionMap.PositionAt(Document("ab"), 0, 0, 0)), "0,0", "index 0 of a region that starts at the first column of the first line");
 
         // The two ways agree wherever a row does not end.
         bool agree = true;
