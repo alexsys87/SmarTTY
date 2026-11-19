@@ -303,6 +303,9 @@ jobs:
       - name: Run local completion session checks (the completion of a command, a path or a directory in the input line of a device terminal)
         run: dotnet run --project tests/LocalCompletionSessionTests -c Release
 
+      - name: Run hex terminal model checks (the rows the bytes are formatted into, chunks and breaks, the layout made again, the match of the search, columns of the two views)
+        run: dotnet run --project tests/HexTerminalModelTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
@@ -459,6 +462,12 @@ jobs:
 
       - name: Run the hex editor control checks (the real control driven by keys and calls, compared with what it did before its logic moved to the model)
         run: xvfb-run -a mono tests/HexEditorControlTests/bin/Release/net48/HexEditorControlTests.exe
+
+      - name: Build the hex terminal control checks
+        run: dotnet build tests/HexTerminalControlTests -c Release
+
+      - name: Run the hex terminal control checks (the real hex view of a device terminal driven by scripted bytes, compared with what it did before its logic moved out of the control)
+        run: xvfb-run -a mono tests/HexTerminalControlTests/bin/Release/net48/HexTerminalControlTests.exe
 
       - name: Build the terminal snapshot checks
         run: dotnet build tests/TerminalSnapshots -c Release
