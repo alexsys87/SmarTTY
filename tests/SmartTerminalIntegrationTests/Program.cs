@@ -846,7 +846,9 @@ internal static class Program
 
     private static string Suggestion(SshTerminalControl terminal)
     {
-        return (string)typeof(SshTerminalControl).GetField("_historySuggestion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+        // The accessor follows the move of the field into HistorySuggestionState (its Current is what the field held).
+        object state = typeof(SshTerminalControl).GetField("_suggestion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+        return (string)state.GetType().GetProperty("Current", BindingFlags.Instance | BindingFlags.Public).GetValue(state, null);
     }
 
     private static Step Retype(SshTerminalControl terminal, string typed, string name, Func<bool> done)
