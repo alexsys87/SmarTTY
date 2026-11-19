@@ -246,6 +246,151 @@ internal static class Program
             },
             new Step
             {
+                Name = "Down below the newest entry leaves the box as it is",
+                Act = () => PressInBox(control, Keys.Down),
+                Done = () => control.NetconsoleInputBox.Text.Length == 0
+            },
+            new Step
+            {
+                Name = "what is typed into the terminal is the draft the history walk starts from",
+                Act = () => Type(terminal, "dra"),
+                Done = () => control.NetconsoleInputBox.Text == "dra"
+            },
+            new Step
+            {
+                Name = "Up brings the newest line",
+                Act = () => PressInBox(control, Keys.Up),
+                Done = () => control.NetconsoleInputBox.Text == "boot"
+            },
+            new Step
+            {
+                Name = "Up again brings the one before it",
+                Act = () => PressInBox(control, Keys.Up),
+                Done = () => control.NetconsoleInputBox.Text == "ver"
+            },
+            new Step
+            {
+                Name = "Down goes back to the newer line",
+                Act = () => PressInBox(control, Keys.Down),
+                Done = () => control.NetconsoleInputBox.Text == "boot"
+            },
+            new Step
+            {
+                Name = "Down below the newest line brings the draft back",
+                Act = () => PressInBox(control, Keys.Down),
+                Done = () => control.NetconsoleInputBox.Text == "dra"
+            },
+            new Step
+            {
+                Name = "Escape clears the box",
+                Act = () => PressInBox(control, Keys.Escape),
+                Done = () => control.NetconsoleInputBox.Text.Length == 0
+            },
+            new Step
+            {
+                Name = "and the next Up starts from the newest line again",
+                Act = () => PressInBox(control, Keys.Up),
+                Done = () => control.NetconsoleInputBox.Text == "boot"
+            },
+            new Step
+            {
+                Name = "Up stops at the oldest line",
+                Act = () =>
+                {
+                    for (int i = 0; i < 6; i++)
+                    {
+                        PressInBox(control, Keys.Up);
+                    }
+                },
+                Done = () => control.NetconsoleInputBox.Text == "printenv"
+            },
+            new Step
+            {
+                Name = "Backspace typed into the terminal takes the last letter out of the box",
+                Act = () =>
+                {
+                    PressInBox(control, Keys.Escape);
+                    terminal.TypeText("abc\b");
+                },
+                Done = () => control.NetconsoleInputBox.Text == "ab"
+            },
+            new Step
+            {
+                Name = "so does Delete (0x7f)",
+                Act = () => terminal.TypeText("\u007f"),
+                Done = () => control.NetconsoleInputBox.Text == "a"
+            },
+            new Step
+            {
+                Name = "a backspace in an empty box does nothing",
+                Act = () => terminal.TypeText("\b\b"),
+                Done = () => control.NetconsoleInputBox.Text.Length == 0
+            },
+            new Step
+            {
+                Name = "a tab goes into the box",
+                Act = () => terminal.TypeText("a\tb"),
+                Done = () => control.NetconsoleInputBox.Text == "a\tb"
+            },
+            new Step
+            {
+                Name = "what is typed after the text in the box is added to it and Enter sends all of it",
+                Act = () =>
+                {
+                    ClearReceived();
+                    terminal.TypeText("c\r");
+                },
+                Done = () => Received() == "a\tbc\n" && control.NetconsoleInputBox.Text.Length == 0
+            },
+            new Step
+            {
+                Name = "a line ending of CR and LF in one piece of text sends one line",
+                Act = () =>
+                {
+                    ClearReceived();
+                    terminal.TypeText("one\r\ntwo\r");
+                },
+                Done = () => Received() == "one\n|two\n"
+            },
+            new Step
+            {
+                Name = "a lone LF sends a line",
+                Act = () =>
+                {
+                    ClearReceived();
+                    terminal.TypeText("x\ny\n");
+                },
+                Done = () => Received() == "x\n|y\n"
+            },
+            new Step
+            {
+                Name = "a control character goes to the device at once, the letters around it into the box",
+                Act = () =>
+                {
+                    ClearReceived();
+                    terminal.TypeText("ab\u0003cd");
+                },
+                Done = () => Received() == "\u0003" && control.NetconsoleInputBox.Text == "abcd"
+            },
+            new Step
+            {
+                Name = "an escape sequence typed as text is cut: the ESC goes to the device, the rest into the box",
+                Act = () =>
+                {
+                    PressInBox(control, Keys.Escape);
+                    ClearReceived();
+                    terminal.TypeText("\u001b[A");
+                },
+                Done = () => Received() == "\u001b" && control.NetconsoleInputBox.Text == "[A"
+            },
+            new Step
+            {
+                Name = "the box is cleared for what follows",
+                Act = () => PressInBox(control, Keys.Escape),
+                Done = () => control.NetconsoleInputBox.Text.Length == 0
+            },
+            new Step
+            {
                 Name = "the tab is closed without hanging",
                 Act = () => control.Disconnect(),
                 Done = () => !control.StatusText.Contains("listening")
@@ -378,6 +523,14 @@ internal static class Program
                 }
             }
             OnKeyPressMethod.Invoke(terminal, new object[] { new KeyPressEventArgs(ch) });
+        }
+    }
+
+    private static void ClearReceived()
+    {
+        lock (DeviceReceived)
+        {
+            DeviceReceived.Clear();
         }
     }
 
