@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 135 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 136 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -47,7 +47,7 @@ PR that changes them.
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
-| `GUI/HexView/` | Stage 3B: the hex editor on WPF (`WpfHexEditor`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
+| `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
@@ -72,7 +72,8 @@ DpiAwareControl (WinForms UserControl)
       └─ EditableTextBrowser      undo/redo edit commands
          └─ TextEditorControl
             ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
-            │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl
+            │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
+            │                                   shows a hex view it is given (the tab gives it the WPF one) through IHexViewPlace
             └─ TerminalEmulatorBase   the view of a TerminalScreen (Terminal/Emulation): forwards the cursor, the buffers, tab stops, scroll region, writing
                └─ TerminalEmulatorControl (+ .Suggestion): VT parser (ProcessOutput), keys (ProcessCmdKey), mouse, paste
                   ├─ SshTerminalControl      Smart Terminal command line, completion, links
@@ -80,7 +81,7 @@ DpiAwareControl (WinForms UserControl)
 DeviceTerminalControl : DpiAwareControl   COM/TCP/telnet panel (+ 13 partials: ZModem, YModem, Kermit, Tftp, GzipBase64,
                                           Netconsole, FileSend, FileDrop, QuickScript, SerialLines, DeviceListing, LineInput);
                                           contains a SerialTerminalControl and a HexTerminalControl
-HexEditorControl : Control                hex editing inside RemoteFileEditor
+HexEditorControl : Control                hex editing inside RemoteFileEditor (the Mono stands; the tab shows GUI/HexView/WpfHexEditor)
 HexTerminalControl : DpiAwareControl      hex view of a device stream (data and search in TextEditing/HexTerminalModel + HexStreamMap)
 ```
 
@@ -99,7 +100,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) started: 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model) and 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window, not yet in the tab) done; next 3B-3, the WPF view in the editor tab |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); next 3C, the caret, the selection, the wrap and the undo of the text view to the model |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -525,3 +526,34 @@ Ctrl+Home/End, PageUp/Down with and without Shift; typing hex digits and charact
 X, V (a hexadecimal text, a plain text, "dead" with its question), Ctrl+Z and Ctrl+Y; a click on each digit, in the gap after a group, on a
 character; a drag inside the table and beyond its edges (automatic scrolling), a Shift+click; the wheel and Shift+wheel; the tool tip of a
 byte; colours by kind; 8, 16 and 32 bytes in a row and groups of 1 to 8; read-only.
+
+Done in 3B-3: first a net for what the hex golden did not reach: `tests/HexEditorControlTests` has two more runs at its end, written by the code
+before the move (the first 3655 lines did not change): `== menu` (the real `HexEditorMenu` on the real control: every item with its text, key,
+image, enabled and checked state in nine states, and the items clicked, not Copy As, with the dialog asked for, the calls after a command and the
+message boxes) and `== inspector` (the real `HexDataInspector`: the text an edit starts with for every value at five offsets, Enter with the same,
+a new and a wrong text, Esc, read-only, the keys of its rows, the rows at their edges, the clicks on the byte order, a value and the Hide link);
+of 7 mutations of the old code 6 made it fail at once and the 7th after a state was added for it. Then: the panel, the menu, the find window,
+the dialogs of the tab, the main window and the status source use the hex view through `CodeEditing/IHexEditorView` (the calls they made on
+`HexEditorControl`; `HighlightSelection` takes an `RgbColor`), which `HexEditorControl` and `WpfHexEditor` implement; the marking colours are
+`TextEditing/HexViewChoices.HighlightColors` (`RgbColor`). The items of the hex submenus and their rules are `CodeEditing/HexMenuModel` (with
+`HexDialogKind`), what the data inspector decides is `TextEditing/HexInspectorModel` (through `IHexInspectorSource`), both moved as they were; the
+WinForms menu and inspector use them, and `tests/HexMenuInspectorTests` (net8.0, 219 checks: a fake view for the menu, the real `HexEditingModel`
+for the inspector) drives them; of 26 mutations 24 made a check fail (one after a check was added), two are equivalent changes. The WPF view
+got its data inspector (`GUI/HexView/WpfHexInspector`, on the model, in device pixels, at the right with the whole height, the header link
+while it is hidden; its keys and typed text do not reach the bytes) and the tab its context menu (`GUI/HexView/HexViewContextMenu`: the
+commands of the panel with its state, the Text submenu off, the hex submenus). `RemoteFileEditor` takes a hex view in its constructor (null:
+its own `HexEditorControl`, as the Mono stands use) and shows, hides and styles it through `CodeEditing/IHexViewPlace` (colours, the font family
+and its size at the zoom of the text before the monitor scale); `EditorTabContext` is that place (the WPF view over the `WindowsFormsHost` in a
+grid, one of the two shown; closing the hex view gives the keyboard back to the host when the view had it), and `MainWindowController` makes the
+editor with the WPF view. The Mono stand has a `hex-place` scenario (a WinForms view given to the editor stands in for the WPF one, a place
+logs what it is asked; 486 checks in all). One thing is not word for word: the find window gives the focus back to the view without asking
+whether a WinForms view was disposed (the tab closes it before it disposes the view). Keys while the WPF view has the focus go through WPF:
+Ctrl+F is the main window's (as before), Ctrl+S, Ctrl+G, F3 and the rest are the view's; the shortcuts of the window (Ctrl+W, Ctrl+Tab) may
+now reach the window, which they did not while the WinForms hex control had the focus. Manual check on Windows, in a file tab: the checklist
+of 3B-2 in the tab; Hex Editor on and off from the tool bar and the context menu (the text, its caret and undo history come back, the
+keyboard is in the text); the status bar (offset, selection, INS/OVR, the byte order, groups and row width menus); Ctrl+S, Ctrl+F (the find
+window, F3 and Shift+F3), Ctrl+G (Go to Offset); the context menu over the bytes (each item, the colours, Color and Label, Fill, Insert, Swap,
+Checksums, the view options, Copy As); the data inspector: Ctrl+I, the tool bar button, the header link, the Hide link, the byte order link,
+a double-click or Enter on a value and its edit (Enter, Esc, a wrong value), Up/Down, Ctrl+C, a window too narrow for it; the editor zoom
+(Ctrl+wheel in the text, then the hex view) and the light/dark theme; a reload and a save in the hex view; Ctrl+W and Ctrl+Tab with the
+hex view focused; closing a tab with the hex view open.
