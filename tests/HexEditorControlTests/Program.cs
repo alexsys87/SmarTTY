@@ -11,7 +11,8 @@ using System.Windows.Forms;
 // Drives the real hex editor control (Controls/HexEditorControl.cs) with a script of keys and calls drawn from a seeded random generator, and writes down
 // what it does after every step: the caret and the selection, the typing mode, the area, the bytes, the undo history, the answers and the events.
 // HexEditorControlGolden.txt is what the code wrote before its editing logic was moved to TextEditing/HexEditingModel.cs; the answers must stay the same.
-// The mouse, the clipboard and the page keys are not in the script: they need the layout (fonts) or the system clipboard.
+// The mouse, the page keys, the wheel, the tool tip and the colours are in a run of their own on a shown control (RunView), whose points are
+// found from the cells of the layout so that the fonts do not matter; the clipboard is not in it.
 //   xvfb-run -a mono tests/HexEditorControlTests/bin/Release/net48/HexEditorControlTests.exe            compares with the golden file
 //   ... HexEditorControlTests.exe --record <file>                                                        writes the golden file (old code only)
 internal static class Program
@@ -375,6 +376,249 @@ internal static class Program
         _driver.Dispose();
     }
 
+    // ---- The view: the layout, the mouse, the page keys, the wheel, the tool tip and the colours of the bytes (stage 3, step 3B-1: the net
+    // before the geometry and the input of the control move to the model). The control is shown in a form whose height is chosen so that
+    // exactly 12 rows are visible and that is wide enough for 16 bytes in a row, and every point is found from the cells of the layout, so
+    // that what is written down does not depend on the fonts.
+
+    private static readonly BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    private static T Field<T>(string name)
+    {
+        return (T)typeof(HexEditorControl).GetField(name, Private).GetValue(_hex);
+    }
+
+    private static T PrivateProperty<T>(string name)
+    {
+        return (T)typeof(HexEditorControl).GetProperty(name, Private).GetValue(_hex, null);
+    }
+
+    private static object CallPrivate(string name, params object[] arguments)
+    {
+        return typeof(HexEditorControl).GetMethod(name, Private).Invoke(_hex, arguments);
+    }
+
+    private static HexEditingModel Model => Field<HexEditingModel>("_model");
+
+    private static string View()
+    {
+        return "first=" + Field<int>("_firstRow") + " scrollx=" + Field<int>("_scrollX") + " nib=" + Model.Nibble + " area=" + Model.Area;
+    }
+
+    // The middle of the cell of a byte: its hex digit (0 or 1) or its character, in a visible row.
+    private static System.Drawing.Point Cell(int row, int column, bool ascii, int digit = 0)
+    {
+        int charWidth = Field<int>("_charWidth");
+        int x = ascii ? Field<int>("_asciiStart") + column * charWidth : (int)CallPrivate("HexCellX", column) + digit * charWidth;
+        x += charWidth / 2 - Field<int>("_scrollX");
+        int y = Field<int>("_headerHeight") + (row - Field<int>("_firstRow")) * Field<int>("_rowHeight") + Field<int>("_rowHeight") / 2;
+        return new System.Drawing.Point(x, y);
+    }
+
+    private static readonly MethodInfo MouseDownMethod = typeof(HexEditorControl).GetMethod("OnMouseDown", Private);
+
+    private static readonly MethodInfo MouseMoveMethod = typeof(HexEditorControl).GetMethod("OnMouseMove", Private);
+
+    private static readonly MethodInfo MouseUpMethod = typeof(HexEditorControl).GetMethod("OnMouseUp", Private);
+
+    private static readonly MethodInfo MouseWheelMethod = typeof(HexEditorControl).GetMethod("OnMouseWheel", Private);
+
+    private static void Mouse(MethodInfo method, MouseButtons button, System.Drawing.Point point, int delta = 0)
+    {
+        method.Invoke(_hex, new object[] { new MouseEventArgs(button, 1, point.X, point.Y, delta) });
+    }
+
+    private static void RunView()
+    {
+        Lines.Add("== view");
+        _driver = new Driver();
+        Form form = new Form { FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(0, 0) };
+        _hex.Dock = DockStyle.Fill;
+        form.Controls.Add(_hex);
+        byte[] bytes = new byte[1000];
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            bytes[i] = (byte)((i * 13 + 5) & 0xFF);
+        }
+        _hex.Document = new HexDocument(bytes, bytes);
+        _hex.StateChanged += (sender, e) => _states++;
+        form.ClientSize = new System.Drawing.Size(1400, 300);
+        form.Show();
+        Application.DoEvents();
+        _hex.BytesPerRow = 16;
+        _hex.GroupSize = 4;
+        // The height that shows 12 rows, whatever the height of a row is.
+        int height = 100;
+        while (PrivateProperty<int>("VisibleRows") != 12 && height < 2000)
+        {
+            form.ClientSize = new System.Drawing.Size(1400, height);
+            Application.DoEvents();
+            if (PrivateProperty<int>("VisibleRows") < 12)
+            {
+                height += 1;
+            }
+            else
+            {
+                height -= 1;
+            }
+            if (PrivateProperty<int>("VisibleRows") > 12)
+            {
+                height -= 40;
+            }
+        }
+        _states = 0;
+        Record("layout visible=" + PrivateProperty<int>("VisibleRows") + " rows=" + PrivateProperty<int>("RowCount"), View());
+
+        // The page keys move by the visible rows less one; the caret is kept in view.
+        _driver.Down(Keys.PageDown);
+        Record("key PageDown", View());
+        _driver.Down(Keys.PageDown | Keys.Shift);
+        Record("key Shift+PageDown", View());
+        _driver.Down(Keys.PageUp);
+        Record("key PageUp", View());
+        _driver.Down(Keys.PageUp | Keys.Shift);
+        Record("key Shift+PageUp", View());
+        _driver.Down(Keys.PageUp);
+        Record("key PageUp at the top", View());
+        _driver.Down(Keys.Control | Keys.End);
+        Record("key Ctrl+End", View());
+        _driver.Down(Keys.PageDown);
+        Record("key PageDown at the end", View());
+        _driver.Down(Keys.Control | Keys.Home);
+        Record("key Ctrl+Home", View());
+        _hex.GoToOffset(500);
+        Record("go to 500", View());
+        _hex.GoToOffset(100);
+        Record("go to 100 (above the first row)", View());
+        _hex.GoToOffset(1000);
+        Record("go to the end", View());
+        _hex.GoToOffset(0);
+        Record("go to 0", View());
+
+        // Clicks: on the digits of a byte, in the gap after a group, on a character, on the header, left of the bytes, right of the characters,
+        // below the last byte.
+        Mouse(MouseDownMethod, MouseButtons.Left, Cell(2, 5, ascii: false, digit: 0));
+        Mouse(MouseUpMethod, MouseButtons.Left, Cell(2, 5, ascii: false, digit: 0));
+        Record("click row 2 byte 5 high digit", View());
+        Mouse(MouseDownMethod, MouseButtons.Left, Cell(2, 5, ascii: false, digit: 1));
+        Mouse(MouseUpMethod, MouseButtons.Left, Cell(2, 5, ascii: false, digit: 1));
+        Record("click row 2 byte 5 low digit", View());
+        System.Drawing.Point gap = Cell(3, 3, ascii: false, digit: 2);
+        Mouse(MouseDownMethod, MouseButtons.Left, gap);
+        Mouse(MouseUpMethod, MouseButtons.Left, gap);
+        Record("click in the gap after the group of byte 3", View());
+        Mouse(MouseDownMethod, MouseButtons.Left, Cell(4, 7, ascii: true));
+        Mouse(MouseUpMethod, MouseButtons.Left, Cell(4, 7, ascii: true));
+        Record("click row 4 character 7", View());
+        Mouse(MouseDownMethod, MouseButtons.Left, new System.Drawing.Point(Cell(1, 1, ascii: false).X, 2));
+        Record("click on the header", View());
+        Mouse(MouseDownMethod, MouseButtons.Left, new System.Drawing.Point(2, Cell(5, 0, ascii: false).Y));
+        Mouse(MouseUpMethod, MouseButtons.Left, new System.Drawing.Point(2, Cell(5, 0, ascii: false).Y));
+        Record("click left of the bytes, row 5", View());
+        System.Drawing.Point right = Cell(6, 15, ascii: true);
+        right.X += 5 * Field<int>("_charWidth");
+        Mouse(MouseDownMethod, MouseButtons.Left, right);
+        Mouse(MouseUpMethod, MouseButtons.Left, right);
+        Record("click right of the characters, row 6", View());
+
+        // A drag selects, back to its start selects nothing, beyond the bottom of the table the selection ends at its edge without scrolling.
+        Mouse(MouseDownMethod, MouseButtons.Left, Cell(1, 2, ascii: false));
+        Mouse(MouseMoveMethod, MouseButtons.Left, Cell(3, 9, ascii: false, digit: 1));
+        Record("drag from row 1 byte 2 to row 3 byte 9", View());
+        Mouse(MouseMoveMethod, MouseButtons.Left, Cell(1, 2, ascii: false));
+        Record("drag back to the start", View());
+        Mouse(MouseMoveMethod, MouseButtons.Left, Cell(5, 4, ascii: true));
+        Record("drag into the characters of row 5", View());
+        System.Drawing.Point below = Cell(11, 8, ascii: false);
+        below.Y += 20 * Field<int>("_rowHeight");
+        Mouse(MouseMoveMethod, MouseButtons.Left, below);
+        Record("drag below the table", View());
+        Mouse(MouseUpMethod, MouseButtons.Left, below);
+        Mouse(MouseMoveMethod, MouseButtons.None, Cell(2, 2, ascii: false));
+        Record("move without a button after the drag", View());
+
+        // The right button: inside the selection it keeps it, outside it moves the caret; the middle button does nothing.
+        Mouse(MouseDownMethod, MouseButtons.Right, Cell(3, 0, ascii: true));
+        Mouse(MouseUpMethod, MouseButtons.Right, Cell(3, 0, ascii: true));
+        Record("right click in the selection", View());
+        Mouse(MouseDownMethod, MouseButtons.Right, Cell(0, 3, ascii: false, digit: 1));
+        Mouse(MouseUpMethod, MouseButtons.Right, Cell(0, 3, ascii: false, digit: 1));
+        Record("right click outside", View());
+        Mouse(MouseDownMethod, MouseButtons.Middle, Cell(0, 0, ascii: false));
+        Record("middle click", View());
+
+        // The byte under the mouse (for the tool tip): a digit, the gap, a character, right of the characters, past the end of the bytes, the header.
+        _hex.GoToOffset(990);
+        Record("go to 990", View());
+        string hits = string.Join(",", new[]
+        {
+            CallPrivate("ByteAtPoint", Cell(61, 3, ascii: false, digit: 1)),
+            CallPrivate("ByteAtPoint", Cell(61, 3, ascii: false, digit: 2)),
+            CallPrivate("ByteAtPoint", Cell(61, 4, ascii: false)),
+            CallPrivate("ByteAtPoint", Cell(61, 12, ascii: true)),
+            CallPrivate("ByteAtPoint", new System.Drawing.Point(Cell(61, 15, ascii: true).X + 3 * Field<int>("_charWidth"), Cell(61, 15, ascii: true).Y)),
+            CallPrivate("ByteAtPoint", Cell(62, 9, ascii: false)),
+            CallPrivate("ByteAtPoint", new System.Drawing.Point(Cell(61, 1, ascii: false).X, 2))
+        });
+        Record("bytes under the mouse", hits);
+
+        // The wheel: three rows a notch, the small steps of a touchpad add up, the first row stays in the content.
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(55, 0, ascii: false), 120);
+        Record("wheel up a notch", View());
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(52, 0, ascii: false), 40);
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(52, 0, ascii: false), 40);
+        Record("wheel up two thirds of a notch", View());
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(52, 0, ascii: false), 40);
+        Record("wheel up the last third", View());
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(49, 0, ascii: false), -240);
+        Record("wheel down two notches", View());
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(49, 0, ascii: false), -1200);
+        Record("wheel down ten notches", View());
+        _hex.GoToOffset(0);
+        Mouse(MouseWheelMethod, MouseButtons.None, Cell(0, 0, ascii: false), 360);
+        Record("wheel up at the top", View());
+
+        // The tool tip of a byte: the offset, the value, the character, the word of its group in both byte orders, the coloured block, a change.
+        _hex.GoToOffset(40);
+        _hex.GroupSize = 1;
+        Record("tip group 1", ((string)CallPrivate("DescribeByte", 41)).Replace("\n", "|"));
+        _hex.GroupSize = 4;
+        Record("tip group 4", ((string)CallPrivate("DescribeByte", 41)).Replace("\n", "|"));
+        _hex.BigEndian = true;
+        Record("tip group 4 big endian", ((string)CallPrivate("DescribeByte", 41)).Replace("\n", "|"));
+        _hex.BigEndian = false;
+        Record("tip of the last bytes (no whole group)", ((string)CallPrivate("DescribeByte", 998)).Replace("\n", "|"));
+        _hex.GroupSize = 8;
+        _hex.Document.ReplaceByte(66, 0x41);
+        _hex.GoToOffset(64);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _driver.Down(Keys.Right | Keys.Shift);
+        _hex.HighlightSelection(System.Drawing.Color.FromArgb(10, 200, 30), "header");
+        Record("tip of a changed byte in a block", ((string)CallPrivate("DescribeByte", 66)).Replace("\n", "|"));
+        _hex.HighlightSelection(System.Drawing.Color.FromArgb(10, 200, 30), "");
+        Record("tip of a block without a label", ((string)CallPrivate("DescribeByte", 65)).Replace("\n", "|"));
+
+        // The colours of the bytes by kind, on a dark and a light background, and the same colour for all with the option off.
+        foreach (bool colorByValue in new[] { true, false })
+        {
+            _hex.ColorByValue = colorByValue;
+            foreach (System.Drawing.Color back in new[] { System.Drawing.Color.FromArgb(30, 30, 30), System.Drawing.Color.White })
+            {
+                _hex.BackColor = back;
+                _hex.ForeColor = back.GetBrightness() < 0.5f ? System.Drawing.Color.FromArgb(220, 220, 220) : System.Drawing.Color.Black;
+                List<string> colours = new List<string>();
+                foreach (byte value in new byte[] { 0x00, 0xFF, 0x09, 0x1F, 0x7F, 0x20, 0x41, 0x7E, 0x80, 0xC3 })
+                {
+                    colours.Add(value.ToString("x2", CultureInfo.InvariantCulture) + ":" + ((System.Drawing.Color)CallPrivate("ByteTextColor", value)).ToArgb().ToString("x8", CultureInfo.InvariantCulture));
+                }
+                Record("colours " + (colorByValue ? "by value" : "plain") + " on " + back.ToArgb().ToString("x8", CultureInfo.InvariantCulture), string.Join(",", colours));
+            }
+        }
+        form.Dispose();
+    }
+
     private static int Main(string[] args)
     {
         try
@@ -385,6 +629,7 @@ internal static class Program
             Run(20240601, 700);
             Run(7, 600, focusedSearches: true);
             Run(8, 600, focusedSearches: true);
+            RunView();
         }
         catch (Exception exception)
         {
