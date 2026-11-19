@@ -58,6 +58,7 @@
     <Compile Include="../../Ssh/RemoteOperationException.cs" />
     <Compile Include="../../Ssh/WindowsSftpPath.cs" />
     <Compile Include="../../Utilities/EnumDisplayText.cs" />
+    <Compile Include="../../Utilities/LocalLinkRules.cs" />
     <Compile Include="../../Utilities/PosixShell.cs" />
     <Compile Include="../../Utilities/StringUtils.cs" />
     <Compile Include="../../Utilities/UrlLinks.cs" />
