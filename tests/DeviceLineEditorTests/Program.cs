@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Threading;
@@ -630,6 +631,75 @@ internal static class Program
             LinkStep(terminal, "a path with a drive letter is a link candidate; on this system its full path is not one of this computer", true, new[] { "see C:\\dir\\a.txt ok" }, "-C:\\dir\\a.txt -ok => "),
             new Step
             {
+                Name = "a listing of a directory of the device gives its names, as the shell printed them",
+                Act = () => StartListing(control, "/etc", "a"),
+                Done = () => ListedText() == "a=init.d/,hosts,passwd" && terminal.HasInputLine && InputText(terminal) == ""
+            },
+            new Step
+            {
+                Name = "the command, its output and the markers are kept off the screen",
+                Done = () => !DocumentText(terminal).Contains("__SMARTTY") && !DocumentText(terminal).Contains("command ls") && !DocumentText(terminal).Contains("init.d")
+            },
+            new Step
+            {
+                Name = "the device got one command for it, which ends the line the way the connection does",
+                Done = () => ReceivedShort().EndsWith("|ls /etc", StringComparison.Ordinal)
+            },
+            new Step
+            {
+                Name = "a device that does not answer is given up after four seconds, and the listing says so",
+                Act = () => StartListing(control, "/silent", "s"),
+                Done = () => ListedText() == "a=init.d/,hosts,passwd|s=none",
+                TimeoutMs = 9000
+            },
+            new Step
+            {
+                Name = "what such a device printed is shown as it came, and its prompt is the input line again",
+                Done = () => DocumentText(terminal).Contains("printf") && terminal.HasInputLine && InputText(terminal) == "",
+                TimeoutMs = 9000
+            },
+            new Step
+            {
+                Name = "a listing whose prompt is late is given its names after half a second",
+                Act = () => StartListing(control, "/noprompt", "n"),
+                Done = () => ListedText() == "a=init.d/,hosts,passwd|s=none|n=a.txt,sub/"
+            },
+            new Step
+            {
+                Name = "and the prompt that comes later is the input line",
+                Done = () => terminal.HasInputLine && InputText(terminal) == "",
+                TimeoutMs = 9000
+            },
+            new Step
+            {
+                // The second request waits for the first; the third takes the place of the second (which is told that nothing was listed at once).
+                // The blank typed after "echo" starts the completion of a word, which asks for a listing of its own: it takes the place of the third
+                // request at once (told "none"). When the first listing has finished, what was typed goes out and the waiting request (the one of the
+                // completion) is asked again: the shell has not printed its prompt yet, so it cannot be listed for (CanListDeviceDirectory) and its
+                // callback gets nothing. Recorded as it is.
+                Name = "a request made while a listing runs waits, a newer one replaces it, and what is typed meanwhile is held",
+                Act = () =>
+                {
+                    StartListing(control, "/slow", "1");
+                    StartListing(control, "/etc", "2");
+                    StartListing(control, "/other", "3");
+                    Type(terminal, "echo held\r");
+                },
+                Done = () => ListedText().EndsWith("|2=none|3=none|1=a.txt,sub/", StringComparison.Ordinal) && terminal.HasInputLine && InputText(terminal) == "",
+                TimeoutMs = 9000
+            },
+            new Step
+            {
+                Name = "the device got the first listing, then what was typed, and no listing for the waiting request",
+                Done = () => ReceivedShort().EndsWith("|ls /slow|echo held", StringComparison.Ordinal)
+            },
+            new Step
+            {
+                Name = "all six requests were accepted (a waiting one is accepted too)",
+                Done = () => string.Join(",", ListingStarted) == "True,True,True,True,True,True"
+            },
+            new Step
+            {
                 // Disconnect returns: closing the connection did not hang.
                 Name = "the connection is closed without hanging",
                 Act = () => control.Disconnect()
@@ -702,6 +772,10 @@ internal static class Program
                         askingPassword = true;
                         Write(command + "\r\n" + PasswordPrompt);
                     }
+                    else if (command.Contains(DeviceDirectoryListing.MarkerHead))
+                    {
+                        AnswerListing(command, Write);
+                    }
                     else
                     {
                         Write(command + "\r\n" + ShellPrompt);
@@ -711,6 +785,79 @@ internal static class Program
         }
         catch
         {
+        }
+    }
+
+    // What the shell of the device prints for the command that lists a directory (DeviceDirectoryListing.BuildCommand): its echo, the two marker lines
+    // around "ls -1Ap" and the prompt. Some directories make it behave the way a busy or a different shell does.
+    private static void AnswerListing(string command, Action<string> write)
+    {
+        string token = Regex.Match(command, "'B(\\d+)'").Groups[1].Value;
+        string directory = Regex.Match(command, "cd -- '([^']*)'").Groups[1].Value;
+        string begin = DeviceDirectoryListing.BeginMarker(token) + "\r\n";
+        string end = DeviceDirectoryListing.EndMarker(token) + "\r\n";
+        string names = directory == "/etc" ? "init.d/\r\nhosts\r\npasswd\r\n" : "a.txt\r\nsub/\r\n";
+        switch (directory)
+        {
+            case "/silent":
+                // Not a shell that answers: only the echo comes, and the prompt a while after the terminal gave up.
+                write(command + "\r\n");
+                Thread.Sleep(4600);
+                write(ShellPrompt);
+                break;
+            case "/noprompt":
+                // The listing is complete but the prompt after it is late.
+                write(command + "\r\n" + begin + names + end);
+                Thread.Sleep(1000);
+                write(ShellPrompt);
+                break;
+            case "/slow":
+                Thread.Sleep(600);
+                write(command + "\r\n" + begin + names + end + ShellPrompt);
+                break;
+            default:
+                write(command + "\r\n" + begin + names + end + ShellPrompt);
+                break;
+        }
+    }
+
+    // The answers of the listings that were asked for, in the order their callbacks ran ("label=name,name/" or "label=none").
+    private static readonly List<string> Listed = new List<string>();
+
+    private static readonly List<bool> ListingStarted = new List<bool>();
+
+    private static bool StartListing(DeviceTerminalControl control, string directory, string label)
+    {
+        MethodInfo method = typeof(DeviceTerminalControl).GetMethod("ListDeviceDirectory", BindingFlags.Instance | BindingFlags.NonPublic);
+        Action<IReadOnlyList<DeviceDirectoryEntry>> done = entries =>
+        {
+            lock (Listed)
+            {
+                Listed.Add(label + "=" + (entries == null ? "none" : string.Join(",", entries.Select((DeviceDirectoryEntry entry) => entry.Name + (entry.IsDirectory ? "/" : "")))));
+            }
+        };
+        bool started = (bool)method.Invoke(control, new object[] { directory, done });
+        lock (Listed)
+        {
+            ListingStarted.Add(started);
+        }
+        return started;
+    }
+
+    private static string ListedText()
+    {
+        lock (Listed)
+        {
+            return string.Join("|", Listed);
+        }
+    }
+
+    // What the device got, a listing command as "ls <directory>".
+    private static string ReceivedShort()
+    {
+        lock (DeviceReceived)
+        {
+            return string.Join("|", DeviceReceived.Select((string line) => line.Contains(DeviceDirectoryListing.MarkerHead) ? "ls " + Regex.Match(line, "cd -- '([^']*)'").Groups[1].Value : line));
         }
     }
 
@@ -803,6 +950,7 @@ internal static class Program
         Console.WriteLine("FAIL: " + name);
         Console.WriteLine("  status: " + _control?.StatusText);
         Console.WriteLine("  device got: " + Received());
+        Console.WriteLine("  listings: " + ListedText() + " (accepted: " + string.Join(",", ListingStarted) + ")");
         Console.WriteLine("  input line: '" + InputText(terminal as SerialTerminalControl) + "', suggestion: '" + Suggestion(terminal as SerialTerminalControl) + "'");
         Console.WriteLine("  screen:");
         foreach (string line in DocumentText(terminal).Split('\n'))
