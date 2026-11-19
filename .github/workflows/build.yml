@@ -460,6 +460,12 @@ jobs:
       - name: Run the hex editor control checks (the real control driven by keys and calls, compared with what it did before its logic moved to the model)
         run: xvfb-run -a mono tests/HexEditorControlTests/bin/Release/net48/HexEditorControlTests.exe
 
+      - name: Build the hex terminal control checks
+        run: dotnet build tests/HexTerminalControlTests -c Release
+
+      - name: Run the hex terminal control checks (the real hex view of a device terminal driven by scripted bytes, compared with what it did before its logic moved out of the control)
+        run: xvfb-run -a mono tests/HexTerminalControlTests/bin/Release/net48/HexTerminalControlTests.exe
+
       - name: Build the terminal snapshot checks
         run: dotnet build tests/TerminalSnapshots -c Release
 
