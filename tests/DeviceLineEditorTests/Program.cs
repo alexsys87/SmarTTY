@@ -1,5 +1,6 @@
 using SmarTTY.Controls;
 using SmarTTY.Terminal;
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -96,6 +97,89 @@ internal static class Program
         CompletionItem item = PopupItem(text);
         VirtualTerminalPopupSummary.OptionInfo info = item.Summary as VirtualTerminalPopupSummary.OptionInfo;
         return info == null ? null : info.Description.Summary + " / " + info.Description.Info;
+    }
+
+    // What the link scanner of the device terminal makes of the text the device printed: the text each link covers (the cells that have the
+    // same target), whether the link is live ("+") or not yet ("-") when the text has been scanned, and what a click on it opens. A
+    // piece is the text, or "column|text" for a scan that is told where on the screen the text goes (0: a new line).
+    private static string ScanLinks(SerialTerminalControl terminal, bool finish, params string[] pieces)
+    {
+        List<string> opened = new List<string>();
+        EventHandler<OpenFileEventArgs> handler = (object sender, OpenFileEventArgs e) => opened.Add(e.Path);
+        terminal.OpenFileRequested += handler;
+        try
+        {
+            IColumnAwareLinkScanner scanner = (IColumnAwareLinkScanner)terminal.CreateLinkScanner();
+            StringBuilder text = new StringBuilder();
+            List<LinkCell> cells = new List<LinkCell>();
+            foreach (string piece in pieces)
+            {
+                int bar = piece.IndexOf('|');
+                if (bar > 0 && int.TryParse(piece.Substring(0, bar), out int column))
+                {
+                    string chunk = piece.Substring(bar + 1);
+                    text.Append(chunk);
+                    cells.AddRange(scanner.Scan(chunk, column));
+                }
+                else
+                {
+                    text.Append(piece);
+                    cells.AddRange(scanner.Scan(piece));
+                }
+            }
+            if (finish)
+            {
+                scanner.Finish();
+            }
+            List<ILinkTarget> targets = new List<ILinkTarget>();
+            foreach (LinkCell cell in cells)
+            {
+                if (cell.Target != null && !targets.Contains(cell.Target))
+                {
+                    targets.Add(cell.Target);
+                }
+            }
+            List<string> result = new List<string>();
+            foreach (ILinkTarget target in targets)
+            {
+                StringBuilder covered = new StringBuilder();
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    if (ReferenceEquals(cells[i].Target, target))
+                    {
+                        covered.Append(text[i]);
+                    }
+                }
+                result.Add((target.IsActive ? "+" : "-") + covered);
+                target.Activate();
+            }
+            return string.Join(" ", result) + " => " + string.Join(" ", opened);
+        }
+        finally
+        {
+            terminal.OpenFileRequested -= handler;
+        }
+    }
+
+    private static Step LinkStep(SerialTerminalControl terminal, string name, bool finish, string[] pieces, string expected)
+    {
+        bool reported = false;
+        return new Step
+        {
+            Name = "link scanner: " + name,
+            // The scan does not depend on the time: one try is enough, and a difference is printed once.
+            TimeoutMs = 300,
+            Done = () =>
+            {
+                string actual = ScanLinks(terminal, finish, pieces);
+                if (actual != expected && !reported)
+                {
+                    reported = true;
+                    Console.WriteLine("  expected: " + expected + "\n  actual:   " + actual);
+                }
+                return actual == expected;
+            }
+        };
     }
 
     private const string ShellPrompt = "root@board:~# ";
@@ -532,6 +616,18 @@ internal static class Program
                 },
                 Done = () => InputText(terminal) == ""
             },
+            // A word at the end of the text is still undecided (it may go on in the next piece): it has a target that is not live ("-").
+            LinkStep(terminal, "an address in a sentence covers its full stop but opens without it; the word after it is not live", true, new[] { "see https://example.com/a. now" }, "+https://example.com/a. -now => https://example.com/a"),
+            LinkStep(terminal, "an address that comes in two pieces is one link, with its query", true, new[] { "go https://exa", "mple.com/x?y=1&z=2 ok" }, "+https://example.com/x?y=1&z=2 -ok => https://example.com/x?y=1&z=2"),
+            LinkStep(terminal, "an address at the end of the text is not live until the text is finished", false, new[] { "at https://example.com/z" }, "-https://example.com/z => https://example.com/z"),
+            LinkStep(terminal, "and it is live when the text is finished", true, new[] { "at https://example.com/z" }, "+https://example.com/z => https://example.com/z"),
+            LinkStep(terminal, "a path of the device and a bare name are no links (only the last word is left undecided)", true, new[] { "/tmp/x build.log ./run.sh" }, "-./run.sh => "),
+            LinkStep(terminal, "a word after a backslash and a blank is a word of its own", true, new[] { "a\\ b.txt" }, "-b.txt => "),
+            LinkStep(terminal, "an address does not go on in the next line", true, new[] { "0|https://example.com/long", "0|tail" }, "+https://example.com/long -tail => https://example.com/long"),
+            LinkStep(terminal, "but it goes on in the row of a wrapped line", true, new[] { "0|https://example.com/long", "-1|tail" }, "+https://example.com/longtail => https://example.com/longtail"),
+            LinkStep(terminal, "two addresses are two links", true, new[] { "https://a.org/1 and ftp://b.org/2" }, "+https://a.org/1 +ftp://b.org/2 => https://a.org/1 ftp://b.org/2"),
+            LinkStep(terminal, "an address ends at a quote", true, new[] { "<a href=\"https://a.org/p\">x" }, "+https://a.org/p -x => https://a.org/p"),
+            LinkStep(terminal, "a path with a drive letter is a link candidate; on this system its full path is not one of this computer", true, new[] { "see C:\\dir\\a.txt ok" }, "-C:\\dir\\a.txt -ok => "),
             new Step
             {
                 // Disconnect returns: closing the connection did not hang.
