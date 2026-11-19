@@ -288,16 +288,16 @@ jobs:
       - name: Run history suggestion checks (the grey rest of a typed command of a local line, when it shows and what hides it)
         run: dotnet run --project tests/HistorySuggestionStateTests -c Release
 
-      - name: Run suggestion lookup checks (what the grey suggestion of the Smart Terminal line keeps: the history, when it is made again, the last answer)
+      - name: "Run suggestion lookup checks (what the grey suggestion of the Smart Terminal line keeps: the history, when it is made again, the last answer)"
         run: dotnet run --project tests/SuggestionLookupTests -c Release
 
-      - name: Run device listing checks (the listing of a device directory for the path completion: the answer, the timeouts, the waiting request, the held input)
+      - name: "Run device listing checks (the listing of a device directory for the path completion: the answer, the timeouts, the waiting request, the held input)"
         run: dotnet run --project tests/DeviceListingSessionTests -c Release
 
       - name: Run netconsole line input checks (the history walk of the input box and its draft, what typed text does to the box)
         run: dotnet run --project tests/NetconsoleLineInputTests -c Release
 
-      - name: Run device command list checks (the saved history and the command lists of a COM/TCP device: loading, saving, deleting, clearing)
+      - name: "Run device command list checks (the saved history and the command lists of a COM/TCP device: loading, saving, deleting, clearing)"
         run: dotnet run --project tests/DeviceCommandListsTests -c Release
 
       - name: Run local completion session checks (the completion of a command, a path or a directory in the input line of a device terminal)

@@ -977,14 +977,16 @@ internal static class Program
             },
             new Step
             {
-                // (End is not used: on a line of several rows it puts the caret at a column that the row does not have.)
-                Name = "the long line is cleared",
+                // The caret goes to the last row, to the index of the end of the whole text (it went to a column that the row does not have).
+                Name = "End goes to the end of the whole line of several rows",
+                Act = () => Key(terminal, Keys.End),
+                Done = () => ScreenIndex(terminal) == 300
+            },
+            new Step
+            {
+                Name = "the long line is cleared by Backspace from the end",
                 Act = () =>
                 {
-                    for (int i = 0; i < 300; i++)
-                    {
-                        Key(terminal, Keys.Right);
-                    }
                     for (int i = 0; i < 300; i++)
                     {
                         Key(terminal, Keys.Back);

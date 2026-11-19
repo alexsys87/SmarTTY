@@ -1412,9 +1412,11 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost, IL
             }
             else if (caretMove == CaretMove.End && (keys & Keys.Control) == 0)
             {
-                movedPosition = new TextDocument.TextPosition(
-                    _inputLine.Prompt.Length + _inputLine.Text.Length,
-                    _inputLine.StartLine);
+                // The end of the whole text: on the last row when the line is wrapped over several rows (the column of the whole line
+                // is past the right edge of the window, and the caret there did not match any index of the text).
+                movedPosition = _visibleColumns > 0
+                    ? GetCaretPositionFromInputIndex(_inputLine.Text.Length)
+                    : new TextDocument.TextPosition(_inputLine.Prompt.Length + _inputLine.Text.Length, _inputLine.StartLine);
             }
         }
 
