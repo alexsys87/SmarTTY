@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 132 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 133 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -98,7 +98,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A-1 (the content of the file and the switching between the text and the hex view out of `RemoteFileEditor`) done, see "Stage 3"; next 3A-2, the state of the loading and the saves |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -394,3 +394,41 @@ is compiled there as well, and add to the dependency list there when the model s
 Safety nets that stage 1 adds before moving code: terminal golden snapshots captured from the old code before any
 terminal move (`tests/TerminalSnapshots/`, never re-recorded); `tests/check-model-boundary.sh` with an allowlist that
 only shrinks. Mono tests stay until each of their checks is ported to net8.0 tests on the model.
+
+### Stage 3 (the editor and the hex editor on WPF)
+
+3A takes out of `RemoteFileEditor` what it still decides itself and that needs no window, so that a WPF hex view (3B) and a WPF text view (3D) can
+be put under the same model; 3A is the same whether the text view is AvalonEdit or a view of its own on the model of the editor, which is not
+decided yet. The rules of stage 1 hold: a net first, then the move, no change of behaviour, faults found are kept and listed.
+
+Done in 3A-1: first a net for the switching between the text and the hex view, which the Mono stand reached only as far as opening the hex view:
+`tests/RemoteFileEditorIntegrationTests` has two more scenarios, `hex-view` and `hex-draft` (what each view shows and which one can be edited, the
+`ModifiedChanged`, `HexModeChanged` and `FormatChanged` events and their order, the text document with its undo history and the caret kept when
+nothing changed, a change of the bytes that makes a new text with its line breaks found again and the caret brought into a shorter line, the
+same hex document shown again for the same text, the question about bytes that are not UTF-8 and both answers, the text made from them saved as
+those bytes, a save in the hex view, the modified state set in the hex view, a reload in the hex view that opens it again at the same offset, the
+encoding and the line breaks that cannot be changed there, Select all and Delete of the hex view, a new encoding that leaves it, the draft of the
+bytes that comes back in the hex view), recorded on the code before the move (258 checks before, 378 after: both servers); seven mutations of the
+old code (the text document never kept, the hex document not saved with the text, no offset after a reload, the line of the caret, a restored
+draft that is not modified, the hex view read-only, the hex view not reset) each make it fail. A text that the encoding cannot store (the error,
+the text view stays) cannot be checked there: the encodings of Mono do not throw for such a letter. Then the content is
+`CodeEditing/RemoteFileContent.cs` (public): the bytes on the server (`RawBytes`) and the encoding they are read with, the encoding and the line
+breaks of a save, the hex view (`HexMode`, `HexDocument`, the text, its saved state and its caret kept while the bytes are shown),
+`EnterHexMode` (with the old `GetBytesForHexView` and `ShowHexView`), `ExitHexMode`, `ShowRestoredHexDraft`, `ResetHexMode`, `IsModified` of
+both views, `ApplyContent`, `SetSaveEncoding`, `SetLineEnding`, `GetChanges` and `CompleteSave` (the bytes of the file and the saved state of
+the view they came from, and of the other one when it holds the same bytes), with the events `HexModeChanged` and `FormatChanged` that the
+editor raises again as its own; the code is as it was. The editor is reached through `CodeEditing/IRemoteFileContentHost` (the text view: its
+document, modified state, read-only state, caret, `SetDocument`, focus, `MarkSaved`, `OnModifiedChanged`; the state: loaded, saving, read-only
+mode; where the hex view is: show, hide; the error and the question), which `RemoteFileEditor` implements explicitly, the hex view through
+`IRemoteHexView` (`Document`, `ReadOnly`, `Focus`, `Invalidate`: members `HexEditorControl` has). One thing is not in the old order:
+`CompleteSave` of the editor sets the bytes of the file after `BackupDone` and `IsNewFile`, not before them (plain fields that nothing reads in
+between). `_content` is made by the constructor that opens a file, after the session; before it `IsModified` is the text's and `IsHexMode` is
+false, as they were. A fault found by the net, kept as it is (the net records it): after a save in the hex view, closing it shows the text from
+before the hex view, as not modified (the bytes are the file's now, so the text kept from before is taken as theirs); an edit of that text and a
+save then write it over the bytes that were saved. `tests/RemoteFileContentTests` (net8.0, a fake editor and hex view that log what they are
+asked, 105 checks) drives the model, including the error of a letter the encoding cannot store; of 24 mutations of it 19 made a check fail at
+once and the other five led to checks (the kept bytes of a hex document that changed after the view was left, an edited text whose bytes were set
+back to the file's in the hex view, the encoding rule in the hex view on its own, the changes read in the encoding of the bytes of the server).
+`RemoteFileEditor.cs` is 1420 lines before and 1233 after. Next, 3A-2: the state of the loading and the saves that the editor keeps in fields
+(`_loaded`, `_reloading`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`, what a reload restores) and the
+decisions of `Save`, `SaveInBackground`, `FinishBackgroundSave` and `FinishLoading` that need no control.
