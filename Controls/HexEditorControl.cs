@@ -585,39 +585,14 @@ public sealed class HexEditorControl : Control, IHexViewStatus, IRemoteHexView, 
             {
                 return;
             }
-            byte[] bytes;
-            if (_model.Area == HexEditArea.Ascii)
+            byte[] bytes = HexPasteText.ToBytes(text, _model.Area, question =>
             {
-                bytes = Encoding.UTF8.GetBytes(text);
-            }
-            else
+                DialogResult answer = ThemedMessageBox.Show(question, "Paste", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                return answer == DialogResult.Cancel ? HexPasteChoice.Cancel : (answer == DialogResult.Yes ? HexPasteChoice.Bytes : HexPasteChoice.Text);
+            });
+            if (bytes == null)
             {
-                switch (HexDocument.ClassifyClipboard(text))
-                {
-                    case HexDocument.ClipboardKind.Hex:
-                        bytes = HexDocument.ParseClipboardBytes(text, preferHex: true);
-                        break;
-                    case HexDocument.ClipboardKind.Ambiguous:
-                        // "dead" is DE AD as hex and 64 65 61 64 as text: only the user knows which was copied.
-                        byte[] asHex = HexDocument.ParseClipboardBytes(text, preferHex: true);
-                        byte[] asText = Encoding.UTF8.GetBytes(text);
-                        byte[] textStart = new byte[Math.Min(asText.Length, 8)];
-                        Array.Copy(asText, textStart, textStart.Length);
-                        DialogResult answer = ThemedMessageBox.Show(
-                            "The clipboard holds \"" + (text.Length > 40 ? text.Substring(0, 40) + "..." : text.Trim()) + "\", which can be hexadecimal bytes or text.\n\n"
-                            + "Yes: paste as bytes (" + HexDocument.FormatHex(asHex) + ")\n"
-                            + "No: paste as text (" + HexDocument.FormatHex(textStart) + (asText.Length > textStart.Length ? " ..." : "") + ")",
-                            "Paste", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-                        if (answer == DialogResult.Cancel)
-                        {
-                            return;
-                        }
-                        bytes = (answer == DialogResult.Yes) ? asHex : asText;
-                        break;
-                    default:
-                        bytes = Encoding.UTF8.GetBytes(text);
-                        break;
-                }
+                return;
             }
             _model.InsertBytes(bytes);
         }

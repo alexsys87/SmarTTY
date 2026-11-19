@@ -419,8 +419,34 @@ internal static class Program
         Equal(HexByteText.Blend(RgbColor.FromArgb(10, 0, 0, 0), text, 0f).A, (byte)255, "a blend is opaque");
     }
 
+    private static string Hex(byte[] bytes)
+    {
+        return bytes == null ? "null" : BitConverter.ToString(bytes).Replace("-", " ");
+    }
+
+    private static void Paste()
+    {
+        Console.WriteLine("-- the bytes a paste inserts");
+        List<string> questions = new List<string>();
+        Func<string, HexPasteChoice> never = question => { questions.Add(question); return HexPasteChoice.Cancel; };
+        Equal(Hex(HexPasteText.ToBytes("dead", HexEditArea.Ascii, never)), "64 65 61 64", "in the characters: the UTF-8 of the text, without a question");
+        Equal(Hex(HexPasteText.ToBytes("DE AD BE EF", HexEditArea.Hex, never)), "DE AD BE EF", "hexadecimal bytes in the digits");
+        Equal(Hex(HexPasteText.ToBytes("hello world", HexEditArea.Hex, never)), "68 65 6C 6C 6F 20 77 6F 72 6C 64", "a text that is no hexadecimal: its UTF-8");
+        Equal(questions.Count, 0, "none of these asks");
+        Equal(Hex(HexPasteText.ToBytes("dead", HexEditArea.Hex, question => { questions.Add(question); return HexPasteChoice.Bytes; })), "DE AD", "a text that can be both, answered Bytes: the bytes");
+        Equal(questions[0], "The clipboard holds \"dead\", which can be hexadecimal bytes or text.\n\nYes: paste as bytes (DE AD)\nNo: paste as text (64 65 61 64)", "the question shows both readings");
+        Equal(Hex(HexPasteText.ToBytes("dead", HexEditArea.Hex, question => HexPasteChoice.Text)), "64 65 61 64", "answered Text: the UTF-8");
+        Equal(Hex(HexPasteText.ToBytes("dead", HexEditArea.Hex, question => HexPasteChoice.Cancel)), "null", "answered Cancel: nothing");
+        questions.Clear();
+        // Few hex digits but many blanks: still both readings, and longer than 40 characters.
+        string spaced = "bead" + new string(' ', 40) + "fa";
+        HexPasteText.ToBytes(spaced, HexEditArea.Hex, question => { questions.Add(question); return HexPasteChoice.Text; });
+        Check(questions.Count == 1 && questions[0].Contains("\"" + spaced.Substring(0, 40) + "...\"") && questions[0].Contains("(62 65 61 64 20 20 20 20 ...)"), "a long text is cut to 40 characters, and its text bytes to 8");
+    }
+
     private static int Main()
     {
+        Paste();
         Metrics();
         Sizes();
         HitTests();
