@@ -99,6 +99,15 @@ internal static class Program
         input.Newer();
         Check(host.Box == "x" && host.Log.Count == 0, "with no history nothing happens");
 
+        // A line is added to the history while the walk is at its end (Down went past the newest line): the next Up shows the new newest line.
+        host = new FakeHost { HistoryLines = new List<string> { "a", "b" }, Box = "t" };
+        input = new NetconsoleLineInput(host);
+        input.Older();
+        input.Newer();
+        host.HistoryLines = new List<string> { "a", "b", "c" };
+        input.Older();
+        Equal(host.Box, "c", "at the end of the walk the place is 'below the newest line', whatever the history has grown to");
+
         // The history became shorter than the place of the walk: the box is taken for what is being typed.
         host = new FakeHost { HistoryLines = new List<string> { "a", "b", "c" }, Box = "d" };
         input = new NetconsoleLineInput(host);
