@@ -79,9 +79,11 @@ internal static class Program
         Lines.Add("== " + step);
         Lines.Add("hex   " + Document(HexView));
         Lines.Add("text  " + Document(TextView));
-        string match = Field<int>(_control, "_matchOffset") + "+" + Field<int>(_control, "_matchLength");
+        // The accessors follow the move of the state into HexTerminalModel.
+        HexTerminalModel model = Field<HexTerminalModel>(_control, "_model");
+        string match = model.MatchOffset + "+" + model.MatchLength;
         Lines.Add("bytes " + BitConverter.ToString(_control.AllBytes).Replace("-", "").ToLowerInvariant());
-        Lines.Add("state per-line=" + Field<int>(_control, "_bytesPerLine") + " laid-out=" + Field<int>(_control, "_laidOutBytesPerLine") + " mixed=" + Field<bool>(_control, "_layoutMixed")
+        Lines.Add("state per-line=" + model.BytesPerLine + " laid-out=" + model.LaidOutBytesPerLine + " mixed=" + model.LayoutMixed
             + " match=" + match + " selection=" + _control.HasSelection
             + " hex-sel=" + Position(Property<TextDocument.TextPosition>(HexView, "SelectionStart")) + ".." + Position(Property<TextDocument.TextPosition>(HexView, "SelectionEnd"))
             + " text-sel=" + Position(Property<TextDocument.TextPosition>(TextView, "SelectionStart")) + ".." + Position(Property<TextDocument.TextPosition>(TextView, "SelectionEnd"))
@@ -100,9 +102,10 @@ internal static class Program
             TimeoutForAutoBreak = timeout
         };
         Call("LayoutViews");
-        if (Field<int>(_control, "_bytesPerLine") != maximumBytesPerLine && maximumBytesPerLine > 0)
+        int perLine = Field<HexTerminalModel>(_control, "_model").BytesPerLine;
+        if (perLine != maximumBytesPerLine && maximumBytesPerLine > 0)
         {
-            throw new InvalidOperationException("the window is too narrow for " + maximumBytesPerLine + " bytes in a row (" + Field<int>(_control, "_bytesPerLine") + ")");
+            throw new InvalidOperationException("the window is too narrow for " + maximumBytesPerLine + " bytes in a row (" + perLine + ")");
         }
     }
 

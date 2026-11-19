@@ -12,54 +12,9 @@ namespace SmarTTY.Controls;
 
 public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 {
-    private class DataChunk
-    {
-        public bool IsBreak;
-
-        public bool IsEcho;
-
-        // The bytes of the chunk are the bytes [Start, Start + Count) of the stream.
-        public int Start;
-
-        public int Count;
-
-        internal bool CanAppend(bool isEcho)
-        {
-            if (!IsBreak)
-            {
-                return this.IsEcho == isEcho;
-            }
-            return false;
-        }
-    }
-
-    private int _bytesPerLine = 16;
-
-    // The number of bytes per line the data on the screen was laid out with (0: nothing yet), and whether the data
-    // carries more than one layout: the history is laid out again after a resize only when it does not match.
-    private int _laidOutBytesPerLine;
-
-    private bool _layoutMixed;
-
-    private DateTime _lastDataTime;
-
-    private bool _lastWasEcho;
-
-    private List<DataChunk> _chunks = new List<DataChunk>();
-
-    // All bytes on the screen (the echo too) in the order they are shown, with the row and the column of each: the
-    // search for a byte sequence runs over it, because a sequence may go on in the next row (see HexStreamMap).
-    private readonly HexStreamMap _stream = new HexStreamMap();
-
-    // The match found last (-1: none), and the selection that shows it: while the selection is still that one, the
-    // next search goes on from the match, one byte further.
-    private int _matchOffset = -1;
-
-    private int _matchLength;
-
-    private TextDocument.TextPosition _matchSelectionStart;
-
-    private TextDocument.TextPosition _matchSelectionEnd;
+    // The stream of the bytes with the map to their rows, the chunks it came in, the breaks, the layout and the match that the search selected
+    // (TextEditing/HexTerminalModel.cs); the control writes the rows to its two views.
+    private readonly HexTerminalModel _model = new HexTerminalModel();
 
     // The byte sequence whose matches are marked while the search bar is open (null: none), the marks, and what they
     // were made for: the first row on the screen, the number of rows and the number of bytes.
@@ -198,11 +153,11 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         get
         {
             List<byte> list = new List<byte>();
-            foreach (DataChunk item in _chunks)
+            foreach (HexChunk item in _model.Chunks)
             {
                 if (!item.IsBreak && !item.IsEcho && item.Count > 0)
                 {
-                    list.AddRange(_stream.GetRange(item.Start, item.Count));
+                    list.AddRange(_model.Stream.GetRange(item.Start, item.Count));
                 }
             }
             return list.ToArray();
@@ -243,51 +198,22 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         {
             return;
         }
-        if (_lastDataTime != DateTime.MinValue && ((HexSettings.BreaksAroundEcho && isEcho != _lastWasEcho) || (HexSettings.TimeoutForAutoBreak > 0 && (DateTime.Now - _lastDataTime).TotalMilliseconds >= (double)HexSettings.TimeoutForAutoBreak)))
+        if (_model.ShouldBreak(isEcho, HexSettings.BreaksAroundEcho, HexSettings.TimeoutForAutoBreak, DateTime.Now))
         {
             termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
             termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
-            _chunks.Add(new DataChunk
-            {
-                IsBreak = true,
-                Start = _stream.Length
-            });
-            _stream.AddBreak();
+            _model.AddBreak();
         }
-        count = Math.Max(0, Math.Min(count, buffer.Length));
-        if (_chunks.Count > 0 && _chunks[_chunks.Count - 1].CanAppend(isEcho))
-        {
-            _chunks[_chunks.Count - 1].Count += count;
-        }
-        else
-        {
-            _chunks.Add(new DataChunk
-            {
-                IsEcho = isEcho,
-                Start = _stream.Length,
-                Count = count
-            });
-        }
-        _stream.Append(buffer, count);
-        _lastDataTime = DateTime.Now;
-        _lastWasEcho = isEcho;
+        count = _model.AddData(buffer, count, isEcho, DateTime.Now);
         RenderData(buffer, count, isEcho);
     }
 
     private void RenderData(byte[] buffer, int count, bool isEcho)
     {
-        if (_laidOutBytesPerLine != 0 && _laidOutBytesPerLine != _bytesPerLine)
-        {
-            _layoutMixed = true;
-        }
-        _laidOutBytesPerLine = _bytesPerLine;
+        _model.BeginLayout();
         try
         {
             int currentColumn = (termHex.CursorPosition.X + 1) / 3;
-            StringBuilder stringBuilder = new StringBuilder(_bytesPerLine * 4);
-            StringBuilder hexTextBuilder = new StringBuilder(_bytesPerLine * 2);
-            // The bytes that go to the row the cursor is in, for the map from a byte to its row and column.
-            int pendingBytes = 0;
             if (isEcho)
             {
                 termText.CurrentStyle = (termHex.CurrentStyle = new CellStyle
@@ -298,35 +224,18 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
                     }
                 });
             }
-            for (int byteIndex = 0; byteIndex < count; byteIndex++)
+            foreach (HexRow row in HexTerminalModel.FormatRows(buffer, count, currentColumn, _model.BytesPerLine))
             {
-                byte currentByte = buffer[byteIndex];
-                if (currentColumn >= _bytesPerLine)
+                // The bytes that go to the row the cursor is in, for the map from a byte to its row and column.
+                _model.Stream.MapBytes(termHex.CursorDocumentLine, row.ByteCount);
+                termHex.WriteText(row.Hex);
+                termText.WriteText(row.Text);
+                if (row.EndsRow)
                 {
-                    _stream.MapBytes(termHex.CursorDocumentLine, pendingBytes);
-                    pendingBytes = 0;
-                    termHex.WriteText(stringBuilder.ToString());
-                    termText.WriteText(hexTextBuilder.ToString());
                     termHex.MoveCursorBy(-termHex.CursorPosition.X, 1, scroll: true);
                     termText.MoveCursorBy(-termText.CursorPosition.X, 1, scroll: true);
-                    int length = (hexTextBuilder.Length = 0);
-                    stringBuilder.Length = length;
-                    currentColumn = 0;
                 }
-                if (currentColumn != 0)
-                {
-                    stringBuilder.Append(" ");
-                }
-                currentColumn++;
-                pendingBytes++;
-                stringBuilder.AppendFormat("{0:x2}", currentByte);
-                // Only the printable ASCII range is shown as it is. Encoding.ASCII turned every byte above 0x7F into "?" (the same as a real
-                // 0x3F), and 0x7F went to the screen as a control character.
-                hexTextBuilder.Append(HexDocument.IsPrintable(currentByte) ? (char)currentByte : '.');
             }
-            _stream.MapBytes(termHex.CursorDocumentLine, pendingBytes);
-            termHex.WriteText(stringBuilder.ToString());
-            termText.WriteText(hexTextBuilder.ToString());
         }
         finally
         {
@@ -336,15 +245,10 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     public void Clear()
     {
-        _chunks.Clear();
-        _stream.Clear();
-        _matchOffset = -1;
+        _model.Clear();
         RemoveMatchHighlights();
         termHex.Reset();
         termText.Reset();
-        _lastDataTime = DateTime.MinValue;
-        _laidOutBytesPerLine = 0;
-        _layoutMixed = false;
     }
 
     public void ArchiveScreen()
@@ -382,7 +286,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         }
         // A maximum of 0 (or less) was typed in the settings: the width of the window decides, instead of one byte on every line.
         int configuredMaximum = HexSettings.MaximumBytesPerLine;
-        _bytesPerLine = configuredMaximum > 0 ? Math.Min(bytesPerLineLimit, configuredMaximum) : bytesPerLineLimit;
+        _model.BytesPerLine = configuredMaximum > 0 ? Math.Min(bytesPerLineLimit, configuredMaximum) : bytesPerLineLimit;
     }
 
     private void SyncSelectionToText(ReadonlyTextBrowser readonlyTextBrowser, TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool select)
@@ -396,16 +300,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
             _syncingSelection = true;
             TextDocument.TextPosition selectionStart = termHex.SelectionStart;
             TextDocument.TextPosition selectionEnd = termHex.SelectionEnd;
-            if (selectionEnd < selectionStart)
-            {
-                selectionStart.Column = (selectionStart.Column + 2) / 3;
-                selectionEnd.Column = (selectionEnd.Column + 1) / 3;
-            }
-            else
-            {
-                selectionStart.Column = (selectionStart.Column + 1) / 3;
-                selectionEnd.Column = (selectionEnd.Column + 2) / 3;
-            }
+            HexTerminalModel.HexSelectionToText(ref selectionStart, ref selectionEnd);
             termText.SetSelection(((ReadonlyTextBrowser)termHex).HasSelection, new TextDocument.TextPosition(selectionStart.Column, selectionStart.Line));
             termText.SetSelectionEnd(new TextDocument.TextPosition(selectionEnd.Column, selectionEnd.Line));
         }
@@ -426,16 +321,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
             _syncingSelection = true;
             TextDocument.TextPosition selectionStart = termText.SelectionStart;
             TextDocument.TextPosition selectionEnd = termText.SelectionEnd;
-            if (selectionEnd < selectionStart)
-            {
-                selectionStart.Column = Math.Max(0, selectionStart.Column * 3 - 1);
-                selectionEnd.Column *= 3;
-            }
-            else
-            {
-                selectionStart.Column *= 3;
-                selectionEnd.Column = Math.Max(0, selectionEnd.Column * 3 - 1);
-            }
+            HexTerminalModel.TextSelectionToHex(ref selectionStart, ref selectionEnd);
             termHex.SetSelection(((ReadonlyTextBrowser)termText).HasSelection, new TextDocument.TextPosition(selectionStart.Column, selectionStart.Line));
             termHex.SetSelectionEnd(new TextDocument.TextPosition(selectionEnd.Column, selectionEnd.Line));
         }
@@ -519,23 +405,21 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
             return;
         }
         _resizeTimer.Enabled = false;
-        if (_chunks.Count == 0 || (!_layoutMixed && _laidOutBytesPerLine == _bytesPerLine))
+        if (!_model.NeedsRelayout)
         {
             // The lines are laid out by the number of bytes in them: with the same number nothing changes, and the whole
             // history (all of it is kept) was laid out again, and the scroll position lost, at every change of the size.
             return;
         }
         // The match that is selected is the same bytes in the new rows: it is selected again there.
-        int matchOffset = IsMatchSelected() ? _matchOffset : -1;
-        int matchLength = _matchLength;
-        _matchOffset = -1;
+        int matchOffset = IsMatchSelected() ? _model.MatchOffset : -1;
+        int matchLength = _model.MatchLength;
+        _model.ClearMatch();
         RemoveMatchHighlights();
         termHex.Reset();
         termText.Reset();
-        _stream.ClearRows();
-        _laidOutBytesPerLine = 0;
-        _layoutMixed = false;
-        foreach (DataChunk item in _chunks)
+        _model.BeginRelayout();
+        foreach (HexChunk item in _model.Chunks)
         {
             if (item.IsBreak)
             {
@@ -544,7 +428,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
             }
             else
             {
-                RenderData(_stream.GetRange(item.Start, item.Count), item.Count, item.IsEcho);
+                RenderData(_model.Stream.GetRange(item.Start, item.Count), item.Count, item.IsEcho);
             }
         }
         if (matchOffset >= 0)
@@ -564,7 +448,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
     /// </summary>
     public int FindBytes(byte[] pattern, int startOffset, bool backward, bool wrap)
     {
-        return _stream.Find(pattern, startOffset, backward, wrap);
+        return _model.Stream.Find(pattern, startOffset, backward, wrap);
     }
 
     public bool FindNextBytes(byte[] pattern, bool backward, bool wrapAround)
@@ -573,7 +457,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         if (found < 0 || !SelectBytes(found, pattern.Length))
         {
             // As the search in the text of a terminal does when it finds nothing.
-            _matchOffset = -1;
+            _model.ClearMatch();
             termHex.SetSelection(select: false, TextDocument.TextPosition.Invalid);
             return false;
         }
@@ -588,41 +472,26 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
 
     private bool IsMatchSelected()
     {
-        return _matchOffset >= 0 && ((ReadonlyTextBrowser)termHex).HasSelection && termHex.SelectionStart == _matchSelectionStart && termHex.SelectionEnd == _matchSelectionEnd;
+        return _model.IsMatchSelected(((ReadonlyTextBrowser)termHex).HasSelection, termHex.SelectionStart, termHex.SelectionEnd);
     }
 
     // Where the search begins: one byte behind (or before) the start of the match found last, so that overlapping
     // matches are found one by one; otherwise behind the selection or the caret (before it, backward).
     private int GetSearchStart(bool backward)
     {
-        if (IsMatchSelected())
-        {
-            return backward ? (_matchOffset - 1) : (_matchOffset + 1);
-        }
-        TextDocument.TextPosition position = new TextDocument.TextPosition(0, 0);
-        if (termHex.SelectionStart.IsValid)
-        {
-            position = termHex.SelectionStart;
-        }
-        TextDocument.TextPosition end = termHex.SelectionEnd;
-        if (end.IsValid && (backward ? (end < position) : (end > position)))
-        {
-            position = end;
-        }
-        int offset = _stream.OffsetAtOrAfter(position.Line, position.Column);
-        return backward ? (offset - 1) : offset;
+        return _model.GetSearchStart(backward, IsMatchSelected(), termHex.SelectionStart, termHex.SelectionEnd);
     }
 
     // Selects the bytes in the HEX view, from the first digit of the first one to the last digit of the last one (in
     // as many rows as they take), and in the text view, and scrolls them into view.
     private bool SelectBytes(int offset, int length)
     {
-        if (!_stream.TryLocate(offset, out int firstLine, out int firstIndex) || !_stream.TryLocate(offset + length - 1, out int lastLine, out int lastIndex))
+        if (!_model.Stream.TryLocate(offset, out int firstLine, out int firstIndex) || !_model.Stream.TryLocate(offset + length - 1, out int lastLine, out int lastIndex))
         {
             return false;
         }
-        TextDocument.TextPosition start = new TextDocument.TextPosition(3 * firstIndex, firstLine);
-        TextDocument.TextPosition end = new TextDocument.TextPosition(3 * lastIndex + 2, lastLine);
+        TextDocument.TextPosition start = new TextDocument.TextPosition(HexTerminalModel.HexStartColumn(firstIndex), firstLine);
+        TextDocument.TextPosition end = new TextDocument.TextPosition(HexTerminalModel.HexEndColumn(lastIndex), lastLine);
         // The same order as the search in the text of a terminal: the selection begins behind the match and ends at its start.
         termHex.SetSelectionEnd(start);
         termHex.SetSelection(select: true, end);
@@ -632,10 +501,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         termText.Redraw();
         termHex.ScrollIntoView(start);
         termText.TopLine = termHex.TopLine;
-        _matchOffset = offset;
-        _matchLength = length;
-        _matchSelectionStart = termHex.SelectionStart;
-        _matchSelectionEnd = termHex.SelectionEnd;
+        _model.SetMatch(offset, length, termHex.SelectionStart, termHex.SelectionEnd);
         return true;
     }
 
@@ -673,18 +539,18 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         }
         _highlightTopLine = termHex.TopLine;
         _highlightRows = termHex.VisibleRowCount;
-        _highlightLength = _stream.Length;
-        int from = _stream.OffsetAtOrAfter(_highlightTopLine - 1, 0);
-        int to = _stream.OffsetAtOrAfter(_highlightTopLine + _highlightRows + 1, 0);
+        _highlightLength = _model.Stream.Length;
+        int from = _model.Stream.OffsetAtOrAfter(_highlightTopLine - 1, 0);
+        int to = _model.Stream.OffsetAtOrAfter(_highlightTopLine + _highlightRows + 1, 0);
         List<int> ranges = new List<int>();
-        _stream.CollectMatchRanges(_highlightPattern, from, to, ranges, 10000);
+        _model.Stream.CollectMatchRanges(_highlightPattern, from, to, ranges, 10000);
         for (int index = 0; index < ranges.Count; index += 2)
         {
-            if (!_stream.TryLocate(ranges[index], out int firstLine, out int firstIndex) || !_stream.TryLocate(ranges[index + 1] - 1, out int lastLine, out int lastIndex))
+            if (!_model.Stream.TryLocate(ranges[index], out int firstLine, out int firstIndex) || !_model.Stream.TryLocate(ranges[index + 1] - 1, out int lastLine, out int lastIndex))
             {
                 continue;
             }
-            _hexHighlightIds.Add(termHex.AddHighlight(new TextDocument.TextPosition(3 * firstIndex, firstLine), new TextDocument.TextPosition(3 * lastIndex + 2, lastLine), MatchStyle));
+            _hexHighlightIds.Add(termHex.AddHighlight(new TextDocument.TextPosition(HexTerminalModel.HexStartColumn(firstIndex), firstLine), new TextDocument.TextPosition(HexTerminalModel.HexEndColumn(lastIndex), lastLine), MatchStyle));
             _textHighlightIds.Add(termText.AddHighlight(new TextDocument.TextPosition(firstIndex, firstLine), new TextDocument.TextPosition(lastIndex + 1, lastLine), MatchStyle));
         }
     }
@@ -697,7 +563,7 @@ public partial class HexTerminalControl : DpiAwareControl, IByteSearchTarget
         {
             return;
         }
-        if (_highlightTopLine == termHex.TopLine && _highlightRows == termHex.VisibleRowCount && _highlightLength == _stream.Length)
+        if (_highlightTopLine == termHex.TopLine && _highlightRows == termHex.VisibleRowCount && _highlightLength == _model.Stream.Length)
         {
             return;
         }
