@@ -48,7 +48,7 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
-| `GUI/TerminalView/` | Stage 2: the WPF terminal view (`TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` shows it on its own | WPF |
+| `GUI/TerminalView/` | Stage 2: the WPF terminal (`WpfTerminal`: the classic tab and the sudo prompt; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
@@ -98,7 +98,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1A | Editor logic out of WinForms | Done in alexsys87/SmarTTY#508–#526 (A1–A7, see the "Done in A…" notes below); what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here" |
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
-| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window; see "Done in 2A") done; next 2B, the classic SSH tab on the new view |
+| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window) and 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`) done, see "Stage 2"; next 2C, the Smart Terminal, then 2D, the device terminal and the HEX view, then the removal of `TerminalEmulatorBase` and its subclasses |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
@@ -413,16 +413,35 @@ Done in 2A (nothing in the tabs changed yet; the view is reached through Tools >
 - Tests: `TerminalRenderModelTests` (112 checks), `TerminalKeyEncoderTests` (139, with the real key layout). Only the model runs in CI; the view is
   compile-checked on Linux and has to be tried on Windows.
 
-Not in 2A: the view in the tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the
-device terminal use the WinForms control), byte mode, links, the paste guard and its dialogs, wide (East Asian) characters taking two cells (the
+Done in 2B: the classic terminal tab (a shell, or a command in a PTY of its own: Run, tail, the package manager) and the sudo prompt
+(`GUI/SudoConfirmationWindow`) are `GUI/TerminalView/WpfTerminal` (a WPF `Border` with the panel); `CreateNewTerminal` makes it for every tab that is
+not a Smart Terminal. What `TerminalEmulatorControl` did for such a tab is there or in the model: byte mode (`TerminalDisplayModel`, the code of the
+control with the screen in place of the control: the stray bytes put together, the half-crossed cell, the key counts with the prediction; the view
+repeats Left/Right/Delete/Backspace by `ByteKeyCount` and parses the waiting output before counting), the links (`OutputLinkScanner` with the same
+options, Ctrl+click and the hand cursor in the view), the colours of a log (`HighlightLogLevels`), Clear, a new session after a reconnect, the paste
+(`PasteGuard`, the upload offer, `PasteJob` in pieces with its progress window, the paste menu of Ctrl+Shift+Insert / Ctrl+Shift+V, the files of the
+clipboard, the middle button and the right button as the settings say, Esc cancels), the log file, the bell, the settings of the window (font, text
+colour, palette, copy on select, Alt+letter, Shift+PageUp, the wheel as arrows, the scroll bar mode, the minimalistic mode at the edges), the window
+shortcuts (Ctrl+W, Ctrl+Shift+T/N, the Ctrl+C/X/V interception, Alt+Enter, Ctrl+Tab), the size freeze while the window is resized
+(`SuppressTerminalResizeEvents`), the search bar (`WpfTerminal` is the `ISearchTarget`: `Terminal/Rendering/DocumentSearch`, highlights drawn by the
+view) and the context menu (the same WinForms `ContextMenuStrip`, shown at the mouse; `MainWindowController.MenuTerminal` is the terminal it was
+opened on). The window, the session and the menus see a tab's terminal as `Controls/ITerminalSurface` (the members they called; the WinForms
+`TerminalEmulatorControl` implements it in `TerminalEmulatorControl.Surface.cs` for the Smart Terminal); `NormalTabContext.Terminal` is that interface
+and `EditorControl` is null for a WPF tab. `Controls/PasteAnchor` is what a paste needs of its terminal (handle, thread, place on the screen) so that
+`PasteJob`, `PasteMenu` and the progress windows work for both. The lab lost its mirror of a classic tab (the tabs are the WPF terminal now).
+`TerminalRenderModelTests` has 146 checks (byte mode, log colours, links, Clear, new session, search). Not ported, on purpose: the warning of
+Ctrl+Insert (it copies and sends nothing now), the timestamps margin (never shown in a classic tab).
+
+Not in 2A/2B: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the
+device terminal use the WinForms control), wide (East Asian) characters taking two cells (the
 screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
 slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
 
 Manual check on Windows, for every change of the view (record the numbers of the lab in the pull request): local with a GPU; the same with
 "Software rendering (this window)"; over Remote Desktop (tier 0, remote session yes); a virtual machine without 3D (Hyper-V or VirtualBox
 without acceleration); 100 %, 150 % and 200 % scaling and a window moved between monitors of different DPI. On each: the five scripts (no frame
-over about 30 ms of build time, rows kept above 90 % in the scrolling log, the window responsive during the colour flood); a mirror of a classic tab
-with `htop`, `mc` (mouse), `vim` (application keys after Ctrl+L), `less`; the keys Ctrl+C, Ctrl+Left, Alt+F, Alt+Backspace, F1-F12, the keypad in
+over about 30 ms of build time, rows kept above 90 % in the scrolling log, the window responsive during the colour flood); a classic tab with `htop`, `mc` (mouse), `vim` (application keys), `less`, a paste of 100 KB (progress window, Esc), Ctrl+click on a file
+name and an address, the search bar, Clear, a reconnect (the old screen dimmed), BusyBox `ash` without Unicode (Cyrillic letters and Backspace); the keys Ctrl+C, Ctrl+Left, Alt+F, Alt+Backspace, F1-F12, the keypad in
 `vim` with `:set` in application mode, Ctrl+Space; the German layout (AltGr+Q gives @, AltGr+7 gives {, ^ then e gives the e with a circumflex,
 the left Ctrl+Alt+A sends ESC ^A), the Russian layout (letters, Ctrl+C, Alt+letter), Alt+0233 on the keypad (e acute), Japanese and Chinese IME
 (the composition window at the caret, Enter that ends a composition is not sent); minimise during the colour flood and restore.

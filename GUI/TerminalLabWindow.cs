@@ -1,4 +1,3 @@
-using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
 using SmarTTY.Terminal.Input;
 using SmarTTY.Terminal.Rendering;
@@ -19,16 +18,13 @@ using System.Windows.Threading;
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Tools > WPF terminal lab: the new WPF terminal view (stage 2) on its own, before it replaces the WinForms one in the tabs. It runs the
-/// generated scripts of <see cref="TerminalBenchmarkScripts"/> and shows what the frames cost, mirrors a classic terminal tab (the output
-/// of its connection is shown here too, and what is typed here goes to it) to try the keyboard and the IME against a real program, logs
-/// the bytes of every key, and says how WPF renders on this machine (hardware, software, Remote Desktop) with a switch that forces the
-/// software mode in this window.
+/// Tools > WPF terminal lab: the WPF terminal view on its own (the classic tabs use it since stage 2B). It runs the generated scripts of
+/// <see cref="TerminalBenchmarkScripts"/> and shows what the frames cost, logs the bytes of every key (layouts, AltGr, Alt codes, dead keys,
+/// the IME), and says how WPF renders on this machine (hardware, software, Remote Desktop) with a switch that forces the software mode in
+/// this window.
 /// </summary>
 internal sealed class TerminalLabWindow : Window
 {
-    private readonly Func<TerminalEmulatorControl> _activeTerminal;
-
     private readonly TerminalPanel _panel;
 
     private readonly TerminalRenderView _view;
@@ -38,8 +34,6 @@ internal sealed class TerminalLabWindow : Window
     private readonly ComboBox _scripts = new ComboBox { MinWidth = 260 };
 
     private readonly Button _runButton = new Button { Content = "Run", Padding = new Thickness(10, 2, 10, 2) };
-
-    private readonly Button _mirrorButton = new Button { Content = "Mirror the active terminal tab", Padding = new Thickness(10, 2, 10, 2) };
 
     private readonly CheckBox _localEcho = new CheckBox { Content = "Local echo", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
 
@@ -83,12 +77,8 @@ internal sealed class TerminalLabWindow : Window
 
     private string _benchmarkName;
 
-    // The mirrored tab.
-    private TerminalEmulatorControl _mirror;
-
-    public TerminalLabWindow(Func<TerminalEmulatorControl> activeTerminal)
+    public TerminalLabWindow()
     {
-        _activeTerminal = activeTerminal;
         Title = "WPF terminal lab";
         Width = 1000;
         Height = 760;
@@ -122,7 +112,6 @@ internal sealed class TerminalLabWindow : Window
             }
         };
         _runButton.Click += (sender, e) => RunBenchmark();
-        _mirrorButton.Click += (sender, e) => ToggleMirror();
         _software.Checked += (sender, e) => SetSoftwareRendering(true);
         _software.Unchecked += (sender, e) => SetSoftwareRendering(false);
         _blink.Checked += (sender, e) => _view.CursorBlink = true;
@@ -137,7 +126,7 @@ internal sealed class TerminalLabWindow : Window
         };
 
         WrapPanel tools = new WrapPanel { Margin = new Thickness(4) };
-        foreach (UIElement element in new UIElement[] { _scripts, _runButton, _mirrorButton, reset, new TextBlock { Text = "Font size", VerticalAlignment = VerticalAlignment.Center }, _fontSize, _localEcho, _blink, _software })
+        foreach (UIElement element in new UIElement[] { _scripts, _runButton, reset, new TextBlock { Text = "Font size", VerticalAlignment = VerticalAlignment.Center }, _fontSize, _localEcho, _blink, _software })
         {
             if (element is FrameworkElement frameworkElement)
             {
@@ -167,14 +156,13 @@ internal sealed class TerminalLabWindow : Window
         Loaded += (sender, e) =>
         {
             UpdateDiagnostics();
-            _model.ProcessOutput("WPF terminal lab. Type here (local echo), run a script, or mirror a classic terminal tab.\r\n" +
+            _model.ProcessOutput("WPF terminal lab. Type here (local echo) or run a script.\r\n" +
                 "\u001b[1mBold\u001b[0m \u001b[31mred\u001b[0m \u001b[42mgreen background\u001b[0m \u001b[4munderline\u001b[0m \u001b[7minverse\u001b[0m " +
                 "\u001b[38;5;208m256 colours\u001b[0m \u001b[38;2;120;180;255m24-bit\u001b[0m Кириллица ─│┌┐\r\n");
             _view.Focus();
         };
         Closed += (sender, e) =>
         {
-            StopMirror();
             _statsTimer.Stop();
             RenderCapability.TierChanged -= OnTierChanged;
         };
@@ -255,11 +243,6 @@ internal sealed class TerminalLabWindow : Window
 
     private void RunBenchmark()
     {
-        if (_mirror != null)
-        {
-            MessageBox.Show(this, "Stop the mirror first: the script would be mixed with the output of the tab.", Title);
-            return;
-        }
         int script = Math.Max(0, _scripts.SelectedIndex);
         List<string> chunks = TerminalBenchmarkScripts.Create(script, _model.Columns, _model.Rows);
         _benchmarkName = TerminalBenchmarkScripts.Names[script];
@@ -279,106 +262,8 @@ internal sealed class TerminalLabWindow : Window
         _view.Focus();
     }
 
-    // The mirror of a classic terminal tab.
-
-    private void ToggleMirror()
-    {
-        if (_mirror != null)
-        {
-            StopMirror();
-            return;
-        }
-        TerminalEmulatorControl terminal = _activeTerminal?.Invoke();
-        if (terminal == null || terminal is SshTerminalControl || terminal is SerialTerminalControl)
-        {
-            MessageBox.Show(this, "Open a classic terminal tab (not the Smart Terminal and not a COM/TCP device) and make it the active tab, then press the button again.", Title);
-            return;
-        }
-        _mirror = terminal;
-        _view.ResetTerminal();
-        _model.SuppressReplies = true;
-        _view.SetFixedGrid(terminal.TerminalSize.Width, terminal.TerminalSize.Height);
-        _view.EnqueueOutput(SeedFrom(terminal));
-        terminal.OutputReceived += OnMirroredOutput;
-        terminal.TerminalSizeChanged += OnMirroredResize;
-        _mirrorButton.Content = "Stop the mirror";
-        _localEcho.IsEnabled = false;
-        _runButton.IsEnabled = false;
-        AppendLog("mirror", "started: " + terminal.TerminalSize.Width + " x " + terminal.TerminalSize.Height + "; press Ctrl+L to make the program draw its screen again");
-        _view.Focus();
-    }
-
-    // What the screen of the tab shows now, as output: the text without its colours and the cursor (the modes of the program are not known
-    // until it sets them again, e.g. after Ctrl+L).
-    private static string SeedFrom(TerminalEmulatorControl terminal)
-    {
-        StringBuilder seed = new StringBuilder();
-        if (terminal.ActiveBufferIndex != 0)
-        {
-            seed.Append("\u001b[?1049h");
-        }
-        seed.Append("\u001b[2J\u001b[H");
-        System.Drawing.Point cursor = terminal.CursorPosition;
-        int firstLine = terminal.CursorDocumentLine - cursor.Y;
-        int columns = terminal.TerminalSize.Width;
-        for (int row = 0; row < terminal.TerminalSize.Height; row++)
-        {
-            string text;
-            try
-            {
-                text = terminal.GetLineText(firstLine + row) ?? "";
-            }
-            catch (Exception)
-            {
-                text = "";
-            }
-            if (text.Length > columns)
-            {
-                text = text.Substring(0, columns);
-            }
-            seed.Append("\u001b[").Append(row + 1).Append(";1H").Append(text);
-        }
-        seed.Append("\u001b[").Append(cursor.Y + 1).Append(';').Append(cursor.X + 1).Append('H');
-        return seed.ToString();
-    }
-
-    private void OnMirroredOutput(string output)
-    {
-        _view.EnqueueOutput(output);
-    }
-
-    private void OnMirroredResize(TerminalEmulatorControl terminal, int columns, int rows)
-    {
-        Dispatcher.BeginInvoke(new Action(() => _view.SetFixedGrid(columns, rows)));
-    }
-
-    private void StopMirror()
-    {
-        if (_mirror == null)
-        {
-            return;
-        }
-        _mirror.OutputReceived -= OnMirroredOutput;
-        _mirror.TerminalSizeChanged -= OnMirroredResize;
-        _mirror = null;
-        _model.SuppressReplies = false;
-        _mirrorButton.Content = "Mirror the active terminal tab";
-        _localEcho.IsEnabled = true;
-        _runButton.IsEnabled = true;
-        AppendLog("mirror", "stopped");
-    }
-
     private void OnDataEntered(byte[] bytes, TerminalInputKind kind)
     {
-        TerminalEmulatorControl mirror = _mirror;
-        if (mirror != null)
-        {
-            if (!mirror.IsDisposed)
-            {
-                mirror.SendInput(bytes, (TerminalEmulatorControl.InputKind)(int)kind);
-            }
-            return;
-        }
         if (_localEcho.IsChecked == true && kind != TerminalInputKind.MouseReport)
         {
             // Enter is shown as a new line; the keys' escape sequences move the cursor, as a program would.

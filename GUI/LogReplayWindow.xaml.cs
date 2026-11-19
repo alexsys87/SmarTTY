@@ -14,7 +14,7 @@ public partial class LogReplayWindow : Window
 
     private readonly byte[] _rawBytes;
 
-    private readonly TerminalEmulatorControl _terminalEmulatorControl;
+    private readonly ITerminalSurface _terminalEmulatorControl;
 
     // When set, the log is the raw byte stream of a device (COM / raw TCP / telnet) terminal and is replayed through
     // the device terminal (hex dump in HEX mode, decoded text otherwise) instead of the plain text terminal above.
@@ -30,7 +30,7 @@ public partial class LogReplayWindow : Window
 
     private bool _finished;
 
-    private LogReplayWindow(string logText, TerminalEmulatorControl terminalEmulatorControl)
+    private LogReplayWindow(string logText, ITerminalSurface terminalEmulatorControl)
     {
         InitializeComponent();
         _terminalEmulatorControl = terminalEmulatorControl;
@@ -49,7 +49,7 @@ public partial class LogReplayWindow : Window
     }
 
     /// <summary>Replays a recorded text log into <paramref name="terminal"/>.</summary>
-    public static void Replay(string logText, TerminalEmulatorControl terminal)
+    public static void Replay(string logText, ITerminalSurface terminal)
     {
         Show(new LogReplayWindow(logText ?? throw new ArgumentNullException(nameof(logText)), terminal));
     }

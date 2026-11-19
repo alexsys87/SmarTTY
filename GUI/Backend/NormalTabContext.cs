@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
+using SmarTTY.GUI.TerminalView;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
@@ -14,7 +15,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 {
     private SessionWrapper _Session;
 
-    public readonly TerminalEmulatorControl Terminal;
+    /// <summary>The terminal of the tab: the WPF terminal of a classic tab, the WinForms Smart Terminal until it moves to WPF too.</summary>
+    public readonly ITerminalSurface Terminal;
 
     private string _Title;
 
@@ -51,7 +53,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
     }
 
-    public TextEditorControl EditorControl => Terminal;
+    /// <summary>The WinForms editor of the tab (the Smart Terminal), or null for a WPF terminal.</summary>
+    public TextEditorControl EditorControl => Terminal as TextEditorControl;
 
     public FrameworkElement VerticalScrollBar { get; }
 
@@ -65,14 +68,8 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    public NormalTabContext(SessionWrapper sessionWrapper, TerminalEmulatorControl term)
+    public NormalTabContext(SessionWrapper sessionWrapper, ITerminalSurface term)
     {
-        WPFScrollBar wPFScrollBar = new WPFScrollBar();
-        wPFScrollBar.Orientation = Orientation.Vertical;
-        VerticalScrollBar = (FrameworkElement)wPFScrollBar;
-        WPFScrollBar wPFScrollBar2 = new WPFScrollBar();
-        wPFScrollBar2.Orientation = Orientation.Horizontal;
-        HorizontalScrollBar = (FrameworkElement)wPFScrollBar2;
         NormalTabContext normalTabContext = this;
         if (term is SshTerminalControl vtc)
         {
@@ -111,19 +108,37 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         _Session = sessionWrapper;
         Terminal = term;
-        // The terminal is a WinForms control hosted in WPF: files dropped on it never reach the WPF window's own
-        // drop handler, so the control has to accept them itself.
-        term.AllowDrop = true;
-        term.DragEnter += Terminal_DragOver;
-        term.DragOver += Terminal_DragOver;
-        term.DragDrop += Terminal_DragDrop;
-        term.ClipboardFilesPasted += Terminal_ClipboardFilesPasted;
-        WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
-        ((WindowsFormsHost)winFormsHostWrapper).Child = term;
-        Control = (FrameworkElement)winFormsHostWrapper;
-        Searcher = new TextSearcher(term);
+        if (term is WpfTerminal wpfTerminal)
+        {
+            // The WPF terminal is the content of the tab itself and has its own scroll bar.
+            wpfTerminal.DragEnter += WpfTerminal_DragOver;
+            wpfTerminal.DragOver += WpfTerminal_DragOver;
+            wpfTerminal.Drop += WpfTerminal_Drop;
+            wpfTerminal.ClipboardFilesPasted += (WpfTerminal terminal, string[] files) => Terminal_ClipboardFilesPasted(files);
+            Control = wpfTerminal;
+        }
+        else if (term is TerminalEmulatorControl winFormsTerminal)
+        {
+            WPFScrollBar wPFScrollBar = new WPFScrollBar();
+            wPFScrollBar.Orientation = Orientation.Vertical;
+            VerticalScrollBar = (FrameworkElement)wPFScrollBar;
+            WPFScrollBar wPFScrollBar2 = new WPFScrollBar();
+            wPFScrollBar2.Orientation = Orientation.Horizontal;
+            HorizontalScrollBar = (FrameworkElement)wPFScrollBar2;
+            // The terminal is a WinForms control hosted in WPF: files dropped on it never reach the WPF window's own
+            // drop handler, so the control has to accept them itself.
+            winFormsTerminal.AllowDrop = true;
+            winFormsTerminal.DragEnter += Terminal_DragOver;
+            winFormsTerminal.DragOver += Terminal_DragOver;
+            winFormsTerminal.DragDrop += Terminal_DragDrop;
+            winFormsTerminal.ClipboardFilesPasted += (TerminalEmulatorControl terminal, string[] files) => Terminal_ClipboardFilesPasted(files);
+            WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
+            ((WindowsFormsHost)winFormsHostWrapper).Child = winFormsTerminal;
+            Control = (FrameworkElement)winFormsHostWrapper;
+            winFormsTerminal.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
+        }
+        Searcher = new TextSearcher(term.SearchTarget);
         Title = term.Title;
-        term.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
         term.TitleChanged += (object sender, EventArgs e) =>
         {
             normalTabContext.Title = term.Title;
@@ -132,7 +147,37 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public void FocusMainControl()
     {
-        Terminal?.Focus();
+        Terminal?.FocusTerminal();
+    }
+
+    private void WpfTerminal_DragOver(object sender, System.Windows.DragEventArgs e)
+    {
+        bool acceptFiles = !FileListControl.IsDraggingOut && !_Session.IsDevice && e.Data != null && e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop);
+        e.Effects = acceptFiles ? System.Windows.DragDropEffects.Copy : System.Windows.DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void WpfTerminal_Drop(object sender, System.Windows.DragEventArgs e)
+    {
+        e.Handled = true;
+        if (FileListControl.IsDraggingOut || _Session.IsDevice || e.Data == null || !(e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] files) || files.Length == 0)
+        {
+            return;
+        }
+        // Start the upload after the drop has finished, so that Explorer is not kept waiting while the remote directory is being determined.
+        Application.Current.Dispatcher.BeginInvoke((Action)(() => UploadDropped(files)));
+    }
+
+    private void UploadDropped(string[] files)
+    {
+        try
+        {
+            _Session.UploadFiles(files, this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
     }
 
     private void Terminal_DragOver(object sender, System.Windows.Forms.DragEventArgs e)
@@ -149,33 +194,22 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         // Start the upload after the drop has finished, so that Explorer is not kept waiting while the remote
         // directory is being determined.
-        Terminal.BeginInvoke((Action)(() =>
-        {
-            try
-            {
-                _Session.UploadFiles(files, this);
-            }
-            catch (Exception exception)
-            {
-                MessageBoxes.Exception(exception);
-            }
-        }));
+        Application.Current.Dispatcher.BeginInvoke((Action)(() => UploadDropped(files)));
     }
 
     // Files copied in Explorer and pasted into the terminal: the same upload as for dropped files, or their paths as text.
-    private void Terminal_ClipboardFilesPasted(TerminalEmulatorControl terminal, string[] files)
+    private void Terminal_ClipboardFilesPasted(string[] files)
     {
+        ITerminalSurface terminal = Terminal;
         if (_Session.IsDevice || files == null || files.Length == 0)
         {
             return;
         }
         string what = files.Length == 1 ? "\"" + System.IO.Path.GetFileName(files[0]) + "\"" : files.Length + " files";
-        System.Windows.Forms.DialogResult answer = ThemedMessageBox.Show(
-            terminal,
-            "The clipboard holds " + what + ".\n\nYes: upload to the server (like dropping the files on the terminal).\nNo: paste the local path" + (files.Length == 1 ? "" : "s") + " as text.",
-            "Paste",
-            System.Windows.Forms.MessageBoxButtons.YesNoCancel,
-            System.Windows.Forms.MessageBoxIcon.Question);
+        string question = "The clipboard holds " + what + ".\n\nYes: upload to the server (like dropping the files on the terminal).\nNo: paste the local path" + (files.Length == 1 ? "" : "s") + " as text.";
+        System.Windows.Forms.DialogResult answer = terminal is System.Windows.Forms.IWin32Window owner
+            ? ThemedMessageBox.Show(owner, question, "Paste", System.Windows.Forms.MessageBoxButtons.YesNoCancel, System.Windows.Forms.MessageBoxIcon.Question)
+            : ThemedMessageBox.Show(question, "Paste", System.Windows.Forms.MessageBoxButtons.YesNoCancel, System.Windows.Forms.MessageBoxIcon.Question);
         try
         {
             if (answer == System.Windows.Forms.DialogResult.Yes)

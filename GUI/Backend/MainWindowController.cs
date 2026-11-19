@@ -6,6 +6,8 @@ using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
+using SmarTTY.GUI.TerminalView;
+using SmarTTY.Terminal.Input;
 using SmarTTY.TextEditing;
 using SmarTTY.Utilities;
 using System;
@@ -255,7 +257,7 @@ public class MainWindowController : INotifyPropertyChanged
                     LogReplayWindow.Replay(bytes, deviceTab.Terminal);
                     return;
                 }
-                TerminalEmulatorControl terminalEmulatorControl = (activeTab as NormalTabContext)?.Terminal;
+                ITerminalSurface terminalEmulatorControl = (activeTab as NormalTabContext)?.Terminal;
                 if (terminalEmulatorControl == null)
                 {
                     throw new Exception("No active terminal");
@@ -272,7 +274,7 @@ public class MainWindowController : INotifyPropertyChanged
         {
             try
             {
-                TerminalEmulatorControl terminalEmulatorControl = (_Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+                ITerminalSurface terminalEmulatorControl = (_Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
                 if (terminalEmulatorControl == null)
                 {
                     throw new Exception("No active terminal");
@@ -617,6 +619,11 @@ public class MainWindowController : INotifyPropertyChanged
                 deviceTab.Terminal.CopySelection();
                 return;
             }
+            if (activeTab is NormalTabContext normalTab)
+            {
+                normalTab.Terminal.CopySelection();
+                return;
+            }
             activeTab?.EditorControl?.CopySelection();
         }
 
@@ -626,6 +633,11 @@ public class MainWindowController : INotifyPropertyChanged
             if (activeTab is DeviceTabContext deviceTab)
             {
                 deviceTab.Terminal.Paste();
+                return;
+            }
+            if (activeTab is NormalTabContext normalTab)
+            {
+                normalTab.Terminal.Paste();
                 return;
             }
             activeTab?.EditorControl?.Paste();
@@ -697,7 +709,11 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 foreach (ITabContext tab in allSession.Tabs)
                 {
-                    if (tab is NormalTabContext { Terminal: var terminal })
+                    if (tab is NormalTabContext { Terminal: WpfTerminal wpfTerminal })
+                    {
+                        _Controller.ApplyTerminalSettings(wpfTerminal, font);
+                    }
+                    else if (tab is NormalTabContext { Terminal: TerminalEmulatorControl terminal })
                     {
                         terminal.Font = font;
                         _Controller.ApplyTerminalSettings(terminal);
@@ -1495,10 +1511,13 @@ public class MainWindowController : INotifyPropertyChanged
         {
             _SuppressTerminalResizeEvents = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("SuppressTerminalResizeEvents"));
-            TerminalEmulatorControl terminalEmulatorControl = (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
-            if (terminalEmulatorControl != null)
+            if ((ActiveSession?.ActiveTab as NormalTabContext)?.Terminal is TerminalEmulatorControl terminalEmulatorControl)
             {
                 terminalEmulatorControl.LayoutSuspended = value;
+            }
+            else if ((ActiveSession?.ActiveTab as NormalTabContext)?.Terminal is WpfTerminal wpfTerminal)
+            {
+                wpfTerminal.LayoutSuspended = value;
             }
         }
     }
@@ -1702,11 +1721,25 @@ public class MainWindowController : INotifyPropertyChanged
         _TerminalContextMenu = new ContextMenuStrip();
         _TerminalContextMenu.Items.Add("Copy", Icons.Load("copy"), (object sender, EventArgs e) =>
         {
-            ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
+            if (MenuTerminal != null)
+            {
+                MenuTerminal.CopySelection();
+            }
+            else
+            {
+                ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
+            }
         });
         _TerminalContextMenu.Items.Add("Paste", Icons.Load("paste"), (object _, EventArgs e) =>
         {
-            ActiveSession?.ActiveTab?.EditorControl?.Paste();
+            if (MenuTerminal != null)
+            {
+                MenuTerminal.Paste();
+            }
+            else
+            {
+                ActiveSession?.ActiveTab?.EditorControl?.Paste();
+            }
         });
         ToolStripMenuItem pasteSpecialMenu = new ToolStripMenuItem("Paste special");
         pasteSpecialMenu.DropDownItems.Add("Paste as one line (lines joined with a space)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.OneLineSpaces));
@@ -1721,14 +1754,23 @@ public class MainWindowController : INotifyPropertyChanged
         _TerminalContextMenu.Items.Add(commandHistoryItem);
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
         {
-            TerminalEmulatorControl target = ContextMenuTerminal(out SessionWrapper targetSession);
+            // Opened by a WinForms terminal (its SourceControl), not by the WPF one that opened it the last time.
+            if (!_MenuOpeningFromWpf)
+            {
+                _MenuOpenedBy = null;
+            }
+            _MenuOpeningFromWpf = false;
+        };
+        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
+        {
+            ITerminalSurface target = ContextMenuTerminal(out SessionWrapper targetSession);
             // A classic tab reads the history file of the shell, which a Windows server does not have.
             commandHistoryItem.Enabled = target is SshTerminalControl || (target != null && targetSession?.Session != null && !targetSession.IsWindowsHost);
         };
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
         {
             // Only the Smart Terminal knows when a command has ended.
-            pasteLineByLineItem.Enabled = ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) is SshTerminalControl;
+            pasteLineByLineItem.Enabled = MenuTerminal is SshTerminalControl;
         };
         // The "Quick commands" sub menu goes on top of the menu; it is rebuilt each time the menu opens, from the list as it is saved now.
         _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => AddQuickCommandItems();
@@ -1740,7 +1782,7 @@ public class MainWindowController : INotifyPropertyChanged
         });
         _TerminalContextMenu.Items.Add("Clear", Icons.Load("clear"), (object _, EventArgs e) =>
         {
-            ((_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal)?.ClearOutput();
+            MenuTerminal?.ClearOutput();
         });
         _TerminalContextMenu.Items.Add("New Tab", Icons.Load("add"), (object _, EventArgs e) =>
         {
@@ -1760,10 +1802,18 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyGlobalVisualSettings();
     }
 
+    // The WPF terminal that opened the menu (a WinForms terminal is its SourceControl); cleared when a WinForms control opens it.
+    private ITerminalSurface _MenuOpenedBy;
+
+    private bool _MenuOpeningFromWpf;
+
+    // The terminal the menu was opened on, or the one of the active tab.
+    private ITerminalSurface MenuTerminal => _MenuOpenedBy ?? (_TerminalContextMenu.SourceControl as ITerminalSurface) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+
     // The terminal the menu was opened on (or the one of the active tab) and its session.
-    private TerminalEmulatorControl ContextMenuTerminal(out SessionWrapper session)
+    private ITerminalSurface ContextMenuTerminal(out SessionWrapper session)
     {
-        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+        ITerminalSurface terminal = MenuTerminal;
         session = ActiveSession?.Tabs.OfType<NormalTabContext>().Any((NormalTabContext page) => page.Terminal == terminal) == true
             ? ActiveSession
             : AllSessions.FirstOrDefault((SessionWrapper candidate) => candidate.Tabs.OfType<NormalTabContext>().Any((NormalTabContext page) => page.Terminal == terminal));
@@ -1773,7 +1823,7 @@ public class MainWindowController : INotifyPropertyChanged
     /// <summary>"Command history..." of the terminal menu: the window that searches, puts in and deletes commands.</summary>
     private void ShowCommandHistory()
     {
-        TerminalEmulatorControl terminal = ContextMenuTerminal(out SessionWrapper session);
+        ITerminalSurface terminal = ContextMenuTerminal(out SessionWrapper session);
         CommandHistorySource source = CreateCommandHistorySource(terminal, session);
         if (source == null)
         {
@@ -1794,7 +1844,7 @@ public class MainWindowController : INotifyPropertyChanged
     /// the session at once and from the history file on the server. A classic shell tab only reads that file, since the
     /// shell keeps its own history, and only puts a command into the terminal.
     /// </summary>
-    private CommandHistorySource CreateCommandHistorySource(TerminalEmulatorControl terminal, SessionWrapper session)
+    private CommandHistorySource CreateCommandHistorySource(ITerminalSurface terminal, SessionWrapper session)
     {
         if (terminal == null || session == null)
         {
@@ -1846,7 +1896,7 @@ public class MainWindowController : INotifyPropertyChanged
             Insert = (string command) =>
             {
                 terminal.InsertCommand(command);
-                terminal.Focus();
+                terminal.FocusTerminal();
             }
         };
     }
@@ -1862,7 +1912,7 @@ public class MainWindowController : INotifyPropertyChanged
             old.Dispose();
         }
         _QuickCommandItems.Clear();
-        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+        ITerminalSurface terminal = MenuTerminal;
         SessionWrapper session = ActiveSession?.Tabs.OfType<NormalTabContext>().Any(tab => tab.Terminal == terminal) == true
             ? ActiveSession
             : AllSessions.FirstOrDefault(candidate => candidate.Tabs.OfType<NormalTabContext>().Any(tab => tab.Terminal == terminal));
@@ -1957,6 +2007,11 @@ public class MainWindowController : INotifyPropertyChanged
         if (activeTab is DeviceTabContext deviceTab)
         {
             deviceTab.Terminal.CopyAll();
+            return;
+        }
+        if (activeTab is NormalTabContext normalTab)
+        {
+            normalTab.Terminal.CopyAll();
             return;
         }
         (activeTab?.EditorControl)?.CopyAll();
@@ -2080,52 +2135,28 @@ public class MainWindowController : INotifyPropertyChanged
         Dispatcher.BeginInvoke((Delegate)a, new object[0]);
     }
 
-    public TerminalEmulatorControl CreateNewTerminal(SessionWrapper session, InitialCommand initialCommand, bool virtualMode, string initialDirForVirtualMode = null)
+    public ITerminalSurface CreateNewTerminal(SessionWrapper session, InitialCommand initialCommand, bool virtualMode, string initialDirForVirtualMode = null)
     {
-        TerminalEmulatorControl terminalEmulatorControl;
-        if (virtualMode)
+        if (!virtualMode)
         {
-            // The session the tab is created for, which is not necessarily the active one yet (a new connection).
-            SshTerminalControl vt = new SshTerminalControl(session, initialDirForVirtualMode)
-            {
-                Tag = new TerminalTag
-                {
-                    Session = session
-                }
-            };
-            vt.EndOfInputRequested += (object sender, EventArgs e) =>
-            {
-                session.CloseTabPageForControl(vt);
-            };
-            vt.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
-            vt.OpenFileRequested += Vt_FileOpenRequested;
-            vt.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: true);
-            terminalEmulatorControl = vt;
+            return CreateClassicTerminal(session, initialCommand);
         }
-        else
+        // The session the tab is created for, which is not necessarily the active one yet (a new connection).
+        SshTerminalControl vt = new SshTerminalControl(session, initialDirForVirtualMode)
         {
-            terminalEmulatorControl = new TerminalEmulatorControl();
-            terminalEmulatorControl.HighlightLogLevels = initialCommand.HighlightLogLevels;
-            // Decided before the shell starts: the PTY of a byte-counting shell is opened without IUTF8.
-            terminalEmulatorControl.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: false);
-            // Ctrl+click on a file name in the output opens it in the editor; relative names are resolved against the directory
-            // the shell reports (OSC 7) or, failing that, the one read from the title or the prompt.
-            terminalEmulatorControl.FileLinks = session.VTSettings.ClassicTerminalLinks && !session.IsWindowsHost && !session.IsDevice;
-            // Addresses name no file of either computer: they are links on a Windows host too, and open in the browser.
-            terminalEmulatorControl.UrlLinks = session.VTSettings.ClassicTerminalLinks && !session.IsDevice;
-            terminalEmulatorControl.DirectoryFallback = () => session.TryExtractCurrentDir();
-            terminalEmulatorControl.FileLinkClicked += Vt_FileOpenRequested;
-            SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminalEmulatorControl.ByteOrientedLineEditing);
-            sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
-            terminalEmulatorControl.DataEntered += terminalEmulatorControl1_HandleTerminalInput;
-            terminalEmulatorControl.TerminalSizeChanged += terminalEmulatorControl1_TerminalSizeChanged;
-            terminalEmulatorControl.Tag = new TerminalTag
+            Tag = new TerminalTag
             {
-                Channel = sshShellChannel,
                 Session = session
-            };
-            session.AttachChannelToControl(terminalEmulatorControl, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
-        }
+            }
+        };
+        vt.EndOfInputRequested += (object sender, EventArgs e) =>
+        {
+            session.CloseTabPageForControl(vt);
+        };
+        vt.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
+        vt.OpenFileRequested += Vt_FileOpenRequested;
+        vt.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: true);
+        TerminalEmulatorControl terminalEmulatorControl = vt;
         // A very large paste can be sent as a file instead of being typed into the terminal.
         terminalEmulatorControl.LargePasteUploadRequested += (TerminalEmulatorControl control, string text) => session.UploadPastedText(text, control);
         terminalEmulatorControl.CaretWhenUnfocused = false;
@@ -2159,10 +2190,160 @@ public class MainWindowController : INotifyPropertyChanged
         return terminalEmulatorControl;
     }
 
+    // A classic terminal tab (a shell or a command in a PTY of its own) on the WPF terminal (stage 2B).
+    private WpfTerminal CreateClassicTerminal(SessionWrapper session, InitialCommand initialCommand)
+    {
+        WpfTerminal terminal = new WpfTerminal();
+        terminal.HighlightLogLevels = initialCommand.HighlightLogLevels;
+        // Decided before the shell starts: the PTY of a byte-counting shell is opened without IUTF8.
+        terminal.ByteOrientedLineEditing = session.UsesByteOrientedLineEditing(smartTerminal: false);
+        // Ctrl+click on a file name in the output opens it in the editor; relative names are resolved against the directory the shell
+        // reports (OSC 7) or, failing that, the one read from the title or the prompt.
+        terminal.FileLinks = session.VTSettings.ClassicTerminalLinks && !session.IsWindowsHost && !session.IsDevice;
+        // Addresses name no file of either computer: they are links on a Windows host too, and open in the browser.
+        terminal.UrlLinks = session.VTSettings.ClassicTerminalLinks && !session.IsDevice;
+        terminal.DirectoryFallback = () => session.TryExtractCurrentDir();
+        terminal.FileLinkClicked += Vt_FileOpenRequested;
+        terminal.InputDispatcher = _Worker;
+        terminal.AppSettings = Settings;
+        terminal.CaretWhenUnfocused = false;
+        // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators.
+        terminal.PasteLineBreak = "\r";
+        terminal.ContextMenuReference = _TerminalContextMenu;
+        terminal.AutoWrap = Settings.AutoWrapLines;
+        Font configuredFont = null;
+        try
+        {
+            configuredFont = Settings.ConfiguredFont;
+        }
+        catch
+        {
+        }
+        ApplyTerminalSettings(terminal, configuredFont);
+        SshShellChannel sshShellChannel = session.Session.OpenShellChannel(initialCommand.Command, "xterm", ExtendedDataMode.Normal, utf8Tty: !terminal.ByteOrientedLineEditing);
+        sshShellChannel.ExtendedDataMode = ExtendedDataMode.Merge;
+        terminal.DataEntered += (WpfTerminal source, byte[] input, TerminalInputKind kind) => HandleTerminalInput(source, input);
+        terminal.TerminalSizeChanged += (WpfTerminal source, int columns, int rows) => terminalEmulatorControl1_TerminalSizeChanged(source, columns, rows);
+        terminal.Tag = new TerminalTag
+        {
+            Channel = sshShellChannel,
+            Session = session
+        };
+        session.AttachChannelToControl(terminal, sshShellChannel, initialCommand.Command != null, initialCommand.TabKeptAfterExit);
+        // A very large paste can be sent as a file instead of being typed into the terminal.
+        terminal.LargePasteUploadRequested += (WpfTerminal source, string text) => session.UploadPastedText(text, source);
+        terminal.ContextMenuRequested += (WpfTerminal source, System.Drawing.Point screen) =>
+        {
+            _MenuOpenedBy = source;
+            _MenuOpeningFromWpf = true;
+            _TerminalContextMenu.Show(screen);
+        };
+        terminal.ShortcutKey += WpfTerminal_ShortcutKey;
+        terminal.CtrlTabPressed += (WpfTerminal source, bool shift) => ActiveSession?.OnCtrlTabPressed(shift);
+        terminal.KeyUp += (object sender, System.Windows.Input.KeyEventArgs e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.LeftCtrl || e.Key == System.Windows.Input.Key.RightCtrl)
+            {
+                ActiveSession?.OnCtrlReleased();
+            }
+        };
+        terminal.MouseMove += WpfTerminal_MouseMove;
+        if (initialCommand.Echo && !string.IsNullOrEmpty(initialCommand.Command))
+        {
+            terminal.ProcessOutput(initialCommand.Command + "\r\n");
+        }
+        return terminal;
+    }
+
+    // The shortcuts of the window in a WPF terminal (what ctl_KeyDown does for a WinForms one).
+    private void WpfTerminal_ShortcutKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        WpfTerminal terminal = sender as WpfTerminal;
+        System.Windows.Input.Key key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+        System.Windows.Input.ModifierKeys modifiers = e.KeyboardDevice.Modifiers;
+        bool control = (modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+        bool alt = (modifiers & System.Windows.Input.ModifierKeys.Alt) != 0;
+        bool shift = (modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+        if (Settings.UseCtrlShortcuts)
+        {
+            if (control && !alt && !shift && key == System.Windows.Input.Key.W)
+            {
+                ActiveSession?.CloseTabPageForControl(terminal);
+                e.Handled = true;
+                return;
+            }
+            if (control && !alt && shift && (key == System.Windows.Input.Key.T || key == System.Windows.Input.Key.N))
+            {
+                ActiveSession?.CreateNewTerminalPage();
+                e.Handled = true;
+                return;
+            }
+        }
+        if (Settings.InterceptCtrlClipboardShortcuts && control && !alt && !shift)
+        {
+            switch (key)
+            {
+                case System.Windows.Input.Key.C:
+                case System.Windows.Input.Key.X:
+                    terminal?.CopySelection();
+                    e.Handled = true;
+                    return;
+                case System.Windows.Input.Key.V:
+                    terminal?.Paste();
+                    e.Handled = true;
+                    return;
+            }
+        }
+        if (!control && alt && !shift && key == System.Windows.Input.Key.Return)
+        {
+            FullScreenMode = !FullScreenMode;
+            e.Handled = true;
+        }
+    }
+
+    // The scroll bar in Auto mode and the headers of the minimalistic mode follow the mouse at the edges of a WPF terminal, as for a WinForms one.
+    private void WpfTerminal_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!(sender is WpfTerminal terminal) || e.LeftButton == System.Windows.Input.MouseButtonState.Pressed || e.RightButton == System.Windows.Input.MouseButtonState.Pressed)
+        {
+            return;
+        }
+        System.Windows.Point point = e.GetPosition(terminal);
+        ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.EdgeFlags.None;
+        if (point.X < EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Left;
+        }
+        if (point.Y < EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Top;
+        }
+        if (point.X > terminal.ActualWidth - EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Right;
+        }
+        if (point.Y > terminal.ActualHeight - EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Bottom;
+        }
+        switch (Settings.VerticalScrollbarMode)
+        {
+            case GlobalSettings.ScrollbarMode.Show:
+                terminal.ScrollBarVisible = true;
+                break;
+            case GlobalSettings.ScrollbarMode.Hide:
+                terminal.ScrollBarVisible = false;
+                break;
+            case GlobalSettings.ScrollbarMode.Auto:
+                terminal.ScrollBarVisible = (edgeFlags & ScreenEdgeUtils.EdgeFlags.Right) != 0;
+                break;
+        }
+        UpdateMinimalisticModeVisibility(edgeFlags);
+    }
+
     private void PasteSpecial(PasteMode mode)
     {
-        TerminalEmulatorControl terminal = (_TerminalContextMenu.SourceControl as TerminalEmulatorControl) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
-        terminal?.PasteSpecial(mode);
+        MenuTerminal?.PasteSpecial(mode);
     }
 
     private void Vt_FileOpenRequested(object sender, OpenFileEventArgs e)
@@ -2232,6 +2413,11 @@ public class MainWindowController : INotifyPropertyChanged
             FocusMainControlDelayed(null);
         };
         e.Popup = suggestionPopupController;
+    }
+
+    private void ApplyTerminalSettings(WpfTerminal terminal, Font font)
+    {
+        terminal.ApplySettings(Settings, font);
     }
 
     private void ApplyTerminalSettings(TerminalEmulatorControl trm)
@@ -2331,7 +2517,7 @@ public class MainWindowController : INotifyPropertyChanged
         }
     }
 
-    private void terminalEmulatorControl1_TerminalSizeChanged(TerminalEmulatorControl sender, int newWidth, int newHeight)
+    private void terminalEmulatorControl1_TerminalSizeChanged(ITerminalSurface sender, int newWidth, int newHeight)
     {
         TerminalTag tag = sender.Tag as TerminalTag;
         if (tag?.Channel == null || tag.ShellOpenFailed)
@@ -2373,7 +2559,11 @@ public class MainWindowController : INotifyPropertyChanged
 
     private void terminalEmulatorControl1_HandleTerminalInput(object sender, byte[] input, TerminalEmulatorControl.InputKind type)
     {
-        TerminalEmulatorControl terminal = (TerminalEmulatorControl)sender;
+        HandleTerminalInput((ITerminalSurface)sender, input);
+    }
+
+    private void HandleTerminalInput(ITerminalSurface terminal, byte[] input)
+    {
         TerminalTag tag = (TerminalTag)terminal.Tag;
         if (tag.ShellOpenFailed)
         {
@@ -2584,8 +2774,19 @@ public class MainWindowController : INotifyPropertyChanged
     {
         if (session == ActiveSession && _ActiveTab != activeTab)
         {
-            TerminalEmulatorControl previousTerminal = (_ActiveTab as NormalTabContext)?.Terminal;
-            TerminalEmulatorControl newTerminal = (activeTab as NormalTabContext)?.Terminal;
+            TerminalEmulatorControl previousTerminal = (_ActiveTab as NormalTabContext)?.Terminal as TerminalEmulatorControl;
+            TerminalEmulatorControl newTerminal = (activeTab as NormalTabContext)?.Terminal as TerminalEmulatorControl;
+            if ((_ActiveTab as NormalTabContext)?.Terminal is WpfTerminal previousWpf)
+            {
+                previousWpf.CaretWhenUnfocused = false;
+                previousWpf.LayoutSuspended = false;
+            }
+            if ((activeTab as NormalTabContext)?.Terminal is WpfTerminal newWpf)
+            {
+                newWpf.CaretWhenUnfocused = true;
+                newWpf.LayoutSuspended = SuppressTerminalResizeEvents;
+                newWpf.ScrollBarVisible = Settings.VerticalScrollbarMode != GlobalSettings.ScrollbarMode.Hide;
+            }
             _ActiveTab = activeTab;
             if (previousTerminal != null)
             {

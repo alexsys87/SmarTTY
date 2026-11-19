@@ -215,6 +215,135 @@ internal sealed class TerminalRenderView : FrameworkElement
     /// <summary>The bytes of a key or a character, as they were sent (the key log of the lab window).</summary>
     public event Action<string, string> InputLogged;
 
+    /// <summary>
+    /// A paste was asked for (Shift+Insert, Ctrl+Shift+V, the middle button): the owner pastes through its guard and returns true. Without a
+    /// handler the view pastes the clipboard itself.
+    /// </summary>
+    public Func<bool> PasteRequested;
+
+    /// <summary>Ctrl+Shift+Insert: the owner shows its paste menu.</summary>
+    public event Action PasteMenuRequested;
+
+    /// <summary>The right button was released over the view (not reported to the program): the point on the screen, in device pixels.</summary>
+    public event Action<Point> ContextMenuRequested;
+
+    /// <summary>Ctrl+Tab (true with Shift): the owner switches tabs.</summary>
+    public event Action<bool> CtrlTabPressed;
+
+    /// <summary>The mouse wheel sends Up and Down when the program does not read the mouse (a setting).</summary>
+    public bool WheelSendsArrowKeys { get; set; }
+
+    /// <summary>The caret is drawn (hollow) while the view does not have the keyboard focus.</summary>
+    public bool ShowCaretWhenUnfocused
+    {
+        get => _showCaretWhenUnfocused;
+        set
+        {
+            _showCaretWhenUnfocused = value;
+            _cursorState = null;
+            OnModelChanged();
+        }
+    }
+
+    private bool _showCaretWhenUnfocused = true;
+
+    /// <summary>The owner hides the caret (an inactive session).</summary>
+    public bool CaretHiddenByOwner
+    {
+        get => _caretHiddenByOwner;
+        set
+        {
+            if (_caretHiddenByOwner != value)
+            {
+                _caretHiddenByOwner = value;
+                _cursorState = null;
+                OnModelChanged();
+            }
+        }
+    }
+
+    /// <summary>The words in a selection by double click (the WinForms terminal counted '.' and '-' as letters of a word, for file names).</summary>
+    public Func<char, bool> IsWordCharacter { get; set; } = ch => char.IsLetterOrDigit(ch) || ch == '_' || ch == '.' || ch == '-';
+
+    private bool _caretHiddenByOwner;
+
+    // The search: the matches of the search bar, highlighted in the rows that are shown, and the ranges it marks.
+    private TextMatcher _matchHighlight;
+
+    private readonly Dictionary<int, KeyValuePair<TextDocument.TextPosition, TextDocument.TextPosition>> _highlights = new Dictionary<int, KeyValuePair<TextDocument.TextPosition, TextDocument.TextPosition>>();
+
+    private readonly Dictionary<int, HighlightStyle> _highlightStyles = new Dictionary<int, HighlightStyle>();
+
+    private int _nextHighlight = 1;
+
+    private int _highlightVersion;
+
+    /// <summary>Highlights the matches of the search in the rows that are shown (null: none).</summary>
+    public void SetMatchHighlight(TextMatcher matcher)
+    {
+        _matchHighlight = matcher;
+        _highlightVersion++;
+        OnModelChanged();
+    }
+
+    /// <summary>Marks a range of the document; returns the number to change or remove it with.</summary>
+    public int AddHighlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle style)
+    {
+        int index = _nextHighlight++;
+        SetHighlight(index, start, end, style);
+        return index;
+    }
+
+    public int SetHighlight(int index, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle style)
+    {
+        _highlights[index] = new KeyValuePair<TextDocument.TextPosition, TextDocument.TextPosition>(start, end);
+        _highlightStyles[index] = style;
+        _highlightVersion++;
+        OnModelChanged();
+        return index;
+    }
+
+    public void RemoveHighlight(int index)
+    {
+        if (_highlights.Remove(index))
+        {
+            _highlightStyles.Remove(index);
+            _highlightVersion++;
+            OnModelChanged();
+        }
+    }
+
+    /// <summary>Parses the output that waits, then <paramref name="output"/>, at once (messages of SmarTTY itself, a replayed log).</summary>
+    public void ProcessOutputNow(string output)
+    {
+        FlushOutput();
+        if (_model != null && !string.IsNullOrEmpty(output))
+        {
+            _model.ProcessOutput(output);
+        }
+    }
+
+    /// <summary>Parses all the output that waits (before the keys of byte mode are counted on the screen).</summary>
+    public void FlushOutput()
+    {
+        if (_model == null)
+        {
+            return;
+        }
+        string piece;
+        while ((piece = _output.Take(ParseChunk)) != null)
+        {
+            _model.ProcessOutput(piece);
+            Stats.CharactersParsed += piece.Length;
+        }
+    }
+
+    /// <summary>Sends text to the remote side as typed (the owner's TypeText and paste).</summary>
+    public void SendInput(string text, TerminalInputKind kind)
+    {
+        SendText(text, kind, kind == TerminalInputKind.Paste ? "paste" : "typed");
+    }
+
     public TerminalFrameStats Stats { get; } = new TerminalFrameStats();
 
     public TerminalColorScheme ColorScheme => _scheme;
@@ -281,6 +410,7 @@ internal sealed class TerminalRenderView : FrameworkElement
         ClearRows();
         if (_model != null)
         {
+            _model.FlushPendingOutput = FlushOutput;
             _model.Changed += OnModelChanged;
             _model.Reply += OnReply;
             _model.MouseModeChanged += OnMouseModeChanged;
@@ -371,6 +501,14 @@ internal sealed class TerminalRenderView : FrameworkElement
             return;
         }
         SendText(XtermProtocol.PreparePaste(text, PasteLineBreak, _model.BracketedPaste), TerminalInputKind.Paste, "paste");
+    }
+
+    private void RequestPaste()
+    {
+        if (PasteRequested == null || !PasteRequested())
+        {
+            Paste();
+        }
     }
 
     private IntPtr WindowHandle => (PresentationSource.FromVisual(this) as HwndSource)?.Handle ?? IntPtr.Zero;
@@ -542,9 +680,28 @@ internal sealed class TerminalRenderView : FrameworkElement
         UpdateGridSize();
     }
 
+    /// <summary>
+    /// The grid keeps its size while this is set (the window is being resized by dragging its edge: the program on the other side would get
+    /// a resize for every pixel); it takes the size of the element again when it is cleared.
+    /// </summary>
+    public bool GridSizeFrozen
+    {
+        get => _gridSizeFrozen;
+        set
+        {
+            _gridSizeFrozen = value;
+            if (!value)
+            {
+                UpdateGridSize();
+            }
+        }
+    }
+
+    private bool _gridSizeFrozen;
+
     private void UpdateGridSize()
     {
-        if (_model == null)
+        if (_model == null || _gridSizeFrozen)
         {
             return;
         }
@@ -818,12 +975,13 @@ internal sealed class TerminalRenderView : FrameworkElement
     private void DrawSelection(TerminalFont font)
     {
         TerminalDisplayModel model = _model;
-        int version = model.HasSelection ? model.Version : -2;
-        if (!model.HasSelection && _selectionVersion == -2)
+        bool anyHighlight = _matchHighlight != null || _highlights.Count != 0;
+        int version = (model.HasSelection || anyHighlight) ? model.Version * 7919 + _highlightVersion : -2;
+        if (version == -2 && _selectionVersion == -2)
         {
             return;
         }
-        if (model.HasSelection && version == _selectionVersion && _selectionTopLine == model.TopLine)
+        if (version != -2 && version == _selectionVersion && _selectionTopLine == model.TopLine)
         {
             return;
         }
@@ -831,6 +989,7 @@ internal sealed class TerminalRenderView : FrameworkElement
         _selectionTopLine = model.TopLine;
         using (DrawingContext context = _selectionVisual.RenderOpen())
         {
+            DrawHighlights(context, font);
             if (!model.HasSelection)
             {
                 return;
@@ -856,12 +1015,66 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
     }
 
+    // The ranges the search marks and the matches of the search bar in the rows that are shown, under the selection.
+    private void DrawHighlights(DrawingContext context, TerminalFont font)
+    {
+        TerminalDisplayModel model = _model;
+        foreach (KeyValuePair<int, KeyValuePair<TextDocument.TextPosition, TextDocument.TextPosition>> entry in _highlights)
+        {
+            HighlightStyle style = _highlightStyles[entry.Key];
+            TextDocument.TextPosition start = entry.Value.Key;
+            TextDocument.TextPosition end = entry.Value.Value;
+            if (end < start)
+            {
+                TextDocument.TextPosition swap = start;
+                start = end;
+                end = swap;
+            }
+            Brush fill = style == null || style.FillColor.IsEmpty ? GetBrush(new RgbColor(0x40FFFF00)) : GetBrush(style.FillColor);
+            Pen border = style != null && !style.BorderColor.IsEmpty ? new Pen(GetBrush(style.BorderColor), font.OnePixel) : null;
+            for (int row = 0; row < model.Rows; row++)
+            {
+                int line = model.TopLine + row;
+                if (line < start.Line || line > end.Line)
+                {
+                    continue;
+                }
+                int from = line == start.Line ? start.Column : 0;
+                int to = line == end.Line ? end.Column : model.Columns;
+                if (to > from)
+                {
+                    context.DrawRectangle(fill, border, new Rect(from * font.CellWidth, row * font.CellHeight, (to - from) * font.CellWidth, font.CellHeight));
+                }
+            }
+        }
+        if (_matchHighlight == null)
+        {
+            return;
+        }
+        Brush match = GetBrush(new RgbColor(0x70FFA500));
+        for (int row = 0; row < model.Rows; row++)
+        {
+            int line = model.TopLine + row;
+            if (line >= model.Document.LineCount)
+            {
+                break;
+            }
+            string text = model.Document.GetLineText(line);
+            int from = 0;
+            while (from < text.Length && _matchHighlight.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length))
+            {
+                context.DrawRectangle(match, null, new Rect(index * font.CellWidth, row * font.CellHeight, length * font.CellWidth, font.CellHeight));
+                from = index + Math.Max(length, 1);
+            }
+        }
+    }
+
     private bool TryGetCaretCell(out GridPoint cell)
     {
         TerminalDisplayModel model = _model;
         TextDocument.TextPosition caret = model.Caret;
         cell = new GridPoint(caret.Column, caret.Line - model.TopLine);
-        return !model.CaretHidden && cell.Y >= 0 && cell.Y < model.Rows && cell.X >= 0 && cell.X <= model.Columns;
+        return !model.CaretHidden && !_caretHiddenByOwner && (ShowCaretWhenUnfocused || IsKeyboardFocused) && cell.Y >= 0 && cell.Y < model.Rows && cell.X >= 0 && cell.X <= model.Columns;
     }
 
     private void DrawCursor(TerminalFont font)
@@ -1035,12 +1248,33 @@ internal sealed class TerminalRenderView : FrameworkElement
             Extended = KeyScanFlags.IsExtended(virtualKey),
             Kind = kind
         };
+        if (kind == TerminalKeyKind.Normal && virtualKey == VirtualKey.Tab && keyEvent.Control && !keyEvent.Alt && CtrlTabPressed != null)
+        {
+            CtrlTabPressed(keyEvent.Shift);
+            e.Handled = true;
+            return;
+        }
         SyncKeyModes();
         TerminalKeyResult result = _keys.KeyDown(keyEvent, _keyOptions);
         switch (result.Action)
         {
             case TerminalKeyAction.Send:
-                SendText(result.Text, TerminalInputKind.KeySequence, DescribeKey(keyEvent));
+                string sequence = result.Text;
+                bool plain = !keyEvent.Shift && !keyEvent.Control && !keyEvent.Alt;
+                if (plain && (virtualKey == VirtualKey.Left || virtualKey == VirtualKey.Right || virtualKey == VirtualKey.Delete || virtualKey == VirtualKey.Back))
+                {
+                    // Byte mode: once per UTF-8 byte of the letter the key crosses.
+                    int count = _model.ByteKeyCount(virtualKey);
+                    if (count > 1)
+                    {
+                        sequence = new StringBuilder(sequence.Length * count).Insert(0, sequence, count).ToString();
+                    }
+                }
+                else
+                {
+                    _model.DropPrediction();
+                }
+                SendText(sequence, virtualKey == VirtualKey.Back || virtualKey == VirtualKey.Return ? TerminalInputKind.Typed : TerminalInputKind.KeySequence, DescribeKey(keyEvent));
                 _model.ScrollToScreen();
                 ResetBlink();
                 e.Handled = true;
@@ -1050,8 +1284,12 @@ internal sealed class TerminalRenderView : FrameworkElement
                 e.Handled = true;
                 break;
             case TerminalKeyAction.Paste:
-                Paste();
+                RequestPaste();
                 _model.ScrollToScreen();
+                e.Handled = true;
+                break;
+            case TerminalKeyAction.PasteMenu:
+                PasteMenuRequested?.Invoke();
                 e.Handled = true;
                 break;
             case TerminalKeyAction.ScrollPageUp:
@@ -1075,6 +1313,14 @@ internal sealed class TerminalRenderView : FrameworkElement
         string text = _keys.TextInput(e.Text, e.SystemText, e.ControlText, _keyOptions);
         if (text != null)
         {
+            if (text.Length == 1 && char.IsControl(text[0]))
+            {
+                _model.DropPrediction();
+            }
+            else
+            {
+                _model.TypedText(text);
+            }
             SendText(text, TerminalInputKind.Typed, "text " + (string.IsNullOrEmpty(e.Text) ? (string.IsNullOrEmpty(e.SystemText) ? "control" : "system") : "") + " '" + (e.Text + e.SystemText + e.ControlText) + "'");
             _model.ScrollToScreen();
             ResetBlink();
@@ -1215,6 +1461,13 @@ internal sealed class TerminalRenderView : FrameworkElement
             e.Handled = true;
             return;
         }
+        if (e.ChangedButton == MouseButton.Left && TryGetLinkAt(point, out ILinkTarget link))
+        {
+            // Plain clicks select text, so a link needs Ctrl.
+            link.Activate();
+            e.Handled = true;
+            return;
+        }
         if (e.ChangedButton == MouseButton.Left)
         {
             TextDocument.TextPosition position = HitTestDocument(point);
@@ -1235,10 +1488,56 @@ internal sealed class TerminalRenderView : FrameworkElement
             }
             e.Handled = true;
         }
-        else if (e.ChangedButton == MouseButton.Middle)
+        else if (e.ChangedButton == MouseButton.Middle && MiddleButtonPastes)
         {
-            Paste();
+            RequestPaste();
             e.Handled = true;
+        }
+    }
+
+    /// <summary>The middle button pastes (a setting).</summary>
+    public bool MiddleButtonPastes { get; set; } = true;
+
+    // The active link under a point while Ctrl (without Shift) is held.
+    private bool TryGetLinkAt(Point point, out ILinkTarget link)
+    {
+        link = null;
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        if (_model == null || !_model.LinksAvailable || (modifiers & ModifierKeys.Control) == 0 || (modifiers & ModifierKeys.Shift) != 0)
+        {
+            return false;
+        }
+        TerminalFont font = EnsureFont();
+        int column = (int)Math.Floor(point.X / font.CellWidth);
+        int line = _model.TopLine + (int)Math.Floor(point.Y / font.CellHeight);
+        link = _model.GetLinkAt(line, column);
+        return link != null && link.IsActive;
+    }
+
+    private void UpdateMouseCursor(Point point)
+    {
+        if (_model == null)
+        {
+            return;
+        }
+        Cursor = TryGetLinkAt(point, out _) ? Cursors.Hand : (_model.MouseMode == MouseReportingMode.Off ? Cursors.IBeam : Cursors.Arrow);
+    }
+
+    protected override void OnPreviewKeyUp(KeyEventArgs e)
+    {
+        base.OnPreviewKeyUp(e);
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl)
+        {
+            UpdateMouseCursor(Mouse.GetPosition(this));
+        }
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if ((e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl) && IsMouseOver)
+        {
+            UpdateMouseCursor(Mouse.GetPosition(this));
         }
     }
 
@@ -1250,17 +1549,17 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
         string text = _model.Document.GetLineText(position.Line);
         int column = Math.Min(position.Column, Math.Max(0, text.Length - 1));
-        if (text.Length == 0 || char.IsWhiteSpace(text[column]))
+        if (text.Length == 0 || !IsWordCharacter(text[column]))
         {
             return;
         }
         int start = column;
-        while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+        while (start > 0 && IsWordCharacter(text[start - 1]))
         {
             start--;
         }
         int end = column;
-        while (end < text.Length && !char.IsWhiteSpace(text[end]))
+        while (end < text.Length && IsWordCharacter(text[end]))
         {
             end++;
         }
@@ -1279,6 +1578,10 @@ internal sealed class TerminalRenderView : FrameworkElement
             return;
         }
         Point point = e.GetPosition(this);
+        if (!_selecting && e.LeftButton != MouseButtonState.Pressed)
+        {
+            UpdateMouseCursor(point);
+        }
         if (_selecting)
         {
             // Dragging past the top or the bottom scrolls.
@@ -1321,6 +1624,17 @@ internal sealed class TerminalRenderView : FrameworkElement
             e.Handled = true;
             return;
         }
+        if (e.ChangedButton == MouseButton.Right && _reportedButton == TerminalMouseButton.None && !ReportsMouse())
+        {
+            // The context menu (or what the settings say the right button does) belongs to the owner.
+            if (ContextMenuRequested != null)
+            {
+                Point screen = PointToScreen(e.GetPosition(this));
+                ContextMenuRequested(screen);
+                e.Handled = true;
+            }
+            return;
+        }
         if (_reportedButton != TerminalMouseButton.None || ReportsMouse())
         {
             byte[] report = _mouse.MouseButton(_model.MouseMode, ToButton(e.ChangedButton), pressed: false, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
@@ -1350,6 +1664,12 @@ internal sealed class TerminalRenderView : FrameworkElement
         {
             byte[] report = _mouse.MouseWheel(_model.MouseMode, e.Delta < 0, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
             SendBytes(report, TerminalInputKind.MouseReport, "wheel");
+        }
+        else if (WheelSendsArrowKeys && (Keyboard.Modifiers & ModifierKeys.Alt) == 0)
+        {
+            SyncKeyModes();
+            TerminalKeyResult arrow = _keys.KeyDown(new TerminalKeyEvent { Key = e.Delta < 0 ? VirtualKey.Down : VirtualKey.Up, Extended = true }, _keyOptions);
+            SendText(arrow.Text, TerminalInputKind.KeySequence, "wheel");
         }
         else
         {

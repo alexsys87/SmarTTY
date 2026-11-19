@@ -413,7 +413,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     {
         try
         {
-            new TerminalLabWindow(() => (Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) { Owner = this }.Show();
+            new TerminalLabWindow { Owner = this }.Show();
         }
         catch (Exception exception)
         {

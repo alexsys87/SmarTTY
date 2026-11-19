@@ -31,6 +31,13 @@ internal sealed class TerminalPanel : Grid
 
     public TerminalRenderView View { get; }
 
+    /// <summary>Shows or hides the scroll bar (the setting of the window).</summary>
+    public Visibility ScrollBarVisibility
+    {
+        get => _scrollBar.Visibility;
+        set => _scrollBar.Visibility = value;
+    }
+
     private void UpdateScrollBar()
     {
         TerminalDisplayModel model = View.Model;

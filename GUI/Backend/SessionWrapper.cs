@@ -1010,7 +1010,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// Tries again to open the shell of a classic terminal tab whose shell could not be reopened after a reconnect.
     /// Called on the UI thread; does nothing while there is no working connection (the reconnect prompt owns that case).
     /// </summary>
-    internal void RetryShell(TerminalEmulatorControl ctl)
+    internal void RetryShell(ITerminalSurface ctl)
     {
         SshSession session = Session;
         if (session == null || IsInactive || session.IsConnectionClosed)
@@ -1032,7 +1032,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void AttachChannelToControl(TerminalEmulatorControl ctl, SshShellChannel chn, bool isAutoLaunchedCommand, Action tabKeptAfterExit = null)
+    public void AttachChannelToControl(ITerminalSurface ctl, SshShellChannel chn, bool isAutoLaunchedCommand, Action tabKeptAfterExit = null)
     {
         Utf8StreamDecoder reader = new Utf8StreamDecoder();
         chn.DataReceived += (object sender, byte[] data, int offset, int length, int value) =>
@@ -1081,7 +1081,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             };
         }
         chn.PollingEnabled = true;
-        chn.ResizePty(ctl.TerminalSize.Width, ctl.TerminalSize.Height);
+        chn.ResizePty(ctl.GridSize.X, ctl.GridSize.Y);
     }
 
     /// <summary>
@@ -1151,7 +1151,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    private static bool IsChannelAttached(TerminalEmulatorControl ctl, SshShellChannel chn)
+    private static bool IsChannelAttached(ITerminalSurface ctl, SshShellChannel chn)
     {
         return !ctl.IsDisposed && (ctl.Tag as TerminalTag)?.Channel == chn;
     }
@@ -1172,7 +1172,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    private static bool IsRemoteExit(TerminalEmulatorControl ctl, SshShellChannel chn)
+    private static bool IsRemoteExit(ITerminalSurface ctl, SshShellChannel chn)
     {
         return IsChannelAttached(ctl, chn) && !chn.IsDisposed && !chn.ClosedByConnectionLoss;
     }
@@ -1191,7 +1191,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         return null;
     }
 
-    private void AppendText(TerminalEmulatorControl ctl, string text, byte[] data, int offset, int length)
+    private void AppendText(ITerminalSurface ctl, string text, byte[] data, int offset, int length)
     {
         try
         {
@@ -1802,7 +1802,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         }
     }
 
-    public void CloseTabPageForControl(TerminalEmulatorControl ctl, bool autoInvoked = false)
+    public void CloseTabPageForControl(ITerminalSurface ctl, bool autoInvoked = false)
     {
         if (!autoInvoked || _Controller.Settings.AutoCloseTabs)
         {
@@ -1889,7 +1889,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// A paste that is too large to be typed into the terminal, sent as a file instead: the text is saved in a temporary
     /// file and uploaded to the current directory of the terminal like a dropped file.
     /// </summary>
-    public void UploadPastedText(string text, TerminalEmulatorControl terminal)
+    public void UploadPastedText(string text, ITerminalSurface terminal)
     {
         string copyDirectory = null;
         try
@@ -2251,12 +2251,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             // itself, and the prompt has no $ or # to look for): the file list keeps the directory of the tab, in SFTP form.
             return windowsTab.FileExplorer?.WorkingDirectory;
         }
-        TerminalEmulatorControl terminalEmulatorControl = (tab as NormalTabContext)?.Terminal;
-        if (terminalEmulatorControl == null)
+        ITerminalSurface terminal = (tab as NormalTabContext)?.Terminal;
+        if (terminal == null)
         {
             return null;
         }
-        return AppEnvironment.GetCurrentDirectory(terminalEmulatorControl, Session, ref _CachedHomeDir);
+        return AppEnvironment.GetCurrentDirectory(terminal, Session, ref _CachedHomeDir);
     }
 
     private void Tabs_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -2309,7 +2309,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         try
         {
             _TabUpdateInProgress++;
-            TerminalEmulatorControl term = _Controller.CreateNewTerminal(this, command, virtualMode, initialDirForVirtualMode);
+            ITerminalSurface term = _Controller.CreateNewTerminal(this, command, virtualMode, initialDirForVirtualMode);
             NormalTabContext item = new NormalTabContext(this, term);
             int firstPseudoPage = FirstPseudoPage;
             Tabs.Insert(firstPseudoPage, item);
@@ -2763,7 +2763,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                     _Controller.BeginInvoke(() => MessageBoxes.Exception(exception));
                 }
             });
-            tab.Terminal.Focus();
+            tab.Terminal.FocusTerminal();
         }
         catch (Exception exception)
         {
@@ -2821,7 +2821,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
     /// the current folder of that terminal (its home folder when the folder cannot be told), made executable, and "./name" is put
     /// into the command line. Nothing runs until the user presses Enter.
     /// </summary>
-    public void InsertQuickCommand(QuickCommand item, TerminalEmulatorControl terminal)
+    public void InsertQuickCommand(QuickCommand item, ITerminalSurface terminal)
     {
         if (item == null || terminal == null)
         {
@@ -2830,7 +2830,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         if (item.Kind == QuickCommandKind.Command)
         {
             terminal.InsertCommand(QuickCommandRules.ToCommandLine(item.Text));
-            terminal.Focus();
+            terminal.FocusTerminal();
             return;
         }
         SshSession session = Session;
@@ -2903,7 +2903,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
                 _Controller.BeginInvoke(() =>
                 {
                     terminal.InsertCommand(invocation);
-                    terminal.Focus();
+                    terminal.FocusTerminal();
                 });
                 return;
             }

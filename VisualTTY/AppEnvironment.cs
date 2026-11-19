@@ -1,5 +1,6 @@
 using SmarTTY.Ssh;
 using SmarTTY.Controls;
+using SmarTTY.TextEditing;
 using System;
 using System.Drawing;
 using System.IO;
@@ -16,7 +17,7 @@ public static class AppEnvironment
 
     public static string ProductName = "SmarTTY";
 
-    public static string GetCurrentDirectory(TerminalEmulatorControl terminalEmulatorControl, SshSession sshSession, ref string cachedHomeDirectory)
+    public static string GetCurrentDirectory(ITerminalSurface terminalEmulatorControl, SshSession sshSession, ref string cachedHomeDirectory)
     {
         if (terminalEmulatorControl == null)
         {
@@ -39,8 +40,8 @@ public static class AppEnvironment
         }
         else if (terminalEmulatorControl != null)
         {
-            Point cursorPosition = terminalEmulatorControl.CursorPosition;
-            string lineText = terminalEmulatorControl.GetLineText(cursorPosition.Y);
+            GridPoint cursorPosition = terminalEmulatorControl.CursorCell;
+            string lineText = terminalEmulatorControl.GetScreenLineText(cursorPosition.Y);
             if (lineText != null && cursorPosition.X == lineText.Length && lineText.Length > 3 && "$#>".IndexOf(lineText[cursorPosition.X - 2]) != -1)
             {
                 colonIndex = lineText.IndexOf(":");
