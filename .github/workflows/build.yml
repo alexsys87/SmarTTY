@@ -255,6 +255,9 @@ jobs:
       - name: Run remote file content checks (the bytes on the server, encoding, line breaks, the switching between the text and the hex view; fake editor and hex view)
         run: dotnet run --project tests/RemoteFileContentTests -c Release
 
+      - name: Run remote file flow checks (the loading and the saves: before the load, during a reload, conflicts, sudo, the check of the file, the service reload offer; fake editor and server)
+        run: dotnet run --project tests/RemoteFileFlowTests -c Release
+
       - name: Run hex editing model checks (caret, selection, typing in both columns, search; what the view is told after each operation)
         run: dotnet run --project tests/HexEditingModelTests -c Release
 

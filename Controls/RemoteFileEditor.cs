@@ -16,7 +16,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost
+public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost, IRemoteFileFlowHost
 {
 
     private ITerminalSessionContext _context;
@@ -67,23 +67,15 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     public bool IsHexMode => _content != null && _content.HexMode;
 
     /// <summary>The file is loaded and nothing is being saved: the hex view can be opened or closed.</summary>
-    public bool CanToggleHexMode => _loaded && !_reloading && !IsSaving;
+    public bool CanToggleHexMode => _flow != null && _flow.CanToggleHexMode;
 
     /// <summary>Raised when the editor switched between the text and the hex view.</summary>
     public event EventHandler HexModeChanged;
 
-    // The file on the server as it was when it was opened or last saved (see RemoteFileServer.FetchSignature): a save that finds
-    // something else there asks before it overwrites the changes of somebody else.
-    private string _remoteSignature;
+    // Whether the file is loaded, loaded again or saved, and what a save and a reload do (see RemoteFileFlow).
+    private RemoteFileFlow _flow;
 
-    // The conflict question was answered "reload": the server version is loaded once the save has ended.
-    private bool _pendingReload;
-
-    // A reload of the opened file is running (the text stays on screen and the editor read-only until it is done).
-    private bool _reloading;
-
-    private bool _loaded;
-
+    // What a reload puts back once the new text is in: the caret, the hex view at its offset, the folds.
     private bool _restoreCaret;
 
     private TextDocument.TextPosition _caretToRestore;
@@ -109,7 +101,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// The encoding can be reinterpreted: the whole file has been loaded from the server (reading it again in another
     /// encoding does not write anything, so a read-only file qualifies, a preview of a huge file does not).
     /// </summary>
-    public bool CanReopenWithEncoding => _loaded && !_reloading && _content.RawBytes != null && !IsNewFile && !IsPreview;
+    public bool CanReopenWithEncoding => _flow.CanReopenWithEncoding;
 
     /// <summary>The file did not exist when the editor was opened: it is created by the first save.</summary>
     public bool IsNewFile { get => _loader.IsNewFile; private set => _loader.IsNewFile = value; }
@@ -121,7 +113,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     public bool IsReadOnlyMode { get => _loader.IsReadOnlyMode; private set => _loader.IsReadOnlyMode = value; }
 
     /// <summary>The file has been loaded completely and is not being loaded again: only then the text can be saved.</summary>
-    public bool CanSave => !IsReadOnlyMode && _loaded && !_reloading;
+    public bool CanSave => _flow.CanSave;
 
     /// <summary>Only the first <see cref="EditorFilePolicy.PreviewBytes"/> of a file that is too big to edit are shown.</summary>
     public bool IsPreview { get => _loader.IsPreview; private set => _loader.IsPreview = value; }
@@ -331,6 +323,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         _drafts = new RemoteFileDrafts(Drafts, _draftKey);
+        _flow = new RemoteFileFlow(text, this, _server, _saver, _session, _content, _loader);
+        _flow.SavingChanged += (object sender, EventArgs e) => SavingChanged?.Invoke(this, EventArgs.Empty);
+        _flow.FormatChanged += (object sender, EventArgs e) => FormatChanged?.Invoke(this, EventArgs.Empty);
         RemoteFileDrafts.StartCleanupOnce(Drafts);
         Disposed += (object sender, EventArgs e) =>
         {
@@ -357,31 +352,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
     }
 
-    /// <summary>Shows a loading error; a failed reload keeps the tab with the text of the user.</summary>
-    private void HandleLoadError(Exception exception)
-    {
-        try
-        {
-            ReportError(exception);
-            if (_reloading)
-            {
-                // The text on screen is still the user's: keep the tab.
-                _reloading = false;
-                ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
-                FormatChanged?.Invoke(this, EventArgs.Empty);
-            }
-            else
-            {
-                LoadFailed?.Invoke(this, EventArgs.Empty);
-            }
-        }
-        catch
-        {
-        }
-    }
-
     // What the loading thread (RemoteFileLoader) tells the editor: these run on the UI thread.
-    bool IRemoteFileLoadView.IsReloading => _reloading;
+    bool IRemoteFileLoadView.IsReloading => _flow.IsReloading;
 
     bool IRemoteFileLoadView.IsClosed => IsDisposed;
 
@@ -407,7 +379,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     void IRemoteFileLoadView.Failed(Exception exception)
     {
-        HandleLoadError(exception);
+        _flow.LoadFailed(exception);
     }
 
     private bool IsWindowsHost => _server.IsWindows;
@@ -430,7 +402,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 ThemedMessageBox.Show(this, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             EditorDraft restoredDraft = null;
-            if (_reloading)
+            if (_flow.IsReloading)
             {
                 // The user dropped the changes to load the file again: their draft must not come back.
                 DiscardDraft();
@@ -444,10 +416,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 }
             }
             _content.ApplyContent(file, encoding, text);
-            _remoteSignature = signature;
-            _session.BackupDone = false;
-            _reloading = false;
-            _loaded = true;
+            _flow.FinishLoading(signature);
             ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
             if (restoredDraft != null)
             {
@@ -504,7 +473,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         catch (Exception exception)
         {
             // Not silent: the tab would stay empty and read-only with no word about why.
-            HandleLoadError(exception);
+            _flow.LoadFailed(exception);
         }
     }
 
@@ -596,26 +565,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public void Reload()
     {
-        if (IsSaving || !_loaded || _reloading || IsNewFile || IsPreview)
-        {
-            return;
-        }
-        // The messages name lines of the text that is about to be replaced.
-        ClearMessages();
-        _reloading = true;
-        _restoreCaret = true;
-        _caretToRestore = CaretPosition;
-        _restoreHexAfterReload = IsHexMode;
-        _hexOffsetToRestore = IsHexMode ? _hexEditor.CaretOffset : 0;
-        _foldsToRestore = GetFoldState();
-        if (IsHexMode)
-        {
-            _hexEditor.ReadOnly = true;
-        }
-        ((EditableTextBrowser)this).ReadOnly = true;
-        FormatChanged?.Invoke(this, EventArgs.Empty);
-        _loadThread = new Thread(_loader.Run);
-        _loadThread.Start();
+        _flow.Reload();
     }
 
     /// <summary>
@@ -666,92 +616,22 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         _content.SetLineEnding(lineEnding);
     }
 
+    /// <summary>Saves the file when its tab closes: false when the tab has to stay (the user cancelled, or the save failed and said why).</summary>
     public bool TrySave()
     {
-        if (!_loaded && !_reloading)
-        {
-            // The file never arrived: there is nothing of the user's to save.
-            return true;
-        }
-        try
-        {
-            Save();
-            return true;
-        }
-        catch (Exception exception)
-        {
-            if (exception is OperationCanceledException)
-            {
-                return false;
-            }
-            ReportError(exception);
-            return false;
-        }
+        return _flow.TrySave();
     }
 
-    // Set by the background thread once its upload and replace attempt finished (successfully or not).
-    private ManualResetEvent _backgroundUploadDone;
-
-    private bool _saveRequestedWhileSaving;
-
     /// <summary>A background save (SaveInBackground) is running.</summary>
-    public bool IsSaving { get; private set; }
+    public bool IsSaving => _flow != null && _flow.IsSaving;
 
     /// <summary>Raised on the UI thread when <see cref="IsSaving"/> changes.</summary>
     public event EventHandler SavingChanged;
 
-    /// <summary>
-    /// How long a save that is asked for when a tab or the window closes waits for the background save that is still running. That
-    /// one is over in moments on a connection that works; on one that went away without a word it never ends, and the window waited
-    /// with it for ever.
-    /// </summary>
-    private static readonly TimeSpan BackgroundSaveWait = TimeSpan.FromSeconds(30);
-
     /// <summary>Saves the file and returns when it is written (used when a tab or the window closes).</summary>
     public void Save()
     {
-        if (IsReadOnlyMode)
-        {
-            return;
-        }
-        if (_reloading)
-        {
-            // The text on screen may be a preview or an older copy of the file: saving it would overwrite the file on the server.
-            throw new InvalidOperationException("The file " + RemotePath + " is being reloaded. Try again when it has been loaded.");
-        }
-        if (!_loaded)
-        {
-            return;
-        }
-        // A background save of an older version must not overwrite this one afterwards. If it does not end, the save of the closing
-        // tab is not started over it: the error is shown, the tab stays open, and closing it again either finds the file saved by then
-        // or lets the user give the changes up.
-        ManualResetEvent backgroundSave = _backgroundUploadDone;
-        if (backgroundSave != null && !backgroundSave.WaitOne(BackgroundSaveWait))
-        {
-            throw new IOException("The save of " + RemotePath + " that was started earlier has not ended after " + (int)BackgroundSaveWait.TotalSeconds
-                + " seconds: the connection may not answer. Close the tab again when it has (the changes are kept in the editor until then), or choose No to give them up.");
-        }
-        RemoteSaveJob job = PrepareSave();
-        // Saving on close does not run the check: the user is leaving and cannot act on what it finds.
-        job.Validator = null;
-        try
-        {
-            if (!job.SkipConflictCheck && _server.HasChanged(_remoteSignature, IsNewFile)
-                && ThemedMessageBox.Show(_server.ConflictDescription(IsNewFile) + " Overwrite it with your version?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-            {
-                throw new OperationCanceledException();
-            }
-            if (!_saver.UploadAndReplace(job))
-            {
-                SaveWithSudo(job);
-            }
-            CompleteSave(job);
-        }
-        finally
-        {
-            _saver.RemoveTemporaryFile(job);
-        }
+        _flow.Save();
     }
 
     /// <summary>
@@ -760,153 +640,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public void SaveInBackground()
     {
-        if (!CanSave)
-        {
-            // While the file is loading (or a preview is shown) the text is empty or partial: saving it would overwrite the
-            // file on the server with it.
-            return;
-        }
-        if (IsSaving)
-        {
-            _saveRequestedWhileSaving = true;
-            return;
-        }
-        RemoteSaveJob job = PrepareSave();
-        ManualResetEvent uploadDone = new ManualResetEvent(initialState: false);
-        _backgroundUploadDone = uploadDone;
-        SetSaving(true);
-        Thread thread = new Thread(() =>
-        {
-            bool replaced = false;
-            bool conflict = false;
-            Exception error = null;
-            try
-            {
-                conflict = !job.SkipConflictCheck && _server.HasChanged(_remoteSignature, IsNewFile);
-                if (!conflict)
-                {
-                    replaced = _saver.UploadAndReplace(job);
-                }
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            finally
-            {
-                uploadDone.Set();
-            }
-            try
-            {
-                BeginInvoke((ThreadStart)(() => FinishBackgroundSave(job, replaced, conflict, error, uploadDone)));
-            }
-            catch
-            {
-                // The editor was closed meanwhile.
-                _saver.RemoveTemporaryFile(job);
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "Saving " + RemotePath
-        };
-        thread.Start();
-    }
-
-    private void FinishBackgroundSave(RemoteSaveJob job, bool replaced, bool conflict, Exception error, ManualResetEvent uploadDone)
-    {
-        ServiceReload reloadToOffer = null;
-        try
-        {
-            // Superseded by a synchronous save of a newer version: only clean up.
-            if (job.Generation == _session.SaveGeneration)
-            {
-                if (error != null)
-                {
-                    ReportError(error);
-                }
-                else if (conflict)
-                {
-                    switch (ThemedMessageBox.Show(_server.ConflictDescription(IsNewFile) + "\n\nYes: overwrite it with your version.\nNo: load the version from the server (your changes are lost).\nCancel: do not save.", "SmarTTY", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning))
-                    {
-                        case DialogResult.Yes:
-                            _session.ForceOverwrite = true;
-                            _saveRequestedWhileSaving = true;
-                            break;
-                        case DialogResult.No:
-                            _pendingReload = true;
-                            break;
-                    }
-                }
-                else if (job.Validation != null)
-                {
-                    HandleValidationFailure(job);
-                }
-                else
-                {
-                    if (!replaced)
-                    {
-                        SaveWithSudo(job);
-                    }
-                    // The sudo prompt pumps messages: a synchronous save may have run meanwhile.
-                    if (job.Generation == _session.SaveGeneration)
-                    {
-                        CompleteSave(job);
-                        reloadToOffer = ReloadToOffer();
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception exception)
-        {
-            ReportError(exception);
-        }
-        finally
-        {
-            ThreadPool.QueueUserWorkItem((object state) => _saver.RemoveTemporaryFile(job));
-            if (_backgroundUploadDone == uploadDone)
-            {
-                _backgroundUploadDone = null;
-            }
-            uploadDone.Dispose();
-            SetSaving(false);
-            if (_pendingReload)
-            {
-                _pendingReload = false;
-                _saveRequestedWhileSaving = false;
-                _session.ForceOverwrite = false;
-                _session.SkipValidation = false;
-                if (IsNewFile)
-                {
-                    // Somebody created the file this new one was going to be: there is a version to load now.
-                    IsNewFile = false;
-                }
-                Reload();
-            }
-            else if (_saveRequestedWhileSaving)
-            {
-                _saveRequestedWhileSaving = false;
-                if (IsModified || _session.ForceOverwrite || _session.SkipValidation)
-                {
-                    SaveInBackground();
-                }
-            }
-            // A save queued meanwhile will offer it again once it is written.
-            if (reloadToOffer != null && !IsSaving)
-            {
-                try
-                {
-                    OfferReload(reloadToOffer);
-                }
-                catch (Exception exception)
-                {
-                    ReportError(exception);
-                }
-            }
-        }
+        _flow.SaveInBackground();
     }
 
     /// <summary>Gives the inline messages the colours of the current theme (dark or light).</summary>
@@ -921,122 +655,17 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     }
 
     /// <summary>
-    /// The check found problems in the text, so the file on the server was not replaced. Says what was found and
-    /// either saves anyway (the next save skips the check) or puts the caret on the first problem (UI thread).
-    /// </summary>
-    private void HandleValidationFailure(RemoteSaveJob job)
-    {
-        // How many problems get an inline message; ParseIssues caps the list at the same number.
-        const int MaxInline = 50;
-        List<ValidationIssue> issues = job.Validation.Issues;
-        // The messages sit in the rows of the text view; the wrapped rows and the hex view have no such rows.
-        bool showInText = !WordWrap && !IsHexMode;
-        if (showInText)
-        {
-            RefreshMessageColors();
-            List<InlineMessageProvider.MessageRequest> messages = new List<InlineMessageProvider.MessageRequest>();
-            for (int i = 0; i < issues.Count && i < MaxInline; i++)
-            {
-                messages.Add(new InlineMessageProvider.MessageRequest
-                {
-                    Line = issues[i].Line,
-                    Severity = InlineMessageProvider.MessageSeverity.Error,
-                    Text = issues[i].Message,
-                    Column = issues[i].Column
-                });
-            }
-            AddMessages(messages);
-        }
-        string text = "The check (" + job.Validator.Name + ") found " + issues.Count + (issues.Count == 1 ? " problem" : " problems")
-            + " in " + RemotePath + (showInText ? ", they are shown in the text" : "") + ".\n\nThe file on the server has not been changed.\n\nYes: save it anyway.\nNo: do not save, go to line " + issues[0].Line + ".";
-        if (ThemedMessageBox.Show(text, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
-        {
-            _session.SkipValidation = true;
-            _saveRequestedWhileSaving = true;
-            return;
-        }
-        GoToPosition(Math.Max(0, issues[0].Line - 1), Math.Max(0, issues[0].Column - 1));
-        FocusActiveView();
-    }
-
-    /// <summary>What to offer after a successful save so that the service reads the file again, or null.</summary>
-    private ServiceReload ReloadToOffer()
-    {
-        if (IsWindowsHost || _settings.Editor.DisableServiceReloadOffer)
-        {
-            return null;
-        }
-        return ConfigValidators.FindReload(RemotePath);
-    }
-
-    /// <summary>Asks whether to reload the service that reads the file just saved, and does so (UI thread).</summary>
-    private void OfferReload(ServiceReload reload)
-    {
-        if (ThemedMessageBox.Show(RemotePath + " was saved.\n\nReload " + reload.Name + " now so that the change takes effect?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-        {
-            return;
-        }
-        ThreadPool.QueueUserWorkItem((object state) =>
-        {
-            _saver.RunServiceReload(reload, out List<string> output, out int? exitStatus);
-            try
-            {
-                BeginInvoke((ThreadStart)(() => FinishReload(reload, output, exitStatus)));
-            }
-            catch
-            {
-                // The editor was closed meanwhile.
-            }
-        });
-    }
-
-    private void FinishReload(ServiceReload reload, List<string> output, int? exitStatus)
-    {
-        try
-        {
-            if (exitStatus == 0)
-            {
-                ThemedMessageBox.Show(reload.Name + " reloaded.", "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            // A lost connection is not a refused reload: do not offer sudo for it.
-            _context.Session.ThrowIfConnectionLost();
-            StringBuilder details = new StringBuilder();
-            if (output != null)
-            {
-                for (int i = 0; i < output.Count && i < 8; i++)
-                {
-                    details.Append(output[i]).Append('\n');
-                }
-            }
-            if (ThemedMessageBox.Show("Could not reload " + reload.Name + (exitStatus.HasValue ? " (exit code " + exitStatus.Value + ")" : "") + ":\n\n" + details + "\nTry again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-            {
-                return;
-            }
-            _saver.RunSudoCommand(reload.Command);
-            ThemedMessageBox.Show(reload.Name + " reloaded.", "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception exception)
-        {
-            ReportError(exception);
-        }
-    }
-
-    /// <summary>
     /// The file can be run in a terminal of the session (F5): it is loaded in full, the host has a shell, and the file
     /// name or the first line says how to run it.
     /// </summary>
-    public bool CanRunInTerminal => _loaded && !_reloading && !IsPreview && !IsWindowsHost && base.EditableDocument != null
+    public bool CanRunInTerminal => _flow.IsLoaded && !_flow.IsReloading && !IsPreview && !IsWindowsHost && base.EditableDocument != null
         && RemoteScript.CanRun(RemotePathUtils.GetFileName(RemotePath), base.EditableDocument.GetLineText(0));
 
     /// <summary>
     /// The file can be followed like tail -f in a terminal tab: it is on the server and the host is a Unix one. It is the
     /// file on the server that is followed, not the text in the editor.
     /// </summary>
-    public bool CanFollowLog => _loaded && !_reloading && !IsNewFile && !IsWindowsHost;
+    public bool CanFollowLog => _flow.CanFollowLog;
 
     /// <summary>The interpreter for a file that is not executable and has no shebang (see <see cref="RemoteScript.DefaultInterpreter"/>).</summary>
     public string RunInterpreter => RemoteScript.DefaultInterpreter(RemotePathUtils.GetFileName(RemotePath)) ?? "sh";
@@ -1048,12 +677,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     public TextDiff.Result GetChanges()
     {
         return _content.GetChanges();
-    }
-
-    private void SetSaving(bool saving)
-    {
-        IsSaving = saving;
-        SavingChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -1176,7 +799,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         OnModifiedChanged();
     }
 
-    bool IRemoteFileContentHost.IsLoaded => _loaded;
+    bool IRemoteFileContentHost.IsLoaded => _flow.IsLoaded;
 
     bool IRemoteFileContentHost.IsSaving => IsSaving;
 
@@ -1203,31 +826,144 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         return ThemedMessageBox.Show(this, question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
     }
 
-    /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
-    private void SaveWithSudo(RemoteSaveJob job)
+    // What the loading and the saves (RemoteFileFlow) need from the editor: the questions, the threads and the view.
+    RemoteSaveJob IRemoteFileFlowHost.PrepareSave()
     {
-        if (!_loader.SudoOnSave && ThemedMessageBox.Show("Failed to " + (IsNewFile ? "create " : "overwrite ") + RemotePath + ". Try again with sudo?", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-        {
-            throw new OperationCanceledException();
-        }
-        _saver.ReplaceWithSudo(job);
+        return PrepareSave();
     }
 
-    private void CompleteSave(RemoteSaveJob job)
+    PromptAnswer IRemoteFileFlowHost.Ask(string text, PromptButtons buttons, PromptIcon icon)
     {
-        // A save through sudo has no signature yet.
-        _remoteSignature = job.NewSignature ?? _server.FetchSignature();
-        if (job.IncludesBackup)
+        MessageBoxButtons boxButtons = buttons == PromptButtons.OkCancel ? MessageBoxButtons.OKCancel
+            : (buttons == PromptButtons.YesNo ? MessageBoxButtons.YesNo : MessageBoxButtons.YesNoCancel);
+        switch (ThemedMessageBox.Show(text, "SmarTTY", boxButtons, icon == PromptIcon.Warning ? MessageBoxIcon.Warning : MessageBoxIcon.Question))
         {
-            _session.BackupDone = true;
-        }
-        IsNewFile = false;
-        // The bytes of the file and the saved state of the view they came from (and of the other one, when it holds them too).
-        _content.CompleteSave(job);
-        if (!IsModified)
-        {
-            // Everything is on the server: the draft is of no use (a later change makes a new one).
-            DiscardDraft();
+            case DialogResult.OK:
+                return PromptAnswer.Ok;
+            case DialogResult.Yes:
+                return PromptAnswer.Yes;
+            case DialogResult.No:
+                return PromptAnswer.No;
+            default:
+                return PromptAnswer.Cancel;
         }
     }
+
+    void IRemoteFileFlowHost.Inform(string text)
+    {
+        ThemedMessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    void IRemoteFileFlowHost.ReportError(Exception exception)
+    {
+        ReportError(exception);
+    }
+
+    bool IRemoteFileFlowHost.ShowIssuesInText(List<ValidationIssue> issues)
+    {
+        // How many problems get an inline message; ParseIssues caps the list at the same number.
+        const int MaxInline = 50;
+        // The messages sit in the rows of the text view; the wrapped rows and the hex view have no such rows.
+        bool showInText = !WordWrap && !IsHexMode;
+        if (showInText)
+        {
+            RefreshMessageColors();
+            List<InlineMessageProvider.MessageRequest> messages = new List<InlineMessageProvider.MessageRequest>();
+            for (int i = 0; i < issues.Count && i < MaxInline; i++)
+            {
+                messages.Add(new InlineMessageProvider.MessageRequest
+                {
+                    Line = issues[i].Line,
+                    Severity = InlineMessageProvider.MessageSeverity.Error,
+                    Text = issues[i].Message,
+                    Column = issues[i].Column
+                });
+            }
+            AddMessages(messages);
+        }
+        return showInText;
+    }
+
+    void IRemoteFileFlowHost.GoToIssue(ValidationIssue issue)
+    {
+        GoToPosition(Math.Max(0, issue.Line - 1), Math.Max(0, issue.Column - 1));
+        FocusActiveView();
+    }
+
+    bool IRemoteFileFlowHost.ServiceReloadOfferDisabled => _settings.Editor.DisableServiceReloadOffer;
+
+    void IRemoteFileFlowHost.ThrowIfConnectionLost()
+    {
+        _context.Session.ThrowIfConnectionLost();
+    }
+
+    void IRemoteFileFlowHost.StartThread(Action work, string name)
+    {
+        Thread thread = new Thread(() => work())
+        {
+            IsBackground = true,
+            Name = name
+        };
+        thread.Start();
+    }
+
+    void IRemoteFileFlowHost.QueueWork(Action work)
+    {
+        ThreadPool.QueueUserWorkItem((object state) => work());
+    }
+
+    bool IRemoteFileFlowHost.Post(Action action)
+    {
+        try
+        {
+            BeginInvoke((ThreadStart)(() => action()));
+            return true;
+        }
+        catch
+        {
+            // The editor was closed meanwhile.
+            return false;
+        }
+    }
+
+    void IRemoteFileFlowHost.ClearMessages()
+    {
+        ClearMessages();
+    }
+
+    void IRemoteFileFlowHost.KeepViewForReload()
+    {
+        _restoreCaret = true;
+        _caretToRestore = CaretPosition;
+        _restoreHexAfterReload = IsHexMode;
+        _hexOffsetToRestore = IsHexMode ? _hexEditor.CaretOffset : 0;
+        _foldsToRestore = GetFoldState();
+        if (IsHexMode)
+        {
+            _hexEditor.ReadOnly = true;
+        }
+        ((EditableTextBrowser)this).ReadOnly = true;
+    }
+
+    void IRemoteFileFlowHost.StartLoading()
+    {
+        _loadThread = new Thread(_loader.Run);
+        _loadThread.Start();
+    }
+
+    void IRemoteFileFlowHost.SetTextReadOnly(bool readOnly)
+    {
+        ((EditableTextBrowser)this).ReadOnly = readOnly;
+    }
+
+    void IRemoteFileFlowHost.RaiseLoadFailed()
+    {
+        LoadFailed?.Invoke(this, EventArgs.Empty);
+    }
+
+    void IRemoteFileFlowHost.DiscardDraft()
+    {
+        DiscardDraft();
+    }
+
 }
