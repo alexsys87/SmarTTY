@@ -48,7 +48,7 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
-| `GUI/TerminalView/` | Stage 2: the WPF terminal (`WpfTerminal`: the classic tab and the sudo prompt; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
+| `GUI/TerminalView/` | Stage 2: the WPF terminal of every SSH tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
@@ -98,7 +98,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1A | Editor logic out of WinForms | Done in alexsys87/SmarTTY#508–#526 (A1–A7, see the "Done in A…" notes below); what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here" |
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
-| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window) and 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`) done, see "Stage 2"; next 2C, the Smart Terminal, then 2D, the device terminal and the HEX view, then the removal of `TerminalEmulatorBase` and its subclasses |
+| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`) and 2C (the Smart Terminal on `WpfSmartTerminal`) done, see "Stage 2": no SSH tab uses a WinForms terminal now; next 2D, the device terminal and the HEX view, then the removal of `TerminalEmulatorBase` and its subclasses |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
@@ -440,7 +440,24 @@ its designer then, the WPF one used Consolas), and bold and italic of the settin
 setting or Courier New 12), `TerminalRenderView.SetFont` takes the weight and the style, and the default of the view is Courier New 16 pixels. Not ported, on purpose: the warning of
 Ctrl+Insert (it copies and sends nothing now), the timestamps margin (never shown in a classic tab).
 
-Not in 2A/2B: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the
+Done in 2C: the Smart Terminal tab is `GUI/TerminalView/WpfSmartTerminal` (a `WpfTerminal`); `SshTerminalControl` is no longer made by the
+application (it stays, with `SmartTerminalIntegrationTests` on Mono, until the WinForms terminals are removed). The logic of the control is moved as it
+was where it did not touch the editor: the prompt, the commands in channels of their own with the output through one queue with a 25 ms budget (now
+at the background priority of the dispatcher), cd/export/unset/exit/clear/history, the history (Up/Down with `HistoryWalk`, Ctrl+R with
+`HistorySearch`, Ctrl+Shift+R as a list, the window of the history), the grey suggestion (`HistorySuggestionState`, `SuggestionLookup`; drawn by the
+view as ghost text after the end of the line), the completion (`CompletionSession` and the WPF popup of the window, at the caret in device pixels),
+Ctrl+L/C/D/U/K/A/V/X, the paste into the command line and line by line, links by a plain click (`CommandRun.CreateScanner` through
+`TerminalDisplayModel.LinkScannerFactory`), the file list (`IFileListHost`). What the editor did is `Terminal/Rendering/PromptLine` (UI-free, in
+`TerminalRenderModelTests`): the prompt and the text at the end of the document, wrapped at the width of the screen and written again on every
+change (`TerminalDisplayModel.ReplaceDocumentTail`), the caret (`SetPromptCaret`) and the selection, Left/Right by one index and Ctrl+Left/Right by
+the words of `IsWordChar`, Home/End, Backspace/Delete with Ctrl by words, surrogate pairs whole; `BeginOutputAtEnd` starts the screen of a command
+on a new line after it. `WpfTerminal` got the hooks: `OnTerminalKey` (after the window's shortcuts), `OnTerminalText`, `OnDocumentClicked`,
+`OnGridResized`, `CancelActivePaste`, `EditsLocally` (the window leaves Ctrl+C/X/V to the prompt, as `CanEdit` did). The WinForms branches of
+`NormalTabContext` and `MainWindowController` for SSH tabs are gone (`NormalTabContext` takes a `WpfTerminal`). Not as before: Ctrl+Z (the undo of
+the editor) does nothing in the command line, a selection made with the mouse inside the command line is not replaced by typing (it is dropped and
+the text goes in at the caret), Alt+letter does nothing at the prompt (it did nothing useful before: there was no channel).
+
+Not in 2A/2B/2C: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the
 device terminal use the WinForms control), wide (East Asian) characters taking two cells (the
 screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
 slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
@@ -449,7 +466,10 @@ Manual check on Windows, for every change of the view (record the numbers of the
 "Software rendering (this window)"; over Remote Desktop (tier 0, remote session yes); a virtual machine without 3D (Hyper-V or VirtualBox
 without acceleration); 100 %, 150 % and 200 % scaling and a window moved between monitors of different DPI. On each: the five scripts (no frame
 over about 30 ms of build time, rows kept above 90 % in the scrolling log, the window responsive during the colour flood); a classic tab with `htop`, `mc` (mouse), `vim` (application keys), `less`, a paste of 100 KB (progress window, Esc), Ctrl+click on a file
-name and an address, the search bar, Clear, a reconnect (the old screen dimmed), BusyBox `ash` without Unicode (Cyrillic letters and Backspace); the keys Ctrl+C, Ctrl+Left, Alt+F, Alt+Backspace, F1-F12, the keypad in
+name and an address, the search bar, Clear, a reconnect (the old screen dimmed), BusyBox `ash` without Unicode (Cyrillic letters and Backspace); a Smart Terminal tab: the prompt and typing, a line longer than the screen,
+Home/End/Ctrl+Left/Right/Shift selection, Up/Down, Ctrl+R, the grey suggestion (Right takes it, Esc hides it), Tab and the completion list (Esc,
+Enter, a directory), `cd`/`export`/`clear`/`history`/`exit`, a command that runs (`top`, `vim`, Ctrl+C), the exit code note, Ctrl+L, a paste and a
+paste line by line, the history window, a click on a file name in the output; the keys Ctrl+C, Ctrl+Left, Alt+F, Alt+Backspace, F1-F12, the keypad in
 `vim` with `:set` in application mode, Ctrl+Space; the German layout (AltGr+Q gives @, AltGr+7 gives {, ^ then e gives the e with a circumflex,
 the left Ctrl+Alt+A sends ESC ^A), the Russian layout (letters, Ctrl+C, Alt+letter), Alt+0233 on the keypad (e acute), Japanese and Chinese IME
 (the composition window at the caret, Enter that ends a composition is not sent); minimise during the colour flood and restore.

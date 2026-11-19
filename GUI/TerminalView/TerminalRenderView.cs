@@ -166,7 +166,7 @@ internal sealed class TerminalRenderView : FrameworkElement
     public TerminalRenderView(XtermKeyTable keyTable)
     {
         _keys = new TerminalKeyEncoder(keyTable);
-        _visuals = new VisualCollection(this) { _selectionVisual, _cursorVisual };
+        _visuals = new VisualCollection(this) { _selectionVisual, _ghostVisual, _cursorVisual };
         Focusable = true;
         FocusVisualStyle = null;
         UseLayoutRounding = true;
@@ -228,6 +228,80 @@ internal sealed class TerminalRenderView : FrameworkElement
     /// handler the view pastes the clipboard itself.
     /// </summary>
     public Func<bool> PasteRequested;
+
+    /// <summary>Text input before it is sent: a handler that returns true takes it (the command line of the Smart Terminal).</summary>
+    public Func<TextCompositionEventArgs, bool> PreviewTerminalText;
+
+    /// <summary>A plain click of the left button (no drag) on a place of the document.</summary>
+    public event Action<TextDocument.TextPosition> DocumentClicked;
+
+    /// <summary>A link is opened by a plain click (the Smart Terminal); otherwise it needs Ctrl, because a plain click selects text.</summary>
+    public bool LinksNeedControl { get; set; } = true;
+
+    /// <summary>
+    /// A grey text drawn after a place of the document (the suggestion of the Smart Terminal from the history: the rest of a command typed
+    /// before); null: none.
+    /// </summary>
+    public void SetGhostText(TextDocument.TextPosition position, string text)
+    {
+        if (text == _ghostText && position == _ghostPosition)
+        {
+            return;
+        }
+        _ghostText = string.IsNullOrEmpty(text) ? null : text;
+        _ghostPosition = position;
+        _ghostVersion++;
+        OnModelChanged();
+    }
+
+    private string _ghostText;
+
+    private TextDocument.TextPosition _ghostPosition;
+
+    private int _ghostVersion;
+
+    private int _ghostDrawnVersion = -1;
+
+    private int _ghostDrawnTopLine = -1;
+
+    private readonly DrawingVisual _ghostVisual = new DrawingVisual();
+
+    /// <summary>The colour of the grey suggestion.</summary>
+    public Color GhostTextColor { get; set; } = Color.FromRgb(0x80, 0x80, 0x80);
+
+    private void DrawGhostText(TerminalFont font)
+    {
+        TerminalDisplayModel model = _model;
+        if (_ghostDrawnVersion == _ghostVersion && _ghostDrawnTopLine == model.TopLine)
+        {
+            return;
+        }
+        _ghostDrawnVersion = _ghostVersion;
+        _ghostDrawnTopLine = model.TopLine;
+        using (DrawingContext context = _ghostVisual.RenderOpen())
+        {
+            if (_ghostText == null)
+            {
+                return;
+            }
+            int row = _ghostPosition.Line - model.TopLine;
+            if (row < 0 || row >= model.Rows)
+            {
+                return;
+            }
+            // The rest of the command after the caret; what does not fit on the row is cut (the line wraps when it is taken).
+            int column = _ghostPosition.Column;
+            int fits = Math.Max(0, model.Columns - column);
+            string text = _ghostText.Length > fits ? _ghostText.Substring(0, fits) : _ghostText;
+            if (text.Length == 0)
+            {
+                return;
+            }
+            context.PushTransform(new TranslateTransform(column * font.CellWidth, row * font.CellHeight));
+            DrawGlyphs(context, text, 0, text.Length, GetBrush(new RgbColor((uint)(GhostTextColor.A << 24 | GhostTextColor.R << 16 | GhostTextColor.G << 8 | GhostTextColor.B))), font, 0);
+            context.Pop();
+        }
+    }
 
     /// <summary>Ctrl+Shift+Insert: the owner shows its paste menu.</summary>
     public event Action PasteMenuRequested;
@@ -475,6 +549,7 @@ internal sealed class TerminalRenderView : FrameworkElement
         ClearRows();
         _cursorState = null;
         _selectionVersion = -1;
+        _ghostDrawnVersion = -1;
         InvalidateVisual();
         RequestFrame();
     }
@@ -895,7 +970,7 @@ internal sealed class TerminalRenderView : FrameworkElement
                     visual = new RowVisual();
                     RenderOptions.SetEdgeMode(visual, EdgeMode.Aliased);
                     // Below the selection and the caret.
-                    _visuals.Insert(_visuals.Count - 2, visual);
+                    _visuals.Insert(_visuals.Count - 3, visual);
                 }
                 DrawRow(visual, layout, font);
                 _rowVisuals[row] = visual;
@@ -929,6 +1004,7 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
 
         DrawSelection(font);
+        DrawGhostText(font);
         DrawCursor(font);
         UpdateImeWindow(force: false);
 
@@ -1362,6 +1438,12 @@ internal sealed class TerminalRenderView : FrameworkElement
         {
             return;
         }
+        if (PreviewTerminalText != null && PreviewTerminalText(e))
+        {
+            e.Handled = true;
+            ResetBlink();
+            return;
+        }
         string text = _keys.TextInput(e.Text, e.SystemText, e.ControlText, _keyOptions);
         if (text != null)
         {
@@ -1555,7 +1637,7 @@ internal sealed class TerminalRenderView : FrameworkElement
     {
         link = null;
         ModifierKeys modifiers = Keyboard.Modifiers;
-        if (_model == null || !_model.LinksAvailable || (modifiers & ModifierKeys.Control) == 0 || (modifiers & ModifierKeys.Shift) != 0)
+        if (_model == null || !_model.LinksAvailable || (LinksNeedControl && (modifiers & ModifierKeys.Control) == 0) || (modifiers & ModifierKeys.Shift) != 0)
         {
             return false;
         }
@@ -1669,6 +1751,10 @@ internal sealed class TerminalRenderView : FrameworkElement
         {
             _selecting = false;
             ReleaseMouseCapture();
+            if (!_model.HasSelection)
+            {
+                DocumentClicked?.Invoke(_selectionAnchor);
+            }
             if (CopyOnSelect)
             {
                 CopySelection();

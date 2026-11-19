@@ -32,7 +32,7 @@ namespace SmarTTY.GUI.TerminalView;
 /// guard, its progress window and its menu, the links, the log file, the bell, the settings, the search of the window, and the events the
 /// window and the session listen to. It is the terminal of a tab through <see cref="ITerminalSurface"/>.
 /// </summary>
-public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
+public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 {
     // From this size a paste is sent in pieces, one after another, so that the window does not wait for the whole text.
     private const int AsyncPasteThreshold = 16 * 1024;
@@ -77,7 +77,11 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _model.OutputReceived += output => OutputReceived?.Invoke(output);
         _model.Bell += OnBell;
         _view.DataEntered += OnViewData;
-        _view.TerminalSizeChanged += (columns, rows) => PostResize(columns, rows);
+        _view.TerminalSizeChanged += (columns, rows) =>
+        {
+            OnGridResized(columns, rows);
+            PostResize(columns, rows);
+        };
         _view.PasteRequested = () =>
         {
             Paste();
@@ -87,6 +91,8 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _view.ContextMenuRequested += OnContextMenuRequested;
         _view.CtrlTabPressed += shift => CtrlTabPressed?.Invoke(this, shift);
         _view.PreviewTerminalKey += OnPreviewTerminalKey;
+        _view.PreviewTerminalText = OnTerminalText;
+        _view.DocumentClicked += position => OnDocumentClicked(position);
     }
 
     // The key layout of the application (VisualTTY/XTermKeys.xml), read once.
@@ -388,7 +394,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _view.SendInput(text, TerminalInputKind.Typed);
     }
 
-    public void InsertCommand(string text)
+    public virtual void InsertCommand(string text)
     {
         if (!string.IsNullOrEmpty(text))
         {
@@ -423,7 +429,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         return true;
     }
 
-    public void PasteText(string clipboardText)
+    public virtual void PasteText(string clipboardText)
     {
         _model.DropPrediction();
         try
@@ -459,7 +465,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         }
     }
 
-    public void PasteSpecial(PasteMode mode)
+    public virtual void PasteSpecial(PasteMode mode)
     {
         _pasteMode = mode;
         try
@@ -587,9 +593,8 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     {
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
         ModifierKeys modifiers = e.KeyboardDevice.Modifiers;
-        if (key == Key.Escape && modifiers == ModifierKeys.None && _pasteJob != null && _pasteJob.IsActive)
+        if (key == Key.Escape && modifiers == ModifierKeys.None && CancelActivePaste())
         {
-            _pasteJob.Cancel();
             e.Handled = true;
             return;
         }
@@ -600,6 +605,65 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             return;
         }
         ShortcutKey?.Invoke(this, e);
+        if (!e.Handled)
+        {
+            OnTerminalKey(e);
+        }
+    }
+
+    /// <summary>A key that the window's shortcuts left: a subclass that edits a line of its own (the Smart Terminal) takes it here.</summary>
+    protected virtual void OnTerminalKey(KeyEventArgs e)
+    {
+    }
+
+    /// <summary>Text input before the terminal sends it: true when a subclass took it.</summary>
+    protected virtual bool OnTerminalText(TextCompositionEventArgs e)
+    {
+        return false;
+    }
+
+    /// <summary>The grid got another size (on the UI thread, before the remote side is told).</summary>
+    protected virtual void OnGridResized(int columns, int rows)
+    {
+    }
+
+    /// <summary>The way the paste that is being done now was asked for (see <see cref="PasteSpecial"/>).</summary>
+    protected PasteMode PasteModeInUse => _pasteMode;
+
+    /// <summary>A plain click (no drag) on a place of the document.</summary>
+    protected virtual void OnDocumentClicked(TextDocument.TextPosition position)
+    {
+    }
+
+    /// <summary>The tab is being closed (before the view lets the model go).</summary>
+    protected virtual void OnDisposing()
+    {
+    }
+
+    /// <summary>Stops a paste that is being sent (Esc); false when there is none.</summary>
+    protected virtual bool CancelActivePaste()
+    {
+        if (_pasteJob != null && _pasteJob.IsActive)
+        {
+            _pasteJob.Cancel();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The terminal edits a line of its own now (the Smart Terminal at its prompt): the window then leaves Ctrl+C, Ctrl+X and Ctrl+V to it
+    /// (the WinForms terminal said so with <c>CanEdit</c>).
+    /// </summary>
+    public virtual bool EditsLocally => false;
+
+    /// <summary>The anchor of this terminal for pastes, questions and the paste menu.</summary>
+    internal PasteAnchor PasteAnchor => _anchor;
+
+    /// <summary>Sends bytes for the remote side through the usual path (the input dispatcher), as if they had been typed.</summary>
+    protected void SendInput(string text, TerminalInputKind kind)
+    {
+        _view.SendInput(text, kind);
     }
 
     public void CopySelection(bool select = true)
@@ -609,12 +673,17 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     public void CopyAll()
     {
-        SelectAll();
+        SelectDocument();
         _view.CopySelection();
     }
 
     /// <summary>Selects the whole document (the scrollback and the screen).</summary>
-    public void SelectAll()
+    public virtual void SelectAll()
+    {
+        SelectDocument();
+    }
+
+    private void SelectDocument()
     {
         EditableTextDocument document = _model.Document;
         if (document.LineCount == 0)
@@ -632,7 +701,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     public bool HasSelection => _model.HasSelection;
 
-    public void ClearOutput()
+    public virtual void ClearOutput()
     {
         _model.ClearOutput();
     }
@@ -663,6 +732,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             return;
         }
         _disposed = true;
+        OnDisposing();
         _pasteJob?.Abort();
         _view.Attach(null);
         OpenLogFile(null);

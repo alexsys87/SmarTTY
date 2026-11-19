@@ -45,7 +45,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     {
         get
         {
-            if (!(Terminal is SshTerminalControl))
+            if (!(Terminal is WpfSmartTerminal))
             {
                 return IconType.Terminal;
             }
@@ -68,10 +68,10 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    public NormalTabContext(SessionWrapper sessionWrapper, ITerminalSurface term)
+    public NormalTabContext(SessionWrapper sessionWrapper, WpfTerminal term)
     {
         NormalTabContext normalTabContext = this;
-        if (term is SshTerminalControl vtc)
+        if (term is WpfSmartTerminal vtc)
         {
             FileExplorer = new FileExplorer(vtc)
             {
@@ -108,7 +108,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         _Session = sessionWrapper;
         Terminal = term;
-        if (term is WpfTerminal wpfTerminal)
+        WpfTerminal wpfTerminal = term;
         {
             // The WPF terminal is the content of the tab itself and has its own scroll bar.
             wpfTerminal.DragEnter += WpfTerminal_DragOver;
@@ -116,26 +116,6 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             wpfTerminal.Drop += WpfTerminal_Drop;
             wpfTerminal.ClipboardFilesPasted += (WpfTerminal terminal, string[] files) => Terminal_ClipboardFilesPasted(files);
             Control = wpfTerminal;
-        }
-        else if (term is TerminalEmulatorControl winFormsTerminal)
-        {
-            WPFScrollBar wPFScrollBar = new WPFScrollBar();
-            wPFScrollBar.Orientation = Orientation.Vertical;
-            VerticalScrollBar = (FrameworkElement)wPFScrollBar;
-            WPFScrollBar wPFScrollBar2 = new WPFScrollBar();
-            wPFScrollBar2.Orientation = Orientation.Horizontal;
-            HorizontalScrollBar = (FrameworkElement)wPFScrollBar2;
-            // The terminal is a WinForms control hosted in WPF: files dropped on it never reach the WPF window's own
-            // drop handler, so the control has to accept them itself.
-            winFormsTerminal.AllowDrop = true;
-            winFormsTerminal.DragEnter += Terminal_DragOver;
-            winFormsTerminal.DragOver += Terminal_DragOver;
-            winFormsTerminal.DragDrop += Terminal_DragDrop;
-            winFormsTerminal.ClipboardFilesPasted += (TerminalEmulatorControl terminal, string[] files) => Terminal_ClipboardFilesPasted(files);
-            WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
-            ((WindowsFormsHost)winFormsHostWrapper).Child = winFormsTerminal;
-            Control = (FrameworkElement)winFormsHostWrapper;
-            winFormsTerminal.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
         }
         Searcher = new TextSearcher(term.SearchTarget);
         Title = term.Title;
@@ -178,23 +158,6 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             MessageBoxes.Exception(exception);
         }
-    }
-
-    private void Terminal_DragOver(object sender, System.Windows.Forms.DragEventArgs e)
-    {
-        bool acceptFiles = !FileListControl.IsDraggingOut && !_Session.IsDevice && e.Data != null && e.Data.GetDataPresent(System.Windows.Forms.DataFormats.FileDrop);
-        e.Effect = acceptFiles ? System.Windows.Forms.DragDropEffects.Copy : System.Windows.Forms.DragDropEffects.None;
-    }
-
-    private void Terminal_DragDrop(object sender, System.Windows.Forms.DragEventArgs e)
-    {
-        if (FileListControl.IsDraggingOut || _Session.IsDevice || e.Data == null || !(e.Data.GetData(System.Windows.Forms.DataFormats.FileDrop) is string[] files) || files.Length == 0)
-        {
-            return;
-        }
-        // Start the upload after the drop has finished, so that Explorer is not kept waiting while the remote
-        // directory is being determined.
-        Application.Current.Dispatcher.BeginInvoke((Action)(() => UploadDropped(files)));
     }
 
     // Files copied in Explorer and pasted into the terminal: the same upload as for dropped files, or their paths as text.

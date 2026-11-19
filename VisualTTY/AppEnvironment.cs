@@ -23,9 +23,10 @@ public static class AppEnvironment
         {
             return null;
         }
-        if (terminalEmulatorControl is SshTerminalControl sshTerminalControl)
+        // A Smart Terminal knows its directory (the WPF one and, in the tests that still drive it, the WinForms one).
+        if (terminalEmulatorControl is SmarTTY.GUI.Backend.IFileListHost smartTerminal)
         {
-            return sshTerminalControl.CurrentDirectory;
+            return smartTerminal.CurrentDirectory;
         }
         string title = terminalEmulatorControl.Title;
         if (title == null)

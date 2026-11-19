@@ -1,5 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
+using SmarTTY.GUI.TerminalView;
 using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.LocalRepo;
@@ -2309,7 +2310,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         try
         {
             _TabUpdateInProgress++;
-            ITerminalSurface term = _Controller.CreateNewTerminal(this, command, virtualMode, initialDirForVirtualMode);
+            WpfTerminal term = _Controller.CreateNewTerminal(this, command, virtualMode, initialDirForVirtualMode);
             NormalTabContext item = new NormalTabContext(this, term);
             int firstPseudoPage = FirstPseudoPage;
             Tabs.Insert(firstPseudoPage, item);
@@ -2733,7 +2734,7 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
             {
                 ActiveTabIndex = index;
             }
-            if (tab.Terminal is SshTerminalControl smartTerminal)
+            if (tab.Terminal is SmarTTY.GUI.TerminalView.WpfSmartTerminal smartTerminal)
             {
                 if (!smartTerminal.Submit(" " + commandLine))
                 {

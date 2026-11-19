@@ -1206,7 +1206,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 activeSession.UploadAndInstallLocalPackages(packageManagerWindow2.LocalInstall);
                 return;
             }
-            if (accepted && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
+            if (accepted && packageManagerWindow2.CommandLine != null && (!((activeSession.ActiveTab as NormalTabContext)?.Terminal is SmarTTY.GUI.TerminalView.WpfSmartTerminal smartTerminal) || !smartTerminal.Submit(packageManagerWindow2.CommandLine)))
             {
                 activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true, tabKeptAfterExit: () => ShowPackageManager(activeSession)));
             }
