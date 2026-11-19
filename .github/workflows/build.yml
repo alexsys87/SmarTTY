@@ -297,6 +297,9 @@ jobs:
       - name: Run netconsole line input checks (the history walk of the input box and its draft, what typed text does to the box)
         run: dotnet run --project tests/NetconsoleLineInputTests -c Release
 
+      - name: Run device command list checks (the saved history and the command lists of a COM/TCP device: loading, saving, deleting, clearing)
+        run: dotnet run --project tests/DeviceCommandListsTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 

@@ -419,11 +419,7 @@ public partial class DeviceTerminalControl : INetconsoleLineHost
         }
         _serialTerminalControl.AddToHistory(line);
         // A line typed with a leading blank is not saved (like in a shell).
-        if (_commandKey != null && _savedHistory.Add(line))
-        {
-            _commandStorage.SaveHistory(_commandKey, _savedHistory);
-            RefreshCommandSuggestions();
-        }
+        _commandLists.Remember(line);
     }
 
     private void OnNetconsoleInputKeyDown(object sender, KeyEventArgs e)

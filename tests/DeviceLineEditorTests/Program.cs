@@ -1195,7 +1195,9 @@ internal static class Program
     // What the device terminal keeps on disk for the next session.
     private static IReadOnlyList<string> SavedHistory(DeviceTerminalControl control)
     {
-        CommandHistory history = (CommandHistory)typeof(DeviceTerminalControl).GetField("_savedHistory", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+        // The accessor follows the move of the state into DeviceCommandLists.
+        DeviceCommandLists lists = (DeviceCommandLists)typeof(DeviceTerminalControl).GetField("_commandLists", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+        CommandHistory history = lists.SavedHistory;
         return history.Items;
     }
 
