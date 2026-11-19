@@ -252,6 +252,9 @@ jobs:
       - name: Run remote file session checks (taking the bytes to save, the CRLF and BOM questions, bytes kept from the hex view, backup, check of the file; fake editor)
         run: dotnet run --project tests/RemoteFileSessionTests -c Release
 
+      - name: Run remote file content checks (the bytes on the server, encoding, line breaks, the switching between the text and the hex view; fake editor and hex view)
+        run: dotnet run --project tests/RemoteFileContentTests -c Release
+
       - name: Run hex editing model checks (caret, selection, typing in both columns, search; what the view is told after each operation)
         run: dotnet run --project tests/HexEditingModelTests -c Release
 

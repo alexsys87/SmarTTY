@@ -16,7 +16,7 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource
+public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost
 {
 
     private ITerminalSessionContext _context;
@@ -53,33 +53,18 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public static Action<SshShellChannel, string> SudoConfirmationPrompt;
 
-    // The bytes of the file as they are on the server (what was downloaded, then what was saved): "Reopen with
-    // encoding" decodes them again.
-    private byte[] _rawBytes;
+    // The bytes on the server, the encoding and the line breaks, and the switching between the text and the hex view (see RemoteFileContent).
+    // Made by the constructor that opens a file: the base classes may ask for IsModified before that.
+    private RemoteFileContent _content;
 
-    // The encoding _rawBytes (the file as it is on the server) is read with.
-    private TextFileEncoding _rawEncoding = TextFileEncodings.Utf8;
-
-    // The hex view: its bytes, its undo history and the bytes it saved. The text document is kept apart, so that the
-    // two views can be switched back and forth without saving one into the other (see ToggleHexMode).
+    // The hex view of the file.
     private HexEditorControl _hexEditor;
-
-    private HexDocument _hexDocument;
-
-    private bool _hexMode;
-
-    // The text, its caret and its saved state at the moment the hex view was opened.
-    private string _textBeforeHex;
-
-    private bool _textModifiedBeforeHex;
-
-    private TextDocument.TextPosition _textCaretBeforeHex;
 
     /// <summary>The hex view of the file.</summary>
     public HexEditorControl HexEditor => _hexEditor;
 
     /// <summary>The editor shows the bytes instead of the text.</summary>
-    public bool IsHexMode => _hexMode;
+    public bool IsHexMode => _content != null && _content.HexMode;
 
     /// <summary>The file is loaded and nothing is being saved: the hex view can be opened or closed.</summary>
     public bool CanToggleHexMode => _loaded && !_reloading && !IsSaving;
@@ -112,10 +97,10 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     private FoldedLineInfo[] _foldsToRestore;
 
     /// <summary>The encoding the file is read in and saved in.</summary>
-    public TextFileEncoding FileEncoding { get; private set; } = TextFileEncodings.Utf8;
+    public TextFileEncoding FileEncoding => _content.FileEncoding;
 
     /// <summary>The line breaks of the file as it was loaded, or as the user converted them.</summary>
-    public LineEndingKind LineEndings { get; private set; } = LineEndingKind.None;
+    public LineEndingKind LineEndings => _content.LineEndings;
 
     /// <summary>Raised on the UI thread when the encoding or the line endings changed (or the file was loaded).</summary>
     public event EventHandler FormatChanged;
@@ -124,7 +109,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// The encoding can be reinterpreted: the whole file has been loaded from the server (reading it again in another
     /// encoding does not write anything, so a read-only file qualifies, a preview of a huge file does not).
     /// </summary>
-    public bool CanReopenWithEncoding => _loaded && !_reloading && _rawBytes != null && !IsNewFile && !IsPreview;
+    public bool CanReopenWithEncoding => _loaded && !_reloading && _content.RawBytes != null && !IsNewFile && !IsPreview;
 
     /// <summary>The file did not exist when the editor was opened: it is created by the first save.</summary>
     public bool IsNewFile { get => _loader.IsNewFile; private set => _loader.IsNewFile = value; }
@@ -187,20 +172,20 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         // The messages are rows of the text view, so they do not belong in the hex view.
         ClearMessages();
-        if (_hexMode)
+        if (IsHexMode)
         {
-            ExitHexMode();
+            _content.ExitHexMode();
         }
         else
         {
-            EnterHexMode();
+            _content.EnterHexMode();
         }
     }
 
     /// <summary>Puts the keyboard focus on the view that is shown: the text or the hex editor.</summary>
     public void FocusActiveView()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.Focus();
         }
@@ -237,213 +222,18 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
     }
 
-    /// <summary>
-    /// The bytes the editor shows: the server version when the text is unchanged, otherwise the text encoded in the
-    /// file encoding, or the exact bytes the hex view left when the text has not been edited since.
-    /// </summary>
-    private byte[] GetBytesForHexView(string text)
-    {
-        if (_session.HexBytesForTextSave != null && _session.HexTextSnapshot == text)
-        {
-            return _session.HexBytesForTextSave;
-        }
-        if (!base.IsModified && _rawBytes != null)
-        {
-            return _rawBytes;
-        }
-        return TextFileEncodings.Encode(text, FileEncoding);
-    }
-
-    private void EnterHexMode()
-    {
-        if (_hexMode || !_loaded || IsSaving)
-        {
-            return;
-        }
-        string text = base.EditableDocument.GetText();
-        HexDocument document = _hexDocument;
-        bool reuse = document != null && _session.HexTextSnapshot == text && _session.HexBytesForTextSave != null
-            && HexDocument.ByteArraysEqual(document.ToArray(), _session.HexBytesForTextSave);
-        if (!reuse)
-        {
-            try
-            {
-                byte[] serverBytes = _rawBytes ?? Array.Empty<byte>();
-                HexDocument previous = document;
-                document = new HexDocument(GetBytesForHexView(text), serverBytes);
-                // The text was edited meanwhile: the coloured blocks of the bytes are kept as far as they still fit.
-                document.CopyHighlightsFrom(previous);
-            }
-            catch (InvalidOperationException exception)
-            {
-                ThemedMessageBox.Show(this, exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-                return;
-            }
-        }
-        ShowHexView(document);
-    }
-
-    /// <summary>
-    /// Shows <paramref name="document"/> in the hex view: the text document is kept aside for <see cref="ExitHexMode"/>.
-    /// </summary>
-    private void ShowHexView(HexDocument document)
-    {
-        _textBeforeHex = base.EditableDocument.GetText();
-        _textModifiedBeforeHex = base.IsModified;
-        _textCaretBeforeHex = CaretPosition;
-        AttachHexDocument(document);
-        _hexMode = true;
-        ((EditableTextBrowser)this).ReadOnly = true;
-        if (!ReferenceEquals(_hexEditor.Document, document))
-        {
-            _hexEditor.Document = document;
-        }
-        _hexEditor.ReadOnly = IsReadOnlyMode;
-        _hexEditor.Visible = true;
-        _hexEditor.BringToFront();
-        _hexEditor.Focus();
-        OnModifiedChanged();
-        HexModeChanged?.Invoke(this, EventArgs.Empty);
-        FormatChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    /// <summary>Shows the bytes of a restored draft in the hex view.</summary>
-    private void ShowRestoredHexDraft(byte[] bytes)
-    {
-        ShowHexView(new HexDocument(bytes, _rawBytes ?? Array.Empty<byte>()));
-    }
-
-    private void ExitHexMode()
-    {
-        if (!_hexMode || _hexDocument == null)
-        {
-            return;
-        }
-        byte[] bytes = _hexDocument.ToArray();
-        bool keepText = !_textModifiedBeforeHex && _textBeforeHex != null
-            && HexDocument.ByteArraysEqual(bytes, _rawBytes ?? Array.Empty<byte>());
-        string text;
-        if (keepText)
-        {
-            // Nothing changed: show the text exactly as it was, even when the encoding does not round-trip.
-            text = _textBeforeHex;
-        }
-        else
-        {
-            text = TextFileEncodings.Decode(bytes, FileEncoding);
-            byte[] roundTrip = null;
-            try
-            {
-                roundTrip = TextFileEncodings.Encode(text, FileEncoding);
-            }
-            catch
-            {
-                // A character the encoding cannot store is just as lossy.
-            }
-            if (!HexDocument.ByteArraysEqual(roundTrip, bytes)
-                && ThemedMessageBox.Show(this, "Not all bytes can be shown as text in " + FileEncoding.DisplayName
-                    + ": saving the text after it is edited would change them.\n\nShow the bytes as text anyway?",
-                    "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-            {
-                _hexEditor.Focus();
-                return;
-            }
-        }
-        _session.HexBytesForTextSave = bytes;
-        _session.HexTextSnapshot = text;
-        _hexMode = false;
-        _hexEditor.Visible = false;
-        _hexEditor.ReadOnly = true;
-        ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
-
-        // When the bytes are still the text that was shown before, the text document and its undo history are kept:
-        // switching to the hex view and back must not lose them.
-        if (text == _textBeforeHex && base.EditableDocument.GetText() == text)
-        {
-            ((EditableTextBrowser)this).IsModified = !HexDocument.ByteArraysEqual(bytes, _rawBytes ?? Array.Empty<byte>());
-            Focus();
-            OnModifiedChanged();
-            HexModeChanged?.Invoke(this, EventArgs.Empty);
-            FormatChanged?.Invoke(this, EventArgs.Empty);
-            return;
-        }
-
-        LineEndingKind lineEndings = LineEndingDetector.Detect(text);
-        LineEndings = lineEndings;
-        EditableTextDocument document = new EditableTextDocument
-        {
-            DefaultLineEnding = (lineEndings == LineEndingKind.CrLf) ? TextDocument.LineEnding.CrLf : ((lineEndings == LineEndingKind.Cr) ? TextDocument.LineEnding.Cr : TextDocument.LineEnding.Lf)
-        };
-        document.SetText(text);
-        SetDocument(document);
-        int line = Math.Max(0, Math.Min(_textCaretBeforeHex.Line, Math.Max(0, document.LineCount - 1)));
-        SetCaret(new TextDocument.TextPosition(Math.Min(_textCaretBeforeHex.Column, document.GetLineText(line).Length), line));
-        ((EditableTextBrowser)this).IsModified = !HexDocument.ByteArraysEqual(bytes, _rawBytes ?? Array.Empty<byte>());
-        Focus();
-        OnModifiedChanged();
-        HexModeChanged?.Invoke(this, EventArgs.Empty);
-        FormatChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void AttachHexDocument(HexDocument document)
-    {
-        if (_hexDocument != null)
-        {
-            _hexDocument.ModifiedChanged -= OnHexDocumentModifiedChanged;
-        }
-        _hexDocument = document;
-        if (_hexDocument != null)
-        {
-            _hexDocument.ModifiedChanged += OnHexDocumentModifiedChanged;
-        }
-    }
-
-    private void OnHexDocumentModifiedChanged(object sender, EventArgs e)
-    {
-        if (_hexMode && ReferenceEquals(sender, _hexDocument))
-        {
-            OnModifiedChanged();
-        }
-    }
-
-    /// <summary>Hides and forgets the hex view (the file is being loaded again, or its text was replaced).</summary>
-    private void ResetHexMode()
-    {
-        bool hadHex = _hexMode || _hexDocument != null;
-        AttachHexDocument(null);
-        _hexMode = false;
-        _session.HexBytesForTextSave = null;
-        _session.HexTextSnapshot = null;
-        _textBeforeHex = null;
-        _textModifiedBeforeHex = false;
-        _hexEditor.Visible = false;
-        _hexEditor.ReadOnly = true;
-        _hexEditor.Document = null;
-        if (hadHex)
-        {
-            HexModeChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
-
     /// <summary>The unsaved state covers both views: the bytes in hex mode, the text in text mode.</summary>
     public override bool IsModified
     {
         get
         {
-            return (_hexMode && _hexDocument != null) ? _hexDocument.IsModified : base.IsModified;
+            return (_content != null) ? _content.IsModified : base.IsModified;
         }
         set
         {
-            if (_hexMode && _hexDocument != null)
+            if (_content != null)
             {
-                if (value)
-                {
-                    _hexDocument.MarkModified();
-                }
-                else
-                {
-                    _hexDocument.MarkSaved();
-                }
+                _content.IsModified = value;
             }
             else
             {
@@ -454,7 +244,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void CopySelection(bool select = true)
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.CopySelection();
         }
@@ -466,7 +256,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void CopyAll()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.CopyAll();
         }
@@ -478,7 +268,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void Cut()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.Cut();
         }
@@ -490,7 +280,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void Paste()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.Paste();
         }
@@ -502,7 +292,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void DeleteSelection()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.DeleteSelection();
         }
@@ -514,7 +304,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     public override void SelectAllText()
     {
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.SelectAll();
         }
@@ -534,6 +324,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         SessionRemoteFileHost host = new SessionRemoteFileHost(terminalSessionContext);
         _server = new RemoteFileServer(host, text);
         _session = new RemoteFileSession(text);
+        _content = new RemoteFileContent(text, this, _hexEditor, _session);
+        _content.HexModeChanged += (object sender, EventArgs e) => HexModeChanged?.Invoke(this, EventArgs.Empty);
+        _content.FormatChanged += (object sender, EventArgs e) => FormatChanged?.Invoke(this, EventArgs.Empty);
         _saver = new RemoteFileSaver(host, _server, text, () => _loader.SudoOnSave);
         _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
@@ -650,7 +443,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                     text = restoredDraft.Text ?? text;
                 }
             }
-            ApplyContent(file, encoding, text);
+            _content.ApplyContent(file, encoding, text);
             _remoteSignature = signature;
             _session.BackupDone = false;
             _reloading = false;
@@ -661,7 +454,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 if (restoredDraft.Bytes != null)
                 {
                     // The draft holds the bytes of the hex view: show them there, where they can be saved as they are.
-                    ShowRestoredHexDraft(restoredDraft.Bytes);
+                    _content.ShowRestoredHexDraft(restoredDraft.Bytes);
                 }
                 else
                 {
@@ -689,8 +482,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 if (_restoreHexAfterReload)
                 {
                     _restoreHexAfterReload = false;
-                    EnterHexMode();
-                    if (_hexMode)
+                    _content.EnterHexMode();
+                    if (IsHexMode)
                     {
                         _hexEditor.GoToOffset(_hexOffsetToRestore);
                     }
@@ -713,29 +506,6 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             // Not silent: the tab would stay empty and read-only with no word about why.
             HandleLoadError(exception);
         }
-    }
-
-    /// <summary>
-    /// Puts <paramref name="text"/> (the file <paramref name="file"/>, read as <paramref name="encoding"/>) in the editor
-    /// as unmodified.
-    /// </summary>
-    private void ApplyContent(byte[] file, TextFileEncoding encoding, string text)
-    {
-        ResetHexMode();
-        _rawBytes = file;
-        _rawEncoding = encoding;
-        FileEncoding = encoding;
-        LineEndings = LineEndingDetector.Detect(text);
-        EditableTextDocument document = new EditableTextDocument
-        {
-            DefaultLineEnding = (LineEndings == LineEndingKind.CrLf) ? TextDocument.LineEnding.CrLf : ((LineEndings == LineEndingKind.Cr) ? TextDocument.LineEnding.Cr : TextDocument.LineEnding.Lf)
-        };
-        document.SetText(text);
-        SetDocument(document);
-        ((EditableTextBrowser)this).IsModified = false;
-        _session.ConvertCrLf = null;
-        _session.BomAnswered = false;
-        FormatChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -785,14 +555,15 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             {
                 return;
             }
-            bool hex = _hexMode && _hexDocument != null;
-            object version = hex ? _hexDocument.CurrentVersion : CurrentVersion;
-            if (!_drafts.ShouldCapture(version, hex ? _hexDocument.Length : (long?)null))
+            HexDocument hexDocument = _content.HexDocument;
+            bool hex = _content.HexMode && hexDocument != null;
+            object version = hex ? hexDocument.CurrentVersion : CurrentVersion;
+            if (!_drafts.ShouldCapture(version, hex ? hexDocument.Length : (long?)null))
             {
                 return;
             }
             string draftText = hex ? null : base.EditableDocument.GetText();
-            byte[] draftBytes = hex ? _hexDocument.ToArray() : null;
+            byte[] draftBytes = hex ? hexDocument.ToArray() : null;
             _drafts.Captured(hex ? draftBytes.Length : draftText.Length);
             _drafts.Queue(new EditorDraft
             {
@@ -834,10 +605,10 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         _reloading = true;
         _restoreCaret = true;
         _caretToRestore = CaretPosition;
-        _restoreHexAfterReload = _hexMode;
-        _hexOffsetToRestore = _hexMode ? _hexEditor.CaretOffset : 0;
+        _restoreHexAfterReload = IsHexMode;
+        _hexOffsetToRestore = IsHexMode ? _hexEditor.CaretOffset : 0;
         _foldsToRestore = GetFoldState();
-        if (_hexMode)
+        if (IsHexMode)
         {
             _hexEditor.ReadOnly = true;
         }
@@ -867,16 +638,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public void SetSaveEncoding(TextFileEncoding encoding)
     {
-        if (encoding == null || encoding == FileEncoding || ((EditableTextBrowser)this).ReadOnly || _hexMode)
-        {
-            return;
-        }
-        FileEncoding = encoding;
-        // The bytes kept from the hex view are in the old encoding: save the text in the chosen one now.
-        _session.HexBytesForTextSave = null;
-        _session.HexTextSnapshot = null;
-        ((EditableTextBrowser)this).IsModified = true;
-        FormatChanged?.Invoke(this, EventArgs.Empty);
+        _content.SetSaveEncoding(encoding);
     }
 
     /// <summary>
@@ -890,9 +652,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             return;
         }
         DiscardDraft();
-        string text = TextFileEncodings.Decode(_rawBytes, encoding);
+        string text = TextFileEncodings.Decode(_content.RawBytes, encoding);
         _drafts.BaseHash = EditorDraftStore.HashText(text);
-        ApplyContent(_rawBytes, encoding, text);
+        _content.ApplyContent(_content.RawBytes, encoding, text);
     }
 
     /// <summary>
@@ -901,18 +663,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public void SetLineEnding(TextDocument.LineEnding lineEnding)
     {
-        if (((EditableTextBrowser)this).ReadOnly || _hexMode)
-        {
-            return;
-        }
-        base.EditableDocument.SetLineEnding(lineEnding);
-        base.EditableDocument.DefaultLineEnding = lineEnding;
-        LineEndings = (lineEnding == TextDocument.LineEnding.CrLf) ? LineEndingKind.CrLf : ((lineEnding == TextDocument.LineEnding.Cr) ? LineEndingKind.Cr : LineEndingKind.Lf);
-        // The text no longer matches the bytes kept from the hex view.
-        _session.HexBytesForTextSave = null;
-        _session.HexTextSnapshot = null;
-        ((EditableTextBrowser)this).IsModified = true;
-        FormatChanged?.Invoke(this, EventArgs.Empty);
+        _content.SetLineEnding(lineEnding);
     }
 
     public bool TrySave()
@@ -1296,8 +1047,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public TextDiff.Result GetChanges()
     {
-        string original = _rawBytes == null ? "" : TextFileEncodings.Decode(_rawBytes, _rawEncoding);
-        return TextDiff.Compare(original, base.EditableDocument.GetText(), RemotePath + " (on the server)", RemotePath + " (in the editor)");
+        return _content.GetChanges();
     }
 
     private void SetSaving(bool saving)
@@ -1322,13 +1072,13 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     }
 
     // What the taking of the bytes to save (RemoteFileSession.PrepareSave) needs from the editor.
-    bool IRemoteSaveSource.HexMode => _hexMode && _hexDocument != null;
+    bool IRemoteSaveSource.HexMode => _content.HexMode && _content.HexDocument != null;
 
-    object IRemoteSaveSource.HexVersion => _hexDocument.CurrentVersion;
+    object IRemoteSaveSource.HexVersion => _content.HexDocument.CurrentVersion;
 
     byte[] IRemoteSaveSource.HexBytes()
     {
-        return _hexDocument.ToArray();
+        return _content.HexDocument.ToArray();
     }
 
     string IRemoteSaveSource.GetText()
@@ -1372,6 +1122,87 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         return base.EditableDocument.GetLineText(0);
     }
 
+    // What the content of the file and the switching between the views (RemoteFileContent) need from the editor.
+    EditableTextDocument IRemoteFileContentHost.TextDocument => base.EditableDocument;
+
+    bool IRemoteFileContentHost.IsTextModified
+    {
+        get
+        {
+            return base.IsModified;
+        }
+        set
+        {
+            base.IsModified = value;
+        }
+    }
+
+    bool IRemoteFileContentHost.TextReadOnly
+    {
+        get
+        {
+            return ((EditableTextBrowser)this).ReadOnly;
+        }
+        set
+        {
+            ((EditableTextBrowser)this).ReadOnly = value;
+        }
+    }
+
+    TextDocument.TextPosition IRemoteFileContentHost.Caret => CaretPosition;
+
+    void IRemoteFileContentHost.SetCaret(TextDocument.TextPosition position)
+    {
+        SetCaret(position);
+    }
+
+    void IRemoteFileContentHost.SetDocument(EditableTextDocument document)
+    {
+        SetDocument(document);
+    }
+
+    void IRemoteFileContentHost.FocusText()
+    {
+        Focus();
+    }
+
+    void IRemoteFileContentHost.MarkTextSaved(object version)
+    {
+        MarkSaved(version);
+    }
+
+    void IRemoteFileContentHost.RaiseModifiedChanged()
+    {
+        OnModifiedChanged();
+    }
+
+    bool IRemoteFileContentHost.IsLoaded => _loaded;
+
+    bool IRemoteFileContentHost.IsSaving => IsSaving;
+
+    bool IRemoteFileContentHost.IsReadOnlyMode => IsReadOnlyMode;
+
+    void IRemoteFileContentHost.ShowHexView()
+    {
+        _hexEditor.Visible = true;
+        _hexEditor.BringToFront();
+    }
+
+    void IRemoteFileContentHost.HideHexView()
+    {
+        _hexEditor.Visible = false;
+    }
+
+    void IRemoteFileContentHost.ShowError(string message)
+    {
+        ThemedMessageBox.Show(this, message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+    }
+
+    bool IRemoteFileContentHost.ConfirmWarning(string question)
+    {
+        return ThemedMessageBox.Show(this, question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+    }
+
     /// <summary>Asks whether to retry with sudo and does so (UI thread).</summary>
     private void SaveWithSudo(RemoteSaveJob job)
     {
@@ -1386,31 +1217,13 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     {
         // A save through sudo has no signature yet.
         _remoteSignature = job.NewSignature ?? _server.FetchSignature();
-        _rawBytes = job.Bytes;
-        _rawEncoding = job.Encoding ?? FileEncoding;
         if (job.IncludesBackup)
         {
             _session.BackupDone = true;
         }
         IsNewFile = false;
-        if (job.HexMode && _hexDocument != null)
-        {
-            _hexDocument.MarkSaved(job.Version, job.Bytes);
-            _hexEditor.Invalidate();
-            // The text is rebuilt from these bytes when the hex view is closed.
-            _session.HexBytesForTextSave = null;
-            _session.HexTextSnapshot = null;
-        }
-        else
-        {
-            MarkSaved(job.Version);
-            if (_hexDocument != null && HexDocument.ByteArraysEqual(_hexDocument.ToArray(), job.Bytes))
-            {
-                // The text was saved back as the exact bytes of the hex view: both views are saved now.
-                _hexDocument.MarkSaved(_hexDocument.CurrentVersion, job.Bytes);
-            }
-        }
-        FormatChanged?.Invoke(this, EventArgs.Empty);
+        // The bytes of the file and the saved state of the view they came from (and of the other one, when it holds them too).
+        _content.CompleteSave(job);
         if (!IsModified)
         {
             // Everything is on the server: the draft is of no use (a later change makes a new one).

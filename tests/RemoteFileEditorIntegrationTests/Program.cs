@@ -20,8 +20,8 @@ using VisualTTY;
 /// The questions the editor asks the user are caught (ThemedMessageBox.ShowImpl) and answered by the checks. It is a .NET Framework 4.8
 /// WinForms program: on Linux it is built with the .NET SDK and run by Mono under a virtual X display, see the project file.
 ///
-/// It is the safety net of the move of the logic of the editor out of the control (stage 1, step A4): it was written against the code before
-/// the move, and what it checks must stay the same.
+/// It is the safety net of the move of the logic of the editor out of the control (stage 1, step A4, and stage 3, step 3A: the "hex-view" and
+/// "hex-draft" scenarios): it was written against the code before the move, and what it checks must stay the same.
 /// </summary>
 internal static class Program
 {

@@ -44,7 +44,7 @@ public sealed class HexHighlightColor
 /// remote file editor saves the bytes (see <see cref="RemoteFileEditor"/>). The control draws its own scroll bars,
 /// because the WPF scroll bars of the text editor are hidden in hex mode.
 /// </summary>
-public sealed class HexEditorControl : Control, IHexViewStatus
+public sealed class HexEditorControl : Control, IHexViewStatus, IRemoteHexView
 {
     /// <summary>The row widths the view offers.</summary>
     public static readonly int[] BytesPerRowChoices = HexViewChoices.BytesPerRow;
