@@ -181,6 +181,19 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         set => _view.InputEncoding = value;
     }
 
+    /// <summary>What Enter sends while the program reads the keyboard; null: a CR (the device terminal sets the line ending of its connection).</summary>
+    public string EnterSequence
+    {
+        get => _enterSequence;
+        set
+        {
+            _enterSequence = value;
+            _view.KeyOptions.EnterSequence = value ?? "\r";
+        }
+    }
+
+    private string _enterSequence;
+
     /// <summary>Alt+F4 goes to the program instead of closing the window.</summary>
     public bool ForwardAltF4
     {
@@ -604,11 +617,24 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             e.Handled = true;
             return;
         }
+        OnKeyBeforeShortcuts(e);
+        if (e.Handled)
+        {
+            return;
+        }
         ShortcutKey?.Invoke(this, e);
         if (!e.Handled)
         {
             OnTerminalKey(e);
         }
+    }
+
+    /// <summary>
+    /// A key before the window's shortcuts: a subclass whose own keys must win over them takes it here (the input line of the serial
+    /// terminal handled Ctrl+C, Ctrl+L, Ctrl+R, Tab, Up, Down, Enter and Esc before the device panel saw the key).
+    /// </summary>
+    protected virtual void OnKeyBeforeShortcuts(KeyEventArgs e)
+    {
     }
 
     /// <summary>A key that the window's shortcuts left: a subclass that edits a line of its own (the Smart Terminal) takes it here.</summary>
@@ -660,6 +686,24 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     /// <summary>The anchor of this terminal for pastes, questions and the paste menu.</summary>
     internal PasteAnchor PasteAnchor => _anchor;
 
+    // The place of the caret on the screen in device pixels and the height of a row, for the popups.
+    protected void GetCaretScreenPlace(out GridPoint location, out int lineHeight)
+    {
+        TerminalFont font = View.TerminalFont;
+        TextDocument.TextPosition caret = Model.Caret;
+        Point point = new Point(caret.Column * font.CellWidth, (caret.Line - Model.TopLine + 1) * font.CellHeight - font.CellHeight);
+        try
+        {
+            Point screen = View.PointToScreen(point);
+            location = new GridPoint((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
+        }
+        catch (InvalidOperationException)
+        {
+            location = new GridPoint(0, 0);
+        }
+        lineHeight = (int)Math.Round(font.CellHeight * font.PixelsPerDip);
+    }
+
     /// <summary>Sends bytes for the remote side through the usual path (the input dispatcher), as if they had been typed.</summary>
     protected void SendInput(string text, TerminalInputKind kind)
     {
@@ -706,13 +750,13 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _model.ClearOutput();
     }
 
-    public void BeginNewSession()
+    public virtual void BeginNewSession()
     {
         _model.BeginNewSession();
     }
 
     /// <summary>A full reset that the user asked for: the output that waits is dropped.</summary>
-    public void Reset()
+    public virtual void Reset()
     {
         _view.ResetTerminal();
     }

@@ -831,24 +831,6 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
         return CompletionTriggers().FirstCharacterInWord;
     }
 
-    // The place of the caret on the screen in device pixels and the height of a row, for the popups.
-    private void GetCaretScreenPlace(out GridPoint location, out int lineHeight)
-    {
-        TerminalFont font = View.TerminalFont;
-        TextDocument.TextPosition caret = Model.Caret;
-        Point point = new Point(caret.Column * font.CellWidth, (caret.Line - Model.TopLine + 1) * font.CellHeight - font.CellHeight);
-        try
-        {
-            Point screen = View.PointToScreen(point);
-            location = new GridPoint((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
-        }
-        catch (InvalidOperationException)
-        {
-            location = new GridPoint(0, 0);
-        }
-        lineHeight = (int)Math.Round(font.CellHeight * font.PixelsPerDip);
-    }
-
     private void ShowCompletions(CompletionTrigger completionTrigger = CompletionTrigger.Normal)
     {
         ICompletionPopup completionPopup = _popup;

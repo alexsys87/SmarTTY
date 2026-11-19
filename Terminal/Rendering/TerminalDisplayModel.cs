@@ -204,6 +204,60 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     }
 
     /// <summary>
+    /// Replaces the document from column <paramref name="keepColumns"/> of <paramref name="startLine"/> to its end with <paramref name="rows"/>:
+    /// the first row goes after the kept columns, which keep their text and their styles (the prompt the device drew, which the input line of
+    /// the serial terminal continues), the others are lines of their own. A line shorter than the kept columns is padded with blanks. With no
+    /// columns to keep, or a line past the end of the document, it is <see cref="ReplaceDocumentTail(int, IList{string})"/>.
+    /// </summary>
+    public void ReplaceDocumentTail(int startLine, int keepColumns, IList<string> rows)
+    {
+        EditableTextDocument document = _document;
+        if (keepColumns <= 0 || startLine < 0 || startLine >= document.LineCount)
+        {
+            ReplaceDocumentTail(startLine, rows);
+            return;
+        }
+        if (startLine + 1 < document.LineCount)
+        {
+            document.RemoveLines(startLine + 1, document.LineCount - startLine - 1);
+        }
+        Lines.RemoveLines(startLine + 1, int.MaxValue);
+        string line = document.GetLineText(startLine);
+        string kept = line.Length >= keepColumns ? line.Substring(0, keepColumns) : line.PadRight(keepColumns);
+        string first = rows.Count > 0 ? rows[0] ?? "" : "";
+        string replaced = kept + first;
+        if (replaced != line)
+        {
+            document.ReplaceInLine(startLine, 0, line.Length, replaced);
+        }
+        for (int index = 1; index < rows.Count; index++)
+        {
+            document.AppendLine(rows[index] ?? "");
+        }
+        if (_hasSelection)
+        {
+            _selectionAnchor = Clamp(_selectionAnchor);
+            _selectionEnd = Clamp(_selectionEnd);
+        }
+        OnChanged();
+    }
+
+    /// <summary>
+    /// Puts the cursor of the screen at a cell (the serial terminal gives the cursor back to the device after the end of its prompt, where the
+    /// device echoes the command). The caret is the cursor again.
+    /// </summary>
+    public void MoveCursorTo(GridPoint cell)
+    {
+        _promptCaret = null;
+        _screen.Cursor = cell;
+        _screen.UpdateCaret();
+        OnChanged();
+    }
+
+    /// <summary>The remote side reset the terminal (ESC c), after the reset is done.</summary>
+    public event Action StreamReset;
+
+    /// <summary>
     /// The output of a command starts on a new line at the end of the document: the screen of the remote side begins there with the cursor
     /// at its top left corner, and the caret is the cursor again (what <c>SshTerminalControl.BeginExecution</c> did to its buffer).
     /// </summary>
@@ -664,6 +718,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     void ITerminalHost.ResetFromStream()
     {
         Reset();
+        StreamReset?.Invoke();
     }
 
     void ITerminalHost.MoveForwardBytes(int bytes)

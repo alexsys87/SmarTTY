@@ -80,6 +80,7 @@ internal static class Program
             SearchChecks();
             ThreadingSourceChecks();
             PromptLineChecks();
+            DevicePromptChecks();
         }
         catch (Exception exception)
         {
@@ -614,5 +615,49 @@ internal static class Program
         model.ProcessOutput("x");
         Equal(model.Caret.Line + ":" + model.Caret.Column, "0:1", "a reset gives the caret back to the screen");
         Check(next.Prompt == "$ ", "the prompt");
+    }
+    // The input line of the serial terminal that continues the device's own prompt (PromptLine with the prompt on the screen).
+    private static void DevicePromptChecks()
+    {
+        TerminalDisplayModel model = new TerminalDisplayModel(12, 4);
+        model.ProcessOutput("boot\r\n\u001b[32mroot\u001b[0m# ");
+        int line = model.CursorDocumentLine;
+        Equal(line + ":" + model.CursorPosition.X, "1:6", "the device's cursor after its prompt");
+        Equal(model.Lines.GetLine(1).Cells[0].Foreground, 3, "the prompt has the colour of the device (green)");
+        PromptLine input = new PromptLine(model, line, "root# ", promptOnScreen: true);
+        Check(input.PromptOnScreen && input.StartColumn == 6, "the line starts after the device's prompt");
+        Equal(model.Document.LineCount, 2, "the blank rows below the prompt go");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "1:6", "the caret is after the prompt");
+        input.Insert("ls /etc/x");
+        Equal(model.Document.GetLineText(1) + "|" + model.Document.GetLineText(2), "root# ls /et|c/x", "the text follows the prompt and wraps");
+        Equal(model.Lines.GetLine(1).Cells[0].Foreground, 3, "the prompt keeps the colour of the device");
+        Equal(model.CursorPosition.X + ":" + model.CursorDocumentLine, "6:1", "the device's cursor stays after its prompt");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "2:3", "the caret at the end of the text");
+        Equal(input.IndexOf(new TextDocument.TextPosition(8, 1)), 2, "a place in the text");
+        input.Erase(keepLocalPrompt: false);
+        Equal(model.Document.LineCount + "|" + model.Document.GetLineText(1), "2|root# ", "Erase takes the text away, the device's prompt stays");
+        Equal(model.Lines.GetLine(1).Cells[0].Foreground, 3, "with its colour");
+        model.MoveCursorTo(new GridPoint(6, 1));
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "1:6", "the caret is the device's cursor again");
+        model.ProcessOutput("ls\r\nfile\r\n");
+        Equal(model.Document.GetLineText(1) + "|" + model.Document.GetLineText(2), "root# ls|file", "the device echoes the command after its prompt");
+
+        // A local prompt goes with the text when it is erased.
+        PromptLine local = new PromptLine(model, model.Document.LineCount, "> ");
+        local.Insert("abc");
+        int localLine = local.StartLine;
+        Equal(model.Document.GetLineText(localLine), "> abc", "a local prompt and its text");
+        local.Erase(keepLocalPrompt: false);
+        Equal(model.Document.GetLineText(localLine) + "|" + model.Document.LineCount, "|" + (localLine + 1), "Erase empties the line of a local prompt");
+
+        // A line of the document shorter than the prompt (no trailing blanks kept) is padded.
+        model.ReplaceDocumentTail(0, 5, new[] { "x", "y" });
+        Equal(model.Document.GetLineText(0) + "|" + model.Document.GetLineText(1) + "|" + model.Document.LineCount, "boot x|y|2", "the kept columns are padded and the rows follow");
+
+        // ESC c from the device: the model is reset and tells its owner.
+        int resets = 0;
+        model.StreamReset += () => resets++;
+        model.ProcessOutput("\u001bc");
+        Equal(resets, 1, "ESC c is told after the reset");
     }
 }

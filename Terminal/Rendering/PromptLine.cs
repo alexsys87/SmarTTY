@@ -8,7 +8,7 @@ namespace SmarTTY.Terminal.Rendering;
 /// The command line of the Smart Terminal on a <see cref="TerminalDisplayModel"/>: the prompt and the text typed after it, at the end of the
 /// document, wrapped at the width of the screen, with the caret and a selection inside the text. It is what <c>SshTerminalControl</c> made
 /// of its editor (<c>InputRegion</c>, <c>RewrapInput</c> and the editing commands of the text editor): every change writes the rows again
-/// (<see cref="TerminalDisplayModel.ReplaceDocumentTail"/>), and the places in the text are mapped to the document by <see cref="InputRegionMap"/>.
+/// (<see cref="TerminalDisplayModel.ReplaceDocumentTail(int, IList{string})"/>), and the places in the text are mapped to the document by <see cref="InputRegionMap"/>.
 /// An index is a place in <see cref="Text"/> (0 is the start, <c>Text.Length</c> the end).
 /// </summary>
 internal sealed class PromptLine
@@ -23,12 +23,29 @@ internal sealed class PromptLine
     private int _anchor = -1;
 
     public PromptLine(TerminalDisplayModel model, int startLine, string prompt)
+        : this(model, startLine, prompt, promptOnScreen: false)
+    {
+    }
+
+    /// <summary>
+    /// A command line after <paramref name="prompt"/>. With <paramref name="promptOnScreen"/> the prompt is the text the device has drawn on
+    /// <paramref name="startLine"/> (as many columns as the prompt is long): it is not written again, so it keeps the colours of the device,
+    /// and only what follows it is replaced (what <c>SerialTerminalControl.ReplaceAfterDevicePrompt</c> did).
+    /// </summary>
+    public PromptLine(TerminalDisplayModel model, int startLine, string prompt, bool promptOnScreen)
     {
         _model = model;
         StartLine = startLine;
         Prompt = prompt ?? "";
+        PromptOnScreen = promptOnScreen && Prompt.Length > 0;
         Render();
     }
+
+    /// <summary>The prompt is the device's own text on the screen (see the constructor).</summary>
+    public bool PromptOnScreen { get; }
+
+    /// <summary>The column of the start line where the typed text starts (the length of the prompt).</summary>
+    public int StartColumn => Prompt.Length;
 
     /// <summary>
     /// The text changed: the index where it changed, the length that was replaced and the length that took its place (the completion
@@ -266,8 +283,31 @@ internal sealed class PromptLine
     /// <summary>Writes the rows again (the screen got another width).</summary>
     public void Render()
     {
+        WriteRows(_text);
+        UpdateCaret();
+    }
+
+    /// <summary>
+    /// Takes the typed text off the screen and leaves the prompt: the device's prompt stays as it was drawn, a local prompt goes with the
+    /// text when <paramref name="keepLocalPrompt"/> is false (the old control replaced its whole line then). The caret is left where it was;
+    /// the owner gives it back to the screen.
+    /// </summary>
+    public void Erase(bool keepLocalPrompt)
+    {
+        if (PromptOnScreen || keepLocalPrompt)
+        {
+            WriteRows("");
+        }
+        else
+        {
+            _model.ReplaceDocumentTail(StartLine, new[] { "" });
+        }
+    }
+
+    private void WriteRows(string text)
+    {
         int columns = Math.Max(1, _model.Columns);
-        string all = Prompt + _text;
+        string all = Prompt + text;
         List<string> rows = new List<string>();
         for (int offset = 0; offset < all.Length; offset += columns)
         {
@@ -277,8 +317,16 @@ internal sealed class PromptLine
         {
             rows.Add("");
         }
-        _model.ReplaceDocumentTail(StartLine, rows);
-        UpdateCaret();
+        if (PromptOnScreen && StartColumn < columns)
+        {
+            // The device's prompt stays as the device drew it, only the text after it is written again.
+            rows[0] = rows[0].Substring(Math.Min(StartColumn, rows[0].Length));
+            _model.ReplaceDocumentTail(StartLine, StartColumn, rows);
+        }
+        else
+        {
+            _model.ReplaceDocumentTail(StartLine, rows);
+        }
     }
 
     private void UpdateCaret()
