@@ -776,6 +776,184 @@ internal static class Program
         o.Close();
     }
 
+    // What the editor told, in order: the modified state (its ModifiedChanged event), the view (HexModeChanged) and the format (FormatChanged).
+    private static List<string> RecordEvents(RemoteFileEditor editor)
+    {
+        List<string> events = new List<string>();
+        editor.ModifiedChanged += (sender, modified) => events.Add("modified:" + modified);
+        editor.HexModeChanged += (sender, e) => events.Add("hex:" + editor.IsHexMode);
+        editor.FormatChanged += (sender, e) => events.Add("format");
+        return events;
+    }
+
+    private static string Events(List<string> events)
+    {
+        string text = string.Join(",", events);
+        events.Clear();
+        return text;
+    }
+
+    private static string Caret(RemoteFileEditor editor)
+    {
+        return editor.CaretPosition.Line + ":" + editor.CaretPosition.Column;
+    }
+
+    // The switching between the text and the hex view (stage 3, step 3A: the net before it moves out of the control): what each view shows, which
+    // one can be edited, what the editor tells and in which order, the undo history and the caret kept, the question about bytes the text cannot
+    // hold, saving in either view, a reload and a new encoding while the hex view is open, and the commands that go to the hex view.
+    private static void HexView(Server server)
+    {
+        Console.WriteLine("-- the hex view: switching, editing, saving, reloading");
+        WriteRemote(server, "hex.txt", Bytes("abc\ndef\n"));
+        Opened o = Open(server, "hex.txt");
+        RemoteFileEditor e = o.Editor;
+        List<string> events = RecordEvents(e);
+        Check(e.CanToggleHexMode && !e.IsHexMode, "a loaded file can be shown as bytes");
+
+        e.ToggleHexMode();
+        Equal(Events(events), "modified:False,hex:True,format", "opening the hex view tells the modified state, the view and the format, in this order");
+        Check(e.IsHexMode && e.HexEditor.Visible && !e.HexEditor.ReadOnly && e.ReadOnly, "the hex view is shown and can be edited, the text is read-only");
+        SameBytes(e.HexEditor.Document.ToArray(), Bytes("abc\ndef\n"), "the hex view shows the bytes of the file");
+        Check(!e.IsModified, "a file that was not changed is not modified in the hex view");
+        e.ToggleHexMode();
+        Equal(Events(events), "modified:False,hex:False,format", "closing it tells the same, in the same order");
+        Check(!e.IsHexMode && !e.HexEditor.Visible && e.HexEditor.ReadOnly && !e.ReadOnly, "the text is shown and can be edited again, the hex view is read-only");
+        Equal(Text(o), "abc\ndef\n", "the text is the one before");
+        Check(!e.IsModified, "and it is not modified");
+
+        // An edited text: the hex view shows its bytes, and going back keeps the text, its undo history and the caret.
+        Replace(o, 0, "abc", "ABC");
+        e.SetCaret(new TextDocument.TextPosition(2, 1));
+        events.Clear();
+        e.ToggleHexMode();
+        Equal(Events(events), "modified:True,hex:True,format", "the hex view of an edited text is modified");
+        SameBytes(e.HexEditor.Document.ToArray(), Bytes("ABC\ndef\n"), "an edited text is shown as its bytes in the encoding of the file");
+        HexDocument shown = e.HexEditor.Document;
+        e.ToggleHexMode();
+        Equal(Events(events), "modified:True,hex:False,format", "back in the text: modified");
+        Equal(Text(o), "ABC\ndef\n", "the edited text is back");
+        Check(e.IsModified && e.CanUndo, "it is modified and its undo history is kept");
+        Equal(Caret(e), "1:2", "the caret is where it was");
+
+        // The same text again: the same hex document, with its own undo history. A change of the bytes makes a new text when the view closes:
+        // its line breaks are found again, the caret is brought into the shorter line, and the undo history of the text is gone.
+        e.SetCaret(new TextDocument.TextPosition(3, 1));
+        e.ToggleHexMode();
+        Check(ReferenceEquals(e.HexEditor.Document, shown), "the hex view of a text that did not change is the same document");
+        e.HexEditor.Document.Replace(4, 3, Bytes("D\r"));
+        Check(e.IsModified && e.HexEditor.Document.CanUndo, "a change of the bytes is modified and can be undone");
+        events.Clear();
+        e.ToggleHexMode();
+        Equal(Events(events), "modified:True,hex:False,format", "back in the text after a change of the bytes");
+        Equal(Text(o), "ABC\nD\r\n", "the text is made of the changed bytes");
+        Equal(e.LineEndings, LineEndingKind.Mixed, "and its line breaks are found again (LF and CRLF)");
+        Check(e.IsModified && !e.CanUndo, "it is modified and is a new document, without the undo history of the text");
+        Equal(Caret(e), "1:1", "the caret is brought into the line, which is shorter now");
+
+        // A byte that is not UTF-8: the text could not hold it, so the editor asks.
+        e.ToggleHexMode();
+        Check(ReferenceEquals(e.HexEditor.Document, shown), "the hex view of the text made from it is that document again");
+        e.HexEditor.Document.ReplaceByte(0, 0xFF);
+        Prompted(server, "lossy no", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.No : (DialogResult?)null, () => e.ToggleHexMode());
+        string lossy = OnlyPrompt(server, "bytes that are not UTF-8");
+        Check(lossy.Contains("Not all bytes can be shown as text in UTF-8") && lossy.Contains("Show the bytes as text anyway?"), "the editor says that the bytes cannot be shown as text and asks");
+        Check(e.IsHexMode && e.HexEditor.Visible, "answered No: the hex view stays");
+        Prompted(server, "lossy yes", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.Yes : (DialogResult?)null, () => e.ToggleHexMode());
+        Check(!e.IsHexMode, "answered Yes: the text is shown");
+        Equal(Text(o), "\uFFFDBC\nD\r\n", "the byte that is not UTF-8 is shown as U+FFFD");
+        // Saved before it is edited, the text is written as the bytes of the hex view, and no question about the CRLF is asked.
+        Prompted(server, "exact bytes", (text, buttons) => null, () => Save(o));
+        NoPrompt(server, "a save of the text made from the hex view");
+        SameBytes(ReadRemote(server, "hex.txt"), Concat(new byte[] { 0xFF }, Bytes("BC\nD\r\n")), "the file gets the bytes of the hex view, not the text");
+        Check(!e.IsModified, "the text is saved");
+        e.ToggleHexMode();
+        Check(ReferenceEquals(e.HexEditor.Document, shown) && !e.IsModified, "the hex view of those bytes is saved too");
+
+        // A save in the hex view writes its bytes.
+        e.HexEditor.Document.ReplaceByte(0, (byte)'a');
+        Check(e.IsModified, "a changed byte modifies the editor");
+        Prompted(server, "hex save", (text, buttons) => null, () => Save(o));
+        NoPrompt(server, "a save in the hex view");
+        SameBytes(ReadRemote(server, "hex.txt"), Bytes("aBC\nD\r\n"), "a save in the hex view writes its bytes");
+        Check(e.IsHexMode && !e.IsModified, "the hex view stays and is saved");
+        e.IsModified = true;
+        Check(e.IsModified && e.HexEditor.Document.IsModified, "the modified state that is set goes to the hex document");
+        e.IsModified = false;
+        Check(!e.IsModified && !e.HexEditor.Document.IsModified, "and so does the saved state");
+        e.ToggleHexMode();
+        // Recorded as it is (a fault, see the pull request of 3A): the bytes are those of the file, so the text from before the hex view is shown.
+        Equal(Text(o), "\uFFFDBC\nD\r\n", "back in the text after a save in the hex view: the text from before the hex view");
+        Check(!e.IsModified, "not modified");
+
+        // A reload started in the hex view opens it again on the new bytes, at the same offset.
+        e.ToggleHexMode();
+        e.HexEditor.GoToOffset(3);
+        Thread.Sleep(1100);
+        WriteRemote(server, "hex.txt", Bytes("reloaded bytes\n"));
+        events.Clear();
+        e.Reload();
+        Check(e.HexEditor.ReadOnly && e.ReadOnly && !e.CanSave && !e.CanToggleHexMode, "while the file is loaded again neither view can be edited");
+        Pump(() => e.CanSave, "the file to be loaded again");
+        Settle(server);
+        Check(e.IsHexMode && e.HexEditor.Visible && !e.HexEditor.ReadOnly, "the hex view is open again");
+        SameBytes(e.HexEditor.Document.ToArray(), Bytes("reloaded bytes\n"), "on the bytes that are on the server now");
+        Equal(e.HexEditor.CaretOffset, 3, "at the same offset");
+        Check(!e.IsModified, "not modified");
+        Equal(Text(o), "reloaded bytes\n", "the text behind it is the new file");
+        Equal(Events(events), "format,hex:False,format,modified:False,hex:True,format", "a reload in the hex view tells the format, the text view, the format, then the modified state, the hex view and the format");
+
+        // The encoding and the line breaks are not changed in the hex view; Select all and Delete are the hex view's.
+        e.SetSaveEncoding(TextFileEncodings.Utf8Bom);
+        e.SetLineEnding(TextDocument.LineEnding.CrLf);
+        Check(e.FileEncoding == TextFileEncodings.Utf8 && e.LineEndings == LineEndingKind.Lf && !e.IsModified, "the encoding and the line breaks cannot be changed in the hex view");
+        e.SelectAllText();
+        Equal(e.HexEditor.SelectionLength, 15, "Select all selects the bytes");
+        e.DeleteSelection();
+        Equal(e.HexEditor.Document.Length, 0, "Delete removes them");
+        Check(e.IsModified, "which modifies the editor");
+        e.HexEditor.Document.Undo();
+        Check(!e.IsModified && e.HexEditor.Document.Length == 15, "undo in the hex view brings them back");
+
+        // Reading the file again in another encoding leaves the hex view.
+        events.Clear();
+        e.ReopenWithEncoding(TextFileEncodings.Windows1251);
+        Equal(Events(events), "hex:False,format", "a new encoding in the hex view tells the text view and the format");
+        Check(!e.IsHexMode && !e.HexEditor.Visible && e.HexEditor.Length == 0 && !ReferenceEquals(e.HexEditor.Document, shown), "and forgets the hex view (it shows an empty document)");
+        Check(e.FileEncoding == TextFileEncodings.Windows1251 && !e.IsModified, "the file is read in the encoding that was chosen");
+
+        // Not here: a text that the encoding cannot store (the editor says so and stays in the text), because the encodings of Mono do not
+        // throw for such a letter; RemoteFileContentTests has it.
+        o.Close();
+    }
+
+    // The draft of the bytes of the hex view comes back in the hex view.
+    private static void HexDraft(Server server)
+    {
+        Console.WriteLine("-- the draft of the hex view");
+        WriteRemote(server, "hexdraft.bin", Bytes("0123\n"));
+        Opened o = Open(server, "hexdraft.bin");
+        o.Editor.ToggleHexMode();
+        o.Editor.HexEditor.Document.ReplaceByte(1, 0x80);
+        Stopwatch wait = Stopwatch.StartNew();
+        while (wait.Elapsed < TimeSpan.FromSeconds(13))
+        {
+            Application.DoEvents();
+            Thread.Sleep(20);
+        }
+        o.Close();
+        Thread.Sleep(500);
+        o = null;
+        Prompted(server, "hex draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogResult.Yes : (DialogResult?)null, () => o = Open(server, "hexdraft.bin"));
+        OnlyPrompt(server, "a file with a draft of the hex view");
+        Check(o.Editor.IsHexMode && o.Editor.HexEditor.Visible, "answered Yes: the draft of the bytes is shown in the hex view");
+        SameBytes(o.Editor.HexEditor.Document.ToArray(), new byte[] { (byte)'0', 0x80, (byte)'2', (byte)'3', (byte)'\n' }, "with the bytes of the draft");
+        Check(o.Editor.IsModified, "as an unsaved change");
+        Equal(Text(o), "0123\n", "the text behind it is the file");
+        o.Editor.DiscardDraft();
+        o.Close();
+        Thread.Sleep(500);
+    }
+
     // The SSH layer drops the connection now and then after a transfer or a command (see Settle); that is not what is checked here. A scenario
     // that was cut short by it starts again, on a new connection and in a directory of its own. A scenario that fails the same way every
     // time, or that fails for any other reason, fails the run.
@@ -837,6 +1015,8 @@ internal static class Program
         RunScenario(server, "validation", Validation);
         RunScenario(server, "service-reload", ServiceReload);
         RunScenario(server, "drafts", Drafts);
+        RunScenario(server, "hex-view", HexView);
+        RunScenario(server, "hex-draft", HexDraft);
     }
 
     private static void RunServer(string name, string host, int port, string user, string password)
