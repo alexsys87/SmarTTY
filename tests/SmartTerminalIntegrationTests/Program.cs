@@ -987,6 +987,90 @@ internal static class Program
             Done = () => InputText(terminal) == "cd",
             TimeoutMs = 3000
         };
+        // The edits made while walking (InputLine.NavigateHistory): those of a recalled command are kept, an emptied line is not, and the typed
+        // line (entry 0) is the one the prefix is taken from.
+        yield return new Step
+        {
+            Name = "Up recalls the newest command that starts with the typed text, to be edited",
+            Act = () => Key(terminal, Keys.Up),
+            Done = () => InputText(terminal) == "cd -",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the recalled command is edited",
+            Act = () => Type(terminal, "x"),
+            Done = () => InputText(terminal) == "cd -x",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Down brings the typed text back",
+            Act = () => Key(terminal, Keys.Down),
+            Done = () => InputText(terminal) == "cd",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Up shows the edited command, the edit is kept",
+            Act = () => Key(terminal, Keys.Up),
+            Done = () => InputText(terminal) == "cd -x",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "an emptied recalled line is not kept: Down and Up bring the edited command back",
+            Act = () =>
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    Key(terminal, Keys.Back);
+                }
+                Key(terminal, Keys.Down);
+            },
+            Done = () => InputText(terminal) == "cd",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "and Up shows the edited command again",
+            Act = () => Key(terminal, Keys.Up),
+            Done = () => InputText(terminal) == "cd -x",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the typed text is edited after Down: the prefix is the new text",
+            Act = () =>
+            {
+                Key(terminal, Keys.Down);
+                Type(terminal, "q");
+                Key(terminal, Keys.Up);
+            },
+            Done = () => InputText(terminal) == "cdq",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "and with the letter taken off again Up finds the edited command",
+            Act = () =>
+            {
+                Key(terminal, Keys.Back);
+                Key(terminal, Keys.Up);
+            },
+            Done = () => InputText(terminal) == "cd -x",
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the typed text comes back for the steps that follow",
+            Act = () =>
+            {
+                Key(terminal, Keys.Down);
+            },
+            Done = () => InputText(terminal) == "cd",
+            TimeoutMs = 3000
+        };
         yield return new Step
         {
             Name = "with the option off Up shows the newest command whatever was typed",

@@ -273,6 +273,9 @@ jobs:
       - name: Run local completion checks (the built-in commands, the programs of PATH, the names of a device directory, the rules of a word)
         run: dotnet run --project tests/LocalCompletionItemsTests -c Release
 
+      - name: Run history walk checks (Up and Down through the history of a line edited in place, the edits kept on the way)
+        run: dotnet run --project tests/HistoryWalkTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 

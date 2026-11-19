@@ -114,9 +114,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
         private readonly SshTerminalControl _terminal;
 
-        private List<string> _history;
-
-        private int _historyIndex;
+        private readonly HistoryWalk _walk = new HistoryWalk();
 
         public TextDocument.TextPosition StartPosition => Region.StartPosition;
 
@@ -163,30 +161,14 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         /// </summary>
         public void NavigateHistory(bool older, bool byPrefix)
         {
-            string text = this.Text ?? "";
-            if (_history == null)
-            {
-                _history = BuildHistory();
-                _history.Remove(text);
-                _history.Insert(0, text);
-                _historyIndex = 0;
-            }
-            else if (_historyIndex >= 0 && _historyIndex < _history.Count && (_historyIndex == 0 || text != ""))
-            {
-                // Edits of the line being typed (entry 0) and of recalled commands are kept while navigating.
-                _history[_historyIndex] = text;
-            }
-            // Like bash, Up stops at the oldest command and Down at the line being typed: wrapping around used to
-            // replace the typed line with the oldest command when Down was pressed at the prompt.
-            int newIndex = HistorySuggestion.StepByPrefix(_history, _historyIndex, older, byPrefix ? _history[0] : "");
-            if (newIndex < 0)
+            string shown = _walk.Step(this.Text, older, byPrefix, BuildHistory);
+            if (shown == null)
             {
                 return;
             }
-            _historyIndex = newIndex;
             try
             {
-                SetText(_history[_historyIndex]);
+                SetText(shown);
             }
             catch
             {
@@ -201,8 +183,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         /// <summary>Up/Down start again from the current history (some commands were removed from it).</summary>
         public void ResetHistory()
         {
-            _history = null;
-            _historyIndex = 0;
+            _walk.Reset();
         }
     }
 
