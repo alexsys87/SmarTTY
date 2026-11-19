@@ -547,8 +547,8 @@ internal static class Program
         yield return Run(terminal, "export SM_ENV_A=one", null, "a variable is exported");
         yield return Run(terminal, "export SM_ENV_B=$SM_ENV_A-two", null, "a variable that refers to an earlier one is kept as it was typed");
         yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[one-two]", "and it is worked out after the earlier one");
-        yield return Run(terminal, "export SM_ENV_A=three", null, "a variable that is set again replaces the old value");
-        yield return Run(terminal, "echo \"[$SM_ENV_A][$SM_ENV_B]\"", "[three][-two]", "and goes to the end of the list: the one that refers to it is worked out before it");
+        yield return Run(terminal, "export SM_ENV_A=three", null, "a variable that is set again gets the new value");
+        yield return Run(terminal, "echo \"[$SM_ENV_A][$SM_ENV_B]\"", "[three][one-two]", "and the one that was set from it keeps the value the other had then, as in a shell");
         yield return Run(terminal, "unset SM_ENV_B", null, "unset is kept");
         yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[]", "an unset variable is gone from the next command");
         yield return Check("the tab has an environment, and its names are those that have a value", () => terminal.HasEnvironment && terminal.EnvironmentNames.Contains("SM_ENV_A") && !terminal.EnvironmentNames.Contains("SM_ENV_B") && terminal.EnvironmentNames.Contains("SMARTTY_UNIQUE_VAR"));
@@ -968,31 +968,26 @@ internal static class Program
             Done = () => CaretIndex(terminal) == 0,
             TimeoutMs = 3000
         };
-        // At the end of a row the caret and the start of the next row are the same index of the text: a press of Right there moves the caret to the
-        // start of the next row and the index stays (recorded as it is). Which presses those are depends on the width of the screen, so the checks are
-        // on what each press does, not on the number of the row.
+        // At the end of a row the caret and the start of the next row are the same index of the text: Right and Left move by one index, so no press is
+        // spent on going from the one place to the other. Which presses cross a row depends on the width of the screen, so the checks are on what each
+        // press does, not on the number of the row.
         int stays = 0;
         string wrongStep = null;
         yield return new Step
         {
-            Name = "Right goes on across the rows of the line: the index grows by one, or stays when the caret goes to the start of the next row",
+            Name = "Right goes on across the rows of the line: the index grows by one with every press",
             Act = () =>
             {
                 for (int i = 0; i < 250; i++)
                 {
                     int before = CaretIndex(terminal);
-                    int lineBefore = terminal.CaretPosition.Line;
                     Key(terminal, Keys.Right);
                     int after = CaretIndex(terminal);
                     if (after == before)
                     {
                         stays++;
-                        if (terminal.CaretPosition.Column != 0 || terminal.CaretPosition.Line != lineBefore + 1)
-                        {
-                            wrongStep = "the index stayed but the caret is at " + terminal.CaretPosition.Column + "," + terminal.CaretPosition.Line + " after " + lineBefore;
-                        }
                     }
-                    else if (after != before + 1)
+                    if (after != before + 1)
                     {
                         wrongStep = "the index went from " + before + " to " + after;
                     }
@@ -1004,7 +999,7 @@ internal static class Program
                 {
                     Console.WriteLine("  " + wrongStep);
                 }
-                return wrongStep == null && stays >= 1 && CaretIndex(terminal) == 250 - stays;
+                return wrongStep == null && stays == 0 && CaretIndex(terminal) == 250;
             },
             TimeoutMs = 3000
         };
@@ -1024,15 +1019,29 @@ internal static class Program
         };
         yield return new Step
         {
-            Name = "Left goes back across the rows",
+            Name = "Left goes back across the rows: the index falls by one with every press",
             Act = () =>
             {
+                wrongStep = null;
                 for (int i = 0; i < 250; i++)
                 {
+                    int before = CaretIndex(terminal);
                     Key(terminal, Keys.Left);
+                    int after = CaretIndex(terminal);
+                    if (after != before - 1)
+                    {
+                        wrongStep = "the index went from " + before + " to " + after;
+                    }
                 }
             },
-            Done = () => CaretIndex(terminal) == 0,
+            Done = () =>
+            {
+                if (wrongStep != null)
+                {
+                    Console.WriteLine("  " + wrongStep);
+                }
+                return wrongStep == null && CaretIndex(terminal) == 0;
+            },
             TimeoutMs = 5000
         };
         yield return new Step

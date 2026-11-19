@@ -7,7 +7,7 @@ public static class CsiParameters
 {
     /// <summary>
     /// The parameters as numbers: one for each of the items or each of the defaults, whichever are more. An item that is missing or is not a number
-    /// is the default of its place.
+    /// is the default of its place, or 0 when there is no default for its place (more items than defaults, as in ESC [ ; ; ; ; H).
     /// </summary>
     public static int[] Parse(string[] items, params int[] defaults)
     {
@@ -16,7 +16,7 @@ public static class CsiParameters
         {
             if (parameterIndex >= items.Length || !int.TryParse(items[parameterIndex], out parameters[parameterIndex]))
             {
-                parameters[parameterIndex] = defaults[parameterIndex];
+                parameters[parameterIndex] = parameterIndex < defaults.Length ? defaults[parameterIndex] : 0;
             }
         }
         return parameters;

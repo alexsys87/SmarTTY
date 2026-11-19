@@ -93,15 +93,17 @@ public sealed class NetconsoleLineInput
 
     /// <summary>
     /// What is typed or pasted into the terminal itself: letters and tabs go into the box, Enter sends the line, Backspace edits it; the other control
-    /// characters (Ctrl+C) go to the device at once, as one write after the rest.
+    /// characters (Ctrl+C) go to the device at once, as one write after the rest. An escape sequence (a cursor key, Ctrl+Right, Alt+a key) goes as a whole:
+    /// ESC [ ... and its final character, ESC O and one character, ESC and a printable character.
     /// </summary>
     public void Process(string text)
     {
         StringBuilder printable = new StringBuilder();
         List<byte> direct = new List<byte>();
         char previous = '\0';
-        foreach (char c in text)
+        for (int position = 0; position < text.Length; position++)
         {
+            char c = text[position];
             char current = c;
             bool pairedLineFeed = current == '\n' && previous == '\r';
             previous = current;
@@ -130,6 +132,13 @@ public sealed class NetconsoleLineInput
             {
                 printable.Append(c);
             }
+            else if (c == '\u001b')
+            {
+                int length = EscapeSequenceLength(text, position);
+                direct.AddRange(_host.Encode(text.Substring(position, length)));
+                position += length - 1;
+                previous = text[position];
+            }
             else
             {
                 direct.AddRange(_host.Encode(c.ToString()));
@@ -140,6 +149,33 @@ public sealed class NetconsoleLineInput
         {
             _host.SendBytes(direct.ToArray());
         }
+    }
+
+    // The number of characters of the escape sequence that starts with the ESC at position: CSI (ESC [, parameters, intermediate characters, a final character
+    // from @ to ~; one that is not complete takes the rest of the text), SS3 (ESC O and a character), ESC and a printable character (Alt and a key), or the ESC alone.
+    private static int EscapeSequenceLength(string text, int position)
+    {
+        int next = position + 1;
+        if (next >= text.Length)
+        {
+            return 1;
+        }
+        char kind = text[next];
+        if (kind == '[')
+        {
+            int end = next + 1;
+            while (end < text.Length && text[end] >= ' ' && text[end] <= '?')
+            {
+                end++;
+            }
+            // The final character; a sequence that is cut short takes what there is.
+            return end < text.Length && text[end] >= '@' && text[end] <= '~' ? end - position + 1 : end - position;
+        }
+        if (kind == 'O')
+        {
+            return next + 1 < text.Length && !char.IsControl(text[next + 1]) ? 3 : 2;
+        }
+        return char.IsControl(kind) ? 1 : 2;
     }
 
     private void AppendToInput(string text)

@@ -113,21 +113,13 @@ internal static class Program
         Equal(string.Join(",", CsiParameters.Parse(new[] { "1", "2", "3" }, 1, 1)), "1,2,3", "more numbers than defaults are all read");
         Equal(string.Join(",", CsiParameters.Parse(new[] { "1", "2", "3" })), "1,2,3", "...also with no defaults at all");
 
-        // A known fault, kept as it was: an item past the defaults that is empty or not a number wants a default that is not there
-        // (ESC [ ; ; ; ; H, a cursor position with five empty items).
-        foreach (string[] items in new[] { new[] { "", "", "", "", "" }, new[] { "1", "2", "x" }, new[] { "1", "2", "3", "" } })
-        {
-            bool threw = false;
-            try
-            {
-                CsiParameters.Parse(items, 1, 1);
-            }
-            catch (IndexOutOfRangeException)
-            {
-                threw = true;
-            }
-            Check(threw, "an item past the defaults that is empty or not a number reads past the end: '" + string.Join(";", items) + "'");
-        }
+        // An item past the defaults that is empty or not a number has no default to take: it is 0 (ESC [ ; ; ; ; H, a cursor position with five
+        // empty items, used to read past the end of the defaults and throw).
+        Equal(string.Join(",", CsiParameters.Parse(new[] { "", "", "", "", "" }, 1, 1)), "1,1,0,0,0", "empty items past the defaults are 0");
+        Equal(string.Join(",", CsiParameters.Parse(new[] { "1", "2", "x" }, 1, 1)), "1,2,0", "an item past the defaults that is not a number is 0");
+        Equal(string.Join(",", CsiParameters.Parse(new[] { "1", "2", "3", "" }, 1, 1)), "1,2,3,0", "an empty item at the end is 0");
+        Equal(string.Join(",", CsiParameters.Parse(new[] { "", "" })), "0,0", "with no defaults at all empty items are 0");
+        Equal(string.Join(",", CsiParameters.Parse(new[] { "", "7", "" }, 5)), "5,7,0", "the default of a place is used where there is one");
     }
 
     private static void Modes()

@@ -691,18 +691,11 @@ internal static class Program
         Equal(pending.Modes.IncompleteEscape, "\u001b[1", "a null chunk with a kept sequence: the sequence is still not complete, and is kept");
         Equal(new Rig().Process(null), "", "a null chunk with nothing kept does not even begin a batch");
 
+        // A cursor position with empty items past the two it takes (ESC [ ; ; ; ; H) used to throw out of the loop; the extra items are ignored.
         Rig crash = new Rig();
-        bool threw = false;
-        try
-        {
-            crash.Process("a\u001b[;;;;Hb");
-        }
-        catch (IndexOutOfRangeException)
-        {
-            threw = true;
-        }
-        Check(threw, "the known fault of a cursor position with empty items still throws out of the loop");
-        Equal(string.Join("; ", Order), "begin; out 'a'; end", "...and the batch is ended all the same");
+        crash.Screen.Cursor = new GridPoint(10, 5);
+        Equal(crash.Process("a\u001b[;;;;Hb"), "begin; out 'a'; out 'b'; end", "a cursor position with empty items past the second does not throw and the text goes on");
+        Check(crash.Screen.Cursor.X == 0 && crash.Screen.Cursor.Y == 0, "...it went home (the first two items are the defaults, 1;1)");
     }
 
     private static string Text(byte[] bytes)

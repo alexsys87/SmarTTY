@@ -1386,6 +1386,19 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost, IL
 
         if (_inputLine != null)
         {
+            if ((caretMove == CaretMove.Left || caretMove == CaretMove.Right) && _visibleColumns > 0 && !_caretClampedFromOutput)
+            {
+                // The end of a wrapped row and the start of the next one are the same index of the text: Left and Right move by one index, so that no press is
+                // spent on going from the one place to the other (the base moves by columns and rows).
+                int block = textPosition.Line - _inputLine.StartLine;
+                int blocks = Math.Max(1, (_inputLine.Prompt.Length + _inputLine.Text.Length + _visibleColumns - 1) / _visibleColumns);
+                int index = block * _visibleColumns + Math.Max(0, textPosition.Column) - _inputLine.Prompt.Length;
+                if (block >= 0 && block <= blocks && index >= 0 && index <= _inputLine.Text.Length)
+                {
+                    movedPosition = GetCaretPositionFromInputIndex(caretMove == CaretMove.Right ? Math.Min(index + 1, _inputLine.Text.Length) : Math.Max(index - 1, 0));
+                }
+            }
+
             // Prevent moving caret before the prompt
             if (movedPosition < _inputLine.StartPosition)
             {

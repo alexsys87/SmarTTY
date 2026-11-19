@@ -5060,11 +5060,11 @@ paste a\u000d\u000ab -> Paste:a\u000ab  asked paste: 2 lines, 3 characters. The 
 TypeText -> Typed:ls\u000d 
 by character: same
 === csi parameter limits
-size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
 style fg1 bg0
 sent 
-threw 0:IndexOutOfRangeException
-000|ab|1+1[fg1 bg0] of 80
+threw 
+000|cb|0+2[fg1 bg0] of 80
 clicks 
 key Up handled 1 suppress 1 -> KeySequence:\u001b[A 
 key Down handled 1 suppress 1 -> KeySequence:\u001b[B 
@@ -5096,7 +5096,7 @@ paste one -> Paste:one
 paste two\u000alines -> Paste:two\u000alines  asked paste: 2 lines, 9 characters. The line breaks run the lines one after another as soon as they are pasted. / two\u000d\u000alines /  [dontAsk True]
 paste a\u000d\u000ab -> Paste:a\u000ab  asked paste: 2 lines, 3 characters. The line breaks run the lines one after another as soon as they are pasted. / a\u000d\u000ab /  [dontAsk True]
 TypeText -> Typed:ls\u000d 
-by character: DIFFERENT f4ff44dcd984da0368e8e4dcf447c3479f1a0e95
+by character: same
 === csi huge repeat
 size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
 style fg0 bg0
