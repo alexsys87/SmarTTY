@@ -740,7 +740,7 @@
 === csi with intermediates
 000|none
 === csi parameter limits
-000|1-2 fg=#FF000000 bg=null; 
+000|0-2 fg=#FF000000 bg=null; 
 === csi huge repeat
 000|none
 001|none
