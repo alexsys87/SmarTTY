@@ -83,14 +83,10 @@ internal sealed class LocalCompletionSession : IDisposable
             {
                 // The user's own commands and the saved history, matched by what is already typed.
                 itemsList.AddRange(_host.GetSuggestedCommandItems());
-            }
-
-            if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
-            {
                 // Built-in local commands
                 _itemsDirectory = "";
                 itemsList.AddRange(LocalCompletionItems.GetBuiltInCommands());
-                // Local executables from PATH
+                // Local executables from PATH (the ones that start with what is typed)
                 itemsList.AddRange(LocalCompletionItems.GetLocalExecutables(filterText));
             }
             else if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)

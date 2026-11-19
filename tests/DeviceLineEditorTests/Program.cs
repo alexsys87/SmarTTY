@@ -220,6 +220,12 @@ internal static class Program
             IsBackground = true
         }.Start();
 
+        // The programs of this computer that the completion offers are the ones of PATH: it holds one folder with one program, so the checks do not depend on what is installed.
+        string programDirectory0 = Path.Combine(Path.GetTempPath(), "devline-path-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(programDirectory0);
+        File.WriteAllText(Path.Combine(programDirectory0, "zqprog.sh"), "");
+        Environment.SetEnvironmentVariable("PATH", programDirectory0);
+
         // The saved history of the device goes next to the program (portable mode), not into the profile of the user.
         string programDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         File.WriteAllText(Path.Combine(programDirectory, "portable.txt"), "");
@@ -604,15 +610,38 @@ internal static class Program
             },
             new Step
             {
-                // Only the saved commands match a word that has letters in it: the built-in ones are offered for an empty word.
-                Name = "Tab after the start of a built-in command offers nothing and leaves the line",
+                // A program of this computer is offered for the start of its name too.
+                Name = "Tab after the start of a program of this computer completes it",
                 Act = () =>
                 {
                     ClearLine(terminal);
-                    Type(terminal, "hel");
+                    Type(terminal, "zqpr");
                     Key(terminal, Keys.Tab);
                 },
-                Done = () => _popup != null && _popup.Filter == "hel" && _popup.Items.Length == 0 && InputText(terminal) == "hel"
+                Done = () => InputText(terminal) == "zqprog"
+            },
+            new Step
+            {
+                Name = "the line is cleared after the program completion",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                },
+                Done = () => InputText(terminal) == ""
+            },
+            new Step
+            {
+                // The built-in commands are offered for a word that has letters in it too; the only one that starts with it is applied
+                // (sendhex: no program of this computer starts with "sendh").
+                Name = "Tab after the start of a built-in command completes it",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "sendh");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => InputText(terminal) == "sendhex"
             },
             new Step
             {
@@ -819,7 +848,8 @@ internal static class Program
             },
             new Step
             {
-                // The only directory of /etc is applied at once (the best match is taken when the list is there), and the list is gone after it.
+                // The only directory of /etc is applied at once (the best match is taken when the list is there). A directory that was applied starts a completion
+                // again; the popup it asks for is for the word "cd" (not looked at here).
                 Name = "Tab after \"cd /etc/\" asks the device for the directory, offers its directories only and applies the only one",
                 Act = () =>
                 {
@@ -827,7 +857,7 @@ internal static class Program
                     Type(terminal, "cd /etc/");
                     Key(terminal, Keys.Tab);
                 },
-                Done = () => PopupTexts() == "" && InputText(terminal) == "cd /etc/init.d/" && terminal.HasInputLine
+                Done = () => InputText(terminal) == "cd /etc/init.d/" && terminal.HasInputLine
             },
             new Step
             {

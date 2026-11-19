@@ -127,23 +127,34 @@ internal static class Program
         host = new FakeHost { Suggested = new List<CompletionItem> { Item("help me"), Item("other"), Item("Hello") } };
         popup = new FakePopup();
         session = new LocalCompletionSession(host, "he", CompletionTarget.Command, 0, 2, popup, false);
-        Equal(Join(popup.Items), "help me|Hello", "for a word that has letters only the saved commands that start with it are offered, whatever the case");
+        Check(popup.Items.Count >= 3 && popup.Items[0] == "help me" && popup.Items[1] == "Hello", "for a word that has letters the saved commands that start with it come first, whatever the case");
+        Check(popup.Items.Contains("help") && !popup.Items.Contains("other") && !popup.Items.Contains("settings"), "then the built-in commands that start with it (and the programs of this computer that do), and nothing else");
+        Check(popup.Items.All((string item) => item.StartsWith("he", StringComparison.OrdinalIgnoreCase)), "everything offered starts with the typed letters");
         Equal(popup.Filter, "he", "with the word as the filter");
 
         // A quoted word is matched without its quotes.
         host = new FakeHost { Suggested = new List<CompletionItem> { Item("help me") } };
         popup = new FakePopup();
         session = new LocalCompletionSession(host, "'he", CompletionTarget.Command, 0, 3, popup, false);
-        Equal(Join(popup.Items), "help me", "a quote in front of the word is not part of what is matched");
+        Check(popup.Items.Count >= 2 && popup.Items[0] == "help me" && popup.Items.Contains("help"), "a quote in front of the word is not part of what is matched (a saved command and a built-in one start with it)");
         Equal(popup.Filter, "he", "nor of the filter");
 
         // Auto-apply: a single match is applied when the list is shown from the window thread.
-        host = new FakeHost { Suggested = new List<CompletionItem> { new CompletionItem { Text = "reboot now", InsertText = "reboot now" } } };
+        host = new FakeHost { Suggested = new List<CompletionItem> { new CompletionItem { Text = "zqboot now", InsertText = "zqboot now" } } };
         popup = new FakePopup();
-        session = new LocalCompletionSession(host, "reb", CompletionTarget.Command, 0, 3, popup, true);
+        session = new LocalCompletionSession(host, "zqb", CompletionTarget.Command, 0, 3, popup, true);
         List<CompletionSession.AppliedEventArgs> applied = Applied(session);
         host.RunPosted();
-        Check(applied.Count == 1 && applied[0].NewText == "reboot now" && applied[0].CaretIndex == 10 && !applied[0].Commit && !applied[0].IsDirectory, "a single match is applied without committing, the caret after it");
+        Check(applied.Count == 1 && applied[0].NewText == "zqboot now" && applied[0].CaretIndex == 10 && !applied[0].Commit && !applied[0].IsDirectory, "a single match is applied without committing, the caret after it");
+
+        // The start of a built-in command is completed (Tab used to offer nothing for a word that has letters in it).
+        host = new FakeHost();
+        popup = new FakePopup();
+        session = new LocalCompletionSession(host, "sendh", CompletionTarget.Command, 0, 5, popup, true);
+        applied = Applied(session);
+        Equal(Join(popup.Items), "sendhex", "the start of a built-in command offers it");
+        host.RunPosted();
+        Check(applied.Count == 1 && applied[0].NewText == "sendhex" && applied[0].CaretIndex == 7, "and the only match is applied");
 
         // The list cannot be made.
         host = new FakeHost { SuggestedThrows = true };
@@ -154,20 +165,20 @@ internal static class Program
 
     private static void TextChangeChecks()
     {
-        FakeHost host = new FakeHost { Suggested = new List<CompletionItem> { Item("reboot"), Item("rename"), Item("ls") } };
+        FakeHost host = new FakeHost { Suggested = new List<CompletionItem> { Item("zqboot"), Item("zqname"), Item("ls") } };
         FakePopup popup = new FakePopup();
-        LocalCompletionSession session = new LocalCompletionSession(host, "re", CompletionTarget.Command, 0, 2, popup, false);
-        Equal(Join(popup.Items), "reboot|rename", "the words that start with the typed letters");
-        Equal(session.OnTextChanged("reb", 2, 0, 1), false, "a letter typed at the end of the word goes on");
-        Equal(Join(popup.Items), "reboot", "the list follows it");
-        Equal(popup.Filter, "reb", "and so does the filter");
-        Equal(session.OnTextChanged("re", 2, 1, 0), false, "a letter taken out goes on");
-        Equal(Join(popup.Items), "reboot|rename", "the list is wider again");
-        Equal(session.OnTextChanged("re x", 3, 0, 1), true, "an edit after the end of the word ends the session");
-        Equal(session.OnTextChanged("r", 1, 3, 0), true, "an edit that starts inside the word and reaches past its end ends the session");
-        Equal(session.OnTextChanged("re", 0, 0, 0), false, "an edit at the start of the word is inside it");
-        Equal(session.OnTextChanged("xre", 0, 0, 1) , false, "a letter put in front of the word is inside it");
-        Equal(popup.Filter, "xre", "the word is longer");
+        LocalCompletionSession session = new LocalCompletionSession(host, "zq", CompletionTarget.Command, 0, 2, popup, false);
+        Equal(Join(popup.Items), "zqboot|zqname", "the words that start with the typed letters");
+        Equal(session.OnTextChanged("zqb", 2, 0, 1), false, "a letter typed at the end of the word goes on");
+        Equal(Join(popup.Items), "zqboot", "the list follows it");
+        Equal(popup.Filter, "zqb", "and so does the filter");
+        Equal(session.OnTextChanged("zq", 2, 1, 0), false, "a letter taken out goes on");
+        Equal(Join(popup.Items), "zqboot|zqname", "the list is wider again");
+        Equal(session.OnTextChanged("zq x", 3, 0, 1), true, "an edit after the end of the word ends the session");
+        Equal(session.OnTextChanged("z", 1, 3, 0), true, "an edit that starts inside the word and reaches past its end ends the session");
+        Equal(session.OnTextChanged("zq", 0, 0, 0), false, "an edit at the start of the word is inside it");
+        Equal(session.OnTextChanged("xzq", 0, 0, 1) , false, "a letter put in front of the word is inside it");
+        Equal(popup.Filter, "xzq", "the word is longer");
 
         host = new FakeHost();
         popup = new FakePopup();
