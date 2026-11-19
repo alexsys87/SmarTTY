@@ -254,6 +254,31 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         OnChanged();
     }
 
+    /// <summary>The style of the text written next (the HEX view of a device writes its rows itself, the echo in a colour of its own).</summary>
+    public CellStyle CurrentStyle
+    {
+        get => _screen.CurrentStyle;
+        set => _screen.CurrentStyle = value;
+    }
+
+    /// <summary>Writes text at the cursor as the output of a program would be, with no escape sequences parsed (the rows of the HEX view).</summary>
+    public void WriteText(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            _screen.WriteText(text);
+        }
+    }
+
+    /// <summary>Moves the cursor by columns and rows; with <paramref name="scroll"/> the screen scrolls when it goes below the last row.</summary>
+    public void MoveCursorBy(int deltaX, int deltaY, bool scroll)
+    {
+        _screen.MoveCursorBy(deltaX, deltaY, scroll);
+    }
+
+    /// <summary>The selection was made, moved or removed (the two panes of the HEX view mirror each other's selection).</summary>
+    public event Action SelectionChanged;
+
     /// <summary>The remote side reset the terminal (ESC c), after the reset is done.</summary>
     public event Action StreamReset;
 
@@ -334,6 +359,12 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     public bool HasSelection => _hasSelection && _selectionAnchor != _selectionEnd;
 
     /// <summary>The selection from its start to its end in the order of the document (valid when <see cref="HasSelection"/>).</summary>
+    /// <summary>Where the selection was started (it can be after its end: a selection made backward).</summary>
+    public TextDocument.TextPosition SelectionAnchor => _selectionAnchor;
+
+    /// <summary>The end of the selection that moves (the place of the mouse while it is dragged).</summary>
+    public TextDocument.TextPosition SelectionEnd => _selectionEnd;
+
     public void GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end)
     {
         if (_selectionAnchor < _selectionEnd)
@@ -520,6 +551,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         _selectionAnchor = Clamp(anchor);
         _selectionEnd = Clamp(end);
         OnChanged();
+        SelectionChanged?.Invoke();
     }
 
     public void ClearSelection()
@@ -528,6 +560,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         {
             _hasSelection = false;
             OnChanged();
+            SelectionChanged?.Invoke();
         }
     }
 
@@ -642,6 +675,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         _selectionAnchor = position;
         _selectionEnd = position;
         OnChanged();
+        SelectionChanged?.Invoke();
     }
 
     void ITerminalScreenView.OnTextReplaced()

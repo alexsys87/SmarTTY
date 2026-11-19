@@ -285,6 +285,30 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _panel.ScrollBarVisibility = settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Hide ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    /// <summary>
+    /// The colours of text without a colour of its own and of the background (a device terminal has its own; null keeps the one there is).
+    /// </summary>
+    public void SetDefaultColors(RgbColor? foreground, RgbColor? background)
+    {
+        TerminalColorScheme scheme = _view.ColorScheme;
+        if (foreground.HasValue)
+        {
+            scheme.DefaultForeground = foreground.Value;
+        }
+        if (background.HasValue)
+        {
+            scheme.DefaultBackground = background.Value;
+        }
+        _view.Invalidate();
+    }
+
+    /// <summary>The selection is copied when the mouse button is released.</summary>
+    public bool CopyOnSelect
+    {
+        get => _view.CopyOnSelect;
+        set => _view.CopyOnSelect = value;
+    }
+
     private void ApplyKeySettings()
     {
         GlobalSettings settings = _appSettings;
