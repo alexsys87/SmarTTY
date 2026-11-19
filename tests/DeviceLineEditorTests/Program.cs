@@ -754,6 +754,11 @@ internal static class Program
             },
             new Step
             {
+                Name = "what was typed at the password prompt is in neither the saved history nor the file of the device",
+                Done = () => !SavedHistory(control).Any((string command) => command.Contains("secret")) && !Storage().LoadHistory(DeviceKey(port)).Items.Any((string command) => command.Contains("secret"))
+            },
+            new Step
+            {
                 Name = "it is in the history of the terminal and not in the saved history",
                 Done = () => terminal.CommandHistory.Contains("blank-cmd") && !SavedHistory(control).Contains(" blank-cmd") && !SavedHistory(control).Contains("blank-cmd")
             },
@@ -788,6 +793,23 @@ internal static class Program
                 Name = "with nothing to clear the question is not asked",
                 Act = () => InvokePrivate(control, "ClearSavedHistory"),
                 Done = () => _messageBoxTexts.Count == 2
+            },
+            new Step
+            {
+                // The history of the terminal has a command that the saved history does not (a leading blank): that is something to clear.
+                Name = "with only the history of the terminal holding a command the question is asked",
+                Act = () =>
+                {
+                    Type(terminal, " lead-only\r");
+                    _messageBoxAnswer = DialogResult.No;
+                },
+                Done = () => terminal.HasInputLine && InputText(terminal) == "" && terminal.CommandHistory.Contains("lead-only") && SavedHistory(control).Count == 0
+            },
+            new Step
+            {
+                Name = "and it is asked when the clearing is asked for",
+                Act = () => InvokePrivate(control, "ClearSavedHistory"),
+                Done = () => _messageBoxTexts.Count == 3 && terminal.CommandHistory.Contains("lead-only")
             },
             new Step
             {
