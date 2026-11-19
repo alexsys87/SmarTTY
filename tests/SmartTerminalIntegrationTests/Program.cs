@@ -547,8 +547,8 @@ internal static class Program
         yield return Run(terminal, "export SM_ENV_A=one", null, "a variable is exported");
         yield return Run(terminal, "export SM_ENV_B=$SM_ENV_A-two", null, "a variable that refers to an earlier one is kept as it was typed");
         yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[one-two]", "and it is worked out after the earlier one");
-        yield return Run(terminal, "export SM_ENV_A=three", null, "a variable that is set again replaces the old value");
-        yield return Run(terminal, "echo \"[$SM_ENV_A][$SM_ENV_B]\"", "[three][-two]", "and goes to the end of the list: the one that refers to it is worked out before it");
+        yield return Run(terminal, "export SM_ENV_A=three", null, "a variable that is set again gets the new value");
+        yield return Run(terminal, "echo \"[$SM_ENV_A][$SM_ENV_B]\"", "[three][one-two]", "and the one that was set from it keeps the value the other had then, as in a shell");
         yield return Run(terminal, "unset SM_ENV_B", null, "unset is kept");
         yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[]", "an unset variable is gone from the next command");
         yield return Check("the tab has an environment, and its names are those that have a value", () => terminal.HasEnvironment && terminal.EnvironmentNames.Contains("SM_ENV_A") && !terminal.EnvironmentNames.Contains("SM_ENV_B") && terminal.EnvironmentNames.Contains("SMARTTY_UNIQUE_VAR"));
