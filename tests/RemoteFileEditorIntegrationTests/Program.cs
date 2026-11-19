@@ -954,6 +954,133 @@ internal static class Program
         Thread.Sleep(500);
     }
 
+    // The paths of the loading and the saves that the other scenarios do not take (stage 3, step 3A-2: the net before the state and the
+    // decisions of the loading and the saves move out of the control): before the file is loaded, while it is loaded again, a reload that
+    // fails, a refused write and the question about sudo, a service reload that fails, the line of a problem of the check, the caret of a
+    // compiler message.
+    private static void Flow(Server server)
+    {
+        Console.WriteLine("-- the loading and the saves: before the load, during a reload, failures");
+        WriteRemote(server, "flow.txt", Bytes("one\n\tb=1\nthree\n"));
+
+        // Before the file is loaded (the loading thread posts its end to the UI thread, which has not run yet): nothing can be saved, and
+        // closing the tab has nothing of the user's to save. The caret of a compiler message (gcc: screen columns, tab stops of 8) is put
+        // on the character it names once the text is in.
+        GlobalSettings settings = new GlobalSettings();
+        Form form = new Form { Width = 800, Height = 600 };
+        string path = server.Directory + "/flow.txt";
+        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(8, 1), null, ColumnUnit.TabStops) { Dock = DockStyle.Fill };
+        form.Controls.Add(e);
+        form.Show();
+        Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && !e.CanRunInTerminal, "before the file is loaded nothing can be saved, switched, read again, followed or run");
+        int savingChanges = 0;
+        e.SavingChanged += (sender, args) => savingChanges++;
+        Prompted(server, "before the load", (text, buttons) => null, () =>
+        {
+            Check(e.TrySave(), "closing the tab before the file arrived: nothing to save, the tab may close");
+            e.Save();
+            e.SaveInBackground();
+            e.Reload();
+        });
+        NoPrompt(server, "saves and a reload before the file is loaded");
+        Check(!e.IsSaving && savingChanges == 0, "no save was started");
+        Opened o = new Opened { Editor = e, Form = form, Server = server, Path = path };
+        Pump(() => e.CanSave, "the file to load");
+        Settle(server);
+        Equal(Caret(e), "1:1", "the column of a compiler message in screen columns is the character after the tab");
+        Check(e.CanToggleHexMode && e.CanReopenWithEncoding && e.CanFollowLog && !e.CanRunInTerminal, "a loaded text file: switched, read again, followed, not run");
+
+        // While the file is loaded again the text cannot be saved: a save on close says so, and the caret comes back where it was.
+        List<string> events = RecordEvents(e);
+        e.SetCaret(new TextDocument.TextPosition(2, 2));
+        Thread.Sleep(1100);
+        WriteRemote(server, "flow.txt", Bytes("one\n\tb=2\nthree, longer\n"));
+        e.Reload();
+        Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && e.ReadOnly, "while the file is loaded again: read-only, nothing can be saved or switched");
+        try
+        {
+            e.Save();
+            Check(false, "a save during a reload throws");
+        }
+        catch (InvalidOperationException exception)
+        {
+            Check(exception.Message == "The file " + path + " is being reloaded. Try again when it has been loaded.", "a save during a reload says that the file is being reloaded");
+        }
+        Prompted(server, "close during reload", (text, buttons) => text.Contains("is being reloaded") ? DialogResult.OK : (DialogResult?)null, () => Check(!e.TrySave(), "closing the tab during a reload: the tab stays"));
+        Check(OnlyPrompt(server, "a save on close during a reload").Contains("is being reloaded"), "and the error is shown");
+        e.SaveInBackground();
+        Check(!e.IsSaving, "a background save during a reload does not start");
+        e.Reload();
+        Pump(() => e.CanSave, "the file to be loaded again");
+        Settle(server);
+        Equal(Text(o), "one\n\tb=2\nthree, longer\n", "the new text");
+        Equal(Caret(e), "2:2", "the caret is where it was");
+        Equal(Events(events), "format,format", "a reload tells the format when it starts and when the text is in (a second Reload meanwhile does nothing)");
+
+        // A reload that fails keeps the text of the user and the tab.
+        Replace(o, 0, "one", "ONE");
+        Remote(server, "chmod 000 '" + path + "'");
+        events.Clear();
+        Prompted(server, "failed reload", (text, buttons) => buttons == MessageBoxButtons.OK ? DialogResult.OK : (DialogResult?)null, () =>
+        {
+            e.Reload();
+            Pump(() => !e.ReadOnly, "the reload to fail");
+        });
+        Remote(server, "chmod 644 '" + path + "'");
+        Settle(server);
+        OnlyPrompt(server, "a reload that fails");
+        Check(e.CanSave && !e.ReadOnly && e.IsModified, "after a reload that failed the text can be edited and saved, and it is still modified");
+        Equal(Text(o), "ONE\n\tb=2\nthree, longer\n", "the text of the user is kept");
+        Equal(Events(events), "format,format", "the format is told when the reload starts and when it failed");
+
+        // A file the user may not write: the replacement is refused and the editor asks about sudo.
+        Remote(server, "chmod 444 '" + path + "'");
+        Prompted(server, "sudo no", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () =>
+        {
+            try
+            {
+                e.Save();
+                Check(false, "a save whose sudo question was answered No throws");
+            }
+            catch (OperationCanceledException)
+            {
+                Check(true, "a save whose sudo question was answered No is cancelled");
+            }
+        });
+        Equal(OnlyPrompt(server, "a refused write"), "Failed to overwrite " + path + ". Try again with sudo?", "the editor asks whether to try again with sudo");
+        Check(e.IsModified, "the changes stay in the editor");
+        Prompted(server, "sudo no on close", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () => Check(!e.TrySave(), "closing the tab with the question answered No: the tab stays"));
+        OnlyPrompt(server, "a refused write on close");
+        Prompted(server, "sudo no in the background", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        OnlyPrompt(server, "a refused write in the background");
+        Check(e.IsModified && !e.IsSaving, "a background save answered No: still modified, not saving");
+        Remote(server, "chmod 644 '" + path + "'");
+        SameBytes(ReadRemote(server, "flow.txt"), Bytes("one\n\tb=2\nthree, longer\n"), "the file on the server is not touched");
+        o.Close();
+
+        // The check found a problem and the user does not save: the caret goes to its line.
+        WriteRemote(server, "flowcheck.sh", Bytes("#!/bin/sh\necho 1\necho 2\n"));
+        o = Open(server, "flowcheck.sh");
+        Replace(o, 2, "echo 2", "if true; then");
+        Prompted(server, "check no", (text, buttons) => text.Contains("The check (") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        OnlyPrompt(server, "a script with a problem");
+        Equal(o.Editor.CaretPosition.Line, 3, "answered No: the caret is on the line the check named");
+        o.Close();
+
+        // A service reload that fails: the editor offers sudo for it.
+        Remote(server, "mkdir -p '" + server.Directory + "/etc/nginx'");
+        WriteRemote(server, "etc/nginx/flow.conf", Bytes("# one\n"));
+        o = Open(server, "etc/nginx/flow.conf", s => s.Editor.DisableConfigCheck = true);
+        Replace(o, 0, "one", "two");
+        Prompted(server, "service reload yes", (text, buttons) => text.Contains("Reload nginx now") ? DialogResult.Yes : (text.Contains("Could not reload nginx") ? DialogResult.No : (DialogResult?)null), () =>
+        {
+            SaveAndWait(o);
+            Pump(() => server.Prompts.Count >= 2, "the answer of the service reload");
+        });
+        Check(server.Prompts.Count == 2 && server.Prompts[1].StartsWith("Could not reload nginx (exit code ") && server.Prompts[1].EndsWith("\nTry again with sudo?"), "answered Yes: nginx is not there, the editor says it could not reload it and offers sudo");
+        o.Close();
+    }
+
     // The SSH layer drops the connection now and then after a transfer or a command (see Settle); that is not what is checked here. A scenario
     // that was cut short by it starts again, on a new connection and in a directory of its own. A scenario that fails the same way every
     // time, or that fails for any other reason, fails the run.
@@ -1017,6 +1144,7 @@ internal static class Program
         RunScenario(server, "drafts", Drafts);
         RunScenario(server, "hex-view", HexView);
         RunScenario(server, "hex-draft", HexDraft);
+        RunScenario(server, "flow", Flow);
     }
 
     private static void RunServer(string name, string host, int port, string user, string password)
