@@ -1,0 +1,1361 @@
+using SmarTTY.Native;
+using SmarTTY.Terminal;
+using SmarTTY.Terminal.Emulation;
+using SmarTTY.Terminal.Input;
+using SmarTTY.Terminal.Rendering;
+using SmarTTY.TextEditing;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
+
+namespace SmarTTY.GUI.TerminalView;
+
+/// <summary>The shape of the caret of <see cref="TerminalRenderView"/>.</summary>
+internal enum TerminalCursorShape
+{
+    Block,
+    Underline,
+    Bar
+}
+
+/// <summary>What the last frames of a <see cref="TerminalRenderView"/> cost (for the diagnostics of the lab window).</summary>
+internal sealed class TerminalFrameStats
+{
+    /// <summary>Frames that painted something.</summary>
+    public long Frames;
+
+    /// <summary>Rows drawn again (their content changed, or they were new).</summary>
+    public long RowsDrawn;
+
+    /// <summary>Rows whose drawing was kept, at the same place or moved (scrolling moves rows, it does not draw them again).</summary>
+    public long RowsReused;
+
+    /// <summary>Characters of output parsed.</summary>
+    public long CharactersParsed;
+
+    /// <summary>The time of the last frame: parsing the output, then building the rows.</summary>
+    public double LastParseMilliseconds;
+
+    public double LastBuildMilliseconds;
+
+    /// <summary>Frames whose parsing stopped at the time budget, the rest of the output waiting for the next frame.</summary>
+    public long BudgetHits;
+
+    /// <summary>The rows drawn and reused in the last frame.</summary>
+    public int LastRowsDrawn;
+
+    public int LastRowsReused;
+
+    public void Reset()
+    {
+        Frames = RowsDrawn = RowsReused = CharactersParsed = BudgetHits = 0;
+        LastParseMilliseconds = LastBuildMilliseconds = 0;
+        LastRowsDrawn = LastRowsReused = 0;
+    }
+}
+
+/// <summary>
+/// The WPF view of a terminal (stage 2 of the migration away from WinForms). It draws the cells of <see cref="TerminalDisplayModel"/>
+/// itself, without a text layout:
+/// <list type="bullet">
+/// <item>every row of the screen is a <see cref="DrawingVisual"/> of its own that keeps its drawing; a row is drawn again only when its
+/// text or colours change (<see cref="RowLayout.Signature"/>), and when the output scrolls, the rows that are still on the screen are moved,
+/// not drawn again;</item>
+/// <item>the text is drawn with <see cref="GlyphRun"/> on the grid of a monospaced font (every glyph advances one cell), one glyph run for
+/// neighbouring cells of one colour (<see cref="RowRunBuilder"/>);</item>
+/// <item>the output of the remote side is queued (from any thread) and parsed and painted once per frame, in
+/// <see cref="CompositionTarget.Rendering"/>, with a time budget, so a flood of output never blocks the window; the frame handler is only
+/// attached while there is work, so an idle terminal costs nothing;</item>
+/// <item>the keyboard is read with KeyDown and TextInput (<see cref="TerminalKeyEncoder"/>): dead keys, the IME (whose window is put at the
+/// caret), Alt codes, AltGr and the xterm combinations.</item>
+/// </list>
+/// Under Remote Desktop and in virtual machines without a GPU WPF renders in software; the view keeps the changed area small there too
+/// (one row per changed row, the caret blinks by opacity), and the lab window can force the software mode on a local machine.
+/// </summary>
+internal sealed class TerminalRenderView : FrameworkElement
+{
+    // The longest piece of output parsed at once, and the time a frame may spend parsing before it paints.
+    private const int ParseChunk = 16 * 1024;
+
+    private const double ParseBudgetMilliseconds = 12;
+
+    private sealed class RowVisual : DrawingVisual
+    {
+        public ulong Signature;
+
+        public string Text;
+    }
+
+    private readonly VisualCollection _visuals;
+
+    private readonly List<RowVisual> _rowVisuals = new List<RowVisual>();
+
+    private readonly Dictionary<ulong, List<RowVisual>> _reusable = new Dictionary<ulong, List<RowVisual>>();
+
+    private readonly List<RowVisual> _spare = new List<RowVisual>();
+
+    private readonly List<RowLayout> _layouts = new List<RowLayout>();
+
+    private readonly DrawingVisual _selectionVisual = new DrawingVisual();
+
+    private readonly DrawingVisual _cursorVisual = new DrawingVisual();
+
+    private readonly Dictionary<uint, SolidColorBrush> _brushes = new Dictionary<uint, SolidColorBrush>();
+
+    private readonly TerminalColorScheme _scheme = new TerminalColorScheme();
+
+    private readonly FrameOutputQueue _output = new FrameOutputQueue();
+
+    private readonly TerminalKeyEncoder _keys;
+
+    private readonly TerminalKeyOptions _keyOptions = new TerminalKeyOptions();
+
+    private readonly TerminalInputEncoder _mouse = new TerminalInputEncoder();
+
+    private readonly DispatcherTimer _blinkTimer;
+
+    private readonly DispatcherTimer _fallbackTimer;
+
+    private readonly Stopwatch _clock = new Stopwatch();
+
+    private TerminalDisplayModel _model;
+
+    private TerminalFont _font;
+
+    private FontFamily _fontFamily = new FontFamily("Consolas");
+
+    private double _fontSize = 13;
+
+    private bool _dirty;
+
+    private bool _framesHooked;
+
+    private bool _renderedSinceTick;
+
+    private TimeSpan _lastRenderingTime;
+
+    // What the overlays were drawn for: they are drawn again only when it changes.
+    private int _selectionTopLine = -1;
+
+    private int _selectionVersion = -1;
+
+    private string _cursorState;
+
+    private GridPoint _imeCell = new GridPoint(-1, -1);
+
+    private bool _selecting;
+
+    private TextDocument.TextPosition _selectionAnchor;
+
+    private TerminalMouseButton _reportedButton = TerminalMouseButton.None;
+
+    public TerminalRenderView(XtermKeyTable keyTable)
+    {
+        _keys = new TerminalKeyEncoder(keyTable);
+        _visuals = new VisualCollection(this) { _selectionVisual, _cursorVisual };
+        Focusable = true;
+        FocusVisualStyle = null;
+        UseLayoutRounding = true;
+        SnapsToDevicePixels = true;
+        Cursor = Cursors.IBeam;
+        ClipToBounds = true;
+        InputMethod.SetIsInputMethodEnabled(this, true);
+        KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.None);
+        KeyboardNavigation.SetDirectionalNavigation(this, KeyboardNavigationMode.None);
+        KeyboardNavigation.SetControlTabNavigation(this, KeyboardNavigationMode.None);
+        TextOptions.SetTextHintingMode(this, TextHintingMode.Fixed);
+        TextOptions.SetTextRenderingMode(this, TextRenderingMode.Auto);
+        RenderOptions.SetEdgeMode(_selectionVisual, EdgeMode.Aliased);
+        RenderOptions.SetEdgeMode(_cursorVisual, EdgeMode.Aliased);
+        _blinkTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(530) };
+        _blinkTimer.Tick += (sender, e) => _cursorVisual.Opacity = _cursorVisual.Opacity > 0 ? 0 : 1;
+        // CompositionTarget.Rendering stops while the window is minimized: this timer parses the output then, so the queue does not grow.
+        _fallbackTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(100) };
+        _fallbackTimer.Tick += OnFallbackTick;
+        KeyScanFlags.Install();
+        TextCompositionManager.AddPreviewTextInputStartHandler(this, (sender, e) => UpdateImeWindow(force: true));
+        Unloaded += (sender, e) => UnhookFrames();
+        Loaded += (sender, e) =>
+        {
+            // The DPI of the monitor is known once the element is in a window: the cells are measured again if it differs.
+            if (_font != null && Math.Abs(_font.PixelsPerDip - VisualTreeHelper.GetDpi(this).PixelsPerDip) > 0.001)
+            {
+                ResetFont();
+            }
+            OnModelChanged();
+        };
+        // Frames stop while the element is hidden (another tab): it is painted when it is shown again.
+        IsVisibleChanged += (sender, e) =>
+        {
+            if (IsVisible)
+            {
+                OnModelChanged();
+            }
+        };
+    }
+
+    /// <summary>Bytes for the remote side (typed, keys, replies, mouse, paste), raised on the thread of the view.</summary>
+    public event Action<byte[], TerminalInputKind> DataEntered;
+
+    /// <summary>The number of columns or rows changed (the remote side is told the new size of its PTY).</summary>
+    public event Action<int, int> TerminalSizeChanged;
+
+    /// <summary>A frame was painted (the lab window shows the statistics).</summary>
+    public event Action FrameRendered;
+
+    /// <summary>A key, before the terminal looks at it: a handler that sets <see cref="RoutedEventArgs.Handled"/> takes it (window shortcuts).</summary>
+    public event KeyEventHandler PreviewTerminalKey;
+
+    /// <summary>The bytes of a key or a character, as they were sent (the key log of the lab window).</summary>
+    public event Action<string, string> InputLogged;
+
+    public TerminalFrameStats Stats { get; } = new TerminalFrameStats();
+
+    public TerminalColorScheme ColorScheme => _scheme;
+
+    public TerminalKeyOptions KeyOptions => _keyOptions;
+
+    /// <summary>The encoding of typed and pasted text (UTF-8).</summary>
+    public Encoding InputEncoding { get; set; } = Encoding.UTF8;
+
+    /// <summary>What a line break of pasted text is sent as (CR, like Enter).</summary>
+    public string PasteLineBreak { get; set; } = "\r";
+
+    /// <summary>The selection is copied when the mouse button is released.</summary>
+    public bool CopyOnSelect { get; set; } = true;
+
+    public bool CursorBlink { get; set; } = true;
+
+    public TerminalCursorShape CursorShape { get; set; } = TerminalCursorShape.Block;
+
+    /// <summary>The selection colour (drawn over the text).</summary>
+    public Color SelectionColor { get; set; } = Color.FromArgb(0x60, 0x33, 0x99, 0xFF);
+
+    /// <summary>A grid size that does not follow the size of the element (the mirror of another terminal); null: as many cells as fit.</summary>
+    public Size? FixedGrid { get; private set; }
+
+    public TerminalDisplayModel Model => _model;
+
+    public TerminalFont TerminalFont => EnsureFont();
+
+    public FontFamily TerminalFontFamily
+    {
+        get => _fontFamily;
+        set
+        {
+            _fontFamily = value;
+            ResetFont();
+        }
+    }
+
+    public double TerminalFontSize
+    {
+        get => _fontSize;
+        set
+        {
+            _fontSize = value;
+            ResetFont();
+        }
+    }
+
+    /// <summary>Characters of output that wait to be parsed.</summary>
+    public int PendingOutput => _output.Count;
+
+    /// <summary>Shows a terminal (null: none).</summary>
+    public void Attach(TerminalDisplayModel model)
+    {
+        if (_model != null)
+        {
+            _model.Changed -= OnModelChanged;
+            _model.Reply -= OnReply;
+            _model.MouseModeChanged -= OnMouseModeChanged;
+        }
+        _model = model;
+        _output.Clear();
+        ClearRows();
+        if (_model != null)
+        {
+            _model.Changed += OnModelChanged;
+            _model.Reply += OnReply;
+            _model.MouseModeChanged += OnMouseModeChanged;
+            UpdateGridSize();
+        }
+        Invalidate();
+    }
+
+    /// <summary>Makes the grid this size whatever the size of the element (null: as many cells as fit).</summary>
+    public void SetFixedGrid(int columns, int rows)
+    {
+        FixedGrid = new Size(columns, rows);
+        InvalidateMeasure();
+        UpdateGridSize();
+    }
+
+    /// <summary>Queues output of the remote side (any thread). It is parsed and painted with the next frame.</summary>
+    public void EnqueueOutput(string text)
+    {
+        if (_output.Append(text))
+        {
+            if (Dispatcher.CheckAccess())
+            {
+                RequestFrame();
+            }
+            else
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(RequestFrame));
+            }
+        }
+    }
+
+    /// <summary>Drops the output that waits and resets the terminal (a reset that the user asked for).</summary>
+    public void ResetTerminal()
+    {
+        _output.Clear();
+        _model?.Reset();
+    }
+
+    /// <summary>Draws everything again (the colours or the font changed).</summary>
+    public void Invalidate()
+    {
+        _brushes.Clear();
+        ClearRows();
+        _cursorState = null;
+        _selectionVersion = -1;
+        InvalidateVisual();
+        RequestFrame();
+    }
+
+    /// <summary>Scrolls the view to a line of the document.</summary>
+    public void ScrollTo(int topLine)
+    {
+        if (_model != null)
+        {
+            _model.TopLine = topLine;
+        }
+    }
+
+    /// <summary>Copies the selection to the clipboard; false when there is none.</summary>
+    public bool CopySelection()
+    {
+        if (_model == null || !_model.HasSelection)
+        {
+            return false;
+        }
+        try
+        {
+            Win32Clipboard.SetText(WindowHandle, _model.GetSelectedText());
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Sends the text of the clipboard as a paste (bracketed when the program asked for it).</summary>
+    public void Paste()
+    {
+        if (_model == null)
+        {
+            return;
+        }
+        string text = Win32Clipboard.GetText(WindowHandle);
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        SendText(XtermProtocol.PreparePaste(text, PasteLineBreak, _model.BracketedPaste), TerminalInputKind.Paste, "paste");
+    }
+
+    private IntPtr WindowHandle => (PresentationSource.FromVisual(this) as HwndSource)?.Handle ?? IntPtr.Zero;
+
+    // Frames.
+
+    private void OnModelChanged()
+    {
+        _dirty = true;
+        if (!_framesHooked)
+        {
+            RequestFrame();
+        }
+    }
+
+    private void RequestFrame()
+    {
+        if (_framesHooked)
+        {
+            return;
+        }
+        _framesHooked = true;
+        CompositionTarget.Rendering += OnRendering;
+        _fallbackTimer.Start();
+    }
+
+    private void UnhookFrames()
+    {
+        if (!_framesHooked)
+        {
+            return;
+        }
+        _framesHooked = false;
+        CompositionTarget.Rendering -= OnRendering;
+        _fallbackTimer.Stop();
+    }
+
+    private void OnRendering(object sender, EventArgs e)
+    {
+        // The event can come more than once for one frame.
+        if (e is RenderingEventArgs args)
+        {
+            if (args.RenderingTime == _lastRenderingTime)
+            {
+                return;
+            }
+            _lastRenderingTime = args.RenderingTime;
+        }
+        _renderedSinceTick = true;
+        Pump();
+    }
+
+    private void OnFallbackTick(object sender, EventArgs e)
+    {
+        if (!_renderedSinceTick)
+        {
+            Pump();
+        }
+        _renderedSinceTick = false;
+    }
+
+    private void Pump()
+    {
+        bool more = ParseOutput();
+        if (_dirty && _model != null && IsVisible)
+        {
+            BuildFrame();
+        }
+        if (!more && _output.Count == 0 && (!_dirty || !IsVisible))
+        {
+            UnhookFrames();
+        }
+    }
+
+    // Parses the queued output until it is gone or the time budget of the frame is spent; true when some is left.
+    private bool ParseOutput()
+    {
+        if (_model == null)
+        {
+            _output.Clear();
+            return false;
+        }
+        _clock.Restart();
+        long parsed = 0;
+        bool more = false;
+        string piece;
+        while ((piece = _output.Take(ParseChunk)) != null)
+        {
+            _model.ProcessOutput(piece);
+            parsed += piece.Length;
+            if (_clock.Elapsed.TotalMilliseconds >= ParseBudgetMilliseconds)
+            {
+                more = _output.Count != 0;
+                break;
+            }
+        }
+        if (parsed != 0)
+        {
+            Stats.CharactersParsed += parsed;
+            Stats.LastParseMilliseconds = _clock.Elapsed.TotalMilliseconds;
+            if (more)
+            {
+                Stats.BudgetHits++;
+            }
+            ResetBlink();
+        }
+        return more;
+    }
+
+    // Fonts and brushes.
+
+    private TerminalFont EnsureFont()
+    {
+        if (_font == null)
+        {
+            double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            _font = new TerminalFont(_fontFamily, _fontSize, pixelsPerDip);
+        }
+        return _font;
+    }
+
+    private void ResetFont()
+    {
+        _font = null;
+        InvalidateMeasure();
+        UpdateGridSize();
+        Invalidate();
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        ResetFont();
+    }
+
+    private SolidColorBrush GetBrush(RgbColor color)
+    {
+        if (!_brushes.TryGetValue(color.Argb, out SolidColorBrush brush))
+        {
+            brush = new SolidColorBrush(Color.FromArgb(color.A, color.R, color.G, color.B));
+            brush.Freeze();
+            _brushes[color.Argb] = brush;
+        }
+        return brush;
+    }
+
+    // Layout.
+
+    protected override int VisualChildrenCount => _visuals.Count;
+
+    protected override Visual GetVisualChild(int index)
+    {
+        return _visuals[index];
+    }
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        if (FixedGrid.HasValue)
+        {
+            TerminalFont font = EnsureFont();
+            return new Size(FixedGrid.Value.Width * font.CellWidth, FixedGrid.Value.Height * font.CellHeight);
+        }
+        return new Size(0, 0);
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        UpdateGridSize();
+    }
+
+    private void UpdateGridSize()
+    {
+        if (_model == null)
+        {
+            return;
+        }
+        int columns;
+        int rows;
+        if (FixedGrid.HasValue)
+        {
+            columns = (int)FixedGrid.Value.Width;
+            rows = (int)FixedGrid.Value.Height;
+        }
+        else
+        {
+            if (ActualWidth <= 0 || ActualHeight <= 0)
+            {
+                return;
+            }
+            TerminalFont font = EnsureFont();
+            columns = Math.Max(1, (int)Math.Floor((ActualWidth + 0.01) / font.CellWidth));
+            rows = Math.Max(1, (int)Math.Floor((ActualHeight + 0.01) / font.CellHeight));
+        }
+        if (columns != _model.Columns || rows != _model.Rows)
+        {
+            _model.Resize(columns, rows);
+            TerminalSizeChanged?.Invoke(columns, rows);
+        }
+    }
+
+    protected override void OnRender(DrawingContext drawingContext)
+    {
+        // The background; the rows draw only the cells that have a background of their own.
+        drawingContext.DrawRectangle(GetBrush(_scheme.DefaultBackground), null, new Rect(RenderSize));
+    }
+
+    // Building a frame.
+
+    private void ClearRows()
+    {
+        foreach (RowVisual visual in _rowVisuals)
+        {
+            if (visual != null)
+            {
+                _visuals.Remove(visual);
+            }
+        }
+        _rowVisuals.Clear();
+        foreach (RowVisual visual in _spare)
+        {
+            _visuals.Remove(visual);
+        }
+        _spare.Clear();
+        _dirty = true;
+    }
+
+    private void BuildFrame()
+    {
+        _dirty = false;
+        _clock.Restart();
+        TerminalFont font = EnsureFont();
+        TerminalDisplayModel model = _model;
+        EditableTextDocument document = model.Document;
+        int rows = model.Rows;
+        int columns = model.Columns;
+        int topLine = model.TopLine;
+        while (_layouts.Count < rows)
+        {
+            _layouts.Add(new RowLayout());
+        }
+
+        // The rows drawn before, by what they show: a row that shows the same thing again keeps its drawing, wherever it is now.
+        _reusable.Clear();
+        foreach (RowVisual visual in _rowVisuals)
+        {
+            if (visual == null)
+            {
+                continue;
+            }
+            if (!_reusable.TryGetValue(visual.Signature, out List<RowVisual> list))
+            {
+                list = new List<RowVisual>(1);
+                _reusable[visual.Signature] = list;
+            }
+            list.Add(visual);
+        }
+        _rowVisuals.Clear();
+
+        int drawn = 0;
+        int reused = 0;
+        for (int row = 0; row < rows; row++)
+        {
+            int line = topLine + row;
+            RowLayout layout = _layouts[row];
+            string text = line < document.LineCount ? document.GetLineText(line) : "";
+            RowRunBuilder.Build(text, model.Lines.GetLine(line), _scheme, columns, layout);
+            if (layout.Backgrounds.Count == 0 && layout.Texts.Count == 0)
+            {
+                // Nothing to draw: the background of the element shows.
+                _rowVisuals.Add(null);
+                continue;
+            }
+            RowVisual match = null;
+            if (_reusable.TryGetValue(layout.Signature, out List<RowVisual> candidates))
+            {
+                for (int index = candidates.Count - 1; index >= 0; index--)
+                {
+                    if (string.Equals(candidates[index].Text, layout.Text, StringComparison.Ordinal))
+                    {
+                        match = candidates[index];
+                        candidates.RemoveAt(index);
+                        break;
+                    }
+                }
+            }
+            if (match != null)
+            {
+                reused++;
+            }
+            _rowVisuals.Add(match);
+        }
+
+        // The rows that were not reused are spare; the rows that need a drawing take them first.
+        foreach (List<RowVisual> list in _reusable.Values)
+        {
+            _spare.AddRange(list);
+        }
+        _reusable.Clear();
+        for (int row = 0; row < rows; row++)
+        {
+            RowLayout layout = _layouts[row];
+            RowVisual visual = _rowVisuals[row];
+            if (visual == null && (layout.Backgrounds.Count != 0 || layout.Texts.Count != 0))
+            {
+                if (_spare.Count != 0)
+                {
+                    visual = _spare[_spare.Count - 1];
+                    _spare.RemoveAt(_spare.Count - 1);
+                }
+                else
+                {
+                    visual = new RowVisual();
+                    RenderOptions.SetEdgeMode(visual, EdgeMode.Aliased);
+                    // Below the selection and the caret.
+                    _visuals.Insert(_visuals.Count - 2, visual);
+                }
+                DrawRow(visual, layout, font);
+                _rowVisuals[row] = visual;
+                drawn++;
+            }
+            if (visual != null)
+            {
+                Vector offset = new Vector(0, row * font.CellHeight);
+                if (visual.Offset != offset)
+                {
+                    visual.Offset = offset;
+                }
+            }
+        }
+        // Spare rows are kept for the next frames, but not more of them than one screen.
+        while (_spare.Count > rows)
+        {
+            _visuals.Remove(_spare[_spare.Count - 1]);
+            _spare.RemoveAt(_spare.Count - 1);
+        }
+        foreach (RowVisual visual in _spare)
+        {
+            if (visual.Signature != 0)
+            {
+                using (visual.RenderOpen())
+                {
+                }
+                visual.Signature = 0;
+                visual.Text = null;
+            }
+        }
+
+        DrawSelection(font);
+        DrawCursor(font);
+        UpdateImeWindow(force: false);
+
+        Stats.Frames++;
+        Stats.RowsDrawn += drawn;
+        Stats.RowsReused += reused;
+        Stats.LastRowsDrawn = drawn;
+        Stats.LastRowsReused = reused;
+        Stats.LastBuildMilliseconds = _clock.Elapsed.TotalMilliseconds;
+        FrameRendered?.Invoke();
+    }
+
+    private void DrawRow(RowVisual visual, RowLayout layout, TerminalFont font)
+    {
+        visual.Signature = layout.Signature;
+        visual.Text = layout.Text;
+        double cellWidth = font.CellWidth;
+        double cellHeight = font.CellHeight;
+        using (DrawingContext context = visual.RenderOpen())
+        {
+            foreach (BackgroundRun run in layout.Backgrounds)
+            {
+                context.DrawRectangle(GetBrush(run.Color), null, new Rect(run.Start * cellWidth, 0, run.Length * cellWidth, cellHeight));
+            }
+            foreach (TextRun run in layout.Texts)
+            {
+                SolidColorBrush brush = GetBrush(run.Foreground);
+                DrawGlyphs(context, layout.Text, run.Start, run.Length, brush, font, 0);
+                if (run.Underline)
+                {
+                    context.DrawRectangle(brush, null, new Rect(run.Start * cellWidth, font.UnderlinePosition, run.Length * cellWidth, font.UnderlineThickness));
+                }
+            }
+        }
+    }
+
+    // Draws the characters of cells [start, start + length) of a row: one glyph run per face (the main font, or a fallback for a character
+    // it lacks). Every glyph advances a whole cell (a surrogate pair, which takes two cells of the grid, two).
+    private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y)
+    {
+        int end = Math.Min(text.Length, start + length);
+        double cellWidth = font.CellWidth;
+        GlyphTypeface face = null;
+        List<ushort> glyphs = null;
+        List<double> advances = null;
+        double runX = 0;
+        int column = start;
+        while (column < end)
+        {
+            char ch = text[column];
+            int codePoint = ch;
+            int units = 1;
+            if (char.IsHighSurrogate(ch) && column + 1 < text.Length && char.IsLowSurrogate(text[column + 1]))
+            {
+                codePoint = char.ConvertToUtf32(ch, text[column + 1]);
+                units = 2;
+            }
+            else if (ch < ' ')
+            {
+                codePoint = ' ';
+            }
+            GlyphTypeface glyphFace = font.GetGlyph(codePoint, out ushort glyph);
+            if (glyphs != null && glyphs.Count != 0 && !ReferenceEquals(glyphFace, face))
+            {
+                FlushGlyphs(context, face, glyphs, advances, runX, y, brush, font);
+            }
+            if (glyphs == null)
+            {
+                glyphs = new List<ushort>(end - column);
+                advances = new List<double>(end - column);
+            }
+            if (glyphs.Count == 0)
+            {
+                face = glyphFace;
+                runX = column * cellWidth;
+            }
+            glyphs.Add(glyph);
+            advances.Add(units * cellWidth);
+            column += units;
+        }
+        if (glyphs != null && glyphs.Count != 0)
+        {
+            FlushGlyphs(context, face, glyphs, advances, runX, y, brush, font);
+        }
+    }
+
+    private static void FlushGlyphs(DrawingContext context, GlyphTypeface face, List<ushort> glyphs, List<double> advances, double x, double y, Brush brush, TerminalFont font)
+    {
+        GlyphRun run = new GlyphRun(face, 0, false, font.EmSize, (float)font.PixelsPerDip, glyphs.ToArray(), new Point(x, y + font.Baseline), advances.ToArray(),
+            null, null, null, null, null, null);
+        context.DrawGlyphRun(brush, run);
+        glyphs.Clear();
+        advances.Clear();
+    }
+
+    private void DrawSelection(TerminalFont font)
+    {
+        TerminalDisplayModel model = _model;
+        int version = model.HasSelection ? model.Version : -2;
+        if (!model.HasSelection && _selectionVersion == -2)
+        {
+            return;
+        }
+        if (model.HasSelection && version == _selectionVersion && _selectionTopLine == model.TopLine)
+        {
+            return;
+        }
+        _selectionVersion = version;
+        _selectionTopLine = model.TopLine;
+        using (DrawingContext context = _selectionVisual.RenderOpen())
+        {
+            if (!model.HasSelection)
+            {
+                return;
+            }
+            model.GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end);
+            Brush brush = new SolidColorBrush(SelectionColor);
+            brush.Freeze();
+            for (int row = 0; row < model.Rows; row++)
+            {
+                int line = model.TopLine + row;
+                if (line < start.Line || line > end.Line)
+                {
+                    continue;
+                }
+                int from = line == start.Line ? start.Column : 0;
+                int to = line == end.Line ? end.Column : Math.Max(from, model.Columns);
+                if (to <= from)
+                {
+                    continue;
+                }
+                context.DrawRectangle(brush, null, new Rect(from * font.CellWidth, row * font.CellHeight, (to - from) * font.CellWidth, font.CellHeight));
+            }
+        }
+    }
+
+    private bool TryGetCaretCell(out GridPoint cell)
+    {
+        TerminalDisplayModel model = _model;
+        TextDocument.TextPosition caret = model.Caret;
+        cell = new GridPoint(caret.Column, caret.Line - model.TopLine);
+        return !model.CaretHidden && cell.Y >= 0 && cell.Y < model.Rows && cell.X >= 0 && cell.X <= model.Columns;
+    }
+
+    private void DrawCursor(TerminalFont font)
+    {
+        bool visible = TryGetCaretCell(out GridPoint cell);
+        bool focused = IsKeyboardFocused;
+        string under = "";
+        if (visible)
+        {
+            int line = _model.Caret.Line;
+            string text = line < _model.Document.LineCount ? _model.Document.GetLineText(line) : "";
+            under = cell.X < text.Length ? text.Substring(cell.X, 1) : " ";
+        }
+        string state = visible ? cell.X + "," + cell.Y + "," + focused + "," + CursorShape + "," + under : "hidden";
+        if (state == _cursorState)
+        {
+            return;
+        }
+        _cursorState = state;
+        // The caret is drawn at the origin and moved to its cell, so that the glyph under a block caret is drawn like that of a row.
+        using (DrawingContext context = _cursorVisual.RenderOpen())
+        {
+            if (!visible)
+            {
+                return;
+            }
+            Brush cursorBrush = GetBrush(_scheme.DefaultForeground);
+            if (!focused)
+            {
+                Pen pen = new Pen(cursorBrush, font.OnePixel);
+                pen.Freeze();
+                double half = font.OnePixel / 2;
+                context.DrawRectangle(null, pen, new Rect(half, half, font.CellWidth - font.OnePixel, font.CellHeight - font.OnePixel));
+            }
+            else
+            {
+                switch (CursorShape)
+                {
+                    case TerminalCursorShape.Underline:
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, font.CellHeight - 2 * font.OnePixel, font.CellWidth, 2 * font.OnePixel));
+                        break;
+                    case TerminalCursorShape.Bar:
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, 2 * font.OnePixel, font.CellHeight));
+                        break;
+                    default:
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, font.CellWidth, font.CellHeight));
+                        if (under.Trim().Length != 0)
+                        {
+                            DrawGlyphs(context, under, 0, under.Length, GetBrush(_scheme.DefaultBackground), font, 0);
+                        }
+                        break;
+                }
+            }
+        }
+        if (visible)
+        {
+            _cursorVisual.Offset = new Vector(Math.Min(cell.X, _model.Columns - 1) * font.CellWidth, cell.Y * font.CellHeight);
+        }
+    }
+
+    private void ResetBlink()
+    {
+        _cursorVisual.Opacity = 1;
+        if (_blinkTimer.IsEnabled)
+        {
+            _blinkTimer.Stop();
+            _blinkTimer.Start();
+        }
+    }
+
+    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnGotKeyboardFocus(e);
+        if (CursorBlink)
+        {
+            _blinkTimer.Start();
+        }
+        _cursorVisual.Opacity = 1;
+        _cursorState = null;
+        _imeCell = new GridPoint(-1, -1);
+        OnModelChanged();
+    }
+
+    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
+    {
+        base.OnLostKeyboardFocus(e);
+        _blinkTimer.Stop();
+        _cursorVisual.Opacity = 1;
+        _cursorState = null;
+        _keys.Reset();
+        OnModelChanged();
+    }
+
+    // The window of the input method goes where the caret is (WPF does that only for its text boxes).
+    private void UpdateImeWindow(bool force)
+    {
+        if (_model == null || !IsKeyboardFocused || !TryGetCaretCell(out GridPoint cell))
+        {
+            return;
+        }
+        if (!force && cell.X == _imeCell.X && cell.Y == _imeCell.Y)
+        {
+            return;
+        }
+        _imeCell = cell;
+        if (!(PresentationSource.FromVisual(this) is HwndSource source) || source.CompositionTarget == null)
+        {
+            return;
+        }
+        TerminalFont font = EnsureFont();
+        Point device;
+        try
+        {
+            Point topLeft = TransformToAncestor(source.RootVisual).Transform(new Point(cell.X * font.CellWidth, cell.Y * font.CellHeight));
+            device = source.CompositionTarget.TransformToDevice.Transform(topLeft);
+        }
+        catch (InvalidOperationException)
+        {
+            // Not in the visual tree of that window (any more).
+            return;
+        }
+        int cellHeight = (int)Math.Round(font.CellHeight * font.PixelsPerDip);
+        ImeCompositionWindow.MoveTo(source.Handle, (int)Math.Round(device.X), (int)Math.Round(device.Y), cellHeight, _fontFamily.Source);
+    }
+
+    // Keyboard.
+
+    private void SyncKeyModes()
+    {
+        _keyOptions.ApplicationCursorKeys = _model.ApplicationCursorKeys;
+        _keyOptions.ApplicationKeypad = _model.ApplicationKeypad;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (_model == null || e.Handled)
+        {
+            return;
+        }
+        PreviewTerminalKey?.Invoke(this, e);
+        if (e.Handled)
+        {
+            return;
+        }
+        Key key = e.Key;
+        TerminalKeyKind kind = TerminalKeyKind.Normal;
+        if (key == Key.System)
+        {
+            key = e.SystemKey;
+        }
+        if (key == Key.ImeProcessed)
+        {
+            kind = TerminalKeyKind.ImeProcessed;
+            key = e.ImeProcessedKey;
+        }
+        else if (key == Key.DeadCharProcessed)
+        {
+            kind = TerminalKeyKind.DeadKey;
+            key = e.DeadCharProcessedKey;
+        }
+        ModifierKeys modifiers = e.KeyboardDevice.Modifiers;
+        VirtualKey virtualKey = (VirtualKey)KeyInterop.VirtualKeyFromKey(key);
+        TerminalKeyEvent keyEvent = new TerminalKeyEvent
+        {
+            Key = virtualKey,
+            Shift = (modifiers & ModifierKeys.Shift) != 0,
+            Control = (modifiers & ModifierKeys.Control) != 0,
+            Alt = (modifiers & ModifierKeys.Alt) != 0,
+            RightAlt = e.KeyboardDevice.IsKeyDown(Key.RightAlt),
+            Extended = KeyScanFlags.IsExtended(virtualKey),
+            Kind = kind
+        };
+        SyncKeyModes();
+        TerminalKeyResult result = _keys.KeyDown(keyEvent, _keyOptions);
+        switch (result.Action)
+        {
+            case TerminalKeyAction.Send:
+                SendText(result.Text, TerminalInputKind.KeySequence, DescribeKey(keyEvent));
+                _model.ScrollToScreen();
+                ResetBlink();
+                e.Handled = true;
+                break;
+            case TerminalKeyAction.Copy:
+                CopySelection();
+                e.Handled = true;
+                break;
+            case TerminalKeyAction.Paste:
+                Paste();
+                _model.ScrollToScreen();
+                e.Handled = true;
+                break;
+            case TerminalKeyAction.ScrollPageUp:
+                _model.TopLine -= _model.Rows;
+                e.Handled = true;
+                break;
+            case TerminalKeyAction.ScrollPageDown:
+                _model.TopLine += _model.Rows;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    protected override void OnTextInput(TextCompositionEventArgs e)
+    {
+        base.OnTextInput(e);
+        if (_model == null || e.Handled)
+        {
+            return;
+        }
+        string text = _keys.TextInput(e.Text, e.SystemText, e.ControlText, _keyOptions);
+        if (text != null)
+        {
+            SendText(text, TerminalInputKind.Typed, "text " + (string.IsNullOrEmpty(e.Text) ? (string.IsNullOrEmpty(e.SystemText) ? "control" : "system") : "") + " '" + (e.Text + e.SystemText + e.ControlText) + "'");
+            _model.ScrollToScreen();
+            ResetBlink();
+            e.Handled = true;
+        }
+    }
+
+    private static string DescribeKey(TerminalKeyEvent keyEvent)
+    {
+        StringBuilder builder = new StringBuilder();
+        if (keyEvent.Control)
+        {
+            builder.Append(keyEvent.RightAlt && keyEvent.Alt ? "AltGr+" : "Ctrl+");
+        }
+        if (keyEvent.Alt && !(keyEvent.RightAlt && keyEvent.Control))
+        {
+            builder.Append("Alt+");
+        }
+        if (keyEvent.Shift)
+        {
+            builder.Append("Shift+");
+        }
+        builder.Append(keyEvent.Key);
+        if (keyEvent.Extended)
+        {
+            builder.Append(" (ext)");
+        }
+        return builder.ToString();
+    }
+
+    private void SendText(string text, TerminalInputKind kind, string source)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+        InputLogged?.Invoke(source, text);
+        DataEntered?.Invoke(InputEncoding.GetBytes(text), kind);
+    }
+
+    private void SendBytes(byte[] bytes, TerminalInputKind kind, string source)
+    {
+        if (bytes == null || bytes.Length == 0)
+        {
+            return;
+        }
+        InputLogged?.Invoke(source, Encoding.ASCII.GetString(bytes));
+        DataEntered?.Invoke(bytes, kind);
+    }
+
+    private void OnReply(string reply)
+    {
+        SendText(reply, TerminalInputKind.KeySequence, "reply");
+    }
+
+    // Mouse.
+
+    private void OnMouseModeChanged()
+    {
+        _mouse.ResetMouseMotion();
+        Cursor = _model.MouseMode == MouseReportingMode.Off ? Cursors.IBeam : Cursors.Arrow;
+    }
+
+    private bool ReportsMouse()
+    {
+        return _model != null && _model.MouseMode != MouseReportingMode.Off && (Keyboard.Modifiers & ModifierKeys.Shift) == 0;
+    }
+
+    private static int MouseModifierBits()
+    {
+        ModifierKeys modifiers = Keyboard.Modifiers;
+        int bits = 0;
+        if ((modifiers & ModifierKeys.Shift) != 0)
+        {
+            bits |= 4;
+        }
+        if ((modifiers & ModifierKeys.Alt) != 0)
+        {
+            bits |= 8;
+        }
+        if ((modifiers & ModifierKeys.Control) != 0)
+        {
+            bits |= 0x10;
+        }
+        return bits;
+    }
+
+    private static TerminalMouseButton ToButton(MouseButton button)
+    {
+        switch (button)
+        {
+            case MouseButton.Left:
+                return TerminalMouseButton.Left;
+            case MouseButton.Middle:
+                return TerminalMouseButton.Middle;
+            case MouseButton.Right:
+                return TerminalMouseButton.Right;
+        }
+        return TerminalMouseButton.Other;
+    }
+
+    private GridPoint HitTestCell(Point point)
+    {
+        TerminalFont font = EnsureFont();
+        int column = (int)Math.Floor(point.X / font.CellWidth);
+        int row = (int)Math.Floor(point.Y / font.CellHeight);
+        return new GridPoint(Math.Max(0, Math.Min(column, _model.Columns - 1)), Math.Max(0, Math.Min(row, _model.Rows - 1)));
+    }
+
+    // The place in the document between two cells that is nearest to a point (a selection starts and ends between cells).
+    private TextDocument.TextPosition HitTestDocument(Point point)
+    {
+        TerminalFont font = EnsureFont();
+        int column = (int)Math.Round(point.X / font.CellWidth);
+        int row = (int)Math.Floor(point.Y / font.CellHeight);
+        column = Math.Max(0, Math.Min(column, _model.Columns));
+        return new TextDocument.TextPosition(column, Math.Max(0, _model.TopLine + row));
+    }
+
+    protected override void OnMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (_model == null)
+        {
+            return;
+        }
+        Focus();
+        Point point = e.GetPosition(this);
+        if (ReportsMouse())
+        {
+            byte[] report = _mouse.MouseButton(_model.MouseMode, ToButton(e.ChangedButton), pressed: true, MouseModifierBits(), HitTestCell(point), _model.Columns, _model.Rows, _model.SgrMouse);
+            if (report != null)
+            {
+                _reportedButton = ToButton(e.ChangedButton);
+                CaptureMouse();
+                SendBytes(report, TerminalInputKind.MouseReport, "mouse");
+            }
+            e.Handled = true;
+            return;
+        }
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            TextDocument.TextPosition position = HitTestDocument(point);
+            if (e.ClickCount == 2)
+            {
+                SelectWord(position);
+            }
+            else if (e.ClickCount >= 3)
+            {
+                _model.Select(new TextDocument.TextPosition(0, position.Line), new TextDocument.TextPosition(int.MaxValue, position.Line));
+            }
+            else
+            {
+                _selectionAnchor = position;
+                _model.Select(position, position);
+                _selecting = true;
+                CaptureMouse();
+            }
+            e.Handled = true;
+        }
+        else if (e.ChangedButton == MouseButton.Middle)
+        {
+            Paste();
+            e.Handled = true;
+        }
+    }
+
+    private void SelectWord(TextDocument.TextPosition position)
+    {
+        if (position.Line >= _model.Document.LineCount)
+        {
+            return;
+        }
+        string text = _model.Document.GetLineText(position.Line);
+        int column = Math.Min(position.Column, Math.Max(0, text.Length - 1));
+        if (text.Length == 0 || char.IsWhiteSpace(text[column]))
+        {
+            return;
+        }
+        int start = column;
+        while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+        {
+            start--;
+        }
+        int end = column;
+        while (end < text.Length && !char.IsWhiteSpace(text[end]))
+        {
+            end++;
+        }
+        _model.Select(new TextDocument.TextPosition(start, position.Line), new TextDocument.TextPosition(end, position.Line));
+        if (CopyOnSelect)
+        {
+            CopySelection();
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (_model == null)
+        {
+            return;
+        }
+        Point point = e.GetPosition(this);
+        if (_selecting)
+        {
+            // Dragging past the top or the bottom scrolls.
+            if (point.Y < 0)
+            {
+                _model.TopLine -= 1;
+            }
+            else if (point.Y > ActualHeight)
+            {
+                _model.TopLine += 1;
+            }
+            _model.Select(_selectionAnchor, HitTestDocument(point));
+            return;
+        }
+        if (ReportsMouse())
+        {
+            TerminalMouseButton button = e.LeftButton == MouseButtonState.Pressed ? TerminalMouseButton.Left
+                : e.MiddleButton == MouseButtonState.Pressed ? TerminalMouseButton.Middle
+                : e.RightButton == MouseButtonState.Pressed ? TerminalMouseButton.Right : TerminalMouseButton.None;
+            byte[] report = _mouse.MouseMove(_model.MouseMode, button, MouseModifierBits(), HitTestCell(point), _model.Columns, _model.Rows, _model.SgrMouse);
+            SendBytes(report, TerminalInputKind.MouseReport, "mouse");
+        }
+    }
+
+    protected override void OnMouseUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (_model == null)
+        {
+            return;
+        }
+        if (_selecting && e.ChangedButton == MouseButton.Left)
+        {
+            _selecting = false;
+            ReleaseMouseCapture();
+            if (CopyOnSelect)
+            {
+                CopySelection();
+            }
+            e.Handled = true;
+            return;
+        }
+        if (_reportedButton != TerminalMouseButton.None || ReportsMouse())
+        {
+            byte[] report = _mouse.MouseButton(_model.MouseMode, ToButton(e.ChangedButton), pressed: false, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
+            _reportedButton = TerminalMouseButton.None;
+            ReleaseMouseCapture();
+            SendBytes(report, TerminalInputKind.MouseReport, "mouse");
+            // The context menu does not open while the program reads the mouse.
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        _selecting = false;
+        _reportedButton = TerminalMouseButton.None;
+    }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        if (_model == null)
+        {
+            return;
+        }
+        if (ReportsMouse())
+        {
+            byte[] report = _mouse.MouseWheel(_model.MouseMode, e.Delta < 0, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
+            SendBytes(report, TerminalInputKind.MouseReport, "wheel");
+        }
+        else
+        {
+            int lines = SystemParameters.WheelScrollLines > 0 ? SystemParameters.WheelScrollLines : 3;
+            _model.TopLine -= Math.Sign(e.Delta) * lines;
+        }
+        e.Handled = true;
+    }
+}

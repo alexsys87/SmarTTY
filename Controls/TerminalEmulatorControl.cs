@@ -534,6 +534,14 @@ public partial class TerminalEmulatorControl : TerminalEmulatorBase
     }
 
     /// <summary>
+    /// Sends bytes to the remote side as this terminal would send them (the WPF terminal lab mirrors a tab and types into it through this).
+    /// </summary>
+    public void SendInput(byte[] buffer, InputKind inputKind)
+    {
+        SendBytes(buffer, inputKind);
+    }
+
+    /// <summary>
     /// Puts a command into the command line without running it (Tools > Quick commands): the user checks it and presses Enter.
     /// A classic terminal types it to the shell; the Smart Terminal inserts it into its own input line.
     /// </summary>

@@ -409,6 +409,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
     }
 
+    private void TerminalLab_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            new TerminalLabWindow(() => (Controller.ActiveSession?.ActiveTab as NormalTabContext)?.Terminal) { Owner = this }.Show();
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         Controller.MenuCommandHandlers.Settings();
