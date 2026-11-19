@@ -295,23 +295,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     // "Paste line by line": the commands that are still to be run, one after another.
     private sealed class LinePaste
     {
-        public readonly Queue<string> Pending;
-
-        public readonly int Total;
-
-        public readonly bool StopOnError;
-
-        public int Started;
-
-        public bool Cancelled;
+        public readonly LinePasteRun Run;
 
         public IPasteProgress Progress;
 
         public LinePaste(List<string> commands, bool stopOnError)
         {
-            Pending = new Queue<string>(commands);
-            Total = commands.Count;
-            StopOnError = stopOnError;
+            Run = new LinePasteRun(commands, stopOnError);
         }
     }
 
@@ -2009,15 +1999,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             return;
         }
-        if (run.Cancelled || run.Pending.Count == 0 || (run.StopOnError && _lastCommandFailed))
+        if (run.Run.IsOver(_lastCommandFailed))
         {
             EndLinePaste();
             return;
         }
-        string command = run.Pending.Dequeue();
-        run.Started++;
-        string shown = command.Length > 60 ? command.Substring(0, 57) + "..." : command;
-        run.Progress?.SetProgress(run.Started - 1, run.Total, "Command " + run.Started + " of " + run.Total + ": " + shown);
+        string command = run.Run.TakeNext(out string progressText);
+        run.Progress?.SetProgress(run.Run.Started - 1, run.Run.Total, progressText);
         Submit(command);
     }
 
@@ -2048,21 +2036,13 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             return;
         }
-        string note;
-        if (run.Pending.Count == 0)
+        LinePasteStep step = run.Run.AfterCommand(_lastCommandFailed, out string note);
+        if (step == LinePasteStep.EndSilently)
         {
             EndLinePaste();
             return;
         }
-        if (run.Cancelled)
-        {
-            note = "[paste cancelled, " + run.Pending.Count + " command(s) not run]";
-        }
-        else if (run.StopOnError && _lastCommandFailed)
-        {
-            note = "[paste stopped after a failed command, " + run.Pending.Count + " command(s) not run]";
-        }
-        else
+        if (step == LinePasteStep.Continue)
         {
             return;
         }
@@ -2073,10 +2053,9 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     protected override bool CancelActivePaste()
     {
         LinePaste run = _linePaste;
-        if (run != null && !run.Cancelled)
+        if (run != null && run.Run.Cancel())
         {
-            run.Cancelled = true;
-            run.Progress?.SetProgress(run.Started, run.Total, "Cancelling after the current command...");
+            run.Progress?.SetProgress(run.Run.Started, run.Run.Total, "Cancelling after the current command...");
             if (_inputLine != null)
             {
                 EndLinePaste();

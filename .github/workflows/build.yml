@@ -282,6 +282,9 @@ jobs:
       - name: Run input region map checks (the text of a command line edited in place, and its indices and positions over several rows)
         run: dotnet run --project tests/InputRegionMapTests -c Release
 
+      - name: Run line paste checks (the state of a paste line by line, its progress text, its notes and the cancel)
+        run: dotnet run --project tests/LinePasteRunTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
