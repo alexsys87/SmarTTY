@@ -300,6 +300,7 @@
             <Image Source="../icons/terminal.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="WPF _hex editor lab..." Click="HexLab_Click" ToolTip="Tries the hex editor drawn with WPF (stage 3B of the move from WinForms) on a file of this computer: keys, mouse, scrolling, tool tip and colours; the bytes can be changed but are never saved" />
         <MenuItem Header="Command _completions..." Click="CommandCompletionsEditor_Click" ToolTip="Edit or create the options that the Smart Terminal suggests for commands (CommandCompletions.xml); can store the file compressed">
           <MenuItem.Icon>
             <Image Source="../icons/edit16.png" />

@@ -300,6 +300,12 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.SetupPublicKey();
     }
 
+    // Tools > WPF hex editor lab: the WPF hex view of stage 3B on a local file, before it goes into the editor tab.
+    private void HexLab_Click(object sender, RoutedEventArgs e)
+    {
+        new HexView.HexLabWindow(Controller.Settings).Show();
+    }
+
     private void QuickCommands_Click(object sender, RoutedEventArgs e)
     {
         Controller.ShowQuickCommands();
