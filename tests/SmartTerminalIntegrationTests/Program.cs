@@ -968,31 +968,26 @@ internal static class Program
             Done = () => CaretIndex(terminal) == 0,
             TimeoutMs = 3000
         };
-        // At the end of a row the caret and the start of the next row are the same index of the text: a press of Right there moves the caret to the
-        // start of the next row and the index stays (recorded as it is). Which presses those are depends on the width of the screen, so the checks are
-        // on what each press does, not on the number of the row.
+        // At the end of a row the caret and the start of the next row are the same index of the text: Right and Left move by one index, so no press is
+        // spent on going from the one place to the other. Which presses cross a row depends on the width of the screen, so the checks are on what each
+        // press does, not on the number of the row.
         int stays = 0;
         string wrongStep = null;
         yield return new Step
         {
-            Name = "Right goes on across the rows of the line: the index grows by one, or stays when the caret goes to the start of the next row",
+            Name = "Right goes on across the rows of the line: the index grows by one with every press",
             Act = () =>
             {
                 for (int i = 0; i < 250; i++)
                 {
                     int before = CaretIndex(terminal);
-                    int lineBefore = terminal.CaretPosition.Line;
                     Key(terminal, Keys.Right);
                     int after = CaretIndex(terminal);
                     if (after == before)
                     {
                         stays++;
-                        if (terminal.CaretPosition.Column != 0 || terminal.CaretPosition.Line != lineBefore + 1)
-                        {
-                            wrongStep = "the index stayed but the caret is at " + terminal.CaretPosition.Column + "," + terminal.CaretPosition.Line + " after " + lineBefore;
-                        }
                     }
-                    else if (after != before + 1)
+                    if (after != before + 1)
                     {
                         wrongStep = "the index went from " + before + " to " + after;
                     }
@@ -1004,7 +999,7 @@ internal static class Program
                 {
                     Console.WriteLine("  " + wrongStep);
                 }
-                return wrongStep == null && stays >= 1 && CaretIndex(terminal) == 250 - stays;
+                return wrongStep == null && stays == 0 && CaretIndex(terminal) == 250;
             },
             TimeoutMs = 3000
         };
@@ -1024,15 +1019,29 @@ internal static class Program
         };
         yield return new Step
         {
-            Name = "Left goes back across the rows",
+            Name = "Left goes back across the rows: the index falls by one with every press",
             Act = () =>
             {
+                wrongStep = null;
                 for (int i = 0; i < 250; i++)
                 {
+                    int before = CaretIndex(terminal);
                     Key(terminal, Keys.Left);
+                    int after = CaretIndex(terminal);
+                    if (after != before - 1)
+                    {
+                        wrongStep = "the index went from " + before + " to " + after;
+                    }
                 }
             },
-            Done = () => CaretIndex(terminal) == 0,
+            Done = () =>
+            {
+                if (wrongStep != null)
+                {
+                    Console.WriteLine("  " + wrongStep);
+                }
+                return wrongStep == null && CaretIndex(terminal) == 0;
+            },
             TimeoutMs = 5000
         };
         yield return new Step

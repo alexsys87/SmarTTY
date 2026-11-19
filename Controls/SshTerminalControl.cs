@@ -1005,6 +1005,17 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
                 movedPosition = _inputLine.Region.PositionAt(boundary);
             }
         }
+        if ((caretMove == CaretMove.Left || caretMove == CaretMove.Right) && _inputLine != null)
+        {
+            // The end of a row and the start of the next one are the same index of the text: Left and Right move by one index, so that no press is spent on
+            // going from the one place to the other (the base moves by columns and rows).
+            int index = _inputLine.Region.IndexOf(textPosition);
+            string text = _inputLine.Text;
+            if (text != null && index >= 0 && index <= text.Length)
+            {
+                movedPosition = _inputLine.Region.PositionAt(caretMove == CaretMove.Right ? Math.Min(index + 1, text.Length) : Math.Max(index - 1, 0));
+            }
+        }
         InputLine inputLine = _inputLine;
         if (inputLine != null && movedPosition < inputLine.StartPosition)
         {
