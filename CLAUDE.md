@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 133 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 134 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -98,7 +98,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A-1 (the content of the file and the switching between the text and the hex view out of `RemoteFileEditor`) done, see "Stage 3"; next 3A-2, the state of the loading and the saves |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; next 3B, the hex view on WPF |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -432,3 +432,38 @@ back to the file's in the hex view, the encoding rule in the hex view on its own
 `RemoteFileEditor.cs` is 1420 lines before and 1233 after. Next, 3A-2: the state of the loading and the saves that the editor keeps in fields
 (`_loaded`, `_reloading`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`, what a reload restores) and the
 decisions of `Save`, `SaveInBackground`, `FinishBackgroundSave` and `FinishLoading` that need no control.
+
+Done in 3A-2: first a net for the paths of the loading and the saves that the Mono stand did not take: `tests/RemoteFileEditorIntegrationTests`
+has a `flow` scenario (before the file is loaded nothing can be saved, switched, read again, followed or run, and a save on close, a background
+save and a reload do nothing; the caret of a compiler message in screen columns after a tab; while the file is loaded again a save throws and
+says so, a save on close shows that and keeps the tab, a background save does not start and a second reload does nothing, and the caret comes
+back; a reload that fails (the file made unreadable) keeps the text of the user, modified and editable; a refused write asks about sudo, and
+answered No it cancels the save on close, keeps the tab and leaves the background save silent; the check of a script answered No puts the caret
+on the line it named; a service reload answered Yes that fails offers sudo), recorded on the code before the move (378 checks before, 440
+after: both servers); of seven mutations of the old code five make it fail, one is an equivalent change (`TrySave` before the load: `Save`
+does nothing then either) and one hangs the stand. One check was made looser afterwards in a commit of its own: once on Dropbear the reload
+command of nginx got no exit code (a channel the SSH layer closed early, as in A4a), and the question then has no "(exit code N)"; the
+editor offers sudo all the same, which is what is checked. Then the flow is `CodeEditing/RemoteFileFlow.cs` (public): `IsLoaded`,
+`IsReloading`, `IsSaving` with `SavingChanged`, the signature a save compares with, a save asked for while one runs, a reload asked for by
+the answer No to a conflict, the upload event of a background save; `CanSave`, `CanToggleHexMode`, `CanReopenWithEncoding`, `CanFollowLog`;
+`FinishLoading` (the state part: the signature, the backup, loaded), `LoadFailed` (the old `HandleLoadError`), `Reload`, `TrySave`,
+`Save` (the wait for a background save, the conflict question, sudo, the clean-up), `SaveInBackground` (the body of its thread),
+`FinishBackgroundSave` (an error, the conflict and its three answers, the check of the file, sudo, a superseded save, a save asked for
+meanwhile, a reload), the decision part of `HandleValidationFailure`, `ReloadToOffer`, `OfferReload`, `FinishReload`, `SaveWithSudo` and
+`CompleteSave`; the code is as it was. The editor is reached through `CodeEditing/IRemoteFileFlowHost` (`PrepareSave`; `Ask` with the
+buttons and a `PromptIcon` (question or warning), `Inform`, `ReportError`; the inline messages of the check and going to the first problem;
+the setting of the service reload offer; the check of the connection; a thread of its own, the pool and a post to the UI thread, which is
+the old `BeginInvoke` with its catch; clearing the messages, what a reload keeps of the view (the caret, the offset of the hex view, the
+folds, both views read-only) and starting the loading thread; the text read-only; the `LoadFailed` event; dropping the draft), which
+`RemoteFileEditor` implements explicitly. What stays in the editor: `FinishLoading` (the draft question, the document, the draft timer, the
+caret, the hex view and the folds that a reload puts back), `PrepareSave` (it reads the settings), the drafts, `CanRunInTerminal` (it reads
+the first line). `tests/RemoteFileFlowTests` (net8.0, 88 checks) drives the model with a fake editor that logs what it is asked and keeps the
+threads, the pool and the posts it is given in queues that the checks run, and a fake connection under the real `RemoteFileServer` and
+`RemoteFileSaver`; the session, the content and the loader are the real classes. Of 38 mutations of the model 31 made a check fail at once,
+six led to checks (the check of the file not run on close, the conflict check skipped after "overwrite", the error of a superseded save, the
+check skipped after a conflict answered No, a save again after the check answered Yes for a text that was not edited, the offer of a service
+reload when a save asked for meanwhile runs) and one is an equivalent change (`TrySave` during a reload: a reload needs a loaded file).
+`RemoteFileEditor.cs` is 1233 lines before and 969 after (1420 before 3A). This ends 3A: what is left in `RemoteFileEditor` is the view (the
+text and the hex view, focus, colours, the clipboard, the questions with their icons as `ThemedMessageBox`, the threads as `Thread`,
+`ThreadPool` and `BeginInvoke`, the draft timer and question, `FinishLoading` on the document). Next, 3B: the hex view on WPF under
+`IRemoteHexView` (the window and the host show it in place of the WinForms control).
