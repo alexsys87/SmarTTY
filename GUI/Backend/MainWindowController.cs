@@ -406,7 +406,7 @@ public class MainWindowController : INotifyPropertyChanged
             newTab.EditorPanel.HexViewOptionsChanged += (object sender, EventArgs e) =>
             {
                 // The next hex view opens with the byte order, the groups and the row width chosen last.
-                HexEditorControl hex = editor.HexEditor;
+                IHexEditorView hex = editor.HexEditor;
                 _Controller.Settings.Editor.HexBytesPerRow = hex.BytesPerRow;
                 _Controller.Settings.Editor.HexGroupSize = hex.GroupSize;
                 _Controller.Settings.Editor.HexBigEndian = hex.BigEndian;

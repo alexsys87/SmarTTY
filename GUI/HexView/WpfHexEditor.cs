@@ -12,7 +12,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
-using DrawingColor = System.Drawing.Color;
 
 namespace SmarTTY.GUI.HexView;
 
@@ -24,7 +23,7 @@ namespace SmarTTY.GUI.HexView;
 /// characters with <see cref="GlyphRun"/>s, one for each run of bytes of one colour in a row. Not yet in it: the data inspector (the flag is kept
 /// and reported) and the context menu, which the tab gives it.
 /// </summary>
-internal sealed class WpfHexEditor : FrameworkElement, IRemoteHexView, IHexViewStatus, IHexLayoutView
+internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayoutView
 {
     // How strongly a marked block tints the background (as in HexEditorControl).
     private const byte HighlightAlpha = 100;
@@ -499,9 +498,9 @@ internal sealed class WpfHexEditor : FrameworkElement, IRemoteHexView, IHexViewS
     }
 
     /// <summary>Marks the selected bytes (the byte under the caret without a selection) with a colour and a label.</summary>
-    public bool HighlightSelection(DrawingColor color, string label)
+    public bool HighlightSelection(RgbColor color, string label)
     {
-        return _model.HighlightSelection(DrawingColor.FromArgb(255, color).ToArgb(), label);
+        return _model.HighlightSelection(RgbColor.FromArgb(255, color.R, color.G, color.B).ToArgb(), label);
     }
 
     /// <summary>Removes the colour from the selected bytes, or the whole block under the caret without a selection.</summary>
@@ -1109,6 +1108,8 @@ internal sealed class WpfHexEditor : FrameworkElement, IRemoteHexView, IHexViewS
     {
         InvalidateVisual();
     }
+
+    bool IHexEditorView.Focused => IsKeyboardFocusWithin;
 
     // ---- drawing (in device pixels: the drawing is scaled back by the DPI)
 

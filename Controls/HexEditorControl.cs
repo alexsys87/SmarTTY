@@ -22,20 +22,6 @@ public sealed class HexSearchEventArgs : EventArgs
     public int Length { get; internal set; }
 }
 
-/// <summary>A colour the hex editor offers for marking bytes, with the name shown in the menus.</summary>
-public sealed class HexHighlightColor
-{
-    public HexHighlightColor(string name, Color color)
-    {
-        Name = name;
-        Color = color;
-    }
-
-    public string Name { get; }
-
-    public Color Color { get; }
-}
-
 /// <summary>
 /// A full hex editor over a <see cref="HexDocument"/>: the offset, the hexadecimal bytes and the ASCII column, with
 /// the caret and the selection, overwrite and insert modes, the clipboard, undo and redo, and a search that is
@@ -44,24 +30,13 @@ public sealed class HexHighlightColor
 /// remote file editor saves the bytes (see <see cref="RemoteFileEditor"/>). The control draws its own scroll bars,
 /// because the WPF scroll bars of the text editor are hidden in hex mode.
 /// </summary>
-public sealed class HexEditorControl : Control, IHexViewStatus, IRemoteHexView, IHexLayoutView
+public sealed class HexEditorControl : Control, IHexEditorView, IHexLayoutView
 {
     /// <summary>The row widths the view offers.</summary>
     public static readonly int[] BytesPerRowChoices = HexViewChoices.BytesPerRow;
 
     /// <summary>The group sizes the view offers: single bytes, 16-, 32- and 64-bit words.</summary>
     public static readonly int[] GroupSizeChoices = HexViewChoices.GroupSize;
-
-    /// <summary>The colours offered for marking bytes.</summary>
-    public static readonly HexHighlightColor[] HighlightColors =
-    {
-        new HexHighlightColor("Yellow", Color.FromArgb(255, 214, 0)),
-        new HexHighlightColor("Green", Color.FromArgb(60, 200, 90)),
-        new HexHighlightColor("Blue", Color.FromArgb(50, 150, 255)),
-        new HexHighlightColor("Red", Color.FromArgb(255, 80, 80)),
-        new HexHighlightColor("Orange", Color.FromArgb(255, 150, 30)),
-        new HexHighlightColor("Purple", Color.FromArgb(170, 110, 255))
-    };
 
     // How strongly a marked block tints the background (the text stays readable in light and dark themes).
     private const int HighlightAlpha = 100;
@@ -543,6 +518,11 @@ public sealed class HexEditorControl : Control, IHexViewStatus, IRemoteHexView, 
     public bool HighlightSelection(Color color, string label)
     {
         return _model.HighlightSelection(Color.FromArgb(255, color).ToArgb(), label);
+    }
+
+    bool IHexEditorView.HighlightSelection(RgbColor color, string label)
+    {
+        return HighlightSelection(color.ToColor(), label);
     }
 
     /// <summary>Removes the colour from the selected bytes, or the whole block under the caret without a selection.</summary>

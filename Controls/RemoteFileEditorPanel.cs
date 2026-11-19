@@ -141,7 +141,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
             RefreshState();
         };
         _editor.ContextMenuStrip = _contextMenu;
-        _editor.HexEditor.ContextMenuStrip = _contextMenu;
+        _editor.HexEditorControl.ContextMenuStrip = _contextMenu;
 
         _editor.Dock = DockStyle.Fill;
         Controls.Add(_editor);
@@ -324,7 +324,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         bool hex = _editor.IsHexMode;
         if (hex)
         {
-            HexEditorControl hexEditor = _editor.HexEditor;
+            IHexEditorView hexEditor = _editor.HexEditor;
             return new EditorCommandState
             {
                 ReadOnly = hexEditor.ReadOnly,

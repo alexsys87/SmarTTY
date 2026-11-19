@@ -1,6 +1,7 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.IO;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
@@ -141,7 +142,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             return;
         }
-        HexEditorControl hex = Editor.HexEditor;
+        IHexEditorView hex = Editor.HexEditor;
         try
         {
             switch (kind)
@@ -149,14 +150,14 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 case HexDialogKind.Highlight:
                 {
                     HexHighlight current = hex.HighlightAtCaret;
-                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexEditorControl.HighlightColors[0].Color;
+                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexViewChoices.HighlightColors[0].Color.ToColor();
                     int start = hex.HasSelection ? hex.SelectionStart : hex.CaretOffset;
                     int count = hex.HasSelection ? hex.SelectionLength : 1;
-                    string target = HexEditorControl.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
+                    string target = HexEditingModel.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
                     HexHighlightWindow window = new HexHighlightWindow(color, current?.Label ?? "", target);
                     if (window.ShowDialog() == true)
                     {
-                        hex.HighlightSelection(window.SelectedColor, window.Label);
+                        hex.HighlightSelection(window.SelectedColor.ToRgb(), window.Label);
                     }
                     break;
                 }

@@ -430,7 +430,7 @@ internal static class Program
         Check(source.IsHexMode, "the hex view is on");
         IHexViewStatus hex = source.HexView;
         Equal(hex.Length, o.Editor.HexEditor.Length, "the size of the file in the hex view");
-        Check(hex.InsertMode == !o.Editor.HexEditor.OverwriteMode && hex.CaretOffset == o.Editor.HexEditor.CaretOffset && hex.SelectionLength == o.Editor.HexEditor.SelectionLength, "the caret, the selection and the typing mode are the hex editor's");
+        Check(hex.InsertMode == o.Editor.HexEditor.InsertMode && hex.CaretOffset == o.Editor.HexEditor.CaretOffset && hex.SelectionLength == o.Editor.HexEditor.SelectionLength, "the caret, the selection and the typing mode are the hex editor's");
         hex.BigEndian = true;
         Check(o.Editor.HexEditor.BigEndian && hex.BigEndian, "the byte order can be changed");
         hex.BytesPerRow = 32;
@@ -812,12 +812,12 @@ internal static class Program
 
         e.ToggleHexMode();
         Equal(Events(events), "modified:False,hex:True,format", "opening the hex view tells the modified state, the view and the format, in this order");
-        Check(e.IsHexMode && e.HexEditor.Visible && !e.HexEditor.ReadOnly && e.ReadOnly, "the hex view is shown and can be edited, the text is read-only");
+        Check(e.IsHexMode && e.HexEditorControl.Visible && !e.HexEditor.ReadOnly && e.ReadOnly, "the hex view is shown and can be edited, the text is read-only");
         SameBytes(e.HexEditor.Document.ToArray(), Bytes("abc\ndef\n"), "the hex view shows the bytes of the file");
         Check(!e.IsModified, "a file that was not changed is not modified in the hex view");
         e.ToggleHexMode();
         Equal(Events(events), "modified:False,hex:False,format", "closing it tells the same, in the same order");
-        Check(!e.IsHexMode && !e.HexEditor.Visible && e.HexEditor.ReadOnly && !e.ReadOnly, "the text is shown and can be edited again, the hex view is read-only");
+        Check(!e.IsHexMode && !e.HexEditorControl.Visible && e.HexEditor.ReadOnly && !e.ReadOnly, "the text is shown and can be edited again, the hex view is read-only");
         Equal(Text(o), "abc\ndef\n", "the text is the one before");
         Check(!e.IsModified, "and it is not modified");
 
@@ -857,7 +857,7 @@ internal static class Program
         Prompted(server, "lossy no", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.No : (DialogResult?)null, () => e.ToggleHexMode());
         string lossy = OnlyPrompt(server, "bytes that are not UTF-8");
         Check(lossy.Contains("Not all bytes can be shown as text in UTF-8") && lossy.Contains("Show the bytes as text anyway?"), "the editor says that the bytes cannot be shown as text and asks");
-        Check(e.IsHexMode && e.HexEditor.Visible, "answered No: the hex view stays");
+        Check(e.IsHexMode && e.HexEditorControl.Visible, "answered No: the hex view stays");
         Prompted(server, "lossy yes", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.Yes : (DialogResult?)null, () => e.ToggleHexMode());
         Check(!e.IsHexMode, "answered Yes: the text is shown");
         Equal(Text(o), "\uFFFDBC\nD\r\n", "the byte that is not UTF-8 is shown as U+FFFD");
@@ -895,7 +895,7 @@ internal static class Program
         Check(e.HexEditor.ReadOnly && e.ReadOnly && !e.CanSave && !e.CanToggleHexMode, "while the file is loaded again neither view can be edited");
         Pump(() => e.CanSave, "the file to be loaded again");
         Settle(server);
-        Check(e.IsHexMode && e.HexEditor.Visible && !e.HexEditor.ReadOnly, "the hex view is open again");
+        Check(e.IsHexMode && e.HexEditorControl.Visible && !e.HexEditor.ReadOnly, "the hex view is open again");
         SameBytes(e.HexEditor.Document.ToArray(), Bytes("reloaded bytes\n"), "on the bytes that are on the server now");
         Equal(e.HexEditor.CaretOffset, 3, "at the same offset");
         Check(!e.IsModified, "not modified");
@@ -918,7 +918,7 @@ internal static class Program
         events.Clear();
         e.ReopenWithEncoding(TextFileEncodings.Windows1251);
         Equal(Events(events), "hex:False,format", "a new encoding in the hex view tells the text view and the format");
-        Check(!e.IsHexMode && !e.HexEditor.Visible && e.HexEditor.Length == 0 && !ReferenceEquals(e.HexEditor.Document, shown), "and forgets the hex view (it shows an empty document)");
+        Check(!e.IsHexMode && !e.HexEditorControl.Visible && e.HexEditor.Length == 0 && !ReferenceEquals(e.HexEditor.Document, shown), "and forgets the hex view (it shows an empty document)");
         Check(e.FileEncoding == TextFileEncodings.Windows1251 && !e.IsModified, "the file is read in the encoding that was chosen");
 
         // Not here: a text that the encoding cannot store (the editor says so and stays in the text), because the encodings of Mono do not
@@ -945,7 +945,7 @@ internal static class Program
         o = null;
         Prompted(server, "hex draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogResult.Yes : (DialogResult?)null, () => o = Open(server, "hexdraft.bin"));
         OnlyPrompt(server, "a file with a draft of the hex view");
-        Check(o.Editor.IsHexMode && o.Editor.HexEditor.Visible, "answered Yes: the draft of the bytes is shown in the hex view");
+        Check(o.Editor.IsHexMode && o.Editor.HexEditorControl.Visible, "answered Yes: the draft of the bytes is shown in the hex view");
         SameBytes(o.Editor.HexEditor.Document.ToArray(), new byte[] { (byte)'0', 0x80, (byte)'2', (byte)'3', (byte)'\n' }, "with the bytes of the draft");
         Check(o.Editor.IsModified, "as an unsaved change");
         Equal(Text(o), "0123\n", "the text behind it is the file");

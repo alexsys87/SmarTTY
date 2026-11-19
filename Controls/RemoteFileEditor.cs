@@ -61,7 +61,10 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     private HexEditorControl _hexEditor;
 
     /// <summary>The hex view of the file.</summary>
-    public HexEditorControl HexEditor => _hexEditor;
+    public IHexEditorView HexEditor => _hexEditor;
+
+    /// <summary>The hex view as a WinForms control (for the context menu of the panel).</summary>
+    internal HexEditorControl HexEditorControl => _hexEditor;
 
     /// <summary>The editor shows the bytes instead of the text.</summary>
     public bool IsHexMode => _content != null && _content.HexMode;
