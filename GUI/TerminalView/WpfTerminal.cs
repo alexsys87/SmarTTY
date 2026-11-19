@@ -87,7 +87,6 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         _view.ContextMenuRequested += OnContextMenuRequested;
         _view.CtrlTabPressed += shift => CtrlTabPressed?.Invoke(this, shift);
         _view.PreviewTerminalKey += OnPreviewTerminalKey;
-        _view.TerminalFontFamily = new FontFamily("Consolas");
     }
 
     // The key layout of the application (VisualTTY/XTermKeys.xml), read once.
@@ -256,9 +255,9 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         }
         if (font != null)
         {
-            _view.TerminalFontFamily = new FontFamily(font.FontFamily.Name);
-            // Points to device-independent pixels (1/96 inch); WPF scales them to the DPI of the monitor itself.
-            _view.TerminalFontSize = Math.Max(4, font.SizeInPoints * 96.0 / 72.0);
+            // The font of the settings, as the WinForms terminal used it: the family, the size in points (to device-independent pixels, 1/96
+            // inch; WPF scales them to the DPI of the monitor itself), bold and italic.
+            _view.SetFont(new FontFamily(font.FontFamily.Name), Math.Max(4, font.SizeInPoints * 96.0 / 72.0), font.Bold, font.Italic);
         }
         else
         {

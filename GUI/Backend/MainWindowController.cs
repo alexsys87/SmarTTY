@@ -2211,10 +2211,11 @@ public class MainWindowController : INotifyPropertyChanged
         terminal.PasteLineBreak = "\r";
         terminal.ContextMenuReference = _TerminalContextMenu;
         terminal.AutoWrap = Settings.AutoWrapLines;
+        // The font of the settings, or the default of the WinForms terminal (Courier New, 12 points) when none is set; EffectiveFont is both.
         Font configuredFont = null;
         try
         {
-            configuredFont = Settings.ConfiguredFont;
+            configuredFont = Settings.EffectiveFont;
         }
         catch
         {

@@ -434,7 +434,10 @@ and `EditorControl` is null for a WPF tab. `Controls/PasteAnchor` is what a past
 channel and the window on the thread of the input dispatcher; the `Tag` of a WPF element is a dependency property that throws off the UI thread, so
 no output was shown and no key reached the shell (only the caret blinked). `WpfTerminal` hides it with `public new object Tag` on a field, the
 members of `ITerminalSurface` that other threads call are listed on the interface, the retry of a shell on a key press is posted to the UI thread,
-and a frame of the view that throws no longer stops the next ones (`TerminalFrameStats.FrameErrors`, shown in the lab). Not ported, on purpose: the warning of
+and a frame of the view that throws no longer stops the next ones (`TerminalFrameStats.FrameErrors`, shown in the lab). A second one: the font was not that of
+the WinForms terminal: a tab took `Settings.ConfiguredFont`, which is null when nothing is set (the WinForms terminal kept Courier New 12 points of
+its designer then, the WPF one used Consolas), and bold and italic of the settings were dropped; a tab takes `Settings.EffectiveFont` now (the
+setting or Courier New 12), `TerminalRenderView.SetFont` takes the weight and the style, and the default of the view is Courier New 16 pixels. Not ported, on purpose: the warning of
 Ctrl+Insert (it copies and sends nothing now), the timestamps margin (never shown in a classic tab).
 
 Not in 2A/2B: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the

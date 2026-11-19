@@ -131,9 +131,14 @@ internal sealed class TerminalRenderView : FrameworkElement
 
     private TerminalFont _font;
 
-    private FontFamily _fontFamily = new FontFamily("Consolas");
+    // The font of the WinForms terminal when nothing is set (ReadonlyTextBrowser.Designer: Courier New, 12 points = 16 device-independent pixels).
+    private FontFamily _fontFamily = new FontFamily("Courier New");
 
-    private double _fontSize = 13;
+    private FontWeight _fontWeight = FontWeights.Normal;
+
+    private FontStyle _fontStyle = FontStyles.Normal;
+
+    private double _fontSize = 16;
 
     private bool _dirty;
 
@@ -384,6 +389,16 @@ internal sealed class TerminalRenderView : FrameworkElement
             _fontFamily = value;
             ResetFont();
         }
+    }
+
+    /// <summary>Sets the whole font at once (the cells are measured once): the family, the size in device-independent pixels, bold, italic.</summary>
+    public void SetFont(FontFamily family, double size, bool bold, bool italic)
+    {
+        _fontFamily = family;
+        _fontSize = size;
+        _fontWeight = bold ? FontWeights.Bold : FontWeights.Normal;
+        _fontStyle = italic ? FontStyles.Italic : FontStyles.Normal;
+        ResetFont();
     }
 
     public double TerminalFontSize
@@ -662,7 +677,7 @@ internal sealed class TerminalRenderView : FrameworkElement
         if (_font == null)
         {
             double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-            _font = new TerminalFont(_fontFamily, _fontSize, pixelsPerDip);
+            _font = new TerminalFont(_fontFamily, _fontSize, pixelsPerDip, _fontWeight, _fontStyle);
         }
         return _font;
     }

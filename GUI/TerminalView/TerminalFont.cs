@@ -26,10 +26,16 @@ internal sealed class TerminalFont
     private readonly Dictionary<int, KeyValuePair<GlyphTypeface, ushort>> _fallbackGlyphs = new Dictionary<int, KeyValuePair<GlyphTypeface, ushort>>();
 
     public TerminalFont(FontFamily family, double emSize, double pixelsPerDip)
+        : this(family, emSize, pixelsPerDip, FontWeights.Normal, FontStyles.Normal)
+    {
+    }
+
+    /// <summary>A font in a weight and a style (the bold and italic of the font settings; WPF simulates them when the family has no such face).</summary>
+    public TerminalFont(FontFamily family, double emSize, double pixelsPerDip, FontWeight weight, FontStyle style)
     {
         EmSize = emSize;
         PixelsPerDip = pixelsPerDip <= 0 ? 1 : pixelsPerDip;
-        Typeface = new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        Typeface = new Typeface(family, style, weight, FontStretches.Normal);
         if (!Typeface.TryGetGlyphTypeface(out GlyphTypeface face))
         {
             // A composite font (a family of the system that maps to several fonts) has no glyph typeface: the first fallback is used.
