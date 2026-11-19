@@ -164,6 +164,7 @@ internal static class Program
         Equal(session.OnTextChanged("re", 2, 1, 0), false, "a letter taken out goes on");
         Equal(Join(popup.Items), "reboot|rename", "the list is wider again");
         Equal(session.OnTextChanged("re x", 3, 0, 1), true, "an edit after the end of the word ends the session");
+        Equal(session.OnTextChanged("r", 1, 3, 0), true, "an edit that starts inside the word and reaches past its end ends the session");
         Equal(session.OnTextChanged("re", 0, 0, 0), false, "an edit at the start of the word is inside it");
         Equal(session.OnTextChanged("xre", 0, 0, 1) , false, "a letter put in front of the word is inside it");
         Equal(popup.Filter, "xre", "the word is longer");
