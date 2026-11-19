@@ -391,7 +391,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     // Variables set with "export" (a null value: "unset"), in the order they were set: a later value may refer to an
     // earlier one. They are applied in front of every command, since each command runs in a new channel.
-    private List<KeyValuePair<string, string>> _environment = new List<KeyValuePair<string, string>>();
+    private SessionEnvironment _environment = new SessionEnvironment();
 
     private List<CommandRun> _runs = new List<CommandRun>();
 
@@ -417,10 +417,10 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     public SshSession Session => _context.Session;
 
-    public bool HasEnvironment => _environment.Count > 0;
+    public bool HasEnvironment => _environment.Any;
 
     /// <summary>Variables exported in this tab (for completing $NAME).</summary>
-    public IEnumerable<string> EnvironmentNames => _environment.ToArray().Where((KeyValuePair<string, string> item) => item.Value != null).Select((KeyValuePair<string, string> item) => item.Key);
+    public IEnumerable<string> EnvironmentNames => _environment.Names;
 
     public string HomeDirectory => _homeDirectory;
 
@@ -1730,16 +1730,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         // Quoted as a single word: a directory name with a quote, $ or ` used to break every command.
         string text = "cd " + RemotePathUtils.ShellQuote(_currentDirectory) + " && ";
         interactive = interactive ?? _context.VTSettings.InteractiveModeWrapper;
-        // "export A=1 && cmd" rather than "A=1 cmd": with the latter $A in the command itself was expanded before the
-        // assignment ("echo $A" printed nothing) and the variable did not reach the other commands of a pipeline.
-        StringBuilder exports = new StringBuilder();
-        // A copy: completion threads build commands while the UI thread may change the list.
-        foreach (KeyValuePair<string, string> item in _environment.ToArray())
-        {
-            exports.Append(item.Value == null ? "unset " + item.Key : "export " + item.Key + "=" + item.Value);
-            exports.Append(" && ");
-        }
-        command = exports + command;
+        command = _environment.BuildExports() + command;
         if (interactive.Value)
         {
             // bash, or ash on OpenWrt, unless a shell is set by hand; until the shell of the host is known (or if it cannot be
@@ -1840,8 +1831,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
                     }
                     foreach (KeyValuePair<string, string> assignment in assignments)
                     {
-                        _environment.RemoveAll((KeyValuePair<string, string> item) => item.Key == assignment.Key);
-                        _environment.Add(assignment);
+                        _environment.Set(assignment);
                     }
                     ShowPrompt();
                     return true;

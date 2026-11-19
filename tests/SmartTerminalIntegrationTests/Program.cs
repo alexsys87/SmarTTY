@@ -542,6 +542,16 @@ internal static class Program
         yield return Check("cd - returned to the previous directory", () => !terminal.CurrentDirectory.EndsWith("/tmp") && terminal.CurrentDirectory.StartsWith("/"));
         yield return Run(terminal, "export SMARTTY_UNIQUE_VAR=value-42", null, "export is kept");
         yield return Run(terminal, "echo \"[$SMARTTY_UNIQUE_VAR]\"", "[value-42]", "an exported variable reaches the next command");
+        // The variables are applied in front of every command, in the order they were set (TryRunBuiltin, BuildRemoteCommand): a later one may
+        // refer to an earlier one, and one that is set again goes to the end of the list.
+        yield return Run(terminal, "export SM_ENV_A=one", null, "a variable is exported");
+        yield return Run(terminal, "export SM_ENV_B=$SM_ENV_A-two", null, "a variable that refers to an earlier one is kept as it was typed");
+        yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[one-two]", "and it is worked out after the earlier one");
+        yield return Run(terminal, "export SM_ENV_A=three", null, "a variable that is set again replaces the old value");
+        yield return Run(terminal, "echo \"[$SM_ENV_A][$SM_ENV_B]\"", "[three][-two]", "and goes to the end of the list: the one that refers to it is worked out before it");
+        yield return Run(terminal, "unset SM_ENV_B", null, "unset is kept");
+        yield return Run(terminal, "echo \"[$SM_ENV_B]\"", "[]", "an unset variable is gone from the next command");
+        yield return Check("the tab has an environment, and its names are those that have a value", () => terminal.HasEnvironment && terminal.EnvironmentNames.Contains("SM_ENV_A") && !terminal.EnvironmentNames.Contains("SM_ENV_B") && terminal.EnvironmentNames.Contains("SMARTTY_UNIQUE_VAR"));
         yield return Run(terminal, "sh -c 'exit 3'", "[exit code 3]", "a failing command shows its exit code");
         yield return new Step
         {
