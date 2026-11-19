@@ -94,6 +94,13 @@ internal static class Program
         Equal(model.Chunks.Count, 4, "data after a break is a new chunk, even of the same kind");
         Check(model.Chunks[3].Start == 10 && model.Chunks[3].Count == 2 && model.Chunks[3].IsEcho, "that starts where the break was");
 
+        // Data of the kind that the chunk before the break had does not go on in the break.
+        HexTerminalModel afterBreak = new HexTerminalModel();
+        afterBreak.AddData(Bytes(2), 2, false, Start);
+        afterBreak.AddBreak();
+        afterBreak.AddData(Bytes(2), 2, false, Start);
+        Check(afterBreak.Chunks.Count == 3 && afterBreak.Chunks[1].IsBreak && afterBreak.Chunks[1].Count == 0 && afterBreak.Chunks[2].Count == 2 && afterBreak.Chunks[2].Start == 2, "data after a break is a chunk of its own, and the break stays empty");
+
         // The break is in the stream too: a match does not go across it.
         HexTerminalModel other = new HexTerminalModel();
         other.AddData(new byte[] { 1, 2 }, 2, false, Start);
@@ -155,6 +162,8 @@ internal static class Program
         Equal(model.GetSearchStart(false, false, Position(0, 0), Position(3, 1)), 5, "of the two ends of a selection the one in the direction of the search counts (forward: the later)");
         Equal(model.GetSearchStart(true, false, Position(3, 1), Position(0, 0)), 0 - 1, "backward: the earlier");
         Equal(model.GetSearchStart(false, false, Position(3, 1), Position(0, 0)), 5, "forward with the end before the start: the start");
+        Equal(model.GetSearchStart(true, false, Position(3, 1), TextDocument.TextPosition.Invalid), 4, "backward with no end of the selection: the start");
+        Equal(model.GetSearchStart(false, false, Position(3, 1), TextDocument.TextPosition.Invalid), 5, "forward with no end of the selection: the start");
         model.ClearMatch();
         Equal(model.MatchOffset, -1, "the match is forgotten");
         Check(!model.IsMatchSelected(true, Position(6, 0), Position(2, 1)), "and is not selected any more");
@@ -182,6 +191,18 @@ internal static class Program
         end = Position(4, 0);
         HexTerminalModel.HexSelectionToText(ref start, ref end);
         Equal(start.Column + "," + end.Column, "1,2", "an empty selection in the middle of a byte takes the byte");
+        start = Position(4, 1);
+        end = Position(10, 1);
+        HexTerminalModel.HexSelectionToText(ref start, ref end);
+        Equal(start.Column + "," + end.Column, "1,4", "left to right with columns that are not a multiple of three: the start rounds down to the byte it is in, the end up");
+        start = Position(10, 1);
+        end = Position(4, 1);
+        HexTerminalModel.HexSelectionToText(ref start, ref end);
+        Equal(start.Column + "," + end.Column, "4,1", "right to left with such columns: the other way round");
+        start = Position(7, 1);
+        end = Position(2, 1);
+        HexTerminalModel.HexSelectionToText(ref start, ref end);
+        Equal(start.Column + "," + end.Column, "3,1", "right to left again");
 
         // And the other way: a selection of the text view in the HEX view.
         start = Position(1, 1);
@@ -196,6 +217,14 @@ internal static class Program
         end = Position(0, 0);
         HexTerminalModel.TextSelectionToHex(ref start, ref end);
         Equal(start.Column + "," + end.Column, "0,0", "an empty selection at the start does not go below column 0");
+        start = Position(0, 2);
+        end = Position(0, 1);
+        HexTerminalModel.TextSelectionToHex(ref start, ref end);
+        Equal(start.Column + "," + end.Column, "0,0", "right to left from column 0 does not go below it either");
+        start = Position(0, 1);
+        end = Position(0, 2);
+        HexTerminalModel.TextSelectionToHex(ref start, ref end);
+        Equal(start.Column + "," + end.Column, "0,0", "nor left to right to column 0");
     }
 
     private static int Main()
