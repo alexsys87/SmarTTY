@@ -174,6 +174,22 @@ internal static class Program
         Equal(result, "a.txt", "then the names are given");
         Check(host.Unclaimed.Count == 0, "and no text is shown again, the answer was complete");
 
+        // The clock may show 0 when the end marker arrives: that must not look like "not yet", or the wait would start again with the next text.
+        host = new FakeHost();
+        session = Make(host);
+        result = "unset";
+        session.Start("/noprompt", entries => result = Names(entries));
+        host.TickCount = 0;
+        session.Filter(Answer("1", "a.txt\r\n", withPrompt: false));
+        host.TickCount = 300;
+        session.Filter("some more text");
+        host.TickCount = 500;
+        session.CheckTimeout();
+        Check(session.IsListing && result == "unset", "the wait counts from the end marker, also when the clock showed 0 then");
+        host.TickCount = 501;
+        session.CheckTimeout();
+        Equal(result, "a.txt", "and ends there, not later because of text that came in between");
+
         // The connection is gone.
         host = new FakeHost();
         session = Make(host);
