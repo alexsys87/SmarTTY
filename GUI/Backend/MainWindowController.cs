@@ -2567,8 +2567,9 @@ public class MainWindowController : INotifyPropertyChanged
         TerminalTag tag = (TerminalTag)terminal.Tag;
         if (tag.ShellOpenFailed)
         {
-            // The shell could not be reopened after a reconnect: this key press is the retry.
-            tag.Session?.RetryShell(terminal);
+            // The shell could not be reopened after a reconnect: this key press is the retry. The input comes on the thread of the
+            // input dispatcher; the retry works on the tab and its terminal, which belong to the UI thread.
+            BeginInvoke(() => tag.Session?.RetryShell(terminal));
             return;
         }
         if (tag.Writes.IsBusy)

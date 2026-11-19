@@ -14,6 +14,7 @@ using System.Media;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -56,7 +57,7 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     private PasteMode _pasteMode;
 
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private string _linkExtensionsText;
 
@@ -280,6 +281,20 @@ public sealed class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     }
 
     // ITerminalSurface.
+
+    /// <summary>
+    /// What the owner keeps with the terminal (the channel and the session of a tab). Not <see cref="FrameworkElement.Tag"/>: that is a
+    /// dependency property, which only the UI thread may read, and the session reads this one on the thread of the channel (is this output
+    /// still for this terminal?) and the window on the thread that writes the input. Reading the dependency property there threw, so no
+    /// output was shown and no key reached the shell.
+    /// </summary>
+    public new object Tag
+    {
+        get => Volatile.Read(ref _tag);
+        set => Volatile.Write(ref _tag, value);
+    }
+
+    private object _tag;
 
     public bool IsDisposed => _disposed;
 

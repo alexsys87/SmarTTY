@@ -429,7 +429,12 @@ opened on). The window, the session and the menus see a tab's terminal as `Contr
 `TerminalEmulatorControl` implements it in `TerminalEmulatorControl.Surface.cs` for the Smart Terminal); `NormalTabContext.Terminal` is that interface
 and `EditorControl` is null for a WPF tab. `Controls/PasteAnchor` is what a paste needs of its terminal (handle, thread, place on the screen) so that
 `PasteJob`, `PasteMenu` and the progress windows work for both. The lab lost its mirror of a classic tab (the tabs are the WPF terminal now).
-`TerminalRenderModelTests` has 146 checks (byte mode, log colours, links, Clear, new session, search). Not ported, on purpose: the warning of
+`TerminalRenderModelTests` has 148 checks (byte mode, log colours, links, Clear, new session, search, and a check of the source of
+`WpfTerminal` for the fault below). A fault found on the first run on Windows: the session reads the `Tag` of a tab's terminal on the thread of the
+channel and the window on the thread of the input dispatcher; the `Tag` of a WPF element is a dependency property that throws off the UI thread, so
+no output was shown and no key reached the shell (only the caret blinked). `WpfTerminal` hides it with `public new object Tag` on a field, the
+members of `ITerminalSurface` that other threads call are listed on the interface, the retry of a shell on a key press is posted to the UI thread,
+and a frame of the view that throws no longer stops the next ones (`TerminalFrameStats.FrameErrors`, shown in the lab). Not ported, on purpose: the warning of
 Ctrl+Insert (it copies and sends nothing now), the timestamps margin (never shown in a classic tab).
 
 Not in 2A/2B: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl`, and search, the context menu, links, the Smart Terminal and the

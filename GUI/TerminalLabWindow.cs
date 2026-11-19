@@ -218,6 +218,7 @@ internal sealed class TerminalLabWindow : Window
             .Append(", moved/kept ").Append(stats.LastRowsReused)
             .Append(" | rows kept overall ").Append(reuse.ToString("0", CultureInfo.InvariantCulture)).Append('%')
             .Append(" | budget hits ").Append(stats.BudgetHits)
+            .Append(" | frame errors ").Append(stats.FrameErrors)
             .Append(" | waiting ").Append(_view.PendingOutput).Append(" chars");
         if (_benchmarkClock != null)
         {

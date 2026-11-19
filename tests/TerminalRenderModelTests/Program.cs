@@ -78,6 +78,7 @@ internal static class Program
             BenchmarkScriptChecks();
             ClassicTerminalChecks();
             SearchChecks();
+            ThreadingSourceChecks();
         }
         catch (Exception exception)
         {
@@ -508,5 +509,25 @@ internal static class Program
         Equal(found.Line + ":" + found.Column, "1:6", "inside a scope");
         found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("zeta", true), false, true, none, none, out length);
         Check(!found.IsValid, "no match");
+    }
+
+    // The session reads the Tag of a tab's terminal on the thread of the channel and the window on the thread of the input. A WPF element's own
+    // Tag is a dependency property that throws there: with it no output was shown and no key reached the shell. The WPF terminal must hide it
+    // with a field of its own (the WPF view cannot run on Linux, so its source is checked).
+    private static void ThreadingSourceChecks()
+    {
+        string directory = AppContext.BaseDirectory;
+        while (directory != null && !System.IO.File.Exists(System.IO.Path.Combine(directory, "SmarTTY.sln")))
+        {
+            directory = System.IO.Path.GetDirectoryName(directory);
+        }
+        if (directory == null)
+        {
+            Console.WriteLine("SKIP: the repository was not found, the source checks are not run");
+            return;
+        }
+        string terminal = System.IO.File.ReadAllText(System.IO.Path.Combine(directory, "GUI", "TerminalView", "WpfTerminal.cs"));
+        Check(terminal.Contains("public new object Tag"), "the WPF terminal hides the dependency property Tag with one that any thread may read");
+        Check(terminal.Contains("Volatile.Read(ref _tag)"), "its Tag is a plain field");
     }
 }

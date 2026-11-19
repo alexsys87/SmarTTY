@@ -7,8 +7,10 @@ namespace SmarTTY.Controls;
 /// <summary>
 /// The terminal of a tab as the window, the session and the menus use it, whatever draws it: the WPF terminal of stage 2
 /// (<c>GUI/TerminalView/WpfTerminal</c>) or, until the Smart Terminal moves to WPF too, the WinForms <see cref="TerminalEmulatorControl"/>.
-/// Every member is one that the code outside the control called on it. All calls come from the UI thread, except
-/// <see cref="EnqueueOutput"/> and <see cref="WriteLog"/>, which the reading thread of the channel calls.
+/// Every member is one that the code outside the control called on it. Most calls come from the UI thread; these come from other threads
+/// too and must not touch anything that belongs to the UI thread (a WPF dependency property throws there): <see cref="Tag"/>,
+/// <see cref="IsDisposed"/> and <see cref="ByteOrientedLineEditing"/> (the reading thread of the channel and the thread of the input
+/// dispatcher), <see cref="EnqueueOutput"/> and <see cref="WriteLog"/> (the reading thread of the channel).
 /// </summary>
 public interface ITerminalSurface
 {

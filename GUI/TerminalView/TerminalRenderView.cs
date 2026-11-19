@@ -47,6 +47,9 @@ internal sealed class TerminalFrameStats
     /// <summary>Frames whose parsing stopped at the time budget, the rest of the output waiting for the next frame.</summary>
     public long BudgetHits;
 
+    /// <summary>Frames that threw (written to the debug output; the lab window shows the count).</summary>
+    public long FrameErrors;
+
     /// <summary>The rows drawn and reused in the last frame.</summary>
     public int LastRowsDrawn;
 
@@ -54,7 +57,7 @@ internal sealed class TerminalFrameStats
 
     public void Reset()
     {
-        Frames = RowsDrawn = RowsReused = CharactersParsed = BudgetHits = 0;
+        Frames = RowsDrawn = RowsReused = CharactersParsed = BudgetHits = FrameErrors = 0;
         LastParseMilliseconds = LastBuildMilliseconds = 0;
         LastRowsDrawn = LastRowsReused = 0;
     }
@@ -572,14 +575,48 @@ internal sealed class TerminalRenderView : FrameworkElement
 
     private void Pump()
     {
-        bool more = ParseOutput();
-        if (_dirty && _model != null && IsVisible)
+        bool more;
+        try
         {
-            BuildFrame();
+            more = ParseOutput();
+            if (_dirty && _model != null && IsVisible)
+            {
+                BuildFrame();
+            }
+        }
+        catch (Exception exception)
+        {
+            // A frame that throws must not stop the next ones (an exception here would reach the dispatcher every frame and the view would
+            // stand still): the error is written to the debug output and the rows are drawn anew.
+            Debug.WriteLine("TerminalRenderView: " + exception);
+            Stats.FrameErrors++;
+            more = _output.Count != 0;
+            _dirty = false;
+            ClearRowsAfterError();
         }
         if (!more && _output.Count == 0 && (!_dirty || !IsVisible))
         {
             UnhookFrames();
+        }
+    }
+
+    private void ClearRowsAfterError()
+    {
+        try
+        {
+            foreach (RowVisual visual in _rowVisuals)
+            {
+                if (visual != null)
+                {
+                    _visuals.Remove(visual);
+                }
+            }
+            _rowVisuals.Clear();
+            _cursorState = null;
+            _selectionVersion = -1;
+        }
+        catch (Exception)
+        {
         }
     }
 
