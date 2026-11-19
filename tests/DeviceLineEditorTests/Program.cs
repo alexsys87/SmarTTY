@@ -920,6 +920,80 @@ internal static class Program
             },
             new Step
             {
+                Name = "a line that is longer than the screen is typed over several rows",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                    Type(terminal, string.Concat(Enumerable.Repeat("0123456789", 30)));
+                },
+                Done = () => InputText(terminal).Length == 300,
+                TimeoutMs = 5000
+            },
+            new Step
+            {
+                Name = "Home goes to the start of the line",
+                Act = () => Key(terminal, Keys.Home),
+                Done = () => ScreenIndex(terminal) == 0
+            },
+            new Step
+            {
+                // The end of a row and the start of the next one are the same index: Right and Left move by one index, so no press is spent between them.
+                Name = "Right across the rows of the line changes the index by one with every press",
+                Act = () =>
+                {
+                    _wrongPress = null;
+                    for (int i = 0; i < 250; i++)
+                    {
+                        int before = ScreenIndex(terminal);
+                        Key(terminal, Keys.Right);
+                        int after = ScreenIndex(terminal);
+                        if (after != before + 1)
+                        {
+                            _wrongPress = "Right: the index went from " + before + " to " + after;
+                        }
+                    }
+                },
+                Done = () => _wrongPress == null && ScreenIndex(terminal) == 250
+            },
+            new Step
+            {
+                Name = "Left back across the rows changes the index by one with every press",
+                Act = () =>
+                {
+                    _wrongPress = null;
+                    for (int i = 0; i < 250; i++)
+                    {
+                        int before = ScreenIndex(terminal);
+                        Key(terminal, Keys.Left);
+                        int after = ScreenIndex(terminal);
+                        if (after != before - 1)
+                        {
+                            _wrongPress = "Left: the index went from " + before + " to " + after;
+                        }
+                    }
+                },
+                Done = () => _wrongPress == null && ScreenIndex(terminal) == 0
+            },
+            new Step
+            {
+                // (End is not used: on a line of several rows it puts the caret at a column that the row does not have.)
+                Name = "the long line is cleared",
+                Act = () =>
+                {
+                    for (int i = 0; i < 300; i++)
+                    {
+                        Key(terminal, Keys.Right);
+                    }
+                    for (int i = 0; i < 300; i++)
+                    {
+                        Key(terminal, Keys.Back);
+                    }
+                },
+                Done = () => InputText(terminal) == ""
+            },
+            new Step
+            {
                 // Disconnect returns: closing the connection did not hang.
                 Name = "the connection is closed without hanging",
                 Act = () => control.Disconnect()
@@ -1236,6 +1310,18 @@ internal static class Program
         {
             Key(terminal, Keys.Back);
         }
+    }
+
+    private static string _wrongPress;
+
+    // The index in the text of the input line that the caret on the screen stands at (the rows of the line are as wide as the screen).
+    private static int ScreenIndex(SerialTerminalControl terminal)
+    {
+        object line = InputLine(terminal);
+        int startLine = (int)line.GetType().GetField("StartLine").GetValue(line);
+        string prompt = (string)line.GetType().GetField("Prompt").GetValue(line);
+        int columns = (int)typeof(SerialTerminalControl).GetField("_visibleColumns", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+        return (terminal.CaretPosition.Line - startLine) * columns + terminal.CaretPosition.Column - prompt.Length;
     }
 
     private static object InputLine(SerialTerminalControl terminal)
