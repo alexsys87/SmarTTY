@@ -267,6 +267,9 @@ jobs:
       - name: Run terminal screen checks (the cursor, writing with wrap and scroll, the scroll region, erasing, the two buffers, the batch, the scrollback, resize)
         run: dotnet run --project tests/TerminalScreenTests -c Release
 
+      - name: Run local completion checks (the built-in commands, the programs of PATH, the names of a device directory, the rules of a word)
+        run: dotnet run --project tests/LocalCompletionItemsTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
