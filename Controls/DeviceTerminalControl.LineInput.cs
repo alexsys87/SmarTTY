@@ -13,22 +13,16 @@ namespace SmarTTY.Controls;
 //    (what was typed at a "Password:" prompt is not stored);
 //  - the user can keep command lists, one for this device and one shared by all devices; together with the saved
 //    history they are offered by Tab while the first word of a line is typed.
-public partial class DeviceTerminalControl
+public partial class DeviceTerminalControl : IDeviceCommandHost
 {
-    private string _commandKey;
-
-    private DeviceLineInputStorage _commandStorage;
-
-    private CommandHistory _savedHistory = new CommandHistory();
-
-    private List<string> _deviceCommands = new List<string>();
-
-    private List<string> _commonCommands = new List<string>();
+    // The saved history and the command lists (VisualTTY/DeviceTerminal/DeviceCommandLists.cs).
+    private DeviceCommandLists _commandLists;
 
     private ToolStripMenuItem _editDeviceCommandsMenuItem;
 
     private void InitializeCommandLists()
     {
+        _commandLists = new DeviceCommandLists(this);
         _serialTerminalControl.CommandSubmitted += OnCommandSubmitted;
 
         _editDeviceCommandsMenuItem = new ToolStripMenuItem("Edit commands for this device...");
@@ -85,62 +79,32 @@ public partial class DeviceTerminalControl
 
     internal void DeleteFromCommandHistory(IReadOnlyList<string> commands)
     {
-        _serialTerminalControl.RemoveFromHistory(commands);
-        if (_savedHistory.Remove(commands) && _commandKey != null)
-        {
-            _commandStorage.SaveHistory(_commandKey, _savedHistory);
-        }
-        RefreshCommandSuggestions();
+        _commandLists.Delete(commands);
     }
 
     /// <summary>Loads the history and the command lists of this device. Called from ApplySettings before connecting.</summary>
     private void ConfigureCommandLists()
     {
-        _commandKey = _deviceTerminalSettings.Connection switch
+        string commandKey = _deviceTerminalSettings.Connection switch
         {
             DeviceTerminalSettings.ConnectionSettings.Serial serial => DeviceLineInputStorage.MakeSerialKey(serial.ComPortName),
             DeviceTerminalSettings.ConnectionSettings.Tcp tcp => DeviceLineInputStorage.MakeTcpKey(tcp.Host, tcp.Port),
             DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole => DeviceLineInputStorage.MakeNetconsoleKey(netconsole.LocalPort),
             _ => null,
         };
-        _commandStorage = new DeviceLineInputStorage(GlobalSettings.DataDirectory);
-        _savedHistory = _commandKey != null ? _commandStorage.LoadHistory(_commandKey) : new CommandHistory();
-        _deviceCommands = _commandKey != null ? _commandStorage.LoadCommands(_commandKey) : new List<string>();
-        _commonCommands = _commandStorage.LoadCommands(null);
-        _editDeviceCommandsMenuItem.Enabled = _commandKey != null;
-
-        // The terminal keeps its own in-memory history for Up/Down and Ctrl+R; start it from the saved one.
-        _serialTerminalControl.ClearHistory();
-        foreach (string command in _savedHistory.Items)
-        {
-            _serialTerminalControl.AddToHistory(command);
-        }
-        RefreshCommandSuggestions();
-    }
-
-    private void RefreshCommandSuggestions()
-    {
-        _serialTerminalControl.CommandSuggestions = CommandListFile.BuildSuggestions(_savedHistory.Items, _deviceCommands, _commonCommands);
+        _commandLists.Configure(commandKey, GlobalSettings.DataDirectory);
+        _editDeviceCommandsMenuItem.Enabled = commandKey != null;
     }
 
     private void OnCommandSubmitted(object sender, SerialTerminalControl.CommandSubmittedEventArgs e)
     {
-        if (_commandKey == null || LineInputText.LooksLikeSecretPrompt(e.Prompt))
-        {
-            return;
-        }
         // RawText keeps leading blanks: a command typed with a leading space is not saved.
-        if (_savedHistory.Add(e.RawText))
-        {
-            _commandStorage.SaveHistory(_commandKey, _savedHistory);
-            RefreshCommandSuggestions();
-        }
+        _commandLists.OnSubmitted(e.RawText, e.Prompt);
     }
 
     private void EditCommandList(bool forThisDevice)
     {
-        string key = forThisDevice ? _commandKey : null;
-        if (forThisDevice && key == null)
+        if (forThisDevice && _commandLists.Key == null)
         {
             return;
         }
@@ -149,24 +113,16 @@ public partial class DeviceTerminalControl
             ? "Commands offered by Tab for " + ConnectionTitle + ".\r\n"
             : "Commands offered by Tab for every COM and TCP device.\r\n")
             + "One command per line, lines starting with # are comments. Press Tab while typing the first word of a line.";
-        List<string> commands = EditCommandList(title, description, forThisDevice ? _deviceCommands : _commonCommands);
+        List<string> commands = EditCommandList(title, description, forThisDevice ? _commandLists.DeviceCommands : _commandLists.CommonCommands);
         if (commands == null)
         {
             return;
         }
-        if (!_commandStorage.SaveCommands(key, commands))
+        if (!_commandLists.SaveList(forThisDevice, commands))
         {
             ThemedMessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
-        if (forThisDevice)
-        {
-            _deviceCommands = commands;
-        }
-        else
-        {
-            _commonCommands = commands;
-        }
-        RefreshCommandSuggestions();
+        _commandLists.SetList(forThisDevice, commands);
     }
 
     /// <summary>
@@ -181,7 +137,7 @@ public partial class DeviceTerminalControl
 
     private void ClearSavedHistory()
     {
-        if (_savedHistory.Count == 0 && _serialTerminalControl.CommandHistory.Count == 0)
+        if (_commandLists.HasNothingToClear)
         {
             return;
         }
@@ -189,12 +145,28 @@ public partial class DeviceTerminalControl
         {
             return;
         }
-        _savedHistory.Clear();
-        if (_commandKey != null)
-        {
-            _commandStorage.DeleteHistory(_commandKey);
-        }
+        _commandLists.ClearHistory();
+    }
+
+    int IDeviceCommandHost.TerminalHistoryCount => _serialTerminalControl.CommandHistory.Count;
+
+    void IDeviceCommandHost.ClearTerminalHistory()
+    {
         _serialTerminalControl.ClearHistory();
-        RefreshCommandSuggestions();
+    }
+
+    void IDeviceCommandHost.AddToTerminalHistory(string command)
+    {
+        _serialTerminalControl.AddToHistory(command);
+    }
+
+    void IDeviceCommandHost.RemoveFromTerminalHistory(IReadOnlyList<string> commands)
+    {
+        _serialTerminalControl.RemoveFromHistory(commands);
+    }
+
+    void IDeviceCommandHost.SetSuggestions(IReadOnlyList<string> suggestions)
+    {
+        _serialTerminalControl.CommandSuggestions = suggestions;
     }
 }

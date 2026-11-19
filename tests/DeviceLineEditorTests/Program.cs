@@ -256,6 +256,7 @@ internal static class Program
         };
         form.Controls.Add(control);
         _control = control;
+        InstallEditorStandIns();
         SerialTerminalControl terminal = (SerialTerminalControl)typeof(DeviceTerminalControl).GetField("_serialTerminalControl", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
 
         terminal.CompletionPopupRequested += (object sender, CompletionPopupRequest request) =>
@@ -700,6 +701,118 @@ internal static class Program
             },
             new Step
             {
+                // The editor of a command list is the themed window of the application; here it stands in for it and says what it was asked.
+                Name = "the command list of this device is saved and Tab offers it after the recent commands",
+                Act = () =>
+                {
+                    _editorAnswers.Enqueue(new List<string> { "reboot", "show version" });
+                    InvokeEditCommandList(control, forThisDevice: true);
+                },
+                Done = () => Suggestions(terminal).EndsWith("|reboot|show version", StringComparison.Ordinal) && string.Join("|", Storage().LoadCommands(DeviceKey(port))) == "reboot|show version"
+            },
+            new Step
+            {
+                Name = "the editor was told the title and the description of the list of this device",
+                Done = () => _editorTitles.Count == 1 && _editorTitles[0].StartsWith("Commands - ", StringComparison.Ordinal) && _editorDescriptions[0].Contains("Commands offered by Tab for ")
+            },
+            new Step
+            {
+                Name = "the list for all devices is saved too and comes after the one of this device (a repeated command keeps the first place)",
+                Act = () =>
+                {
+                    _editorAnswers.Enqueue(new List<string> { "ls /", "reboot" });
+                    InvokeEditCommandList(control, forThisDevice: false);
+                },
+                Done = () => Suggestions(terminal).EndsWith("|reboot|show version|ls /", StringComparison.Ordinal) && string.Join("|", Storage().LoadCommands(null)) == "ls /|reboot"
+            },
+            new Step
+            {
+                Name = "the editor was told the title of the list for all devices",
+                Done = () => _editorTitles.Count == 2 && _editorTitles[1] == "Commands for all devices"
+            },
+            new Step
+            {
+                Name = "an editor that gives nothing (cancelled) leaves the lists as they are",
+                Act = () =>
+                {
+                    _suggestionsBefore = Suggestions(terminal);
+                    _editorAnswers.Enqueue(null);
+                    InvokeEditCommandList(control, forThisDevice: true);
+                },
+                Done = () => _editorTitles.Count == 3 && Suggestions(terminal) == _suggestionsBefore && string.Join("|", Storage().LoadCommands(DeviceKey(port))) == "reboot|show version"
+            },
+            new Step
+            {
+                // The blank is not sent (the command goes to the device trimmed), but the saved history looks at the raw text.
+                Name = "a command typed with a leading blank is sent but not saved",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, " blank-cmd\r");
+                },
+                Done = () => Received().EndsWith("|blank-cmd", StringComparison.Ordinal) && terminal.HasInputLine && InputText(terminal) == ""
+            },
+            new Step
+            {
+                Name = "what was typed at the password prompt is in neither the saved history nor the file of the device",
+                Done = () => !SavedHistory(control).Any((string command) => command.Contains("secret")) && !Storage().LoadHistory(DeviceKey(port)).Items.Any((string command) => command.Contains("secret"))
+            },
+            new Step
+            {
+                Name = "it is in the history of the terminal and not in the saved history",
+                Done = () => terminal.CommandHistory.Contains("blank-cmd") && !SavedHistory(control).Contains(" blank-cmd") && !SavedHistory(control).Contains("blank-cmd")
+            },
+            new Step
+            {
+                Name = "a command typed normally is saved, to the file of the device as well, and Tab offers it first",
+                Act = () => Type(terminal, "saved-cmd\r"),
+                Done = () => SavedHistory(control).Contains("saved-cmd") && Storage().LoadHistory(DeviceKey(port)).Items.Contains("saved-cmd") && Suggestions(terminal).StartsWith("saved-cmd|", StringComparison.Ordinal) && terminal.HasInputLine && InputText(terminal) == ""
+            },
+            new Step
+            {
+                Name = "clearing the saved history asks first, and No keeps everything",
+                Act = () =>
+                {
+                    _messageBoxAnswer = DialogResult.No;
+                    InvokePrivate(control, "ClearSavedHistory");
+                },
+                Done = () => _messageBoxTexts.Count == 1 && _messageBoxTexts[0].StartsWith("Delete the saved command history of ", StringComparison.Ordinal) && SavedHistory(control).Contains("saved-cmd") && terminal.CommandHistory.Contains("saved-cmd")
+            },
+            new Step
+            {
+                Name = "Yes clears the saved history, the history of the terminal, the file of the device and what Tab offered from them; the lists stay",
+                Act = () =>
+                {
+                    _messageBoxAnswer = DialogResult.Yes;
+                    InvokePrivate(control, "ClearSavedHistory");
+                },
+                Done = () => SavedHistory(control).Count == 0 && terminal.CommandHistory.Count == 0 && Storage().LoadHistory(DeviceKey(port)).Count == 0 && Suggestions(terminal) == "reboot|show version|ls /"
+            },
+            new Step
+            {
+                Name = "with nothing to clear the question is not asked",
+                Act = () => InvokePrivate(control, "ClearSavedHistory"),
+                Done = () => _messageBoxTexts.Count == 2
+            },
+            new Step
+            {
+                // The history of the terminal has a command that the saved history does not (a leading blank): that is something to clear.
+                Name = "with only the history of the terminal holding a command the question is asked",
+                Act = () =>
+                {
+                    Type(terminal, " lead-only\r");
+                    _messageBoxAnswer = DialogResult.No;
+                },
+                Done = () => terminal.HasInputLine && InputText(terminal) == "" && terminal.CommandHistory.Contains("lead-only") && SavedHistory(control).Count == 0
+            },
+            new Step
+            {
+                Name = "and it is asked when the clearing is asked for",
+                Act = () => InvokePrivate(control, "ClearSavedHistory"),
+                Done = () => _messageBoxTexts.Count == 3 && terminal.CommandHistory.Contains("lead-only")
+            },
+            new Step
+            {
                 // Disconnect returns: closing the connection did not hang.
                 Name = "the connection is closed without hanging",
                 Act = () => control.Disconnect()
@@ -1026,10 +1139,65 @@ internal static class Program
         return line == null ? "" : (string)line.GetType().GetField("Prompt").GetValue(line);
     }
 
+    // The editor of a command list stands in for the themed window of the application: it gives the lists that the steps queue (null: cancelled).
+    private static readonly Queue<List<string>> _editorAnswers = new Queue<List<string>>();
+
+    private static readonly List<string> _editorTitles = new List<string>();
+
+    private static readonly List<string> _editorDescriptions = new List<string>();
+
+    private static string _suggestionsBefore;
+
+    private static DialogResult _messageBoxAnswer = DialogResult.No;
+
+    private static readonly List<string> _messageBoxTexts = new List<string>();
+
+    private static void InstallEditorStandIns()
+    {
+        DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
+        {
+            _editorTitles.Add(title);
+            _editorDescriptions.Add(description);
+            return _editorAnswers.Dequeue();
+        };
+        ThemedMessageBox.ShowImpl = (text, caption, buttons, icon, owner) =>
+        {
+            _messageBoxTexts.Add(text);
+            return _messageBoxAnswer;
+        };
+    }
+
+    private static void InvokeEditCommandList(DeviceTerminalControl control, bool forThisDevice)
+    {
+        typeof(DeviceTerminalControl).GetMethod("EditCommandList", BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(bool) }, null).Invoke(control, new object[] { forThisDevice });
+    }
+
+    private static void InvokePrivate(DeviceTerminalControl control, string name)
+    {
+        typeof(DeviceTerminalControl).GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic, null, System.Type.EmptyTypes, null).Invoke(control, null);
+    }
+
+    private static string Suggestions(SerialTerminalControl terminal)
+    {
+        return string.Join("|", terminal.CommandSuggestions);
+    }
+
+    private static DeviceLineInputStorage Storage()
+    {
+        return new DeviceLineInputStorage(GlobalSettings.DataDirectory);
+    }
+
+    private static string DeviceKey(int port)
+    {
+        return DeviceLineInputStorage.MakeTcpKey("127.0.0.1", port);
+    }
+
     // What the device terminal keeps on disk for the next session.
     private static IReadOnlyList<string> SavedHistory(DeviceTerminalControl control)
     {
-        CommandHistory history = (CommandHistory)typeof(DeviceTerminalControl).GetField("_savedHistory", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+        // The accessor follows the move of the state into DeviceCommandLists.
+        DeviceCommandLists lists = (DeviceCommandLists)typeof(DeviceTerminalControl).GetField("_commandLists", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(control);
+        CommandHistory history = lists.SavedHistory;
         return history.Items;
     }
 
