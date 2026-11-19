@@ -80,6 +80,7 @@ internal static class Program
         Lines.Add("hex   " + Document(HexView));
         Lines.Add("text  " + Document(TextView));
         string match = Field<int>(_control, "_matchOffset") + "+" + Field<int>(_control, "_matchLength");
+        Lines.Add("bytes " + BitConverter.ToString(_control.AllBytes).Replace("-", "").ToLowerInvariant());
         Lines.Add("state per-line=" + Field<int>(_control, "_bytesPerLine") + " laid-out=" + Field<int>(_control, "_laidOutBytesPerLine") + " mixed=" + Field<bool>(_control, "_layoutMixed")
             + " match=" + match + " selection=" + _control.HasSelection
             + " hex-sel=" + Position(Property<TextDocument.TextPosition>(HexView, "SelectionStart")) + ".." + Position(Property<TextDocument.TextPosition>(HexView, "SelectionEnd"))
