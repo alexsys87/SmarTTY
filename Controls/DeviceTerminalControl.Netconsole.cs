@@ -16,7 +16,7 @@ namespace SmarTTY.Controls;
 //    datagram when Enter is pressed, so the kernel messages that keep arriving never mix with what is being typed;
 //  - character input: every key is sent at once, as a datagram of its own (U-Boot's netconsole reads it like a serial
 //    console).
-public partial class DeviceTerminalControl
+public partial class DeviceTerminalControl : INetconsoleLineHost
 {
     private NetconsoleTransport _netconsoleTransport;
 
@@ -38,11 +38,10 @@ public partial class DeviceTerminalControl
 
     private ToolStripMenuItem _netconsoleTargetItem;
 
-    // The history entry Up/Down showed last in the input box; -1 while the box holds what is being typed.
-    private int _netconsoleHistoryIndex = -1;
+    // The history walk of the input box and what is typed into the terminal in line mode (VisualTTY/DeviceTerminal/NetconsoleLineInput.cs).
+    private NetconsoleLineInput _netconsoleLine;
 
-    // What was typed before Up was pressed, given back when Down goes past the newest entry.
-    private string _netconsoleDraft = "";
+    private NetconsoleLineInput NetconsoleLine => _netconsoleLine ?? (_netconsoleLine = new NetconsoleLineInput(this));
 
     // Whether what is sent is also shown in the terminal (the Linux module never echoes, U-Boot does).
     private bool _netconsoleEcho;
@@ -408,8 +407,7 @@ public partial class DeviceTerminalControl
         }
         RememberNetconsoleLine(line);
         _netconsoleInput.Text = "";
-        _netconsoleDraft = "";
-        _netconsoleHistoryIndex = -1;
+        NetconsoleLine.Reset();
     }
 
     /// <summary>Adds a sent line to the history of this tab and to the history saved for the port.</summary>
@@ -430,9 +428,6 @@ public partial class DeviceTerminalControl
 
     private void OnNetconsoleInputKeyDown(object sender, KeyEventArgs e)
     {
-        IReadOnlyList<string> history = _serialTerminalControl.CommandHistory;
-        // Below the newest entry while the box holds what is being typed.
-        int index = _netconsoleHistoryIndex < 0 || _netconsoleHistoryIndex > history.Count ? history.Count : _netconsoleHistoryIndex;
         switch (e.KeyCode)
         {
             case Keys.Return when !e.Control && !e.Alt:
@@ -440,28 +435,13 @@ public partial class DeviceTerminalControl
                 break;
             case Keys.Escape:
                 _netconsoleInput.Text = "";
-                _netconsoleDraft = "";
-                _netconsoleHistoryIndex = -1;
+                NetconsoleLine.Reset();
                 break;
             case Keys.Up when !e.Control && !e.Alt:
-                if (index > 0)
-                {
-                    if (index == history.Count)
-                    {
-                        _netconsoleDraft = _netconsoleInput.Text;
-                    }
-                    index--;
-                    _netconsoleHistoryIndex = index;
-                    SetNetconsoleInputText(history[index]);
-                }
+                NetconsoleLine.Older();
                 break;
             case Keys.Down when !e.Control && !e.Alt:
-                if (index < history.Count)
-                {
-                    index++;
-                    _netconsoleHistoryIndex = index == history.Count ? -1 : index;
-                    SetNetconsoleInputText(index == history.Count ? _netconsoleDraft : history[index]);
-                }
+                NetconsoleLine.Newer();
                 break;
             case Keys.C when e.Control && !e.Alt && !e.Shift && _netconsoleInput.SelectionLength == 0:
                 // Nothing to copy: Ctrl+C goes to the device (U-Boot stops a running command with it).
@@ -496,50 +476,7 @@ public partial class DeviceTerminalControl
         {
             return false;
         }
-        string text = _textEncoding.GetString(buffer);
-        StringBuilder printable = new StringBuilder();
-        List<byte> direct = new List<byte>();
-        char previous = '\0';
-        foreach (char c in text)
-        {
-            char current = c;
-            bool pairedLineFeed = current == '\n' && previous == '\r';
-            previous = current;
-            if (current == '\r' || current == '\n')
-            {
-                if (pairedLineFeed)
-                {
-                    continue; // the CR of the pair has sent the line already
-                }
-                AppendToNetconsoleInput(printable.ToString());
-                printable.Clear();
-                SendNetconsoleLine();
-            }
-            else if (c == '\b' || c == '\u007f')
-            {
-                if (printable.Length > 0)
-                {
-                    printable.Length--;
-                }
-                else if (_netconsoleInput.Text.Length > 0)
-                {
-                    SetNetconsoleInputText(_netconsoleInput.Text.Substring(0, _netconsoleInput.Text.Length - 1));
-                }
-            }
-            else if (c == '\t' || !char.IsControl(c))
-            {
-                printable.Append(c);
-            }
-            else
-            {
-                direct.AddRange(_textEncoding.GetBytes(c.ToString()));
-            }
-        }
-        AppendToNetconsoleInput(printable.ToString());
-        if (direct.Count > 0)
-        {
-            SendNetconsoleBytes(direct.ToArray());
-        }
+        NetconsoleLine.Process(_textEncoding.GetString(buffer));
         if (_netconsoleBar.Visible && !_netconsoleInput.Focused)
         {
             _netconsoleInput.Focus();
@@ -549,11 +486,27 @@ public partial class DeviceTerminalControl
         return true;
     }
 
-    private void AppendToNetconsoleInput(string text)
+    string INetconsoleLineHost.InputText => _netconsoleInput.Text;
+
+    void INetconsoleLineHost.SetInputText(string text)
     {
-        if (text.Length > 0)
-        {
-            SetNetconsoleInputText(_netconsoleInput.Text + text);
-        }
+        SetNetconsoleInputText(text);
     }
+
+    void INetconsoleLineHost.SendLine()
+    {
+        SendNetconsoleLine();
+    }
+
+    void INetconsoleLineHost.SendBytes(byte[] bytes)
+    {
+        SendNetconsoleBytes(bytes);
+    }
+
+    byte[] INetconsoleLineHost.Encode(string text)
+    {
+        return _textEncoding.GetBytes(text);
+    }
+
+    IReadOnlyList<string> INetconsoleLineHost.History => _serialTerminalControl.CommandHistory;
 }
