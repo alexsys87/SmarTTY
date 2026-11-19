@@ -84,14 +84,14 @@ public sealed class PasteProgressForm : Form
     }
 
     /// <summary>Opens the window over the bottom edge of <paramref name="anchor"/> without taking the focus from it.</summary>
-    public void ShowNear(Control anchor)
+    public void ShowNear(SmarTTY.Controls.PasteAnchor anchor)
     {
         IntPtr root = IntPtr.Zero;
         try
         {
-            if (anchor != null && anchor.IsHandleCreated)
+            if (anchor != null && anchor.IsAlive)
             {
-                Rectangle bounds = anchor.RectangleToScreen(anchor.ClientRectangle);
+                Rectangle bounds = anchor.ScreenBounds;
                 Location = new Point(bounds.Left + Math.Max((bounds.Width - Width) / 2, 0), Math.Max(bounds.Bottom - Height - 24, bounds.Top));
                 root = GetAncestor(anchor.Handle, GaRoot);
             }

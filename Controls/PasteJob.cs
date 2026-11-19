@@ -41,7 +41,7 @@ internal sealed class PasteJob
 
     private const int ReceivedLimit = 4096;
 
-    private readonly Control _owner;
+    private readonly PasteAnchor _owner;
 
     private readonly string _title;
 
@@ -88,6 +88,12 @@ internal sealed class PasteJob
     /// written.
     /// </param>
     public PasteJob(Control owner, string title, List<PasteStep> steps, SendPiece send, PasteSettings settings, bool slow, Action<Outcome, string> finished)
+        : this(PasteAnchor.For(owner), title, steps, send, settings, slow, finished)
+    {
+    }
+
+    /// <summary>A paste of a terminal that is not a WinForms control (the WPF terminal): <paramref name="owner"/> says where it runs and shows.</summary>
+    public PasteJob(PasteAnchor owner, string title, List<PasteStep> steps, SendPiece send, PasteSettings settings, bool slow, Action<Outcome, string> finished)
     {
         _owner = owner;
         _title = title;
@@ -194,9 +200,9 @@ internal sealed class PasteJob
     {
         try
         {
-            if (!_owner.IsDisposed && _owner.IsHandleCreated)
+            if (_owner.IsAlive)
             {
-                _owner.BeginInvoke(action);
+                _owner.Post(action);
             }
         }
         catch (InvalidOperationException)

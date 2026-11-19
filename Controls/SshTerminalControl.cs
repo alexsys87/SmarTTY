@@ -1958,7 +1958,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             _linePaste = run;
             run.Progress = ThemedPasteProgress.Create("Paste line by line");
             run.Progress.CancelRequested += (object sender, EventArgs e) => CancelActivePaste();
-            run.Progress.ShowNear(this);
+            run.Progress.ShowNear(PasteAnchor.For(this));
             RunNextPastedLine();
             return true;
         }
