@@ -20,10 +20,11 @@ namespace SmarTTY.GUI.HexView;
 /// with the same layout (<see cref="HexViewLayout"/>), keys (<see cref="HexKeyMap"/>), mouse selection (<see cref="HexPointer"/>), tool tip and
 /// colours (<see cref="HexByteText"/>) and the same public members, so that the editor tab can take it in its place (3B-3). It draws itself in
 /// whole pixels of the device: the layout counts in device pixels, the drawing is scaled back by the DPI, and the text is put on the grid of the
-/// characters with <see cref="GlyphRun"/>s, one for each run of bytes of one colour in a row. Not yet in it: the data inspector (the flag is kept
-/// and reported) and the context menu, which the tab gives it.
+/// characters with <see cref="GlyphRun"/>s, one for each run of bytes of one colour in a row. The data inspector beside the bytes is
+/// <see cref="WpfHexInspector"/> (3B-3), shown, like in the WinForms view, when it is switched on and the window leaves room for the bytes; while it
+/// is hidden the header has a link that opens it. The context menu is the tab's.
 /// </summary>
-internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayoutView
+internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayoutView, IHexInspectorSource
 {
     // How strongly a marked block tints the background (as in HexEditorControl).
     private const byte HighlightAlpha = 100;
@@ -44,6 +45,8 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
 
     private readonly ScrollBar _horizontalBar = new ScrollBar { Orientation = Orientation.Horizontal, Visibility = Visibility.Collapsed };
 
+    private readonly WpfHexInspector _inspector;
+
     private readonly DispatcherTimer _caretTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(530) };
 
     // Scrolls the table while a selection is dragged beyond its edge, even when the mouse stands still there.
@@ -56,6 +59,12 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     private bool _colorByValue;
 
     private bool _showInspector;
+
+    // Whether the inspector is laid out (it is switched on and the window leaves room for the bytes).
+    private bool _inspectorShown;
+
+    // Where the "Data inspector" link is drawn in the header while the inspector is hidden, in device pixels (empty: not drawn).
+    private Int32Rect _inspectorLinkBounds = Int32Rect.Empty;
 
     private bool _updatingScrollBars;
 
@@ -107,7 +116,8 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
         _model.Changed += OnModelChanged;
         _layout = new HexViewLayout(_model, this);
         _pointer = new HexPointer(_model);
-        _children = new VisualCollection(this) { _verticalBar, _horizontalBar };
+        _inspector = new WpfHexInspector(this) { Visibility = Visibility.Collapsed };
+        _children = new VisualCollection(this) { _verticalBar, _horizontalBar, _inspector };
         Focusable = true;
         FocusVisualStyle = null;
         SnapsToDevicePixels = true;
@@ -284,7 +294,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
         }
     }
 
-    /// <summary>The data inspector is asked for (it is not drawn by this view yet: the flag is kept and reported).</summary>
+    /// <summary>The data inspector (the value at the caret as numbers, time and text) is shown beside the bytes.</summary>
     public bool ShowDataInspector
     {
         get
@@ -298,6 +308,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
                 return;
             }
             _showInspector = value;
+            UpdateInspectorVisibility();
             OnStateChanged();
             ViewOptionsChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -311,6 +322,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
         _model.BigEndian = bigEndian;
         _colorByValue = colorByValue;
         _showInspector = showDataInspector;
+        UpdateInspectorVisibility();
         OnLayoutOptionChanged();
         OnStateChanged();
     }
@@ -320,6 +332,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     {
         _backColor = background;
         _foreColor = foreground;
+        _inspector.InvalidateVisual();
         InvalidateVisual();
     }
 
@@ -590,7 +603,8 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled)
+        // The keys of the inspector and of its edit box are not for the bytes.
+        if (e.Handled || !ReferenceEquals(e.OriginalSource, this))
         {
             return;
         }
@@ -664,7 +678,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     protected override void OnTextInput(TextCompositionEventArgs e)
     {
         base.OnTextInput(e);
-        if (e.Handled || string.IsNullOrEmpty(e.Text))
+        if (e.Handled || string.IsNullOrEmpty(e.Text) || !ReferenceEquals(e.OriginalSource, this))
         {
             return;
         }
@@ -705,11 +719,16 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     {
         base.OnMouseDown(e);
         Focus();
+        DevicePoint(e.GetPosition(this), out int x, out int y);
+        if (e.ChangedButton == MouseButton.Left && Contains(_inspectorLinkBounds, x, y))
+        {
+            ShowDataInspector = true;
+            return;
+        }
         if (e.ChangedButton != MouseButton.Left && e.ChangedButton != MouseButton.Right)
         {
             return;
         }
-        DevicePoint(e.GetPosition(this), out int x, out int y);
         if (y < _layout.HeaderHeight)
         {
             // The column titles are not bytes.
@@ -742,6 +761,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
         DevicePoint(e.GetPosition(this), out int x, out int y);
         if (!_pointer.Dragging || e.LeftButton != MouseButtonState.Pressed)
         {
+            Cursor = Contains(_inspectorLinkBounds, x, y) ? Cursors.Hand : null;
             UpdateToolTip(x, y);
             return;
         }
@@ -858,7 +878,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
 
     int IHexLayoutView.ClientHeight => (int)Math.Round(ActualHeight * _scale);
 
-    int IHexLayoutView.InspectorWidth => 0;
+    int IHexLayoutView.InspectorWidth => _inspectorShown ? _inspector.PreferredWidth : 0;
 
     int IHexLayoutView.VerticalBarWidth => (int)Math.Round(SystemParameters.VerticalScrollBarWidth * _scale);
 
@@ -879,6 +899,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     {
         _verticalBar.Measure(availableSize);
         _horizontalBar.Measure(availableSize);
+        _inspector.Measure(availableSize);
         double width = double.IsInfinity(availableSize.Width) ? 400 : availableSize.Width;
         double height = double.IsInfinity(availableSize.Height) ? 300 : availableSize.Height;
         return new Size(width, height);
@@ -890,14 +911,19 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
         double barHeight = SystemParameters.HorizontalScrollBarHeight;
         bool vertical = _verticalBar.Visibility == Visibility.Visible;
         bool horizontal = _horizontalBar.Visibility == Visibility.Visible;
-        _verticalBar.Arrange(new Rect(Math.Max(0, finalSize.Width - barWidth), 0, barWidth, Math.Max(0, finalSize.Height - (horizontal ? barHeight : 0))));
-        _horizontalBar.Arrange(new Rect(0, Math.Max(0, finalSize.Height - barHeight), Math.Max(0, finalSize.Width - (vertical ? barWidth : 0)), barHeight));
+        // The inspector takes the whole height at the right, the scroll bars the rest (as the docking of the WinForms view).
+        double inspectorWidth = _inspectorShown ? Math.Min(finalSize.Width, _inspector.PreferredWidth / _scale) : 0;
+        double right = Math.Max(0, finalSize.Width - inspectorWidth);
+        _inspector.Arrange(new Rect(right, 0, inspectorWidth, finalSize.Height));
+        _verticalBar.Arrange(new Rect(Math.Max(0, right - barWidth), 0, barWidth, Math.Max(0, finalSize.Height - (horizontal ? barHeight : 0))));
+        _horizontalBar.Arrange(new Rect(0, Math.Max(0, finalSize.Height - barHeight), Math.Max(0, right - (vertical ? barWidth : 0)), barHeight));
         return finalSize;
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         base.OnRenderSizeChanged(sizeInfo);
+        UpdateInspectorVisibility();
         UpdateScrollBars();
         InvalidateVisual();
     }
@@ -914,9 +940,31 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
     {
         _toolTipOffset = -1;
         UpdateMetrics();
+        UpdateInspectorVisibility();
         UpdateScrollBars();
         EnsureVisible();
+        _inspector.InvalidateVisual();
         InvalidateVisual();
+    }
+
+    /// <summary>Shows the data inspector when it is switched on and leaves room for the bytes.</summary>
+    private void UpdateInspectorVisibility()
+    {
+        // In a narrow window the bytes come first: the inspector returns when the window grows.
+        bool visible = _showInspector && _layout.InspectorFits(_inspector.PreferredWidth);
+        if (!visible)
+        {
+            // The header link changes with it.
+            InvalidateVisual();
+        }
+        if (_inspectorShown != visible)
+        {
+            _inspectorShown = visible;
+            _inspector.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            InvalidateArrange();
+            UpdateScrollBars();
+            InvalidateVisual();
+        }
     }
 
     private void UpdateMetrics()
@@ -1096,7 +1144,66 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
 
     private void OnStateChanged()
     {
+        _inspector.InvalidateVisual();
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---- what the data inspector reads of the view
+
+    /// <summary>The DPI scale of the monitor (device pixels in a DIP).</summary>
+    internal double DeviceScale => _scale;
+
+    /// <summary>The width of a character of the font, in device pixels.</summary>
+    internal int CharWidthInPixels => _layout.CharWidth;
+
+    /// <summary>The height of the text of the font, in device pixels.</summary>
+    internal int TextHeightInPixels => _textHeight;
+
+    /// <summary>The size of the font, in device pixels.</summary>
+    internal double EmSizeInPixels => _emSize;
+
+    /// <summary>The font of the bytes, for text that is not on the grid of the characters.</summary>
+    internal Typeface TextTypeface => new Typeface(new FontFamily(_fontFamily), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+
+    internal RgbColor BackgroundColor => _backColor;
+
+    internal RgbColor ForegroundColor => _foreColor;
+
+    internal SolidColorBrush BrushOf(RgbColor color)
+    {
+        return Brush(color);
+    }
+
+    private static bool Contains(Int32Rect bounds, int x, int y)
+    {
+        return !bounds.IsEmpty && x >= bounds.X && x < bounds.X + bounds.Width && y >= bounds.Y && y < bounds.Y + bounds.Height;
+    }
+
+    /// <summary>
+    /// While the data inspector is hidden, the header shows a link that opens it, at its right end when it does not cover the column titles (as in
+    /// the WinForms view).
+    /// </summary>
+    private void DrawInspectorLink(DrawingContext context, int width)
+    {
+        _inspectorLinkBounds = Int32Rect.Empty;
+        if (_inspectorShown)
+        {
+            return;
+        }
+        string text = _showInspector ? "Data inspector: the window is too narrow" : "Data inspector (Ctrl+I)";
+        int textWidth = text.Length * _layout.CharWidth;
+        int x = width - textWidth - Margin;
+        int titlesEnd = _layout.AsciiStart - _layout.ScrollX + 6 * _layout.CharWidth;
+        if (x < titlesEnd)
+        {
+            return;
+        }
+        RgbColor link = HexByteText.IsDark(_backColor) ? RgbColor.FromArgb(120, 180, 255) : RgbColor.FromArgb(0, 90, 200);
+        DrawText(context, text, x, 2, _showInspector ? HexByteText.Blend(_backColor, _foreColor, 0.55f) : link);
+        if (!_showInspector)
+        {
+            _inspectorLinkBounds = new Int32Rect(x, 0, textWidth, _layout.HeaderHeight - 2);
+        }
     }
 
     bool IRemoteHexView.Focus()
@@ -1202,6 +1309,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
             DrawText(context, index.ToString("X2", CultureInfo.InvariantCulture), x, 2, dim);
         }
         DrawText(context, "ASCII", _layout.AsciiStart - scrollX, 2, dim);
+        DrawInspectorLink(context, width);
         context.DrawRectangle(Brush(separator), null, new Rect(0, _layout.HeaderHeight - 2, width, 1));
 
         int textYOffset = Math.Max(0, (rowHeight - _textHeight) / 2);

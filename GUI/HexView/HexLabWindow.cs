@@ -13,7 +13,7 @@ namespace SmarTTY.GUI.HexView;
 /// <summary>
 /// Tools > WPF hex editor lab: the hex editor drawn with WPF (<see cref="WpfHexEditor"/>, stage 3B-2) on a file of this computer, before it takes the
 /// place of the WinForms hex view in the editor tab (3B-3). The keys, the mouse, the scrolling, the tool tip, the colours and the view options can
-/// be tried here; the bytes can be changed but are never saved.
+/// be tried here, and the data inspector (Ctrl+I); the bytes can be changed but are never saved.
 /// </summary>
 internal sealed class HexLabWindow : Window
 {
@@ -138,8 +138,7 @@ internal sealed class HexLabWindow : Window
             ? "selection " + HexEditingModel.FormatByteCount(_editor.SelectionLength) + " from 0x" + _editor.SelectionStart.ToString("X8", CultureInfo.InvariantCulture)
             : "no selection";
         _status.Text = _fileName + "   |   offset 0x" + _editor.CaretOffset.ToString("X8", CultureInfo.InvariantCulture) + " (" + _editor.CaretOffset.ToString(CultureInfo.InvariantCulture) + ")   |   " + selection
-            + "   |   " + HexEditingModel.FormatByteCount(_editor.Length) + "   |   " + (_editor.InsertMode ? "INS" : "OVR") + (_editor.IsModified ? "   |   modified (not saved)" : "")
-            + (_editor.ShowDataInspector ? "   |   data inspector: not drawn by the WPF view yet" : "");
+            + "   |   " + HexEditingModel.FormatByteCount(_editor.Length) + "   |   " + (_editor.InsertMode ? "INS" : "OVR") + (_editor.IsModified ? "   |   modified (not saved)" : "");
     }
 
     private void Note(string text)
