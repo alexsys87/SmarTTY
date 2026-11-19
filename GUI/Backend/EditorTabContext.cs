@@ -12,7 +12,7 @@ using Orientation = System.Windows.Controls.Orientation;
 
 namespace SmarTTY.GUI.Backend;
 
-public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement
+public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement, IHexViewPlace
 {
     private SessionWrapper _Session;
 
@@ -28,6 +28,11 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     private Visibility _verticalScrollBarVisibility;
 
     private Visibility _horizontalScrollBarVisibility;
+
+    // The WinForms part of the tab (the editor with its context menu), and the WPF hex view shown in its place (null when the editor has its own).
+    private readonly WinFormsHostWrapper _host;
+
+    private readonly HexView.WpfHexEditor _wpfHexView;
 
     public readonly string FilePath;
 
@@ -82,9 +87,29 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         Editor = editor;
         _Session = sessionWrapper;
         WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
+        _host = winFormsHostWrapper;
         EditorPanel = new RemoteFileEditorPanel(editor);
         ((WindowsFormsHost)winFormsHostWrapper).Child = EditorPanel;
-        Control = (FrameworkElement)winFormsHostWrapper;
+        _wpfHexView = editor.HexEditor as HexView.WpfHexEditor;
+        if (_wpfHexView != null)
+        {
+            // The WPF hex view lies over the place of the editor: one of the two is shown (a WPF element cannot be drawn over a WinForms one).
+            _wpfHexView.Visibility = Visibility.Collapsed;
+            _wpfHexView.ContextMenu = new HexView.HexViewContextMenu(EditorPanel, _wpfHexView, ShowHexDialog, () =>
+            {
+                Editor.FocusActiveView();
+                EditorPanel.RefreshState();
+            });
+            System.Windows.Controls.Grid place = new System.Windows.Controls.Grid();
+            place.Children.Add(winFormsHostWrapper);
+            place.Children.Add(_wpfHexView);
+            Control = place;
+            editor.HexViewPlace = this;
+        }
+        else
+        {
+            Control = (FrameworkElement)winFormsHostWrapper;
+        }
         ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
         StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, EditorPanel));
         Searcher = new TextSearcher(editor)
@@ -193,6 +218,30 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         Editor.FocusActiveView();
         EditorPanel.RefreshState();
+    }
+
+    void IHexViewPlace.ShowHexView()
+    {
+        _wpfHexView.Visibility = Visibility.Visible;
+        _host.Visibility = Visibility.Collapsed;
+    }
+
+    void IHexViewPlace.HideHexView()
+    {
+        bool hadFocus = _wpfHexView.IsKeyboardFocusWithin;
+        _host.Visibility = Visibility.Visible;
+        _wpfHexView.Visibility = Visibility.Collapsed;
+        if (hadFocus)
+        {
+            // The keyboard goes back into the WinForms part of the tab, where the editor gives it to the text.
+            _host.Focus();
+        }
+    }
+
+    void IHexViewPlace.SetAppearance(RgbColor background, RgbColor foreground, string fontFamily, float fontPoints)
+    {
+        _wpfHexView.SetColors(background, foreground);
+        _wpfHexView.SetFont(fontFamily, fontPoints);
     }
 
     private void CloseHexFind()

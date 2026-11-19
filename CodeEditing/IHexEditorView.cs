@@ -99,3 +99,20 @@ public interface IHexEditorView : IRemoteHexView, IHexViewStatus
     /// <summary>Sets the view options from the settings.</summary>
     void LoadViewOptions(int bytesPerRow, int groupSize, bool bigEndian, bool colorByValue, bool showDataInspector);
 }
+
+/// <summary>
+/// Where the editor shows a hex view that is not one of its own WinForms children (the WPF view of the editor tab, stage 3B-3): in place of the text
+/// and back, with the colours and the font of the text. It is made of what the editor did to its own hex view control (<c>Visible</c>,
+/// <c>BringToFront</c>, <c>Font</c>, <c>BackColor</c>, <c>ForeColor</c>).
+/// </summary>
+public interface IHexViewPlace
+{
+    /// <summary>Shows the hex view in place of the text.</summary>
+    void ShowHexView();
+
+    /// <summary>Hides the hex view: the text is shown.</summary>
+    void HideHexView();
+
+    /// <summary>The colours and the font of the text (the font at the zoom of the editor, before the scale of the monitor).</summary>
+    void SetAppearance(RgbColor background, RgbColor foreground, string fontFamily, float fontPoints);
+}

@@ -356,7 +356,8 @@ public class MainWindowController : INotifyPropertyChanged
                     return;
                 }
             }
-            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception, columnUnit)
+            // The hex view is the WPF one (stage 3B-3): the tab shows it in place of the editor.
+            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception, columnUnit, new HexView.WpfHexEditor())
             {
                 NativeScrollSemantics = false
             };

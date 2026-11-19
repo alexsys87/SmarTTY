@@ -926,6 +926,108 @@ internal static class Program
         o.Close();
     }
 
+    // Where a hex view given to the editor is shown (the tab of the application): what the editor asks it.
+    private sealed class FakeHexPlace : IHexViewPlace
+    {
+        public readonly List<string> Calls = new List<string>();
+
+        public void ShowHexView()
+        {
+            Calls.Add("show");
+        }
+
+        public void HideHexView()
+        {
+            Calls.Add("hide");
+        }
+
+        public void SetAppearance(RgbColor background, RgbColor foreground, string fontFamily, float fontPoints)
+        {
+            Calls.Add("look " + background.ToArgb().ToString("x8", CultureInfo.InvariantCulture) + " " + foreground.ToArgb().ToString("x8", CultureInfo.InvariantCulture)
+                + " " + fontFamily + " " + fontPoints.ToString("0.##", CultureInfo.InvariantCulture));
+        }
+
+        public string Take()
+        {
+            string text = string.Join(",", Calls);
+            Calls.Clear();
+            return text;
+        }
+    }
+
+    // A hex view given to the editor instead of its own WinForms control (stage 3B-3: the WPF view of the tab), shown through a place: the editor
+    // asks the place to show and hide it where it showed and hid its own, gives it the colours and the font of the text (at its zoom), and the
+    // view does what the editor's own did. A WinForms view stands in for the WPF one, which Mono cannot make.
+    private static void HexPlace(Server server)
+    {
+        Console.WriteLine("-- a hex view given to the editor and shown by its place");
+        WriteRemote(server, "place.txt", Bytes("abc\ndef\n"));
+        GlobalSettings settings = new GlobalSettings();
+        Form form = new Form { Width = 800, Height = 600 };
+        string path = server.Directory + "/place.txt";
+        HexEditorControl given = new HexEditorControl { Dock = DockStyle.Fill };
+        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(), null, ColumnUnit.Characters, given) { Dock = DockStyle.Fill };
+        Check(ReferenceEquals(e.HexEditor, given), "the hex view of the editor is the one it was given");
+        Check(e.HexEditorControl == null, "and it has no WinForms one of its own");
+        Check(!e.Controls.Contains(given), "the given view is not put among the editor's controls");
+        FakeHexPlace place = new FakeHexPlace();
+        e.HexViewPlace = place;
+        string look = place.Take();
+        // The font of the text is Courier New of 12 points (Mono may give another family for that name).
+        string family = e.LogicalFont.FontFamily.Name;
+        Check(e.LogicalFont.SizeInPoints == 12f, "the font of the text has 12 points");
+        Check(look.StartsWith("look ", StringComparison.Ordinal) && look.EndsWith(" " + family + " 12", StringComparison.Ordinal), "the place gets the colours and the font of the text when it is set (" + look + ")");
+        form.Controls.Add(given);
+        form.Controls.Add(e);
+        form.Show();
+        Opened o = new Opened { Editor = e, Form = form, Server = server, Path = path };
+        Pump(() => e.CanSave, "the file to load");
+        Settle(server);
+        place.Calls.RemoveAll(call => call.StartsWith("look ", StringComparison.Ordinal));
+        Equal(place.Take(), "hide", "loading the file hides the hex view, as it did the editor's own");
+
+        e.BackColor = System.Drawing.Color.FromArgb(10, 20, 30);
+        look = place.Take();
+        Check(look.StartsWith("look ff0a141e ", StringComparison.Ordinal), "a new background goes to the place (" + look + ")");
+        e.ForeColor = System.Drawing.Color.FromArgb(200, 210, 220);
+        look = place.Take();
+        Check(look.EndsWith("look ff0a141e ffc8d2dc " + family + " 12", StringComparison.Ordinal), "a new text colour too (" + look + ")");
+        e.FontZoom = 1.5f;
+        look = place.Take();
+        Check(look.EndsWith(" " + family + " 18", StringComparison.Ordinal), "the zoom of the text goes with the font (" + look + ")");
+
+        List<string> events = RecordEvents(e);
+        e.ToggleHexMode();
+        Equal(place.Take(), "show", "opening the hex view asks the place to show it");
+        Equal(Events(events), "modified:False,hex:True,format", "and tells what the editor tells with its own view");
+        Check(e.IsHexMode && !given.ReadOnly && e.ReadOnly, "the given view can be edited, the text cannot");
+        SameBytes(given.Document.ToArray(), Bytes("abc\ndef\n"), "the given view shows the bytes of the file");
+        given.Document.ReplaceByte(0, (byte)'A');
+        Check(e.IsModified, "a change in the given view modifies the editor");
+        e.SelectAllText();
+        Equal(given.SelectionLength, 8, "Select all of the editor selects the bytes of the given view");
+        given.GoToOffset(0);
+        SaveAndWait(o);
+        SameBytes(ReadRemote(server, "place.txt"), Bytes("Abc\ndef\n"), "a save in the given view writes its bytes");
+        Check(!e.IsModified && !given.IsModified, "and both are saved");
+
+        given.GoToOffset(2);
+        Thread.Sleep(1100);
+        WriteRemote(server, "place.txt", Bytes("reloaded\n"));
+        e.Reload();
+        Pump(() => e.CanSave, "the file to be loaded again");
+        Settle(server);
+        Equal(place.Take(), "hide,show", "a reload in the hex view hides it and shows it again");
+        SameBytes(given.Document.ToArray(), Bytes("reloaded\n"), "on the new bytes");
+        Equal(given.CaretOffset, 2, "at the same offset");
+
+        e.ToggleHexMode();
+        Equal(place.Take(), "hide", "closing the hex view asks the place to hide it");
+        Check(!e.IsHexMode && given.ReadOnly && !e.ReadOnly, "the given view is read-only again, the text can be edited");
+        Equal(Text(o), "reloaded\n", "the text is the file");
+        o.Close();
+    }
+
     // The draft of the bytes of the hex view comes back in the hex view.
     private static void HexDraft(Server server)
     {
@@ -1147,6 +1249,7 @@ internal static class Program
         RunScenario(server, "hex-view", HexView);
         RunScenario(server, "hex-draft", HexDraft);
         RunScenario(server, "flow", Flow);
+        RunScenario(server, "hex-place", HexPlace);
     }
 
     private static void RunServer(string name, string host, int port, string user, string password)

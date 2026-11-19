@@ -141,7 +141,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
             RefreshState();
         };
         _editor.ContextMenuStrip = _contextMenu;
-        _editor.HexEditorControl.ContextMenuStrip = _contextMenu;
+        // A hex view given to the editor (the WPF one of the tab) has the context menu of the tab.
+        if (_editor.HexEditorControl != null)
+        {
+            _editor.HexEditorControl.ContextMenuStrip = _contextMenu;
+        }
 
         _editor.Dock = DockStyle.Fill;
         Controls.Add(_editor);

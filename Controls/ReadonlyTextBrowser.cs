@@ -924,6 +924,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    /// <summary>The font chosen by the application, before the zoom and the scale of the monitor (null until one is set).</summary>
+    internal Font LogicalFont => _logicalFont;
+
     /// <summary>The factor the text is shown with on top of its font size: 1 is the size the font was set to.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public float FontZoom

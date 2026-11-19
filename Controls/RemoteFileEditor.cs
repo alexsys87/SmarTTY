@@ -57,14 +57,37 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     // Made by the constructor that opens a file: the base classes may ask for IsModified before that.
     private RemoteFileContent _content;
 
-    // The hex view of the file.
-    private HexEditorControl _hexEditor;
+    // The hex view of the file: the WinForms control of this editor, or a view given by the constructor (the WPF view of the tab), which is shown
+    // through _hexPlace.
+    private IHexEditorView _hexEditor;
+
+    private HexEditorControl _hexControl;
+
+    private IHexViewPlace _hexPlace;
 
     /// <summary>The hex view of the file.</summary>
     public IHexEditorView HexEditor => _hexEditor;
 
-    /// <summary>The hex view as a WinForms control (for the context menu of the panel).</summary>
-    internal HexEditorControl HexEditorControl => _hexEditor;
+    /// <summary>The hex view as a WinForms control of this editor (for the context menu of the panel); null when the view was given.</summary>
+    internal HexEditorControl HexEditorControl => _hexControl;
+
+    /// <summary>
+    /// Where a hex view given to the constructor is shown, and what takes the colours and the font of the text (the tab). Until it is set such a
+    /// view is neither shown nor hidden.
+    /// </summary>
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal IHexViewPlace HexViewPlace
+    {
+        get
+        {
+            return _hexPlace;
+        }
+        set
+        {
+            _hexPlace = value;
+            UpdateHexAppearance();
+        }
+    }
 
     /// <summary>The editor shows the bytes instead of the text.</summary>
     public bool IsHexMode => _content != null && _content.HexMode;
@@ -145,9 +168,20 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     public event EventHandler LoadCompleted;
 
     public RemoteFileEditor()
+        : this((IHexEditorView)null)
+    {
+    }
+
+    // A null hex view: the editor makes its own WinForms one.
+    private RemoteFileEditor(IHexEditorView hexView)
     {
         InitializeComponent();
-        _hexEditor = new HexEditorControl
+        if (hexView != null)
+        {
+            _hexEditor = hexView;
+            return;
+        }
+        _hexControl = new HexEditorControl
         {
             Dock = DockStyle.Fill,
             Visible = false,
@@ -155,7 +189,19 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             BackColor = BackColor,
             ForeColor = ForeColor
         };
-        Controls.Add(_hexEditor);
+        _hexEditor = _hexControl;
+        Controls.Add(_hexControl);
+    }
+
+    // Gives a hex view of the place its colours and font.
+    private void UpdateHexAppearance()
+    {
+        if (_hexPlace == null)
+        {
+            return;
+        }
+        System.Drawing.Font font = LogicalFont ?? Font;
+        _hexPlace.SetAppearance(BackColor.ToRgb(), ForeColor.ToRgb(), font.FontFamily.Name, font.SizeInPoints * FontZoom);
     }
 
     /// <summary>Switches the editor between the text and the hex view.</summary>
@@ -193,28 +239,31 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     protected override void OnFontChanged(EventArgs e)
     {
         base.OnFontChanged(e);
-        if (_hexEditor != null)
+        if (_hexControl != null)
         {
-            _hexEditor.Font = Font;
+            _hexControl.Font = Font;
         }
+        UpdateHexAppearance();
     }
 
     protected override void OnBackColorChanged(EventArgs e)
     {
         base.OnBackColorChanged(e);
-        if (_hexEditor != null)
+        if (_hexControl != null)
         {
-            _hexEditor.BackColor = BackColor;
+            _hexControl.BackColor = BackColor;
         }
+        UpdateHexAppearance();
     }
 
     protected override void OnForeColorChanged(EventArgs e)
     {
         base.OnForeColorChanged(e);
-        if (_hexEditor != null)
+        if (_hexControl != null)
         {
-            _hexEditor.ForeColor = ForeColor;
+            _hexControl.ForeColor = ForeColor;
         }
+        UpdateHexAppearance();
     }
 
     /// <summary>The unsaved state covers both views: the bytes in hex mode, the text in text mode.</summary>
@@ -310,8 +359,9 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     }
 
     /// <param name="initialColumnUnit">What the column of <paramref name="textPosition"/> counts: the caret is put at the character it points at once the text is loaded.</param>
-    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters)
-        : this()
+    /// <param name="hexView">The hex view of the file (the WPF view of the tab, shown through <see cref="HexViewPlace"/>); null: the editor makes its own WinForms one.</param>
+    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters, IHexEditorView hexView = null)
+        : this(hexView)
     {
         _initialColumnUnit = initialColumnUnit;
         this._context = terminalSessionContext;
@@ -810,13 +860,21 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     void IRemoteFileContentHost.ShowHexView()
     {
-        _hexEditor.Visible = true;
-        _hexEditor.BringToFront();
+        if (_hexControl != null)
+        {
+            _hexControl.Visible = true;
+            _hexControl.BringToFront();
+        }
+        _hexPlace?.ShowHexView();
     }
 
     void IRemoteFileContentHost.HideHexView()
     {
-        _hexEditor.Visible = false;
+        if (_hexControl != null)
+        {
+            _hexControl.Visible = false;
+        }
+        _hexPlace?.HideHexView();
     }
 
     void IRemoteFileContentHost.ShowError(string message)
