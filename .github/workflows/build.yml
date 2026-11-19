@@ -300,6 +300,9 @@ jobs:
       - name: Run device command list checks (the saved history and the command lists of a COM/TCP device: loading, saving, deleting, clearing)
         run: dotnet run --project tests/DeviceCommandListsTests -c Release
 
+      - name: Run local completion session checks (the completion of a command, a path or a directory in the input line of a device terminal)
+        run: dotnet run --project tests/LocalCompletionSessionTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 

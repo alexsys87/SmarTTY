@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The local completion session of the serial terminal (Terminal/LocalCompletionSession.cs) with a fake host and a fake popup. It is compiled
+    like tests/ModelBuildTests (the logic folders and what they use), except that CompletionSession.cs (it needs SSH.NET) is replaced by a
+    stand-in of its nested AppliedEventArgs: CompletionSessionStub.cs, which must have the members the real class has.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RootNamespace>SmarTTY</RootNamespace>
+    <!-- The same language version as the application: the logic must not need anything that only the application project has. -->
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- tests/model-boundary-allowlist.txt without the comments, as ../../Folder/File.cs;... -->
+    <BoundaryAllowlist>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../model-boundary-allowlist.txt'))</BoundaryAllowlist>
+    <BoundaryAllowlist>$([System.Text.RegularExpressions.Regex]::Replace('$(BoundaryAllowlist)', '(?m)^\s*#.*$', ''))</BoundaryAllowlist>
+    <BoundaryAllowlist>$([System.Text.RegularExpressions.Regex]::Replace('$(BoundaryAllowlist)', '\s*(\S+\.cs)\s*', '../../$1;'))</BoundaryAllowlist>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="CompletionSessionStub.cs" />
+    <Compile Include="../../Terminal/**/*.cs;../../TextEditing/**/*.cs;../../CodeEditing/**/*.cs;../../Completion/**/*.cs" />
+    <!-- The escaped separators of the property are turned back into a list of files. -->
+    <Compile Remove="$([MSBuild]::Unescape('$(BoundaryAllowlist)'))" />
+
+    <!--
+      Clean files that cannot be compiled yet because they use a listed file or a settings type that holds Color or Keys
+      (VisualTTY/ is frozen at stage 1). Remove a line when its cause is gone.
+        ITerminalSessionContext.cs: VirtualTerminalSettings (GlobalSettings) and SshSession
+        ShellCompletionAnalyzer.cs, ISmartTerminalHost.cs, CompletionSession.cs: SshSession (SSH.NET); the analyzer also the settings and the
+          completion database (VisualTTY/); CompletionSession uses the analyzer and the host
+    -->
+    <Compile Remove="../../Terminal/ITerminalSessionContext.cs" />
+    <Compile Remove="../../Completion/ShellCompletionAnalyzer.cs" />
+    <Compile Remove="../../Terminal/ISmartTerminalHost.cs" />
+    <Compile Remove="../../Terminal/CompletionSession.cs" />
+
+    <!-- Code outside the logic folders that the logic uses (found by compiling; plain code without WinForms). -->
+    <Compile Include="../../IO/EditorDraftStore.cs" />
+    <Compile Include="../../IO/EditorFilePolicy.cs" />
+    <Compile Include="../../IO/RemoteFileSignature.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" />
+    <Compile Include="../../IO/RemoteSaveCommand.cs" />
+    <Compile Include="../../IO/RemoteScript.cs" />
+    <Compile Include="../../Ssh/RemoteOperationException.cs" />
+    <Compile Include="../../Ssh/WindowsSftpPath.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" />
+    <Compile Include="../../Utilities/LocalLinkRules.cs" />
+    <Compile Include="../../Utilities/PosixShell.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" />
+    <Compile Include="../../Utilities/UrlLinks.cs" />
+    <Compile Include="../../VisualTTY/CommandCompletion.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceDirectoryListing.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceLineInput.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceSessionKey.cs" />
+    <Compile Include="../../VisualTTY/VirtualTerminalPopupIcon.cs" />
+    <Compile Include="../../VisualTTY/VirtualTerminalPopupItemIcon.cs" />
+    <Compile Include="../../VisualTTY/VirtualTerminalPopupSummary.cs" />
+  </ItemGroup>
+
+</Project>

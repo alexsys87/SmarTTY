@@ -42,11 +42,13 @@
         ITerminalSessionContext.cs: VirtualTerminalSettings (GlobalSettings) and SshSession
         ShellCompletionAnalyzer.cs, ISmartTerminalHost.cs, CompletionSession.cs: SshSession (SSH.NET); the analyzer also the settings and the
           completion database (VisualTTY/); CompletionSession uses the analyzer and the host
+        LocalCompletionSession.cs: CompletionSession.AppliedEventArgs (tests/LocalCompletionSessionTests compiles it with a stand-in of that type)
     -->
     <Compile Remove="../../Terminal/ITerminalSessionContext.cs" />
     <Compile Remove="../../Completion/ShellCompletionAnalyzer.cs" />
     <Compile Remove="../../Terminal/ISmartTerminalHost.cs" />
     <Compile Remove="../../Terminal/CompletionSession.cs" />
+    <Compile Remove="../../Terminal/LocalCompletionSession.cs" />
 
     <!-- Code outside the logic folders that the logic uses (found by compiling; plain code without WinForms). -->
     <Compile Include="../../IO/EditorDraftStore.cs" />

@@ -93,6 +93,12 @@ internal static class Program
         return _popup?.Items.FirstOrDefault((CompletionItem item) => item.Text == text) ?? default;
     }
 
+    // The texts of the items of the popup that the terminal asked for last, in order.
+    private static string PopupTexts()
+    {
+        return _popup == null ? null : string.Join("|", _popup.Items.Select((CompletionItem item) => item.Text));
+    }
+
     private static string PopupSummary(string text)
     {
         CompletionItem item = PopupItem(text);
@@ -813,6 +819,77 @@ internal static class Program
             },
             new Step
             {
+                // The only directory of /etc is applied at once (the best match is taken when the list is there), and the list is gone after it.
+                Name = "Tab after \"cd /etc/\" asks the device for the directory, offers its directories only and applies the only one",
+                Act = () =>
+                {
+                    ClearLine(terminal);
+                    Type(terminal, "cd /etc/");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => PopupTexts() == "" && InputText(terminal) == "cd /etc/init.d/" && terminal.HasInputLine
+            },
+            new Step
+            {
+                // The blank typed after "cd" started a completion of its own (a listing of the shell's directory), as in the steps of the listing above.
+                // (A listing of the shell's own directory is "cd -- ." without quotes: the helper of the stand shows it as "ls " with no directory.)
+                Name = "the device got a listing command for the shell's directory and one for the directory as it was typed",
+                Done = () => ReceivedShort().EndsWith("|ls |ls /etc/", StringComparison.Ordinal)
+            },
+            new Step
+            {
+                Name = "Tab after \"cat /etc/h\" lists the files and completes the only name that matches",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                    Type(terminal, "cat /etc/h");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => InputText(terminal) == "cat /etc/hosts"
+            },
+            new Step
+            {
+                Name = "Tab after \"cat /cfg/c\" completes the common start of the names that match and offers them",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                    Type(terminal, "cat /cfg/c");
+                    Key(terminal, Keys.Tab);
+                },
+                Done = () => InputText(terminal) == "cat /cfg/config." && PopupTexts() == "config.a|config.b"
+            },
+            new Step
+            {
+                // The answer for /delay/ comes after 600 ms; by then the word has been cut back to "/", so the answer is dropped.
+                Name = "the answer of a listing that the word has moved away from is dropped",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                    Type(terminal, "cat /delay/");
+                    Key(terminal, Keys.Tab);
+                    for (int i = 0; i < 6; i++)
+                    {
+                        Key(terminal, Keys.Back);
+                    }
+                },
+                Done = () => InputText(terminal) == "cat /" && PopupTexts() == "sub|a.txt" && terminal.HasInputLine,
+                TimeoutMs = 9000
+            },
+            new Step
+            {
+                Name = "the list is closed and the line cleared after the path completion checks",
+                Act = () =>
+                {
+                    Key(terminal, Keys.Escape);
+                    ClearLine(terminal);
+                },
+                Done = () => InputText(terminal) == ""
+            },
+            new Step
+            {
                 // Disconnect returns: closing the connection did not hang.
                 Name = "the connection is closed without hanging",
                 Act = () => control.Disconnect()
@@ -909,7 +986,10 @@ internal static class Program
         string directory = Regex.Match(command, "cd -- '([^']*)'").Groups[1].Value;
         string begin = DeviceDirectoryListing.BeginMarker(token) + "\r\n";
         string end = DeviceDirectoryListing.EndMarker(token) + "\r\n";
-        string names = directory == "/etc" ? "init.d/\r\nhosts\r\npasswd\r\n" : "a.txt\r\nsub/\r\n";
+        string names = directory == "/etc" || directory == "/etc/" ? "init.d/\r\nhosts\r\npasswd\r\n"
+            : directory == "/cfg/" ? "config.a\r\nconfig.b\r\nother\r\n"
+            : directory == "/delay/" ? "delayed.txt\r\n"
+            : "a.txt\r\nsub/\r\n";
         switch (directory)
         {
             case "/silent":
@@ -923,6 +1003,11 @@ internal static class Program
                 write(command + "\r\n" + begin + names + end);
                 Thread.Sleep(1000);
                 write(ShellPrompt);
+                break;
+            case "/delay/":
+                // A slow answer of the path completion: the word may have moved to another directory by then.
+                Thread.Sleep(600);
+                write(command + "\r\n" + begin + names + end + ShellPrompt);
                 break;
             case "/slow":
                 Thread.Sleep(600);
@@ -1063,6 +1148,7 @@ internal static class Program
         Console.WriteLine("FAIL: " + name);
         Console.WriteLine("  status: " + _control?.StatusText);
         Console.WriteLine("  device got: " + Received());
+        Console.WriteLine("  popup items: " + PopupTexts());
         Console.WriteLine("  listings: " + ListedText() + " (accepted: " + string.Join(",", ListingStarted) + ")");
         Console.WriteLine("  input line: '" + InputText(terminal as SerialTerminalControl) + "', suggestion: '" + Suggestion(terminal as SerialTerminalControl) + "'");
         Console.WriteLine("  screen:");
