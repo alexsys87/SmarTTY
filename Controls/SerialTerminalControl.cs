@@ -22,7 +22,7 @@ using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Controls;
 
-public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
+public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost, ILocalCompletionHost
 {
     // The line being edited locally. Its prompt is either the device's own prompt, already on the screen (the input
     // continues that line: StartColumn is the end of the prompt), or a local prompt drawn on a line of its own
@@ -145,286 +145,6 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
         }
     }
 
-    // Completion infrastructure
-    private enum CompletionTarget
-    {
-        Command,
-        Path,
-        Directory
-    }
-
-    private class LocalCompletionSession : IDisposable
-    {
-        private readonly SerialTerminalControl _terminal;
-        private readonly CompletionTarget _target;
-        private string _commandText;
-        private int _tokenStart;
-        private int _tokenEnd;
-        private readonly ICompletionPopup _popup;
-        private readonly bool _autoApply;
-        private List<CompletionItem> _items;
-        // Directory whose children _items was last listed from ("" for command targets).
-        private string _itemsDirectory = "";
-
-        public event EventHandler<CompletionSession.AppliedEventArgs> ItemApplied;
-
-        public LocalCompletionSession(SerialTerminalControl terminal, string commandText, CompletionTarget target, int tokenStart, int tokenEnd, ICompletionPopup popup, bool autoApply)
-        {
-            _terminal = terminal;
-            _target = target;
-            _commandText = commandText;
-            _tokenStart = tokenStart;
-            _tokenEnd = tokenEnd;
-            _popup = popup;
-            _autoApply = autoApply;
-            _popup.ItemSelected += OnItemSelected;
-            LoadItems();
-            UpdatePopup();
-        }
-
-        private string GetTokenText()
-        {
-            if (_tokenStart >= 0 && _tokenEnd <= _commandText.Length && _tokenStart <= _tokenEnd)
-            {
-                return _commandText.Substring(_tokenStart, _tokenEnd - _tokenStart);
-            }
-            return "";
-        }
-
-        private void LoadItems()
-        {
-            try
-            {
-                List<CompletionItem> itemsList = new List<CompletionItem>();
-                string tokenText = GetTokenText();
-                string filterText = tokenText.Trim('\'', '"');
-
-                if (_target == CompletionTarget.Command)
-                {
-                    // The user's own commands and the saved history, matched by what is already typed.
-                    itemsList.AddRange(_terminal.GetSuggestedCommandItems());
-                }
-
-                if (_target == CompletionTarget.Command && string.IsNullOrEmpty(filterText))
-                {
-                    // Built-in local commands
-                    _itemsDirectory = "";
-                    itemsList.AddRange(LocalCompletionItems.GetBuiltInCommands());
-                    // Local executables from PATH
-                    itemsList.AddRange(LocalCompletionItems.GetLocalExecutables(filterText));
-                }
-                else if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
-                {
-                    // The files are on the device: its shell lists them (the folder of this program used to be offered).
-                    _itemsDirectory = LocalCompletionItems.GetDeviceDirectoryPrefix(tokenText);
-                    _items = itemsList;
-                    RequestDeviceListing(_itemsDirectory);
-                    return;
-                }
-
-                _items = itemsList;
-                _terminal.BeginInvoke((Action)(() => OnItemsLoaded()));
-            }
-            catch (Exception ex)
-            {
-                _popup.DisplayException(ex);
-            }
-        }
-
-        // Live-sync: called by the terminal after every text edit that lands
-        // inside this session's token. Keeps the token text, the item listing
-        // and the popup filter consistent with what the user is typing.
-        // Returns true when the edit invalidated the completion token (the
-        // session must be closed, e.g. the token turned into a region of shell
-        // metacharacters or an unescaped space that listing cannot represent).
-        public bool OnTextChanged(string newFullText, int offset, int oldLength, int newLength)
-        {
-            if (_popup == null)
-            {
-                return true;
-            }
-
-            int endOffset = offset + oldLength;
-            if (offset < _tokenStart || offset > _tokenEnd || endOffset > _tokenEnd)
-            {
-                // Edit happened outside the completed token - the session is stale.
-                return true;
-            }
-
-            _tokenEnd += newLength - oldLength;
-            _commandText = newFullText;
-
-            string extracted = GetTokenText();
-            if (string.IsNullOrEmpty(extracted))
-            {
-                UpdatePopup();
-                return false;
-            }
-
-            if (extracted.IndexOfAny(LocalCompletionItems.CompletionMetaChars) != -1)
-            {
-                return true;
-            }
-            if (LocalCompletionItems.ContainsUnescapedSpace(extracted) && extracted[0] != '\'' && extracted[0] != '"')
-            {
-                return true;
-            }
-
-            // For path/directory targets the listing depends on the directory the
-            // token points into; when it changed we must re-enumerate.
-            if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
-            {
-                string directory = LocalCompletionItems.GetDeviceDirectoryPrefix(extracted);
-                if (!string.Equals(directory, _itemsDirectory, StringComparison.Ordinal))
-                {
-                    LoadItems();
-                }
-            }
-
-            UpdatePopup();
-            return false;
-        }
-
-        // The prefix of the names that matches the word: what follows its last slash.
-        private string GetItemFilter()
-        {
-            string tokenText = GetTokenText();
-            if (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
-            {
-                string path = ShellCommandLine.Unquote(tokenText);
-                return path.Substring(path.LastIndexOf('/') + 1);
-            }
-            return tokenText.Trim('\'', '"');
-        }
-
-        // Each listing request gets a number: the answer to an older one (the word moved to another directory
-        // meanwhile) is dropped.
-        private int _listingGeneration;
-        private bool _disposed;
-
-        private void RequestDeviceListing(string directory)
-        {
-            int generation = ++_listingGeneration;
-            bool directoriesOnly = _target == CompletionTarget.Directory;
-            DeviceDirectoryListerHandler lister = _terminal.DeviceDirectoryLister;
-            bool started = lister != null && _terminal.CanListDeviceDirectory && lister(directory, entries =>
-            {
-                if (_disposed || generation != _listingGeneration)
-                {
-                    return;
-                }
-                _items = LocalCompletionItems.BuildPathItems(directory, entries, directoriesOnly);
-                OnItemsLoaded();
-            });
-            if (!started)
-            {
-                // No shell to ask (a bootloader, a password prompt, characters echoed to the device as they are typed):
-                // nothing is offered rather than files of this computer.
-                _items = new List<CompletionItem>();
-                _terminal.BeginInvoke((Action)(() =>
-                {
-                    if (!_disposed && generation == _listingGeneration)
-                    {
-                        UpdatePopup();
-                    }
-                }));
-            }
-        }
-
-        private void OnItemsLoaded()
-        {
-            UpdatePopup();
-            if (_autoApply)
-            {
-                ApplyBestMatch();
-            }
-        }
-
-        private void UpdatePopup()
-        {
-            if (_items == null || _disposed) return;
-
-            string filter = GetItemFilter();
-
-            var filtered = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
-            _popup.SetItemList(filtered);
-            _popup.SetFilter(filter);
-        }
-
-        private void ApplyBestMatch()
-        {
-            if (_items == null) return;
-            string filter = GetItemFilter();
-
-            var matches = _items.Where(item => item.Text.StartsWith(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
-            if (matches.Length == 1)
-            {
-                ApplyItem(matches[0], commit: false);
-            }
-            else if (matches.Length > 1)
-            {
-                string common = matches[0].Text;
-                foreach (var item in matches.Skip(1))
-                {
-                    common = LocalCompletionItems.CommonPrefix(common, item.Text);
-                }
-                if (common.Length > 0 && common != filter)
-                {
-                    // A path keeps the directory part of the word in front of the common start of the names.
-                    string insertText = (_target == CompletionTarget.Path || _target == CompletionTarget.Directory)
-                        ? ShellCommandLine.EscapeWord(_itemsDirectory + common)
-                        : common;
-                    ApplyItem(new CompletionItem { Text = common, InsertText = insertText }, commit: false);
-                }
-            }
-        }
-
-        private void OnItemSelected(CompletionItem item, VirtualKey keys)
-        {
-            ApplyItem(item, keys == VirtualKey.Return);
-        }
-
-        private void ApplyItem(CompletionItem item, bool commit, string suffix = "")
-        {
-            if (item.InsertText == null) return;
-
-            string insertText = item.InsertText;
-            // Paths are the device's: its separator is "/" (the one of Windows used to be put in).
-            bool isDir = insertText.EndsWith("/", StringComparison.Ordinal);
-
-            if (isDir)
-            {
-                if (suffix == "/") suffix = "";
-                else if (commit) insertText = insertText.TrimEnd('/');
-            }
-
-            string newText = _commandText.Substring(0, _tokenStart) + insertText + _commandText.Substring(_tokenEnd) + suffix;
-            int caretOffset = 0;
-
-            var args = new CompletionSession.AppliedEventArgs
-            {
-                NewText = newText,
-                CaretIndex = _tokenStart + insertText.Length + (suffix ?? "").Length + caretOffset,
-                Commit = commit,
-                Item = item,
-                IsDirectory = isDir
-            };
-            ItemApplied?.Invoke(this, args);
-        }
-
-        public void Dispose()
-        {
-            _disposed = true;
-            _popup?.Close();
-        }
-    }
-
-    /// <summary>
-    /// Lists <c>directory</c> (the directory part of the word, as typed; empty for the shell's own directory) on the device and calls
-    /// <c>done</c> on the UI thread with the names, or with null when the device did not answer. False when no listing could be started.
-    /// </summary>
-    public delegate bool DeviceDirectoryListerHandler(string directory, Action<IReadOnlyList<DeviceDirectoryEntry>> done);
-
     /// <summary>Set by the device terminal: asks the shell of the device for the names that the path completion offers.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public DeviceDirectoryListerHandler DeviceDirectoryLister { get; set; }
@@ -436,6 +156,21 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
     /// </summary>
     internal bool CanListDeviceDirectory => _inputLine != null && _shellPromptSeen && !_localEcho
         && !LineInputText.LooksLikeSecretPrompt(_inputLine.Prompt);
+
+    // The local completion session (Terminal/LocalCompletionSession.cs) asks the control for these.
+    IEnumerable<CompletionItem> ILocalCompletionHost.GetSuggestedCommandItems()
+    {
+        return GetSuggestedCommandItems();
+    }
+
+    void ILocalCompletionHost.Post(Action action)
+    {
+        BeginInvoke(action);
+    }
+
+    DeviceDirectoryListerHandler ILocalCompletionHost.DeviceDirectoryLister => DeviceDirectoryLister;
+
+    bool ILocalCompletionHost.CanListDeviceDirectory => CanListDeviceDirectory;
 
     private LocalCompletionSession _completionSession;
     private ICompletionPopup _completionPopup;
