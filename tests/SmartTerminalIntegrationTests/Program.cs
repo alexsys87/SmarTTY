@@ -215,7 +215,7 @@ internal static class Program
 
         using (SshSession session = Connect(host, port, user, password))
         {
-            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps, HistoryWindowSteps }, serverName);
+            RunSteps(session, user, bash, new Func<SshTerminalControl, SessionContext, IEnumerable<Step>>[] { CommandSteps, HistorySuggestionSteps, HistorySearchSteps, CompletionSteps, SelectionSteps, WrappedInputSteps, HistoryWindowSteps }, serverName);
         }
 
         // The shell of the interactive wrapper chosen automatically: bash, or the BusyBox ash login shell (OpenWRT).
@@ -866,6 +866,118 @@ internal static class Program
 
     // The grey rest of a previously typed command after the caret (Terminal/HistorySuggestion.cs). Runs after
     // CommandSteps, whose commands are the newest in the history.
+    // A command line that is longer than the screen wraps over several rows of the document: the index of the caret in the text and the place of
+    // the caret in the document have to agree across the rows (InputRegion.IndexOf, PositionAt).
+    private static IEnumerable<Step> WrappedInputSteps(SshTerminalControl terminal, SessionContext context)
+    {
+        string typed = string.Concat(Enumerable.Repeat("0123456789", 40));
+        yield return new Step
+        {
+            Name = "a command line longer than the screen is typed over several rows",
+            Act = () =>
+            {
+                Key(terminal, Keys.Control | Keys.C);
+                Type(terminal, typed);
+            },
+            Done = () => InputText(terminal) == typed && CaretIndex(terminal) == 400,
+            TimeoutMs = 5000
+        };
+        yield return new Step
+        {
+            Name = "the line is longer than the width of the screen, so it takes more than one row",
+            Done = () => DocumentText(terminal).Split('\n').Count((string row) => row.Contains("0123456789")) >= 2,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Home puts the caret at the start of the line",
+            Act = () => Key(terminal, Keys.Home),
+            Done = () => CaretIndex(terminal) == 0,
+            TimeoutMs = 3000
+        };
+        // At the end of a row the caret and the start of the next row are the same index of the text: a press of Right there moves the caret to the
+        // start of the next row and the index stays (recorded as it is). Which presses those are depends on the width of the screen, so the checks are
+        // on what each press does, not on the number of the row.
+        int stays = 0;
+        string wrongStep = null;
+        yield return new Step
+        {
+            Name = "Right goes on across the rows of the line: the index grows by one, or stays when the caret goes to the start of the next row",
+            Act = () =>
+            {
+                for (int i = 0; i < 250; i++)
+                {
+                    int before = CaretIndex(terminal);
+                    int lineBefore = terminal.CaretPosition.Line;
+                    Key(terminal, Keys.Right);
+                    int after = CaretIndex(terminal);
+                    if (after == before)
+                    {
+                        stays++;
+                        if (terminal.CaretPosition.Column != 0 || terminal.CaretPosition.Line != lineBefore + 1)
+                        {
+                            wrongStep = "the index stayed but the caret is at " + terminal.CaretPosition.Column + "," + terminal.CaretPosition.Line + " after " + lineBefore;
+                        }
+                    }
+                    else if (after != before + 1)
+                    {
+                        wrongStep = "the index went from " + before + " to " + after;
+                    }
+                }
+            },
+            Done = () =>
+            {
+                if (wrongStep != null)
+                {
+                    Console.WriteLine("  " + wrongStep);
+                }
+                return wrongStep == null && stays >= 1 && CaretIndex(terminal) == 250 - stays;
+            },
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "a letter typed there goes in at the caret, in the middle of the text",
+            Act = () => Type(terminal, "Z"),
+            Done = () => InputText(terminal) == typed.Substring(0, 250 - stays) + "Z" + typed.Substring(250 - stays) && CaretIndex(terminal) == 251 - stays,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Backspace takes it out again",
+            Act = () => Key(terminal, Keys.Back),
+            Done = () => InputText(terminal) == typed && CaretIndex(terminal) == 250 - stays,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "Left goes back across the rows",
+            Act = () =>
+            {
+                for (int i = 0; i < 250; i++)
+                {
+                    Key(terminal, Keys.Left);
+                }
+            },
+            Done = () => CaretIndex(terminal) == 0,
+            TimeoutMs = 5000
+        };
+        yield return new Step
+        {
+            Name = "End puts the caret at the end of the whole line",
+            Act = () => Key(terminal, Keys.End),
+            Done = () => CaretIndex(terminal) == 400,
+            TimeoutMs = 3000
+        };
+        yield return new Step
+        {
+            Name = "the long line is cleared",
+            Act = () => Key(terminal, Keys.Control | Keys.C),
+            Done = () => InputText(terminal) == "",
+            TimeoutMs = 3000
+        };
+    }
+
     private static IEnumerable<Step> HistorySuggestionSteps(SshTerminalControl terminal, SessionContext context)
     {
         yield return Retype(terminal, "echo hello-sm", "the rest of a typed command is suggested", () => Suggestion(terminal) == "artty");
@@ -1235,6 +1347,14 @@ internal static class Program
     {
         object line = InputLine(terminal);
         return line == null ? null : (string)line.GetType().GetProperty("Text").GetValue(line);
+    }
+
+    // The caret as an index into the text of the command line (InputRegion.CaretIndex), which counts through the rows the line wraps over.
+    private static int CaretIndex(SshTerminalControl terminal)
+    {
+        object line = InputLine(terminal);
+        object region = line.GetType().GetField("Region").GetValue(line);
+        return (int)region.GetType().GetProperty("CaretIndex").GetValue(region);
     }
 
     private static string InputPrompt(SshTerminalControl terminal)
