@@ -294,6 +294,9 @@ jobs:
       - name: Run device listing checks (the listing of a device directory for the path completion: the answer, the timeouts, the waiting request, the held input)
         run: dotnet run --project tests/DeviceListingSessionTests -c Release
 
+      - name: Run netconsole line input checks (the history walk of the input box and its draft, what typed text does to the box)
+        run: dotnet run --project tests/NetconsoleLineInputTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
