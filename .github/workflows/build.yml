@@ -285,6 +285,9 @@ jobs:
       - name: Run line paste checks (the state of a paste line by line, its progress text, its notes and the cancel)
         run: dotnet run --project tests/LinePasteRunTests -c Release
 
+      - name: Run history suggestion checks (the grey rest of a typed command of a local line, when it shows and what hides it)
+        run: dotnet run --project tests/HistorySuggestionStateTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 

@@ -887,7 +887,13 @@ internal static class Program
 
     private static string Suggestion(SerialTerminalControl terminal)
     {
-        return terminal == null ? null : (string)typeof(SerialTerminalControl).GetField("_historySuggestion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+        if (terminal == null)
+        {
+            return null;
+        }
+        // The accessor follows the move of the field into HistorySuggestionState (its Current is what the field held).
+        object state = typeof(SerialTerminalControl).GetField("_suggestion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(terminal);
+        return (string)state.GetType().GetProperty("Current", BindingFlags.Instance | BindingFlags.Public).GetValue(state, null);
     }
 
     private static string DocumentText(TerminalEmulatorControl terminal)

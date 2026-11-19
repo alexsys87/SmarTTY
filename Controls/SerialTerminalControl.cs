@@ -67,11 +67,8 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
     private bool _reportedFullScreenProgramActive;
     private readonly LineHistory _history = new LineHistory();
 
-    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion); null when none is shown.
-    private string? _historySuggestion;
-
-    // Esc hides the suggestion until the line changes: the text it was hidden for.
-    private string? _suggestionDismissedFor;
+    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion), and what hides it.
+    private readonly HistorySuggestionState _suggestion = new HistorySuggestionState();
     private string _currentPrompt = "> ";
     private bool _autoDetectPrompt = true;
     private bool _localEcho = true;
@@ -814,8 +811,7 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
         {
             document.RemoveLines(cursor.Line + 1, document.LineCount - cursor.Line - 1);
         }
-        _historySuggestion = null;
-        _suggestionDismissedFor = null;
+        _suggestion.Clear();
         _inputLine = new InputLine(cursor.Line, prompt.Length, prompt);
         RewrapInput();
         OnTextReplaced();
@@ -874,8 +870,7 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
 
         int startLine = ((EditableTextBrowser)this).EditableDocument.LineCount;
         int startColumn = 0;
-        _historySuggestion = null;
-        _suggestionDismissedFor = null;
+        _suggestion.Clear();
         _inputLine = new InputLine(startLine, startColumn, _currentPrompt);
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_currentPrompt);
         RewrapInput();
@@ -1128,9 +1123,9 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
                 return;
             }
             // Then the suggestion, until the line is changed.
-            if (_historySuggestion != null && _inputLine != null)
+            if (_suggestion.Current != null && _inputLine != null)
             {
-                _suggestionDismissedFor = _inputLine.Text;
+                _suggestion.Dismiss(_inputLine.Text);
                 RefreshHistorySuggestion();
                 e.Handled = true;
                 e.SuppressKeyPress = true;
@@ -1444,23 +1439,14 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
     private string? ComputeHistorySuggestion()
     {
         InputLine? inputLine = _inputLine;
-        // Nothing at "Password:": the suggestion would show other commands on the screen while a secret is typed.
-        if (inputLine == null || _inputLineDisabled || HasSelection || _visibleColumns <= 0 || !HistorySuggestionsEnabled
-            || LineInputText.LooksLikeSecretPrompt(inputLine.Prompt))
+        if (inputLine == null)
         {
             return null;
         }
         string text = inputLine.Text;
-        if (text.Length == 0 || text == _suggestionDismissedFor)
-        {
-            return null;
-        }
-        // The arrows move only the caret on the screen: the suggestion is shown while it is after the last typed character.
-        if (CaretPosition != GetCaretPositionFromInputIndex(text.Length))
-        {
-            return null;
-        }
-        return HistorySuggestion.Find(_history.NewestFirst, text);
+        return _suggestion.Compute(true, _inputLineDisabled, HasSelection, _visibleColumns, HistorySuggestionsEnabled,
+            LineInputText.LooksLikeSecretPrompt(inputLine.Prompt), text,
+            () => CaretPosition == GetCaretPositionFromInputIndex(text.Length), _history.NewestFirst);
     }
 
     /// <summary>Works out the grey suggestion for the line as it is now and repaints when it has changed.</summary>
@@ -1476,9 +1462,8 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
             // The caret is also moved while the input line is being redrawn; the next change works it out again.
             suggestion = null;
         }
-        if (suggestion != _historySuggestion)
+        if (_suggestion.Show(suggestion))
         {
-            _historySuggestion = suggestion;
             Invalidate();
         }
     }
@@ -1501,7 +1486,7 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
             return false;
         }
         RefreshHistorySuggestion();
-        string? suggestion = _historySuggestion;
+        string? suggestion = _suggestion.Current;
         if (suggestion == null)
         {
             return false;
@@ -1526,7 +1511,7 @@ public class SerialTerminalControl : TerminalEmulatorControl, ILocalLinkHost
     protected override void PaintLineOverlay(Graphics graphics, int line, string text, int firstColumn, int left, int top, int height)
     {
         base.PaintLineOverlay(graphics, line, text, firstColumn, left, top, height);
-        string? suggestion = _historySuggestion;
+        string? suggestion = _suggestion.Current;
         InputLine? inputLine = _inputLine;
         if (suggestion == null || inputLine == null || HasSelection || _visibleColumns <= 0)
         {
