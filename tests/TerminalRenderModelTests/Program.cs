@@ -79,6 +79,7 @@ internal static class Program
             ClassicTerminalChecks();
             SearchChecks();
             ThreadingSourceChecks();
+            PromptLineChecks();
         }
         catch (Exception exception)
         {
@@ -529,5 +530,89 @@ internal static class Program
         string terminal = System.IO.File.ReadAllText(System.IO.Path.Combine(directory, "GUI", "TerminalView", "WpfTerminal.cs"));
         Check(terminal.Contains("public new object Tag"), "the WPF terminal hides the dependency property Tag with one that any thread may read");
         Check(terminal.Contains("Volatile.Read(ref _tag)"), "its Tag is a plain field");
+    }
+
+    // The command line of the Smart Terminal on the WPF view (Terminal/Rendering/PromptLine).
+    private static void PromptLineChecks()
+    {
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 4);
+        model.ProcessOutput("Welcome");
+        PromptLine line = new PromptLine(model, model.Document.LineCount, "$ ");
+        Equal(model.Document.GetLineText(1), "$ ", "the prompt is a line of its own at the end");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "1:2", "the caret is after the prompt");
+        int changes = 0;
+        string lastChange = "";
+        line.TextChanged += (start, removed, added) =>
+        {
+            changes++;
+            lastChange = start + "," + removed + "," + added;
+        };
+        line.Insert("ls -la /tmp");
+        Equal(model.Document.GetLineText(1) + "|" + model.Document.GetLineText(2), "$ ls -la /|tmp", "a long line wraps at the width of the screen");
+        Equal(line.Text, "ls -la /tmp", "the text without the prompt");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "2:3", "the caret at the end of the text, on the second row");
+        Equal(lastChange + " " + changes, "0,0,11 1", "the change is told (where, removed, added)");
+        line.MoveCaret(line.StepIndex(forward: false, word: true), extend: false);
+        Equal(line.CaretIndex, 8, "Ctrl+Left to the start of the word (the path is split at '/')");
+        line.MoveCaret(0, extend: false);
+        line.MoveCaret(line.StepIndex(forward: true, word: true), extend: false);
+        Equal(line.CaretIndex, 2, "Ctrl+Right to the end of the word");
+        line.MoveCaret(line.Text.Length, extend: false);
+        line.DeleteBackward(word: false);
+        Equal(line.Text, "ls -la /tm", "Backspace");
+        line.DeleteBackward(word: true);
+        Equal(line.Text, "ls -la /", "Ctrl+Backspace deletes the word before the caret");
+        line.MoveCaret(0, extend: false);
+        line.DeleteForward(word: false);
+        Equal(line.Text, "s -la /", "Delete");
+        line.MoveCaret(2, extend: false);
+        line.MoveCaret(5, extend: true);
+        Check(line.HasSelection && line.SelectedText == "-la", "Shift moves select text of the line");
+        Check(model.HasSelection && model.GetSelectedText() == "-la", "the selection is shown in the view");
+        line.Insert("-l");
+        Equal(line.Text + "|" + line.CaretIndex, "s -l /|4", "typing replaces the selection");
+        Check(!model.HasSelection, "and the selection is gone");
+        line.SelectAll();
+        Equal(line.SelectedText, "s -l /", "Ctrl+A selects the text, not the prompt");
+        line.SetText("echo \u00e9\uD83D\uDE00");
+        line.DeleteBackward(word: false);
+        Equal(line.Text, "echo \u00e9", "a surrogate pair is deleted whole");
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        Equal(line.CaretIndex, 5, "Left steps over one character");
+        line.SetText("a\r\nb");
+        Equal(line.Text, "ab", "the line breaks of a pasted text are not part of the line");
+        line.SetText("12345678901234", 3);
+        Equal(line.CaretIndex, 3, "SetText puts the caret where asked");
+        Equal(model.Document.LineCount, 3, "the rows of the line: 16 characters on rows of 10");
+        Equal(line.IndexOf(model.Document.EndPosition), 14, "the end of the document is the end of the text");
+        Equal(line.IndexOf(new TextDocument.TextPosition(1, 1)), 0, "a place in the prompt is the start of the text");
+        Equal(line.IndexOf(new TextDocument.TextPosition(2, 0)), 0, "a place in the output above is the start of the text");
+        Check(line.Contains(new TextDocument.TextPosition(4, 2)) && !line.Contains(new TextDocument.TextPosition(0, 0)), "what is in the line and what is not");
+        Equal(line.IndexOf(new TextDocument.TextPosition(4, 2)), 12, "a place on the second row");
+        Check(line.IsAtWordStart == false, "the caret is inside a word");
+        line.SetText("ls ", -1);
+        Check(line.IsAtWordStart, "after a blank the caret is at the start of a word");
+
+        model.Resize(20, 4);
+        line.SetText("ls -la /tmp");
+        Equal(model.Document.GetLineText(1), "$ ls -la /tmp", "after a resize the line is wrapped at the new width");
+        Equal(model.Document.LineCount, 2, "one row now");
+
+        // A command runs: its output starts on a new line after the command line, the caret is the cursor again.
+        model.BeginOutputAtEnd();
+        Equal(model.ScreenTopLine, 2, "the screen of the command starts after the command line");
+        model.ProcessOutput("out1\r\nout2\r\n");
+        Equal(model.Document.GetLineText(2) + "|" + model.Document.GetLineText(3), "out1|out2", "the output of the command");
+        Equal(model.Caret.Line, 4, "the caret follows the output");
+        Equal(model.Document.GetLineText(1), "$ ls -la /tmp", "the command line stays above");
+        PromptLine next = new PromptLine(model, model.Document.LineCount, "$ ");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "5:2", "the next prompt after the output");
+        model.TopLine = 0;
+        model.ScrollToScreen();
+        Check(model.Caret.Line >= model.TopLine && model.Caret.Line < model.TopLine + model.Rows, "a key brings the command line into the view");
+        model.Reset();
+        model.ProcessOutput("x");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "0:1", "a reset gives the caret back to the screen");
+        Check(next.Prompt == "$ ", "the prompt");
     }
 }

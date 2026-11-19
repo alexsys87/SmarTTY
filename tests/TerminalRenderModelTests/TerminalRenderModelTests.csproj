@@ -28,6 +28,7 @@
     <Compile Include="../../Utilities/UrlLinks.cs" Link="UrlLinks.cs" />
     <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
     <Compile Include="../../TextEditing/TextMatcher.cs" Link="TextMatcher.cs" />
+    <Compile Include="../../Terminal/InputRegionMap.cs" Link="InputRegionMap.cs" />
     <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
     <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
     <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />

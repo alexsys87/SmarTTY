@@ -155,7 +155,110 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     public int MaxTopLine => Math.Max(0, Math.Max(_document.LineCount - _rows, _screen.ActiveBuffer.FirstRow));
 
     /// <summary>The place of the caret in the document.</summary>
-    public TextDocument.TextPosition Caret => _caret;
+    public TextDocument.TextPosition Caret => _promptCaret ?? _caret;
+
+    // The caret of a command line that the terminal edits itself (the Smart Terminal at its prompt); null: the cursor of the screen.
+    private TextDocument.TextPosition? _promptCaret;
+
+    /// <summary>
+    /// Shows the caret at a place of the document instead of at the cursor of the screen (the command line of the Smart Terminal, which is
+    /// edited here and not by a program), and keeps that place in the view; null gives the caret back to the screen.
+    /// </summary>
+    public void SetPromptCaret(TextDocument.TextPosition? position)
+    {
+        _promptCaret = position;
+        if (position.HasValue)
+        {
+            EnsureLineVisible(position.Value.Line);
+        }
+        OnChanged();
+    }
+
+    /// <summary>
+    /// Replaces the lines of the document from <paramref name="startLine"/> to its end with <paramref name="rows"/> (the rows of the command
+    /// line of the Smart Terminal, without styles). The styles of the replaced lines go with them.
+    /// </summary>
+    public void ReplaceDocumentTail(int startLine, IList<string> rows)
+    {
+        EditableTextDocument document = _document;
+        startLine = Math.Max(0, startLine);
+        if (startLine < document.LineCount)
+        {
+            document.RemoveLines(startLine, document.LineCount - startLine);
+        }
+        Lines.RemoveLines(startLine, int.MaxValue);
+        while (document.LineCount < startLine)
+        {
+            document.AppendLine("");
+        }
+        foreach (string row in rows)
+        {
+            document.AppendLine(row ?? "");
+        }
+        if (_hasSelection)
+        {
+            _selectionAnchor = Clamp(_selectionAnchor);
+            _selectionEnd = Clamp(_selectionEnd);
+        }
+        OnChanged();
+    }
+
+    /// <summary>
+    /// The output of a command starts on a new line at the end of the document: the screen of the remote side begins there with the cursor
+    /// at its top left corner, and the caret is the cursor again (what <c>SshTerminalControl.BeginExecution</c> did to its buffer).
+    /// </summary>
+    public void BeginOutputAtEnd()
+    {
+        _promptCaret = null;
+        _document.AppendLine("");
+        _screen.ActiveBuffer.FirstRow = _document.LineCount - 1;
+        _screen.Cursor = new GridPoint(0, 0);
+        _screen.UpdateCaret();
+        EnsureLineVisible(_document.LineCount - 1);
+        OnChanged();
+    }
+
+    /// <summary>Sets the title as a program would (the Smart Terminal shows the user, the host and the directory there).</summary>
+    public void SetTitle(string title)
+    {
+        ((ITerminalHost)this).Title = title;
+    }
+
+    /// <summary>Goes back to the normal screen (the alternate one belongs to a program that has ended).</summary>
+    public void SwitchToNormalScreen()
+    {
+        if (_screen.ActiveBufferIndex != 0)
+        {
+            _screen.ActiveBufferIndex = 0;
+        }
+    }
+
+    /// <summary>The next output starts a new link (a new command).</summary>
+    public void ResetLinkTracking()
+    {
+        _screen.ResetLinkTracking();
+    }
+
+    /// <summary>Forgets a half-crossed character of byte mode (a new command starts).</summary>
+    public void ResetByteColumns()
+    {
+        ResetByteState();
+    }
+
+    /// <summary>Makes the scanners of the links of the output (the Smart Terminal: the scanner of the command that runs); null: the settings of this model decide.</summary>
+    internal Func<ILinkScanner> LinkScannerFactory { get; set; }
+
+    private void EnsureLineVisible(int line)
+    {
+        if (line < _topLine)
+        {
+            _topLine = Math.Max(0, line);
+        }
+        else if (line >= _topLine + _rows)
+        {
+            _topLine = Math.Max(0, line - _rows + 1);
+        }
+    }
 
     /// <summary>The program hid the caret (CSI ? 25 l).</summary>
     public bool CaretHidden => _caretHidden;
@@ -250,7 +353,9 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     public ColumnUnit CompilerColumns { get; set; } = ColumnUnit.Auto;
 
     // Only an ordinary screen of a shell has links: a full-screen program draws its own text, and one that takes the mouse needs the clicks.
-    public bool LinksAvailable => (FileLinks || UrlLinks) && _screen.ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
+    public bool LinksAvailable => LinkScannerFactory != null
+        ? _mouseMode == MouseReportingMode.Off
+        : (FileLinks || UrlLinks) && _screen.ActiveBufferIndex == 0 && _mouseMode == MouseReportingMode.Off;
 
     /// <summary>The link of a cell of the document, or null.</summary>
     internal ILinkTarget GetLinkAt(int line, int column)
@@ -333,12 +438,24 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         _modes.IncompleteEscape = null;
         ResetByteState();
         DropPrediction();
+        _promptCaret = null;
         OnChanged();
     }
 
     /// <summary>Brings the screen of the remote side into the view (a key was pressed).</summary>
     public void ScrollToScreen()
     {
+        if (_promptCaret.HasValue)
+        {
+            // The command line of the Smart Terminal may be below the last screen of the remote side.
+            int topLine = _topLine;
+            EnsureLineVisible(_promptCaret.Value.Line);
+            if (topLine != _topLine)
+            {
+                OnChanged();
+            }
+            return;
+        }
         TopLine = _screen.ActiveBuffer.FirstRow;
     }
 
@@ -500,6 +617,10 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     ILinkScanner ITerminalScreenView.CreateLinkScanner()
     {
+        if (LinkScannerFactory != null)
+        {
+            return LinkScannerFactory();
+        }
         if (HighlightLogLevels)
         {
             return new OutputLinkScanner(null, "/", null, links: false, highlight: false, logLevels: true);
