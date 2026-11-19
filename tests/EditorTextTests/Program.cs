@@ -3847,16 +3847,19 @@ internal static class Program
             "messages are shown in the text view only, not in the wrapped or the hex view");
         Check(remote.Contains("AddMessages(messages)") && remote.Contains("const int MaxInline = 50"),
             "the problems of a failed check become inline messages, capped like ParseIssues");
-        Check(remote.Contains("they are shown in the text") && !remote.Contains("const int MaxShown"),
+        // The question of a failed check is asked by the flow of the saves since stage 3A-2.
+        string flow = File.ReadAllText(Path.Combine(root, "CodeEditing", "RemoteFileFlow.cs"));
+        Check(flow.Contains("they are shown in the text") && !remote.Contains("const int MaxShown") && !flow.Contains("const int MaxShown"),
             "the dialog is short and no longer lists the problems it points at");
         Check(remote.Contains("RefreshMessageColors()"),
             "the messages take the colours of the current theme");
-        // The clearing before a save moved with the taking of the bytes to save, to CodeEditing/RemoteFileSession.cs (A4f).
+        // The clearing before a save moved with the taking of the bytes to save, to CodeEditing/RemoteFileSession.cs (A4f), the one of a reload to
+        // CodeEditing/RemoteFileFlow.cs (3A-2).
         string session = File.ReadAllText(Path.Combine(root, "CodeEditing", "RemoteFileSession.cs"));
         int clears = 0;
         foreach (string snippet in new[] { "// The problems the previous check named", "// The messages name lines of the text", "// The messages are rows of the text view" })
         {
-            if (remote.Contains(snippet) || session.Contains(snippet))
+            if (remote.Contains(snippet) || session.Contains(snippet) || flow.Contains(snippet))
             {
                 clears++;
             }
