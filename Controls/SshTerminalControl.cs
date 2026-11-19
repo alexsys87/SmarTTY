@@ -323,27 +323,12 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
     private string _searchOriginalText;
 
-    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion); null when none is shown.
-    private string _historySuggestion;
+    // The grey rest of a previously typed command drawn after the caret (see HistorySuggestion), and what hides it.
+    private readonly HistorySuggestionState _suggestion = new HistorySuggestionState();
 
-    // Esc hides the suggestion until the line changes: the text it was hidden for.
-    private string _suggestionDismissedFor;
-
-    // BuildHistory() for the suggestions, built again only when the history of the session or of this tab has grown.
-    private List<string> _suggestionHistory;
-
-    private ShellCompletionAnalyzer _suggestionAnalyzer;
-
-    private int _suggestionHistoryVersion = -1;
-
-    private int _suggestionTypedCount = -1;
-
-    // The last lookup: the caret moves on every key, and the history does not need to be searched again for the same text.
-    private string _suggestionQuery;
-
-    private string _suggestionResult;
-
-    private List<string> _suggestionQueryHistory;
+    // BuildHistory() for the suggestions, built again only when the history of the session or of this tab has grown,
+    // and the last lookup: the caret moves on every key, and the history does not need to be searched again for the same text.
+    private readonly SuggestionLookup _suggestionLookup = new SuggestionLookup();
 
     private List<string> _typedCommands = new List<string>();
 
@@ -449,8 +434,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         }
         _typedCommands.RemoveAll(set.Contains);
         _inputLine?.ResetHistory();
-        _suggestionHistory = null;
-        _suggestionQuery = null;
+        _suggestionLookup.Invalidate();
         RefreshHistorySuggestion();
     }
 
@@ -793,8 +777,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             ch = '#';
         }
-        _historySuggestion = null;
-        _suggestionDismissedFor = null;
+        _suggestion.Clear();
         _inputLine = new InputLine(this, ((EditableTextBrowser)this).EditableDocument.LineCount, customPrompt ?? $"{PromptPrefix}{ch} ");
         ((EditableTextBrowser)this).EditableDocument.AppendLine(_inputLine.Prompt);
         RewrapInput();
@@ -1054,14 +1037,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     {
         ShellCompletionAnalyzer analyzer = ShellAnalyzer;
         int historyVersion = analyzer?.HistoryVersion ?? 0;
-        if (_suggestionHistory == null || analyzer != _suggestionAnalyzer || historyVersion != _suggestionHistoryVersion || _typedCommands.Count != _suggestionTypedCount)
-        {
-            _suggestionHistory = BuildHistory();
-            _suggestionAnalyzer = analyzer;
-            _suggestionHistoryVersion = historyVersion;
-            _suggestionTypedCount = _typedCommands.Count;
-        }
-        return _suggestionHistory;
+        return _suggestionLookup.GetHistory(analyzer, historyVersion, _typedCommands.Count, BuildHistory);
     }
 
     private string ComputeHistorySuggestion()
@@ -1072,18 +1048,11 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             return null;
         }
         string text = inputLine.Text ?? "";
-        if (text.Length == 0 || inputLine.Region.CaretIndex != text.Length || text == _suggestionDismissedFor)
+        if (text.Length == 0 || inputLine.Region.CaretIndex != text.Length || text == _suggestion.DismissedFor)
         {
             return null;
         }
-        List<string> history = GetSuggestionHistory();
-        if (text != _suggestionQuery || history != _suggestionQueryHistory)
-        {
-            _suggestionQuery = text;
-            _suggestionQueryHistory = history;
-            _suggestionResult = HistorySuggestion.Find(history, text);
-        }
-        return _suggestionResult;
+        return _suggestionLookup.Find(GetSuggestionHistory(), text);
     }
 
     /// <summary>Works out the grey suggestion for the line as it is now and repaints when it has changed.</summary>
@@ -1100,9 +1069,8 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             // document for a moment; the next change works the suggestion out again.
             suggestion = null;
         }
-        if (suggestion != _historySuggestion)
+        if (_suggestion.Show(suggestion))
         {
-            _historySuggestion = suggestion;
             Invalidate();
         }
     }
@@ -1125,7 +1093,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
             return false;
         }
         RefreshHistorySuggestion();
-        string suggestion = _historySuggestion;
+        string suggestion = _suggestion.Current;
         if (suggestion == null)
         {
             return false;
@@ -1145,18 +1113,18 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
     /// <summary>Esc hides the suggestion until the line is changed.</summary>
     private void DismissHistorySuggestion()
     {
-        if (_historySuggestion == null)
+        if (_suggestion.Current == null)
         {
             return;
         }
-        _suggestionDismissedFor = _inputLine?.Text;
+        _suggestion.Dismiss(_inputLine?.Text);
         RefreshHistorySuggestion();
     }
 
     protected override void PaintLineOverlay(Graphics graphics, int line, string text, int firstColumn, int left, int top, int height)
     {
         base.PaintLineOverlay(graphics, line, text, firstColumn, left, top, height);
-        string suggestion = _historySuggestion;
+        string suggestion = _suggestion.Current;
         if (suggestion == null || _inputLine == null || _historySearch != null || HasSelection || line != ((EditableTextBrowser)this).EditableDocument.LineCount - 1)
         {
             return;

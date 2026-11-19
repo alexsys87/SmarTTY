@@ -288,6 +288,9 @@ jobs:
       - name: Run history suggestion checks (the grey rest of a typed command of a local line, when it shows and what hides it)
         run: dotnet run --project tests/HistorySuggestionStateTests -c Release
 
+      - name: Run suggestion lookup checks (what the grey suggestion of the Smart Terminal line keeps: the history, when it is made again, the last answer)
+        run: dotnet run --project tests/SuggestionLookupTests -c Release
+
       - name: Run line history checks (the commands of a local input line, Up and Down, Ctrl+R)
         run: dotnet run --project tests/LineHistoryTests -c Release
 
