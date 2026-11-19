@@ -47,6 +47,7 @@ PR that changes them.
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
+| `GUI/HexView/` | Stage 3B: the hex editor on WPF (`WpfHexEditor`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
@@ -98,7 +99,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) started: 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model) done; next 3B-2, the WPF view |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) started: 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model) and 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window, not yet in the tab) done; next 3B-3, the WPF view in the editor tab |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -501,3 +502,26 @@ drives the four classes; of 41 mutations of them 34 made a check fail at once, s
 the place of the caret after the last byte, the first pixel of the low digit, a click well above the view, the first pixel below the table,
 the horizontal bar that the vertical one makes necessary) and one is an equivalent change (End in the last row: `MoveTo` brings the offset into
 the bytes itself). `HexEditorControl.cs` is 1670 lines before and 1395 after.
+
+Done in 3B-2: first the paste: the part of `HexEditorControl.Paste` between reading the clipboard and inserting the bytes (the UTF-8 of the text in
+the character column; in the digits the bytes of a hexadecimal text, the UTF-8 of another one, and the question for a text that can be both) is
+`TextEditing/HexPasteText.cs` (`ToBytes` with the question as a `Func`), as it was; the control asks the question with its message box, and
+`HexViewLayoutTests` has 9 checks of it (157 in all). Then `GUI/HexView/WpfHexEditor.cs` (internal), the view of `HexEditingModel` on WPF: a
+`FrameworkElement` with the same layout (`HexViewLayout`, through `IHexLayoutView`), keys (`HexKeyMap`: KeyDown with the virtual key of the
+WPF key, the characters through TextInput into `TypeCharacter`), mouse selection (`HexPointer`, the mouse captured while a drag runs, the
+automatic scrolling by a `DispatcherTimer`), tool tip and colours (`HexByteText`), the same commands and events as `HexEditorControl` (the
+clipboard of WPF, `MessageDialog` for the questions and the errors) and `IRemoteHexView`, `IHexViewStatus`. It counts in whole device pixels:
+the DPI is read from the visual (again on `Loaded` and on `OnDpiChanged`), the font is measured with its `GlyphTypeface` (the advance of "0" and
+the height, rounded up), the drawing is scaled back by the DPI, and the text is put on the grid of the characters with one `GlyphRun` for each
+run of bytes of one colour in a row (the gaps of the groups are blanks), the backgrounds as rectangles; its two `ScrollBar`s are its visual
+children (a WPF scroll bar goes from 0 to the last first row, with the visible rows as its viewport). Colours and font are set by
+`SetColors` and `SetFont`. Not yet in it: the data inspector (the flag is kept and reported, so the settings keep it), the link to it in the
+header and the context menu (3B-3). Tools > WPF hex editor lab (`GUI/HexView/HexLabWindow.cs`) opens a file of this computer (up to 64 MB) in it
+with the editor colours, font (Courier New 12 points with the zoom) and hex view options of the settings, with the view options on a tool bar
+and the state in a status line; the bytes can be changed but are never saved. The view is compile-checked on Linux only. Manual check on
+Windows (the lab): a file of a few bytes, of some KB and of tens of MB (scrolling and paging stay fast); 100 %, 150 % and 200 % scaling and a
+window moved between monitors (crisp text, the caret and the click on the right digit); light and dark theme; the arrows, Home/End,
+Ctrl+Home/End, PageUp/Down with and without Shift; typing hex digits and characters (Insert for overwrite), Backspace and Delete; Ctrl+A, C,
+X, V (a hexadecimal text, a plain text, "dead" with its question), Ctrl+Z and Ctrl+Y; a click on each digit, in the gap after a group, on a
+character; a drag inside the table and beyond its edges (automatic scrolling), a Shift+click; the wheel and Shift+wheel; the tool tip of a
+byte; colours by kind; 8, 16 and 32 bytes in a row and groups of 1 to 8; read-only.
