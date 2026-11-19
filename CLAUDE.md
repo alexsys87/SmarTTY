@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 134 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 135 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -98,7 +98,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; next 3B, the hex view on WPF |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) started: 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model) done; next 3B-2, the WPF view |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -467,3 +467,37 @@ reload when a save asked for meanwhile runs) and one is an equivalent change (`T
 text and the hex view, focus, colours, the clipboard, the questions with their icons as `ThemedMessageBox`, the threads as `Thread`,
 `ThreadPool` and `BeginInvoke`, the draft timer and question, `FinishLoading` on the document). Next, 3B: the hex view on WPF under
 `IRemoteHexView` (the window and the host show it in place of the WinForms control).
+
+3B puts the hex view on WPF: 3B-1 takes out of `HexEditorControl` what it decides without a window, so that the WPF view (3B-2) uses the same
+code, and 3B-3 shows the WPF view in the tab in place of the WinForms control.
+
+Done in 3B-1: first a net for what the golden of `tests/HexEditorControlTests` did not reach (the mouse, the page keys, the layout): a run of its
+own at the end of the golden, `== view`, 47 lines written by the code before the move (the first 3608 lines did not change). The control is
+shown in a form whose height gives exactly 12 rows and whose width holds 16 bytes in a row, and every point is found from the cells of the layout
+(by reflection: the metrics, `HexCellX`), so that the lines are the same with another font (checked with a serif font of 15 points). It writes down
+the page keys with and without Shift and at both ends, the scroll that keeps the caret in view (below, above, at the end), clicks on the high and
+the low digit, in the gap after a group, on a character, on the header, left of the bytes and right of the characters, a drag (back to its start,
+into the characters, beyond the table, where the selection ends at the edge without scrolling), the right button inside and outside the
+selection and the middle button, the byte under the mouse (a digit, the gap, a character, right of the characters, past the end, the header),
+the wheel (a notch, the small steps of a touchpad, both ends), the text of the tool tip (groups, both byte orders, a group the end cuts, a
+named block and one without a name, a changed byte) and the colours of the bytes by kind on a dark and a light background. Of 13 mutations of
+the old code 12 make it fail (one after a point was added for it); the 13th is an equivalent change (an anchor equal to the caret is no
+selection either way). Not in it: the shift with the mouse (`ModifierKeys`), the automatic scrolling (it reads the real mouse), the link of the
+data inspector (its place is found when the control paints) and the clipboard. Then the model: `TextEditing/HexViewLayout.cs` (public: the metrics
+from the measured character, the columns and the groups, the rows and the width in view, the rows of the document, the byte under a point,
+where a click puts the caret, the table and a point brought into it, the step of the automatic scrolling, the rows of the wheel with the
+remainder of a touchpad, the first row brought into the content, the place of the caret, the scroll that keeps it in view, which scroll bars
+are needed, whether the data inspector fits; the first row, the horizontal scroll and the group size are its state), which reads the sizes
+of the view through `IHexLayoutView` (client area, inspector, the two scroll bars; implemented explicitly by the control);
+`TextEditing/HexKeyMap.cs` (`Map`: which `HexKeyAction` a key is with Ctrl, Shift and Alt; `Apply`: the movements, the page keys by the rows
+in view less one, Backspace and Delete on the model; the view runs the rest); `TextEditing/HexPointer.cs` (a press with the left button, Shift,
+the right button inside or outside the selection, another button; the drag; the release); `TextEditing/HexByteText.cs` (the tool tip, the
+colour of a byte, `IsDark` with the formula of `Color.GetBrightness` of .NET, `Blend`). The code is as it was. The control keeps the scroll
+bars and their values, the timers, the tool tip, the painting, the measuring of the font and the inspector; `VisibleRows`, `RowCount`,
+`ByteAtPoint`, `DescribeByte`, `ByteTextColor` and `Blend` are forwarders. One thing is not in the old order: a left press starts the timer of
+the automatic scrolling after the model told the change, not before (starting a timer does nothing at once). The golden passes unchanged
+(3655 steps); its accessors read `_layout` instead of the fields that are gone. `tests/HexViewLayoutTests` (net8.0, a fake view, 148 checks)
+drives the four classes; of 41 mutations of them 34 made a check fail at once, six led to checks (a byte behind the edge of a narrow window,
+the place of the caret after the last byte, the first pixel of the low digit, a click well above the view, the first pixel below the table,
+the horizontal bar that the vertical one makes necessary) and one is an equivalent change (End in the last row: `MoveTo` brings the offset into
+the bytes itself). `HexEditorControl.cs` is 1670 lines before and 1395 after.
