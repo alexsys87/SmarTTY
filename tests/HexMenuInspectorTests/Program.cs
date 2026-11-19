@@ -5,8 +5,9 @@ using SmarTTY.TextEditing;
 
 // Checks of the parts of the hex view that stage 3B-3 took out of the WinForms controls so that the WPF view of the editor tab shows the same:
 // CodeEditing/HexMenuModel.cs (the submenus of the hex view: their items, keys, swatches, when an item is enabled or checked and what it does), with a
-// fake hex view that logs what it is asked. The same code is run in the real WinForms menu by tests/HexEditorControlTests (the "menu" run of its
-// golden file).
+// fake hex view that logs what it is asked, and TextEditing/HexInspectorModel.cs (the data inspector: its rows and texts, the text an edit starts
+// with, Enter and Esc, the message and when it goes, the keys, the clicks and where the rows are), on the real HexEditingModel. The same code is run
+// in the real WinForms menu and inspector by tests/HexEditorControlTests (the "menu" and "inspector" runs of its golden file).
 // Run with: dotnet run --project tests/HexMenuInspectorTests
 internal static class Program
 {
@@ -430,6 +431,283 @@ internal static class Program
         Check(thrown[0] && thrown[1] && thrown[2], "the view, the dialogs and the messages are required");
     }
 
+    // The hex view as the inspector sees it: the real model of the hex editor.
+    private sealed class Source : IHexInspectorSource
+    {
+        public readonly HexEditingModel Model;
+
+        public Source(byte[] bytes)
+        {
+            Model = new HexEditingModel(new HexDocument(bytes, bytes)) { Anchor = -1, BytesPerRow = 16 };
+        }
+
+        public bool BigEndian
+        {
+            get => Model.BigEndian;
+            set => Model.BigEndian = value;
+        }
+
+        public bool ReadOnly => Model.ReadOnly;
+
+        public bool HasSelection => Model.HasSelection;
+
+        public int SelectionStart => Model.SelectionStart;
+
+        public int SelectionLength => Model.SelectionLength;
+
+        public int CaretOffset => Model.CaretOffset;
+
+        public HexDocument Document => Model.Document;
+
+        public byte[] GetBytesAtCaret(int count) => Model.GetBytesAtCaret(count);
+
+        public bool WriteValue(HexValueType type, string text, out string error) => Model.WriteValue(type, text, out error);
+    }
+
+    // 1.5 as a float, a time, "é", "A", 0x80.
+    private static readonly byte[] InspectorBytes = { 0x00, 0x00, 0xC0, 0x3F, 0x00, 0x2C, 0x5B, 0x65, 0xC3, 0xA9, 0x41, 0x80 };
+
+    private static int RowOf(HexValueType type)
+    {
+        for (int row = 0; row < HexInspectorModel.Types.Count; row++)
+        {
+            if (HexInspectorModel.Types[row] == type)
+            {
+                return row;
+            }
+        }
+        throw new Exception("no row for " + type);
+    }
+
+    private static void InspectorRows()
+    {
+        Source source = new Source(InspectorBytes);
+        HexInspectorModel inspector = new HexInspectorModel(source);
+        Equal(HexInspectorModel.Types.Count, 13, "thirteen values");
+        IReadOnlyList<HexInspectorRow> rows = inspector.ReadRows();
+        Equal(rows.Count, 13, "a row for each value");
+        Equal(rows[RowOf(HexValueType.Binary)].Label, "Binary", "a single byte has no byte order in its label");
+        Equal(rows[RowOf(HexValueType.UInt8)].Label, HexValueFormats.GetName(HexValueType.UInt8), "the name of the value");
+        Equal(rows[RowOf(HexValueType.Float32)].Label, HexValueFormats.GetName(HexValueType.Float32) + " LE", "a wider value says the byte order");
+        Equal(rows[RowOf(HexValueType.Float32)].Value, "1.5", "the value of the bytes at the caret");
+        Check(rows[RowOf(HexValueType.Float32)].Known, "a value the bytes give is known");
+        Equal(rows[RowOf(HexValueType.Utf8Char)].Value, "U+0000", "a zero byte is a character without a picture: its code");
+        Equal(inspector.ByteOrderText, "Little endian", "the byte order row");
+        source.BigEndian = true;
+        rows = inspector.ReadRows();
+        Equal(rows[RowOf(HexValueType.Int16)].Label, HexValueFormats.GetName(HexValueType.Int16) + " BE", "big endian in the label");
+        HexValueFormats.TryRead(source.GetBytesAtCaret(8), HexValueType.Int32, true, out string bigInt32);
+        Equal(rows[RowOf(HexValueType.Int32)].Value, bigInt32, "the values read in the byte order of the view");
+        Equal(inspector.ByteOrderText, "Big endian", "the byte order row follows");
+        source.BigEndian = false;
+        source.Model.GoToOffset(InspectorBytes.Length);
+        rows = inspector.ReadRows();
+        Check(!rows[RowOf(HexValueType.UInt8)].Known && rows[RowOf(HexValueType.UInt8)].Value == "-", "after the last byte nothing is known: a dash");
+        source.Model.GoToOffset(InspectorBytes.Length - 1);
+        rows = inspector.ReadRows();
+        Check(rows[RowOf(HexValueType.UInt8)].Known && rows[RowOf(HexValueType.UInt8)].Value == "128", "the last byte is a byte");
+        Check(!rows[RowOf(HexValueType.UInt16)].Known && rows[RowOf(HexValueType.UInt16)].Value == "-", "but no 16-bit word: a dash");
+
+        source.Model.GoToOffset(10);
+        Equal(inspector.Offset, 10, "the offset is the caret's");
+        Equal(inspector.OffsetText, "0x0000000A (10)", "in hex and decimal");
+        Check(inspector.SelectionText == null, "no selection: no selection row");
+        source.Model.Anchor = 4;
+        Equal(inspector.Offset, 4, "with a selection the offset is its start");
+        Equal(inspector.SelectionText, HexEditingModel.FormatByteCount(6), "and the selection row says its size");
+        Check(inspector.Highlight == null, "no block: no row");
+        source.Model.HighlightSelection(unchecked((int)0xFF3CC85A), "");
+        Check(inspector.Highlight != null, "a block at the offset");
+        Equal(HexInspectorModel.HighlightText(inspector.Highlight), HexEditingModel.FormatByteCount(6), "a block without a label: its size");
+        source.Model.HighlightSelection(unchecked((int)0xFF3CC85A), "header");
+        Equal(HexInspectorModel.HighlightText(inspector.Highlight), "header", "a block with a label: the label");
+        source.Model.Anchor = -1;
+
+        Equal(inspector.Hint, "Double-click a value to change it.", "the hint of a file that can be changed");
+        source.Model.ReadOnly = true;
+        Equal(inspector.Hint, "Click the byte order to switch it.", "the hint of a read-only file");
+        source.Model.ReadOnly = false;
+        inspector.ShowMessage("hello", isError: true);
+        Equal(inspector.Hint, "hello", "a message takes the place of the hint");
+        Check(inspector.MessageIsError, "an error message");
+        inspector.ForgetMessageIfMoved();
+        Equal(inspector.Message, "hello", "the message stays while the caret stays");
+        source.Model.GoToOffset(11);
+        inspector.ForgetMessageIfMoved();
+        Equal(inspector.Message, "", "and goes when it moved");
+        Check(!inspector.MessageIsError, "with its colour");
+        source.Model.GoToOffset(9);
+        source.Model.Anchor = 2;
+        inspector.ShowMessage("about a selection", isError: false);
+        inspector.ForgetMessageIfMoved();
+        Equal(inspector.Message, "about a selection", "a message about a selection stays while the selection stays (it is about its start)");
+        source.Model.Anchor = -1;
+        inspector.ShowMessage(null, isError: false);
+        Equal(inspector.Message, "", "no message is an empty one");
+        inspector.ShowMessage("kept", isError: false);
+        inspector.BeginEdit(RowOf(HexValueType.UInt8), out string unused);
+        inspector.ShowMessage("while editing", isError: false);
+        source.Model.GoToOffset(3);
+        inspector.ForgetMessageIfMoved();
+        Equal(inspector.Message, "while editing", "while a value is edited the message stays");
+    }
+
+    private static void InspectorGeometry()
+    {
+        const int rowHeight = 20;
+        Equal(HexInspectorModel.ByteOrderRowTop(rowHeight), 26, "the byte order row is below the title and a gap");
+        Equal(HexInspectorModel.ValueRowTop(0, rowHeight), 46, "the first value row is below it");
+        Equal(HexInspectorModel.ValueRowTop(12, rowHeight), 286, "the rows follow each other");
+        Equal(HexInspectorModel.RowAt(0, rowHeight), -1, "the title is no row");
+        Equal(HexInspectorModel.RowAt(25, rowHeight), -1, "the gap below it neither");
+        Equal(HexInspectorModel.RowAt(26, rowHeight), -2, "the byte order from its first pixel");
+        Equal(HexInspectorModel.RowAt(45, rowHeight), -2, "to its last");
+        Equal(HexInspectorModel.RowAt(46, rowHeight), 0, "then the first value");
+        Equal(HexInspectorModel.RowAt(305, rowHeight), 12, "the last pixel of the last value");
+        Equal(HexInspectorModel.RowAt(306, rowHeight), -1, "below the values: no row");
+        for (int row = 0; row < HexInspectorModel.Types.Count; row++)
+        {
+            Equal(HexInspectorModel.RowAt(HexInspectorModel.ValueRowTop(row, 17), 17), row, "the top of value row " + row + " is that row");
+        }
+        Check(HexInspectorModel.IsLink(-2, true, false), "the value of the byte order is a link");
+        Check(!HexInspectorModel.IsLink(-2, false, false), "its label is not");
+        Check(!HexInspectorModel.IsLink(3, true, false), "a value is not");
+        Check(HexInspectorModel.IsLink(-1, false, true), "the Hide link is");
+        Equal(HexInspectorModel.InnerMargin + HexInspectorModel.LabelChars + HexInspectorModel.ValueChars, 43, "the widths the view is laid out with");
+    }
+
+    private static void InspectorKeysAndClicks()
+    {
+        Source source = new Source(InspectorBytes);
+        HexInspectorModel inspector = new HexInspectorModel(source);
+        Equal(inspector.SelectedRow, -1, "no row chosen at first");
+        Equal(inspector.Key(VirtualKey.Enter, false), HexInspectorCommand.Handled, "Enter without a row does nothing but is the inspector's");
+        Equal(inspector.Key(VirtualKey.F2, false), HexInspectorCommand.Handled, "F2 too");
+        Equal(inspector.Key(VirtualKey.Up, false), HexInspectorCommand.Handled, "Up");
+        Equal(inspector.SelectedRow, 0, "Up without a row chooses the first");
+        inspector.SelectedRow = -1;
+        inspector.OnFocused();
+        Equal(inspector.SelectedRow, 0, "the focus chooses the first row when none was");
+        inspector.SelectedRow = 5;
+        inspector.OnFocused();
+        Equal(inspector.SelectedRow, 5, "and keeps a chosen one");
+        inspector.Key(VirtualKey.Up, false);
+        Equal(inspector.SelectedRow, 4, "Up goes one row up");
+        inspector.Key(VirtualKey.Down, false);
+        inspector.Key(VirtualKey.Down, false);
+        Equal(inspector.SelectedRow, 6, "Down one down");
+        for (int i = 0; i < 20; i++)
+        {
+            inspector.Key(VirtualKey.Down, false);
+        }
+        Equal(inspector.SelectedRow, 12, "Down stops at the last row");
+        for (int i = 0; i < 20; i++)
+        {
+            inspector.Key(VirtualKey.Up, false);
+        }
+        Equal(inspector.SelectedRow, 0, "Up at the first");
+        Equal(inspector.Key(VirtualKey.Enter, false), HexInspectorCommand.BeginEdit, "Enter on a row edits it");
+        Equal(inspector.Key(VirtualKey.F2, false), HexInspectorCommand.BeginEdit, "F2 too");
+        Equal(inspector.Key(VirtualKey.Escape, false), HexInspectorCommand.FocusEditor, "Esc goes back to the bytes");
+        Equal(inspector.Key(VirtualKey.I, true), HexInspectorCommand.HideInspector, "Ctrl+I hides the inspector");
+        Equal(inspector.Key(VirtualKey.I, false), HexInspectorCommand.NotHandled, "I alone is not the inspector's");
+        Equal(inspector.Key(VirtualKey.C, true), HexInspectorCommand.CopyValue, "Ctrl+C copies the value");
+        Equal(inspector.Key(VirtualKey.C, false), HexInspectorCommand.NotHandled, "C alone is not the inspector's");
+        Equal(inspector.Key(VirtualKey.Tab, false), HexInspectorCommand.NotHandled, "nor is Tab");
+
+        inspector.SelectedRow = RowOf(HexValueType.Float32);
+        Check(inspector.TryGetSelectedValue(out string value) && value == "1.5", "the value of the chosen row as shown");
+        inspector.Copied();
+        Equal(inspector.Message, HexValueFormats.GetName(HexValueType.Float32) + " copied.", "and the message after it was copied");
+        source.Model.GoToOffset(InspectorBytes.Length);
+        inspector.SelectedRow = RowOf(HexValueType.UInt8);
+        Check(!inspector.TryGetSelectedValue(out value), "a row the bytes give no value for: nothing to copy");
+        source.Model.GoToOffset(0);
+        inspector.SelectedRow = -1;
+        Check(!inspector.TryGetSelectedValue(out value), "no row: nothing to copy");
+
+        Equal(inspector.Press(5, onHideLink: true), HexInspectorCommand.HideInspector, "a click on the Hide link hides the inspector");
+        Equal(inspector.SelectedRow, -1, "and chooses no row");
+        Equal(inspector.Press(-2, onHideLink: false), HexInspectorCommand.FocusEditor, "a click on the byte order goes back to the bytes");
+        Check(source.BigEndian, "after switching it");
+        inspector.Press(-2, onHideLink: false);
+        Check(!source.BigEndian, "and back");
+        Equal(inspector.Press(7, onHideLink: false), HexInspectorCommand.FocusInspector, "a click on a value takes the focus");
+        Equal(inspector.SelectedRow, 7, "and chooses its row");
+        Equal(inspector.Press(-1, onHideLink: false), HexInspectorCommand.FocusInspector, "a click elsewhere takes the focus");
+        Equal(inspector.SelectedRow, 7, "and keeps the row");
+
+        Check(inspector.SetHover(3), "the mouse over a row changes the hover");
+        Equal(inspector.HoverRow, 3, "to that row");
+        Check(!inspector.SetHover(3), "the same row again changes nothing");
+        Check(inspector.SetHover(-2), "the byte order is no value row");
+        Equal(inspector.HoverRow, -1, "so no row is under the mouse");
+        Check(!inspector.SetHover(-1), "and leaving changes nothing then");
+    }
+
+    private static void InspectorEdits()
+    {
+        Source source = new Source(InspectorBytes);
+        HexInspectorModel inspector = new HexInspectorModel(source);
+        Equal(inspector.Commit("1"), HexInspectorCommit.NotEditing, "Enter with nothing edited does nothing");
+        Check(inspector.BeginEdit(RowOf(HexValueType.Float32), out string text), "an edit starts");
+        Equal(text, "1.5", "with the value as shown");
+        Equal(inspector.EditOriginalText, "1.5", "which is kept");
+        Equal(inspector.Editing, (HexValueType?)HexValueType.Float32, "the value being edited");
+        Equal(inspector.SelectedRow, RowOf(HexValueType.Float32), "its row is chosen");
+        Equal(inspector.Message, "Enter writes the value at the caret (little endian), Esc cancels.", "the message says how");
+        Equal(inspector.Commit("1.5"), HexInspectorCommit.Unchanged, "Enter on the same text");
+        Equal(inspector.Message, "Unchanged: nothing written.", "writes nothing and says so");
+        Check(inspector.Editing == null, "and ends the edit");
+        Check(!source.Document.IsModified, "the bytes did not change");
+        inspector.BeginEdit(RowOf(HexValueType.Float32), out text);
+        Equal(inspector.Commit("2.25"), HexInspectorCommit.Written, "Enter on a new value");
+        Equal(source.GetBytesAtCaret(4)[3], (byte)0x40, "writes it at the caret");
+        Equal(inspector.Message, HexValueFormats.GetName(HexValueType.Float32) + " written: Ctrl+Z in the bytes undoes it.", "and says so");
+        Check(inspector.Editing == null, "the edit ends");
+        inspector.BeginEdit(RowOf(HexValueType.UInt8), out text);
+        Equal(inspector.Commit("300"), HexInspectorCommit.Rejected, "a value that does not fit");
+        Check(inspector.MessageIsError && inspector.Message.Length > 0, "is an error with the reason");
+        Equal(inspector.Editing, (HexValueType?)HexValueType.UInt8, "and the edit goes on");
+        inspector.CancelEdit();
+        Check(inspector.Editing == null && inspector.Message == "" && !inspector.MessageIsError, "Esc ends it without a message");
+
+        source.Model.GoToOffset(8);
+        inspector.BeginEdit(RowOf(HexValueType.Utf8Char), out text);
+        Equal(text, "\u00e9", "a character is edited without its code");
+        source.Model.GoToOffset(0);
+        inspector.BeginEdit(RowOf(HexValueType.Utf8Char), out text);
+        Equal(text, "", "a character without a picture: an empty box");
+        source.Model.GoToOffset(4);
+        inspector.BeginEdit(RowOf(HexValueType.UnixTime32), out text);
+        HexValueFormats.TryRead(source.GetBytesAtCaret(8), HexValueType.UnixTime32, false, out string shown);
+        Check(shown.EndsWith(" UTC", StringComparison.Ordinal), "a time is shown with UTC");
+        Equal(text, shown.Substring(0, shown.Length - 4), "and edited without it");
+        source.BigEndian = true;
+        inspector.BeginEdit(RowOf(HexValueType.Int16), out text);
+        Equal(inspector.Message, "Enter writes the value at the caret (big endian), Esc cancels.", "the message says the byte order");
+        inspector.EndEdit();
+        Check(inspector.Editing == null, "the edit ends when the box loses the focus");
+        Equal(inspector.Message, "Enter writes the value at the caret (big endian), Esc cancels.", "and keeps the message");
+
+        source.Model.ReadOnly = true;
+        Check(!inspector.BeginEdit(RowOf(HexValueType.UInt8), out text), "a read-only file cannot be edited");
+        Check(text == null && inspector.Editing == null, "no edit starts");
+        Equal(inspector.Message, "The file cannot be changed now.", "and the message says why");
+        Check(inspector.MessageIsError, "as an error");
+
+        bool thrown = false;
+        try
+        {
+            new HexInspectorModel(null);
+        }
+        catch (ArgumentNullException)
+        {
+            thrown = true;
+        }
+        Check(thrown, "the inspector needs its view");
+    }
+
     private static int Main()
     {
         try
@@ -439,6 +717,10 @@ internal static class Program
             CheckedStates();
             Commands();
             Arguments();
+            InspectorRows();
+            InspectorGeometry();
+            InspectorKeysAndClicks();
+            InspectorEdits();
         }
         catch (Exception exception)
         {

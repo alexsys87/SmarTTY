@@ -30,7 +30,7 @@ public sealed class HexSearchEventArgs : EventArgs
 /// remote file editor saves the bytes (see <see cref="RemoteFileEditor"/>). The control draws its own scroll bars,
 /// because the WPF scroll bars of the text editor are hidden in hex mode.
 /// </summary>
-public sealed class HexEditorControl : Control, IHexEditorView, IHexLayoutView
+public sealed class HexEditorControl : Control, IHexEditorView, IHexLayoutView, IHexInspectorSource
 {
     /// <summary>The row widths the view offers.</summary>
     public static readonly int[] BytesPerRowChoices = HexViewChoices.BytesPerRow;

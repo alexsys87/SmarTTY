@@ -11,6 +11,10 @@
     <Compile Include="../../CodeEditing/IEditorStatusSource.cs" Link="IEditorStatusSource.cs" />
     <Compile Include="../../CodeEditing/IRemoteFileContentHost.cs" Link="IRemoteFileContentHost.cs" />
     <Compile Include="../../TextEditing/HexViewChoices.cs" Link="HexViewChoices.cs" />
+    <Compile Include="../../TextEditing/HexInspectorModel.cs" Link="HexInspectorModel.cs" />
+    <Compile Include="../../TextEditing/HexEditingModel.cs" Link="HexEditingModel.cs" />
+    <Compile Include="../../TextEditing/HexChecksums.cs" Link="HexChecksums.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
     <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
     <Compile Include="../../TextEditing/HexValueFormats.cs" Link="HexValueFormats.cs" />
     <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />

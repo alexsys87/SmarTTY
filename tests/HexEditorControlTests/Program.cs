@@ -761,6 +761,9 @@ internal static class Program
         return typeof(HexDataInspector).GetField(name, Private).GetValue(Inspector);
     }
 
+    // What the inspector decides (since 3B-3; the control kept it in fields before).
+    private static HexInspectorModel InspectorModel => (HexInspectorModel)InspectorField("_model");
+
     private static object InspectorCall(string name, params object[] arguments)
     {
         return typeof(HexDataInspector).GetMethod(name, Private).Invoke(Inspector, arguments);
@@ -779,10 +782,10 @@ internal static class Program
     private static void RecordInspector(string operation)
     {
         TextBox box = (TextBox)InspectorField("_editBox");
-        object editing = InspectorField("_editing");
+        object editing = InspectorModel.Editing;
         Record("inspector " + operation, "editing=" + (editing == null ? "-" : editing.ToString()) + " box=" + (box.Visible ? "[" + box.Text + "]" : "hidden")
-            + " original=" + (InspectorField("_editOriginalText") ?? "-") + " row=" + InspectorField("_selectedRow")
-            + " message=" + InspectorField("_message") + (((bool)InspectorField("_messageIsError")) ? " (error)" : "")
+            + " original=" + (InspectorModel.EditOriginalText ?? "-") + " row=" + InspectorModel.SelectedRow
+            + " message=" + InspectorModel.Message + (InspectorModel.MessageIsError ? " (error)" : "")
             + " shown=" + Bool(_hex.ShowDataInspector) + " bigendian=" + Bool(_hex.BigEndian));
     }
 
@@ -849,7 +852,7 @@ internal static class Program
         RecordInspector("edit while read-only");
         _hex.ReadOnly = false;
         Inspector.Focus();
-        typeof(HexDataInspector).GetField("_selectedRow", Private).SetValue(Inspector, 2);
+        InspectorModel.SelectedRow = 2;
         InspectorKey(Keys.Up);
         RecordInspector("Up");
         InspectorKey(Keys.Up);
