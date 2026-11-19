@@ -267,6 +267,12 @@ jobs:
       - name: Run terminal screen checks (the cursor, writing with wrap and scroll, the scroll region, erasing, the two buffers, the batch, the scrollback, resize)
         run: dotnet run --project tests/TerminalScreenTests -c Release
 
+      - name: Run WPF terminal view model checks (the colours of the cells, the runs of a row, the output queue of a frame, the display model)
+        run: dotnet run --project tests/TerminalRenderModelTests -c Release
+
+      - name: Run WPF terminal keyboard checks (KeyDown and TextInput to xterm bytes, AltGr, Alt codes, dead keys, IME)
+        run: dotnet run --project tests/TerminalKeyEncoderTests -c Release
+
       - name: Run local link scanner checks (the addresses and paths in the text of a device terminal)
         run: dotnet run --project tests/LocalLinkScannerTests -c Release
 

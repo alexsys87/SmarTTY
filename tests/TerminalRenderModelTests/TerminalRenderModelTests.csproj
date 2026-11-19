@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The model of the WPF terminal view (Terminal/Rendering/): the colours of the cells, the runs of a row, the output queue of a frame,
+       and the display model with the real emulator and screen. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/Emulation/*.cs" />
+    <Compile Include="../../Terminal/Rendering/*.cs" />
+    <Compile Include="../../Terminal/AnsiEscapeUtils.cs" Link="AnsiEscapeUtils.cs" />
+    <Compile Include="../../Terminal/CsiRepeatLimit.cs" Link="CsiRepeatLimit.cs" />
+    <Compile Include="../../Terminal/DecCharsets.cs" Link="DecCharsets.cs" />
+    <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
+    <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
+    <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+    <Compile Include="../../TextEditing/LineEndingDetector.cs" Link="LineEndingDetector.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,384 @@
+using SmarTTY.Terminal;
+using SmarTTY.Terminal.Emulation;
+using SmarTTY.Terminal.Rendering;
+using SmarTTY.TextEditing;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+// Checks of the model of the WPF terminal view (Terminal/Rendering/): the colours a cell is painted with (the rule of the WinForms view,
+// whose painted colours TerminalSnapshots/TerminalSpansGolden.txt holds), the runs a row is drawn with, the queue of the output of a frame,
+// and the display model driven by the real emulator and screen.
+internal static class Program
+{
+    private static int _passed;
+
+    private static void Check(bool condition, string name)
+    {
+        if (!condition)
+        {
+            throw new Exception("FAIL: " + name);
+        }
+        _passed++;
+        Console.WriteLine("PASS: " + name);
+    }
+
+    private static void Equal<T>(T actual, T expected, string name)
+    {
+        bool same = EqualityComparer<T>.Default.Equals(actual, expected);
+        Check(same, name + (same ? "" : " (expected '" + expected + "', got '" + actual + "')"));
+    }
+
+    private static string Hex(RgbColor? color)
+    {
+        return color.HasValue ? "#" + color.Value.Argb.ToString("X8") : "null";
+    }
+
+    private sealed class Target : ILinkTarget
+    {
+        public bool IsActive { get; set; }
+
+        public void Activate()
+        {
+        }
+    }
+
+    private static int Main()
+    {
+        try
+        {
+            ColorChecks();
+            RunChecks();
+            QueueChecks();
+            DisplayModelChecks();
+            BenchmarkScriptChecks();
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception.Message.StartsWith("FAIL") ? exception.Message : "FAIL: " + exception);
+            return 1;
+        }
+        Console.WriteLine(_passed + " checks passed");
+        return 0;
+    }
+
+    private static void ColorChecks()
+    {
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        ResolvedCellColors colors = scheme.Resolve(CellStyle.Default);
+        Equal(Hex(colors.Foreground) + " " + Hex(colors.Background) + " " + colors.Underline, "null null False", "default style: no colours");
+        Equal(Hex(scheme.Resolve(new CellStyle { Foreground = 2 }).Foreground), "#FFBB0000", "red");
+        Equal(Hex(scheme.Resolve(new CellStyle { Foreground = 2, Bold = true }).Foreground), "#FFFF5555", "bold red is bright red (the golden's colour of ESC[1;31m)");
+        Equal(Hex(scheme.Resolve(new CellStyle { Bold = true }).Foreground), "#FFFFFFFF", "bold without a colour: the bold default colour");
+        Equal(Hex(scheme.Resolve(new CellStyle { Background = 5 }).Background), "#FF0000BB", "blue background (the golden's colour of ESC[44m)");
+        colors = scheme.Resolve(new CellStyle { Inverse = true });
+        Equal(Hex(colors.Foreground) + " " + Hex(colors.Background), "#FF000000 #FFD3D3D3", "inverse without colours: the background on the text colour (as in the golden)");
+        colors = scheme.Resolve(new CellStyle { Inverse = true, Foreground = 2, Background = 3 });
+        Equal(Hex(colors.Foreground) + " " + Hex(colors.Background), "#FF00BB00 #FFBB0000", "inverse swaps the colours");
+        Equal(Hex(scheme.Resolve(new CellStyle { ExtendedForeground = 2 }).Foreground), "#FFBB0000", "256 colours: 1 is the palette's red");
+        Equal(Hex(scheme.Resolve(new CellStyle { ExtendedForeground = 10 }).Foreground), "#FFFF5555", "256 colours: 9 is the palette's bright red");
+        Equal(Hex(scheme.Resolve(new CellStyle { ExtendedForeground = 197 }).Foreground), "#FFFF0000", "256 colours: 196 is pure red");
+        Equal(Hex(scheme.Resolve(new CellStyle { ExtendedForeground = 233 }).Foreground), "#FF080808", "256 colours: 232 is the first grey");
+        Equal(Hex(scheme.Resolve(new CellStyle { ExtendedBackground = XtermProtocol.RgbColorFlag | 0x123456 }).Background), "#FF123456", "24-bit background");
+        Equal(Hex(scheme.Resolve(new CellStyle { Foreground = 2, Override = new CellStyle.ForegroundOverride { Color = new RgbColor(0xFF00FF00) } }).Foreground), "#FF00FF00", "the override wins");
+        Equal(Hex(scheme.Resolve(new CellStyle { Foreground = 2, Override = new CellStyle.ForegroundOverride() }).Foreground), "#FFBB0000", "an override without a colour changes nothing");
+        CellStyle error = new CellStyle();
+        error._link.Severity = 3;
+        Equal(Hex(scheme.Resolve(error).Foreground), "#FFFF5555", "an error without a colour of its own is bright red");
+        error._link.Severity = 2;
+        Equal(Hex(scheme.Resolve(error).Foreground), "#FFFFFF55", "a warning is bright yellow");
+        error._link.Severity = 1;
+        Equal(Hex(scheme.Resolve(error).Foreground), "#FF55FFFF", "a note is bright cyan");
+        error.Foreground = 5;
+        Equal(Hex(scheme.Resolve(error).Foreground), "#FF0000BB", "the program's own colour wins over the severity");
+        CellStyle link = new CellStyle();
+        Target target = new Target();
+        link._link.Target = target;
+        Check(!scheme.Resolve(link).Underline, "an inactive link is not underlined");
+        target.IsActive = true;
+        Check(scheme.Resolve(link).Underline, "an active link is underlined");
+        Check(scheme.Resolve(new CellStyle { Underline = true }).Underline, "SGR 4 underlines");
+        scheme.SetPaletteColor(1, bright: false, new RgbColor(0xFF112233));
+        Equal(Hex(scheme.Resolve(new CellStyle { Foreground = 2 }).Foreground), "#FF112233", "a palette colour can be set");
+        Equal(Hex(scheme.GetPaletteColor(9, bright: false)), "null", "a number past the palette has no colour");
+    }
+
+    private static LineInfo Line(params CellStyle[] cells)
+    {
+        return new LineInfo { Cells = cells };
+    }
+
+    private static CellStyle[] Cells(string pattern, Dictionary<char, CellStyle> styles)
+    {
+        return pattern.Select(ch => styles.TryGetValue(ch, out CellStyle style) ? style : CellStyle.Default).ToArray();
+    }
+
+    private static string Describe(RowLayout layout)
+    {
+        StringBuilder builder = new StringBuilder();
+        foreach (BackgroundRun run in layout.Backgrounds)
+        {
+            builder.Append("bg ").Append(run.Start).Append('+').Append(run.Length).Append(' ').Append(Hex(run.Color)).Append("; ");
+        }
+        foreach (TextRun run in layout.Texts)
+        {
+            builder.Append('"').Append(layout.Text.Substring(run.Start, run.Length)).Append("\" ").Append(run.Start).Append(' ').Append(Hex(run.Foreground));
+            if (run.Underline)
+            {
+                builder.Append(" u");
+            }
+            builder.Append("; ");
+        }
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void RunChecks()
+    {
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        RowLayout layout = new RowLayout();
+        CellStyle red = new CellStyle { Foreground = 2 };
+        CellStyle blue = new CellStyle { Background = 5 };
+        CellStyle redOnBlue = new CellStyle { Foreground = 2, Background = 5 };
+        CellStyle under = new CellStyle { Underline = true };
+        Dictionary<char, CellStyle> styles = new Dictionary<char, CellStyle> { ['r'] = red, ['b'] = blue, ['x'] = redOnBlue, ['u'] = under };
+
+        RowRunBuilder.Build("hello world", null, scheme, 80, layout);
+        Equal(Describe(layout), "\"hello world\" 0 #FFD3D3D3;", "plain text is one run: the blank does not split it");
+        RowRunBuilder.Build("  ab   ", null, scheme, 80, layout);
+        Equal(Describe(layout), "\"ab\" 2 #FFD3D3D3;", "a run neither starts nor ends with blanks");
+        RowRunBuilder.Build("", null, scheme, 80, layout);
+        Equal(Describe(layout), "", "an empty line has no runs");
+        RowRunBuilder.Build("     ", null, scheme, 80, layout);
+        Equal(Describe(layout), "", "a line of blanks has no runs");
+        RowRunBuilder.Build(null, null, scheme, 80, layout);
+        Equal(layout.Text, "", "a missing line is empty");
+
+        RowRunBuilder.Build("a RED b", Line(Cells("  rrr  ", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "\"a\" 0 #FFD3D3D3; \"RED\" 2 #FFBB0000; \"b\" 6 #FFD3D3D3;", "a coloured word is a run of its own");
+        RowRunBuilder.Build("ab cd", Line(Cells("rr r", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "\"ab c\" 0 #FFBB0000; \"d\" 4 #FFD3D3D3;", "a blank between cells of one colour stays in the run; cells past the styles are default");
+        RowRunBuilder.Build("ab cd", Line(Cells("rr rr", styles)), scheme, 80, layout);
+        Equal(layout.Texts.Count, 1, "one colour over a blank of another style: one glyph run");
+
+        RowRunBuilder.Build("abcdef", Line(Cells("bbxxbb", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "bg 0+6 #FF0000BB; \"ab\" 0 #FFD3D3D3; \"cd\" 2 #FFBB0000; \"ef\" 4 #FFD3D3D3;", "one background rectangle under three text runs");
+        RowRunBuilder.Build("ab  ", Line(Cells("bb b", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "bg 0+2 #FF0000BB; bg 3+1 #FF0000BB; \"ab\" 0 #FFD3D3D3;", "a background is painted under blanks, and a gap splits it");
+
+        RowRunBuilder.Build("a b", Line(Cells("uuu", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "\"a b\" 0 #FFD3D3D3 u;", "an underlined blank belongs to the run");
+        RowRunBuilder.Build("ab  cd", Line(Cells("uu  uu", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "\"ab\" 0 #FFD3D3D3 u; \"cd\" 4 #FFD3D3D3 u;", "blanks without an underline split underlined runs");
+        RowRunBuilder.Build("abcd", Line(Cells("uu", styles)), scheme, 80, layout);
+        Equal(Describe(layout), "\"ab\" 0 #FFD3D3D3 u; \"cd\" 2 #FFD3D3D3;", "the underline splits a run");
+
+        LineInfo dimmed = Line(Cells("xx", styles));
+        dimmed.IsDimmed = true;
+        RowRunBuilder.Build("ab", dimmed, scheme, 80, layout);
+        Equal(Describe(layout), "\"ab\" 0 #FFA9A9A9;", "a dimmed line: the inactive colour, no background");
+
+        RowRunBuilder.Build("abcdef", Line(Cells("rrrrrr", styles)), scheme, 3, layout);
+        Equal(Describe(layout) + " " + layout.Text, "\"abc\" 0 #FFBB0000; abc", "only the columns of the view are painted");
+
+        RowRunBuilder.Build("abc", Line(Cells("rrr", styles)), scheme, 80, layout);
+        ulong first = layout.Signature;
+        RowRunBuilder.Build("abc", Line(Cells("rrr", styles)), scheme, 80, layout);
+        Equal(layout.Signature, first, "the same row has the same signature");
+        RowRunBuilder.Build("abd", Line(Cells("rrr", styles)), scheme, 80, layout);
+        Check(layout.Signature != first, "another text: another signature");
+        RowRunBuilder.Build("abc", Line(Cells("rrx", styles)), scheme, 80, layout);
+        Check(layout.Signature != first, "another background: another signature");
+        RowRunBuilder.Build("abc", Line(Cells("rrb", styles)), scheme, 80, layout);
+        Check(layout.Signature != first, "another colour: another signature");
+        RowRunBuilder.Build("abc", dimmed, scheme, 80, layout);
+        ulong dim = layout.Signature;
+        RowRunBuilder.Build("abc", Line(new CellStyle { Foreground = 0 }), scheme, 80, layout);
+        Check(layout.Signature != dim, "a dimmed row differs from a plain one");
+    }
+
+    private static void QueueChecks()
+    {
+        FrameOutputQueue queue = new FrameOutputQueue();
+        Equal(queue.Take(), (string)null, "an empty queue gives nothing");
+        Check(queue.Append("abc"), "the first append asks for a frame");
+        Check(!queue.Append("def"), "a second append finds the frame asked for");
+        Check(!queue.Append(""), "an empty append asks for nothing");
+        Equal(queue.Count, 6, "the count");
+        Equal(queue.Take(4), "abcd", "a piece of the given length");
+        Equal(queue.Count, 2, "the count after a piece");
+        Check(!queue.Append("gh"), "an append while a backlog is being taken does not ask again");
+        Equal(queue.Take(4), "ef", "the rest of the backlog first");
+        Equal(queue.Take(), "gh", "then what came after it");
+        Equal(queue.Take(), (string)null, "then nothing");
+        Check(queue.Append("x"), "an append after the queue was emptied asks for a frame again");
+        queue.Clear();
+        Equal(queue.Count, 0, "clear drops everything");
+        queue.Append("ab😀cd");
+        Equal(queue.Take(3), "ab", "a piece does not end with the first half of a surrogate pair");
+        Equal(queue.Take(2), "😀", "the pair comes whole");
+        Equal(queue.Take(0), "cd", "0: everything");
+        queue.Append("\uD83D");
+        Equal(queue.Take(1), "\uD83D", "a lone first half is given when it is all there is");
+
+        FrameOutputQueue shared = new FrameOutputQueue();
+        Parallel.For(0, 8, worker =>
+        {
+            for (int index = 0; index < 1000; index++)
+            {
+                shared.Append("0123456789");
+            }
+        });
+        int total = 0;
+        string piece;
+        while ((piece = shared.Take(777)) != null)
+        {
+            total += piece.Length;
+        }
+        Equal(total, 80000, "appends from several threads: nothing is lost");
+    }
+
+    private static void DisplayModelChecks()
+    {
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 3);
+        int changes = 0;
+        model.Changed += () => changes++;
+        model.ProcessOutput("hello\r\n\u001b[31mred\u001b[0m");
+        Equal(model.Document.GetLineText(0), "hello", "the first row");
+        Equal(model.Document.GetLineText(1), "red", "the second row");
+        Check(changes > 0 && model.Version > 0, "the output changed the model");
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        RowLayout layout = new RowLayout();
+        RowRunBuilder.Build(model.Document.GetLineText(1), model.Lines.GetLine(1), scheme, model.Columns, layout);
+        Equal(Describe(layout), "\"red\" 0 #FFBB0000;", "the emulator's colours reach the runs");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "1:3", "the caret follows the cursor");
+
+        string reply = null;
+        model.Reply += text => reply = text;
+        model.ProcessOutput("\u001b[6n");
+        Equal(reply, "\u001b[2;4R", "a cursor position query is answered");
+        reply = null;
+        model.SuppressReplies = true;
+        model.ProcessOutput("\u001b[6n");
+        Equal(reply, (string)null, "no answer when the replies are suppressed");
+
+        int titles = 0;
+        model.TitleChanged += () => titles++;
+        model.ProcessOutput("\u001b]0;my title\u0007");
+        Equal(model.Title + " " + titles, "my title 1", "the title");
+
+        model.ProcessOutput("\r\n4\r\n5\r\n6\r\n7");
+        Equal(model.ScreenTopLine, 3, "the screen moved down with the output");
+        Equal(model.TopLine, 3, "the view follows the screen");
+        Equal(model.Document.GetLineText(model.TopLine + 2), "7", "the last row is at the bottom of the view");
+        model.TopLine = 0;
+        Equal(model.TopLine, 0, "the view can be scrolled back");
+        model.TopLine = 100;
+        Equal(model.TopLine, model.MaxTopLine, "and not past the end");
+        model.TopLine = -5;
+        Equal(model.TopLine, 0, "or before the start");
+        model.ProcessOutput("8");
+        Equal(model.TopLine, 3, "output brings the caret back into the view");
+        model.TopLine = 0;
+        model.ScrollToScreen();
+        Equal(model.TopLine, model.ScreenTopLine, "a key brings the screen back");
+
+        model.ProcessOutput("\u001b[?1h\u001b=");
+        Check(model.ApplicationCursorKeys && model.ApplicationKeypad, "application cursor keys and keypad");
+        model.ProcessOutput("\u001b[?1l\u001b>");
+        Check(!model.ApplicationCursorKeys && !model.ApplicationKeypad, "and back");
+        model.ProcessOutput("\u001b[?2004h");
+        Check(model.BracketedPaste, "bracketed paste");
+        int mouseChanges = 0;
+        model.MouseModeChanged += () => mouseChanges++;
+        model.ProcessOutput("\u001b[?1000h\u001b[?1006h");
+        Check(model.MouseMode != MouseReportingMode.Off && model.SgrMouse && mouseChanges == 1, "mouse reporting with SGR coordinates");
+        model.ProcessOutput("\u001b[?1000l");
+        Check(model.MouseMode == MouseReportingMode.Off, "mouse reporting off");
+
+        model.ProcessOutput("\u001b[?1049h");
+        Equal(model.ActiveBufferIndex, 1, "the alternate screen");
+        model.ProcessOutput("\u001b[2;2Hx");
+        Equal(model.Document.GetLineText(1).TrimEnd(), " x", "it has a document of its own");
+        model.ProcessOutput("\u001b[?1049l");
+        Equal(model.ActiveBufferIndex + " " + model.Document.GetLineText(0), "0 hello", "back on the normal screen with its text");
+
+        TerminalDisplayModel wrap = new TerminalDisplayModel(5, 3);
+        wrap.ProcessOutput("abcdefgh\r\nxy");
+        Equal(wrap.Document.GetLineText(0) + "|" + wrap.Document.GetLineText(1), "abcde|fgh", "a long line wraps");
+        Check(!wrap.HasSelection, "no selection at first");
+        wrap.Select(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(2, 2));
+        Equal(wrap.GetSelectedText(), "abcdefgh\r\nxy", "a wrapped line is copied without a line break");
+        wrap.Select(new TextDocument.TextPosition(2, 2), new TextDocument.TextPosition(1, 0));
+        wrap.GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end);
+        Equal(start.Line + ":" + start.Column + "-" + end.Line + ":" + end.Column, "0:1-2:2", "a selection made backwards is given in order");
+        wrap.Select(new TextDocument.TextPosition(99, 99), new TextDocument.TextPosition(0, 0));
+        wrap.GetSelection(out start, out end);
+        Equal(end.Line + ":" + end.Column, "2:2", "a selection is kept inside the document");
+        wrap.ClearSelection();
+        Check(!wrap.HasSelection && wrap.GetSelectedText() == "", "the selection is cleared");
+
+        wrap.Resize(8, 4);
+        Equal(wrap.Columns + "x" + wrap.Rows, "8x4", "the grid has the new size");
+        wrap.ProcessOutput("\r\n12345678");
+        Check(Enumerable.Range(0, wrap.Document.LineCount).Any(line => wrap.Document.GetLineText(line) == "12345678"), "the new width is used (8 characters on one row)");
+        Equal(wrap.Caret.Column, 0, "the cursor waits at the edge: the caret is at the start of the next row");
+
+        TerminalDisplayModel reset = new TerminalDisplayModel(10, 3);
+        reset.ProcessOutput("abc\u001b[?1049h\u001b[?1h");
+        reset.Reset();
+        Check(reset.ActiveBufferIndex == 0 && !reset.ApplicationCursorKeys && reset.Document.GetLineText(0) == "", "a reset: the normal screen, the modes, an empty screen");
+        reset.ProcessOutput("\u001b[31mab\u001bc");
+        Check(reset.Document.LineCount <= 1 && reset.Document.GetLineText(0).Trim() == "", "ESC c resets too");
+
+        TerminalDisplayModel hidden = new TerminalDisplayModel(10, 3);
+        hidden.ProcessOutput("\u001b[?25l");
+        Check(hidden.CaretHidden, "the program hides the caret");
+        hidden.ProcessOutput("\u001b[?25h");
+        Check(!hidden.CaretHidden, "and shows it");
+        int bells = 0;
+        hidden.Bell += () => bells++;
+        hidden.ProcessOutput("\u0007");
+        Equal(bells, 1, "the bell");
+        string chunks = "";
+        hidden.OutputReceived += text => chunks += text;
+        hidden.ProcessOutput("a\u001b[");
+        hidden.ProcessOutput("1mb");
+        Equal(chunks, "a\u001b[1mb", "the chunks are given as they came");
+        Equal(hidden.Document.GetLineText(0), "ab", "a sequence cut between two chunks is put together");
+    }
+
+    // The scripts of the lab window are the same on every run and go through the emulator without an error.
+    private static void BenchmarkScriptChecks()
+    {
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        RowLayout layout = new RowLayout();
+        for (int script = 0; script < TerminalBenchmarkScripts.Names.Length; script++)
+        {
+            string name = TerminalBenchmarkScripts.Names[script];
+            List<string> chunks = TerminalBenchmarkScripts.Create(script, 100, 30);
+            List<string> again = TerminalBenchmarkScripts.Create(script, 100, 30);
+            Check(chunks.Count > 0 && chunks.SequenceEqual(again), name + ": the same chunks on every run");
+            TerminalDisplayModel model = new TerminalDisplayModel(100, 30) { ScrollbackLimit = 2000 };
+            for (int index = 0; index < chunks.Count; index++)
+            {
+                if (index == chunks.Count - 1 && script == 2)
+                {
+                    // The redraw script draws on the alternate screen and leaves it with its last chunk.
+                    Check(model.ActiveBufferIndex == 1 && model.CaretHidden && model.Document.GetLineText(1).Contains("|"), name + ": draws on the alternate screen");
+                }
+                model.ProcessOutput(chunks[index]);
+            }
+            int runs = 0;
+            for (int row = 0; row < model.Rows; row++)
+            {
+                int line = model.TopLine + row;
+                string text = line < model.Document.LineCount ? model.Document.GetLineText(line) : "";
+                RowRunBuilder.Build(text, model.Lines.GetLine(line), scheme, model.Columns, layout);
+                runs += layout.Texts.Count;
+            }
+            Check(model.ActiveBufferIndex == 0 && !model.CaretHidden && (runs > 0 || script == 2), name + ": ends on the normal screen" + (script == 2 ? "" : " with text on it"));
+        }
+    }
+}
