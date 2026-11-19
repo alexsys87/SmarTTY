@@ -33,14 +33,7 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
         {
             get
             {
-                StringBuilder stringBuilder = new StringBuilder();
-                EditableTextDocument editableTextDocument = ((EditableTextBrowser)_terminal).EditableDocument;
-                for (int editableTextDocumentIndex = _startLine; editableTextDocumentIndex < editableTextDocument.LineCount; editableTextDocumentIndex++)
-                {
-                    string value = editableTextDocument.GetLineText(editableTextDocumentIndex);
-                    stringBuilder.Append(value);
-                }
-                return stringBuilder.ToString().Substring(_startColumn);
+                return InputRegionMap.GetText(((EditableTextBrowser)_terminal).EditableDocument, _startLine, _startColumn);
             }
             set
             {
@@ -70,37 +63,12 @@ public class SshTerminalControl : TerminalEmulatorControl, SmarTTY.GUI.Backend.I
 
         public int IndexOf(TextDocument.TextPosition textPosition)
         {
-            EditableTextDocument editableTextDocument = ((EditableTextBrowser)_terminal).EditableDocument;
-            int offset = -this._startColumn;
-            for (int line = _startLine; line < editableTextDocument.LineCount; line++)
-            {
-                int length = editableTextDocument.GetLineText(line).Length;
-                if (line == textPosition.Line)
-                {
-                    return offset + textPosition.Column;
-                }
-                offset += length;
-            }
-            return -1;
+            return InputRegionMap.IndexOf(((EditableTextBrowser)_terminal).EditableDocument, _startLine, _startColumn, textPosition);
         }
 
         public TextDocument.TextPosition PositionAt(int index)
         {
-            if (index >= 0)
-            {
-                int targetColumn = index + this._startColumn;
-                int charsBefore = 0;
-                for (int line = _startLine; line < ((EditableTextBrowser)_terminal).EditableDocument.LineCount; line++)
-                {
-                    int length = ((EditableTextBrowser)_terminal).EditableDocument.GetLineText(line).Length;
-                    if (targetColumn >= charsBefore && targetColumn <= charsBefore + length)
-                    {
-                        return new TextDocument.TextPosition(targetColumn - charsBefore, line);
-                    }
-                    charsBefore += length;
-                }
-            }
-            return ((EditableTextBrowser)_terminal).EditableDocument.EndPosition;
+            return InputRegionMap.PositionAt(((EditableTextBrowser)_terminal).EditableDocument, _startLine, _startColumn, index);
         }
     }
 
