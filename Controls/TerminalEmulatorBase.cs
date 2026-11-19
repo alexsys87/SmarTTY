@@ -1,4 +1,5 @@
 ﻿using SmarTTY.Terminal.Emulation;
+using SmarTTY.Terminal.Rendering;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
 using System;
@@ -13,37 +14,6 @@ namespace SmarTTY.Controls;
 
 public partial class TerminalEmulatorBase : TextEditorControl, ITerminalScreenView
 {
-    private class BrushPalette
-    {
-        public Brush[] NormalBrushes;
-
-        public Brush[] BrightBrushes;
-
-        public BrushPalette(ConsolePalette consolePalette)
-        {
-            NormalBrushes = new Brush[consolePalette.NormalColors.Length];
-            this.BrightBrushes = new Brush[consolePalette.BrightColors.Length];
-            for (int normalColorIndex = 0; normalColorIndex < consolePalette.NormalColors.Length; normalColorIndex++)
-            {
-                NormalBrushes[normalColorIndex] = new SolidBrush(consolePalette.NormalColors[normalColorIndex]);
-            }
-            for (int brightColorIndex = 0; brightColorIndex < consolePalette.NormalColors.Length; brightColorIndex++)
-            {
-                this.BrightBrushes[brightColorIndex] = new SolidBrush(consolePalette.BrightColors[brightColorIndex]);
-            }
-        }
-
-        public Brush GetBrush(byte colorIndex, bool bright)
-        {
-            Brush[] brushes = (bright ? this.BrightBrushes : this.NormalBrushes);
-            if (colorIndex == 0 || colorIndex > brushes.Length)
-            {
-                return null;
-            }
-            return brushes[colorIndex - 1];
-        }
-    }
-
     private class TimestampMargin : IMargin
     {
         private TerminalEmulatorBase _terminal;
@@ -104,13 +74,11 @@ public partial class TerminalEmulatorBase : TextEditorControl, ITerminalScreenVi
 
     private SolidBrush _defaultBackBrush = new SolidBrush(Color.Black);
 
-    private BrushPalette _palette = new BrushPalette(ConsolePalette.PuTTY);
+    // The rule that turns the style of a cell into its colours (the palette is the user's, the defaults are those of the control).
+    private readonly TerminalColorScheme _colorScheme = CreateColorScheme(ConsolePalette.PuTTY);
 
-    // Brushes of 256-colour and 24-bit colours, created on first use.
-    private readonly Dictionary<int, Brush> _extendedBrushes = new Dictionary<int, Brush>();
-
-    // Brushes of the colours of CellStyle.Override, created on first use.
-    private readonly Dictionary<RgbColor, Brush> _overrideBrushes = new Dictionary<RgbColor, Brush>();
+    // The brushes of the colours of the rule, by colour, made on first use.
+    private readonly Dictionary<uint, Brush> _schemeBrushes = new Dictionary<uint, Brush>();
 
     public Brush InactiveBrush = Brushes.DarkGray;
 
@@ -309,94 +277,72 @@ public partial class TerminalEmulatorBase : TextEditorControl, ITerminalScreenVi
 
     public void SetPalette(ConsolePalette consolePalette)
     {
-        _palette = new BrushPalette(consolePalette);
+        ApplyPalette(_colorScheme, consolePalette);
     }
 
-    // Resolves a 256-colour or 24-bit colour (see CellStyle.ExtendedForeground); the 16 base colours keep
-    // following the user's palette.
-    private Brush GetExtendedBrush(int encodedColor)
+    private static TerminalColorScheme CreateColorScheme(ConsolePalette consolePalette)
     {
-        int rgb;
-        if ((encodedColor & XtermProtocol.RgbColorFlag) != 0)
+        TerminalColorScheme scheme = new TerminalColorScheme();
+        ApplyPalette(scheme, consolePalette);
+        return scheme;
+    }
+
+    private static void ApplyPalette(TerminalColorScheme scheme, ConsolePalette consolePalette)
+    {
+        for (int index = 0; index < 8; index++)
         {
-            rgb = encodedColor & 0xFFFFFF;
+            if (index < consolePalette.NormalColors.Length)
+            {
+                scheme.SetPaletteColor(index, bright: false, ((Color)consolePalette.NormalColors[index]).ToRgb());
+            }
+            if (index < consolePalette.BrightColors.Length)
+            {
+                scheme.SetPaletteColor(index, bright: true, ((Color)consolePalette.BrightColors[index]).ToRgb());
+            }
         }
-        else
+    }
+
+    // The brush of a colour of the colour rule (null: no colour, the default of the view); made on first use.
+    private Brush GetSchemeBrush(RgbColor? color)
+    {
+        if (!color.HasValue)
         {
-            int index = encodedColor - 1;
-            if (index < 8)
-            {
-                return _palette.GetBrush((byte)(index + 1), bright: false);
-            }
-            if (index < 16)
-            {
-                return _palette.GetBrush((byte)(index - 7), bright: true);
-            }
-            rgb = XtermProtocol.Xterm256ToRgb(index);
+            return null;
         }
-        if (!_extendedBrushes.TryGetValue(rgb, out Brush brush))
+        if (!_schemeBrushes.TryGetValue(color.Value.Argb, out Brush brush))
         {
-            if (_extendedBrushes.Count > 4096)
+            if (_schemeBrushes.Count > 4096)
             {
-                _extendedBrushes.Clear();
+                _schemeBrushes.Clear();
             }
-            brush = new SolidBrush(Color.FromArgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF));
-            _extendedBrushes[rgb] = brush;
+            brush = new SolidBrush(color.Value.ToColor());
+            _schemeBrushes[color.Value.Argb] = brush;
         }
         return brush;
     }
 
-    // The brush of the colour a cell asks for with CellStyle.Override (the colour of the echo of a HEX terminal); made on first use.
-    private Brush GetOverrideBrush(RgbColor color)
+    // The colours that the rule takes from the control: the text colour, the colour of bold text without a colour, the background.
+    private void SyncColorScheme()
     {
-        if (!_overrideBrushes.TryGetValue(color, out Brush brush))
+        if (_defaultColors[0].Foreground is SolidBrush text)
         {
-            brush = new SolidBrush(color.ToColor());
-            _overrideBrushes[color] = brush;
+            _colorScheme.DefaultForeground = text.Color.ToRgb();
         }
-        return brush;
+        _colorScheme.BoldDefaultForeground = _defaultForeBrush.Color.ToRgb();
+        _colorScheme.DefaultBackground = _defaultBackBrush.Color.ToRgb();
     }
 
-    // The palette entries of the colours: 2 is red, 4 yellow, 7 cyan (the SGR numbers 31, 33 and 36).
-    private static byte SeverityColor(byte severity)
-    {
-        return severity >= 3 ? (byte)2 : (severity == 2 ? (byte)4 : (byte)7);
-    }
-
+    // The colours of a cell come from the rule that the WPF view uses too (Terminal/Rendering/TerminalColorScheme.cs), so both paint the same.
     private ColorSpan CreateColorSpan(int start, int end, CellStyle cellStyle)
     {
-        Brush foregroundBrush = (cellStyle.ExtendedForeground != 0) ? GetExtendedBrush(cellStyle.ExtendedForeground) : ((cellStyle.Foreground != 0 || !cellStyle.Bold) ? _palette.GetBrush(cellStyle.Foreground, cellStyle.Bold) : _defaultForeBrush);
-        Brush backgroundBrush = (cellStyle.ExtendedBackground != 0) ? GetExtendedBrush(cellStyle.ExtendedBackground) : _palette.GetBrush(cellStyle.Background, bright: false);
-        if (cellStyle.Inverse)
-        {
-            Brush swapBrush = foregroundBrush;
-            foregroundBrush = backgroundBrush;
-            backgroundBrush = swapBrush;
-            if (foregroundBrush == null)
-            {
-                foregroundBrush = _defaultBackBrush;
-            }
-            if (backgroundBrush == null)
-            {
-                backgroundBrush = _defaultColors[0].Foreground;
-            }
-        }
-        if (cellStyle.Override != null && cellStyle.Override.Color.HasValue)
-        {
-            foregroundBrush = GetOverrideBrush(cellStyle.Override.Color.Value);
-        }
-        else if (cellStyle._link.Severity != 0 && cellStyle.Foreground == 0 && cellStyle.ExtendedForeground == 0 && !cellStyle.Inverse)
-        {
-            // An error, a warning or a note that the program wrote without a colour of its own.
-            foregroundBrush = _palette.GetBrush(SeverityColor(cellStyle._link.Severity), bright: true);
-        }
+        ResolvedCellColors colors = _colorScheme.Resolve(cellStyle);
         return new ColorSpan
         {
-            Foreground = foregroundBrush,
-            Background = backgroundBrush,
+            Foreground = GetSchemeBrush(colors.Foreground),
+            Background = GetSchemeBrush(colors.Background),
             Start = start,
             End = end,
-            Underline = cellStyle.Underline || (cellStyle._link.Target?.IsActive ?? false)
+            Underline = colors.Underline
         };
     }
 
@@ -423,6 +369,7 @@ public partial class TerminalEmulatorBase : TextEditorControl, ITerminalScreenVi
         {
             return null;
         }
+        SyncColorScheme();
         CellStyle cellStyle = default;
         int spanStart = 0;
         List<ColorSpan> list = null;
