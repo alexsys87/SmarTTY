@@ -1077,7 +1077,9 @@ internal static class Program
             SaveAndWait(o);
             Pump(() => server.Prompts.Count >= 2, "the answer of the service reload");
         });
-        Check(server.Prompts.Count == 2 && server.Prompts[1].StartsWith("Could not reload nginx (exit code ") && server.Prompts[1].EndsWith("\nTry again with sudo?"), "answered Yes: nginx is not there, the editor says it could not reload it and offers sudo");
+        // The exit code is in the question when the command gave one; a channel that the SSH layer closed early gives none (see Settle), and the
+        // question is the same without it.
+        Check(server.Prompts.Count == 2 && server.Prompts[1].StartsWith("Could not reload nginx") && server.Prompts[1].EndsWith("\nTry again with sudo?"), "answered Yes: nginx is not there, the editor says it could not reload it and offers sudo" + (server.Prompts.Count == 2 && server.Prompts[1].StartsWith("Could not reload nginx") ? "" : " (" + string.Join(" || ", server.Prompts).Replace("\n", " ") + ")"));
         o.Close();
     }
 
