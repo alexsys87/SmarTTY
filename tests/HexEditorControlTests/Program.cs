@@ -400,18 +400,21 @@ internal static class Program
 
     private static HexEditingModel Model => Field<HexEditingModel>("_model");
 
+    // Where the columns and the rows are (since 3B-1; the control kept them in fields before).
+    private static HexViewLayout Layout => Field<HexViewLayout>("_layout");
+
     private static string View()
     {
-        return "first=" + Field<int>("_firstRow") + " scrollx=" + Field<int>("_scrollX") + " nib=" + Model.Nibble + " area=" + Model.Area;
+        return "first=" + Layout.FirstRow + " scrollx=" + Layout.ScrollX + " nib=" + Model.Nibble + " area=" + Model.Area;
     }
 
     // The middle of the cell of a byte: its hex digit (0 or 1) or its character, in a visible row.
     private static System.Drawing.Point Cell(int row, int column, bool ascii, int digit = 0)
     {
-        int charWidth = Field<int>("_charWidth");
-        int x = ascii ? Field<int>("_asciiStart") + column * charWidth : (int)CallPrivate("HexCellX", column) + digit * charWidth;
-        x += charWidth / 2 - Field<int>("_scrollX");
-        int y = Field<int>("_headerHeight") + (row - Field<int>("_firstRow")) * Field<int>("_rowHeight") + Field<int>("_rowHeight") / 2;
+        int charWidth = Layout.CharWidth;
+        int x = ascii ? Layout.AsciiStart + column * charWidth : Layout.HexCellX(column) + digit * charWidth;
+        x += charWidth / 2 - Layout.ScrollX;
+        int y = Layout.HeaderHeight + (row - Layout.FirstRow) * Layout.RowHeight + Layout.RowHeight / 2;
         return new System.Drawing.Point(x, y);
     }
 
@@ -516,7 +519,7 @@ internal static class Program
         Mouse(MouseUpMethod, MouseButtons.Left, new System.Drawing.Point(2, Cell(5, 0, ascii: false).Y));
         Record("click left of the bytes, row 5", View());
         System.Drawing.Point right = Cell(6, 15, ascii: true);
-        right.X += 5 * Field<int>("_charWidth");
+        right.X += 5 * Layout.CharWidth;
         Mouse(MouseDownMethod, MouseButtons.Left, right);
         Mouse(MouseUpMethod, MouseButtons.Left, right);
         Record("click right of the characters, row 6", View());
@@ -530,7 +533,7 @@ internal static class Program
         Mouse(MouseMoveMethod, MouseButtons.Left, Cell(5, 4, ascii: true));
         Record("drag into the characters of row 5", View());
         System.Drawing.Point below = Cell(11, 8, ascii: false);
-        below.Y += 20 * Field<int>("_rowHeight");
+        below.Y += 20 * Layout.RowHeight;
         Mouse(MouseMoveMethod, MouseButtons.Left, below);
         Record("drag below the table", View());
         Mouse(MouseUpMethod, MouseButtons.Left, below);
@@ -556,7 +559,7 @@ internal static class Program
             CallPrivate("ByteAtPoint", Cell(61, 3, ascii: false, digit: 2)),
             CallPrivate("ByteAtPoint", Cell(61, 4, ascii: false)),
             CallPrivate("ByteAtPoint", Cell(61, 12, ascii: true)),
-            CallPrivate("ByteAtPoint", new System.Drawing.Point(Cell(61, 15, ascii: true).X + 3 * Field<int>("_charWidth"), Cell(61, 15, ascii: true).Y)),
+            CallPrivate("ByteAtPoint", new System.Drawing.Point(Cell(61, 15, ascii: true).X + 3 * Layout.CharWidth, Cell(61, 15, ascii: true).Y)),
             CallPrivate("ByteAtPoint", Cell(62, 9, ascii: false)),
             CallPrivate("ByteAtPoint", new System.Drawing.Point(Cell(61, 1, ascii: false).X, 2))
         });

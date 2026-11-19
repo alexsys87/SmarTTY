@@ -261,6 +261,9 @@ jobs:
       - name: Run hex editing model checks (caret, selection, typing in both columns, search; what the view is told after each operation)
         run: dotnet run --project tests/HexEditingModelTests -c Release
 
+      - name: Run hex view layout checks (columns, the byte under a point, scrolling to the caret, scroll bars, keys, mouse selection, tool tip and colours)
+        run: dotnet run --project tests/HexViewLayoutTests -c Release
+
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
