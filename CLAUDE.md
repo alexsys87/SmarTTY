@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 138 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
@@ -77,7 +77,7 @@ DpiAwareControl (WinForms UserControl)
    └─ ReadonlySmartScrollBrowser
       └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
          └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
-            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor, .Completion): folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring, the rules of the word list and the parameter hint CodeEditing/EditorCompletion
+            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor, .Completion): folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring, the rules of the word list and the parameter hint CodeEditing/EditorCompletion, the line commands, the moves to a bracket and the zoom steps CodeEditing/LineCommands, TokenMoves and EditorZoom
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
             │                                   shows a hex view it is given (the tab gives it the WPF one) through IHexViewPlace
             └─ (the WinForms terminals TerminalEmulatorBase, TerminalEmulatorControl, SshTerminalControl, SerialTerminalControl:
@@ -102,7 +102,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: the device panel's tool bar and menus are WinForms (hosted, they go with stage 4) |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; next the view in the editor tab |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) in progress: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) done; next 3E-2 (the search highlights, the marks of the blanks, the pair of a bracket), 3E-3 (several cursors), 3E-4 (`RemoteFileEditor` on a text view it is given, the panel, the tab, the status bar and the search on the WPF editor), 3E-5 (the WinForms editor removed) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -969,3 +969,41 @@ Enter, Tab and a blank accept, a blank after a word the item does not continue i
 double click; the list near the bottom and the right edge of the screen; the hint of a function of the file and of a C library function (API
 symbols on): the parameter after a comma, closed after the call, Left and Right back into it, scrolled; the light and the dark theme; 100 %,
 150 % and 200 % scaling.
+
+3E puts the WPF text view of 3D in the editor tab in place of the WinForms editor: 3E-1 to 3E-3 give the view what `CodeEditorPP` still does that it
+has not (the commands of the editor and their keys; the search highlights, the marks of the blanks and the pair of a bracket; several cursors),
+3E-4 puts `RemoteFileEditor` on a text view it is given (as 3B-3 did for the hex view) with the panel, the tab, the status bar and the search on
+the WPF editor, and 3E-5 removes the WinForms editor, as 2E removed the WinForms terminals. The rules of stage 1 hold for what moves.
+
+Done in 3E-1 (the commands of the editor): first a net: `tests/TextViewTests` has a line command run on a real `CodeEditorPP` (a subclass with a
+comment style it is given), written by the code before the move (the 1515 lines of before did not change; 1623 in all, the same on every run):
+duplicate, move and delete of the caret line and of selected lines (the first and the last line, a selection that ends at the start of a line, a
+text without a final line break, a line before an empty last one), comment and uncomment (a selection, the caret line after its indentation, a
+mark with an end, no comment style), the transforms of the Text menu with and without a selection (sorting and duplicates need two lines, the
+caret moved with its text, a block that loses lines replaced and selected, a final line break added once), read-only, the undo step of each
+command, the zoom steps, a zoom set rounded and its limits with the `ZoomChanged` events, the moves to a bracket forward and back with and
+without the selection, and the key bindings (the keys with their modifiers in `KeyData`) that run them. Of 26 mutations of the old code 23 make it
+fail; three are equivalent changes (a transform that changes nothing makes an empty undo step; `RemoveLines` clears the selection itself;
+`SuppressKeyPress` sets `Handled`). A fault it found, kept as it is and not run by the stand: a search back for a bracket that goes over a pair
+whose opening bracket is the first token of its line never ends (the index before that bracket is -1, which the next turn of the loop reads as the
+end of the line, so the same closing bracket is met again); forward, the search goes over the pair the caret is in, and from a line without a
+token after the caret it goes on from the last token of the next line. Then `CodeEditing/LineCommands.cs` (public, through `ILineCommandHost`:
+the document, the caret, the selection, whether the lines can be edited, the tab size, the comment style, `ReplaceText`,
+`ExecuteAsSingleUndoStep`, `SetSelection`, `SetCaret`, `RemoveLines`, `UpdateMaxLineWidth`, implemented in `Controls/CodeEditorPP.LineEditing.cs`):
+`HasLineSelection`, `ApplyLineTransform`, `DuplicateLines`, `MoveLines`, `DeleteLines`, `ToggleComment`; `CodeEditing/TokenMoves.cs` (public
+static: `TryFind`, the search of `MoveToToken`; the view selects and moves the caret); `CodeEditing/EditorZoom.cs` (public static: `By`, `Round`,
+`Clamp`, `Min`, `Max`; `ReadonlyTextBrowser.MinFontZoom`/`MaxFontZoom` and the `FontZoom` setter take them from it). The code is as it was. Every
+golden and stand passes unchanged. `tests/LineCommandTests` (net8.0, compiled like `ModelBuildTests`, a fake view over a real document that logs
+what it is asked, the real token cache, 87 checks, the search that never ends on a background thread) drives them; of 31 mutations 28 made a
+check fail at once, one after a check was added (a line left without a match: the next one is searched from its first token), two are
+equivalent changes (a document has a line always; the line of a token is never past the text).
+
+For the WPF view: `WpfTextEditor` is an `IEditorCommandTarget` with the key bindings of `CodeEditorPP` (`KeyBindingMap` on `EditorCommands`,
+`SetKeyBindings` for those of the settings; a key that has a command runs it and nothing else, after an open word list has had its keys), the
+line commands through `LineCommands` (it is the `ILineCommandHost`), `MoveToToken` through `TokenMoves`, `Retokenize`, the folds, the completion,
+and the zoom (`FontZoom`, `ZoomBy`, `ResetZoom`, `SetZoom` with `EditorZoom`, `ZoomChanged`, Ctrl+wheel); `CommentStyle` is set by its owner. The
+commands of several cursors do nothing yet (3E-3). The lab takes the zoom of the settings as `FontZoom` and the comment marks of the syntax, and
+shows the zoom. Manual check on Windows (the lab): Ctrl+Shift+D, Alt+Up, Alt+Down, Ctrl+Shift+K with the caret and with a selection of lines;
+Ctrl+/ in a C, a shell and an XML file (and the numpad /, and Ctrl+Shift+7 where / is Shift+7); Ctrl+Z after each; Ctrl+Alt+9 and Ctrl+Alt+0,
+Ctrl+Shift+9 and Ctrl+Shift+0, Ctrl+[ and Ctrl+], Ctrl+, and Ctrl+. ; Ctrl+R; Ctrl+Alt+Left and Right on a fold; Ctrl+Plus, Ctrl+Minus, Ctrl+0,
+the numpad keys and Ctrl+wheel (the size in the status line, the text crisp at 150 %); read-only.
