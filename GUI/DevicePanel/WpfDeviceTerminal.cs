@@ -738,7 +738,6 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             BellMode = BeepMode.None,
             EnterSequence = null,
             CaretWhenUnfocused = false,
-            ContextMenuReference = contextMenuStrip1,
             OpensPasteMenu = false
         };
         _serialTerminalControl.Model.ScrollbackLimit = int.MaxValue;
@@ -2127,7 +2126,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     /// <summary>The menu with the clipboard, the texts pasted lately and the snippets; the choice goes to the device.</summary>
     private void ShowPasteMenu()
     {
-        PasteMenu.Show(Anchor, contextMenuStrip1, _commonSettings, System.Windows.Forms.Cursor.Position, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
+        System.Windows.FrameworkElement target = HexMode ? hexTerminalControl1 : _serialTerminalControl;
+        SmarTTY.GUI.PasteMenu.Show(target, _commonSettings, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
     }
 
     private void PasteToDevice(string clipboardText, PasteKind kind)
