@@ -9,14 +9,17 @@ using System.Windows.Forms;
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// A remote file editor with its context menu. The WPF tool bar above the editor offers the same commands, and both
-/// run them through <see cref="RunCommand"/>. The commands that need the main window (saving, the search bar, the Go
-/// to Line dialog) are raised as events; the others act on the editor directly. The WPF status bar below the editor
-/// reads the state of the editor when <see cref="StateChanged"/> is raised.
+/// A remote file editor with its WinForms text view and its context menu. The commands and their state are
+/// <see cref="Commands"/> (<see cref="RemoteFileEditorCommands"/>): the WPF tool bar above the editor, this context menu and
+/// the keys run them there, and the WPF status bar below the editor reads the state of the editor when its
+/// <see cref="RemoteFileEditorCommands.StateChanged"/> is raised.
 /// </summary>
 internal sealed class RemoteFileEditorPanel : UserControl
 {
     private readonly RemoteFileEditor _editor;
+
+    // The WinForms text view of the editor, which this panel hosts.
+    private readonly RemoteTextView _view;
 
     private readonly ContextMenuStrip _contextMenu;
 
@@ -39,59 +42,18 @@ internal sealed class RemoteFileEditorPanel : UserControl
 
     private ToolStripRenderer _renderer;
 
-    private bool _refreshPending;
-
     private int _contextMenuDpi;
 
-    /// <summary>The Save button or menu item was used.</summary>
-    public event EventHandler SaveRequested;
-
-    public event EventHandler FindRequested;
-
-    public event EventHandler ReplaceRequested;
-
-    public event EventHandler GoToLineRequested;
-
-    /// <summary>The Show Changes button or menu item was used: the window with the differences is the main window's.</summary>
-    public event EventHandler ShowChangesRequested;
-
-    /// <summary>The Run in Terminal button, menu item or F5 was used: the terminal tabs belong to the session.</summary>
-    public event EventHandler RunRequested;
-
-    /// <summary>The Follow Log button or menu item was used: the terminal tab and the question belong to the main window.</summary>
-    public event EventHandler FollowLogRequested;
-
-    /// <summary>The toolbar or the context menu switched the invisible-character marks on or off.</summary>
-    public event EventHandler ShowAllCharactersChanged;
-
-    /// <summary>The toolbar or the context menu switched the word wrap on or off.</summary>
-    public event EventHandler WordWrapChanged;
-
-    /// <summary>The byte order, the groups, the row width, the inspector or the colours of the hex view changed.</summary>
-    public event EventHandler HexViewOptionsChanged;
-
-    /// <summary>A command of the hex view needs a dialog of the main window (a colour, a byte pattern, the checksums).</summary>
-    public event EventHandler<HexDialogRequestedEventArgs> HexDialogRequested;
-
-    /// <summary>The enabled state of the commands changed (for the WPF tool bar).</summary>
-    internal event EventHandler StateChanged;
-
-    // For RemoteFileEditorStatusSource: the event as two calls.
-    internal void AddStateChanged(EventHandler handler)
-    {
-        StateChanged += handler;
-    }
-
-    internal void RemoveStateChanged(EventHandler handler)
-    {
-        StateChanged -= handler;
-    }
-
-    internal EditorCommandState CommandState { get; private set; }
+    /// <summary>The commands of the editor and their state.</summary>
+    internal RemoteFileEditorCommands Commands { get; }
 
     public RemoteFileEditorPanel(RemoteFileEditor editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        _view = editor.TextControl ?? throw new ArgumentException("The panel hosts the WinForms text view of the editor.", nameof(editor));
+        Commands = new RemoteFileEditorCommands(editor, PostRefresh);
+        // First, so that the menu shows the new state before the tool bar and the status bar are told.
+        Commands.StateChanged += (sender, e) => UpdateMenuItems();
         SuspendLayout();
 
         _contextMenu = new ContextMenuStrip();
@@ -113,7 +75,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         {
             LineTransformKind current = kind;
             ToolStripMenuItem item = new ToolStripMenuItem(LineTransforms.Title(kind));
-            item.Click += (sender, e) => RunTransform(current);
+            item.Click += (sender, e) => Commands.RunTransform(current);
             _transformItems[kind] = item;
             _textMenu.DropDownItems.Add(item);
         }
@@ -122,7 +84,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         // After Hex View, shown in the hex view only.
         _hexMenu = new HexEditorMenu(
             _editor.HexEditor,
-            kind => HexDialogRequested?.Invoke(this, new HexDialogRequestedEventArgs(kind)),
+            kind => Commands.RequestHexDialog(kind),
             () =>
             {
                 _editor.FocusActiveView();
@@ -140,35 +102,24 @@ internal sealed class RemoteFileEditorPanel : UserControl
             ApplyMenuTheme(_contextMenu);
             RefreshState();
         };
-        _editor.ContextMenuStrip = _contextMenu;
-        _editor.HexEditor.ContextMenuStrip = _contextMenu;
+        _view.ContextMenuStrip = _contextMenu;
+        // A hex view given to the editor (the WPF one of the tab) has the context menu of the tab.
+        if (_editor.HexEditorControl != null)
+        {
+            _editor.HexEditorControl.ContextMenuStrip = _contextMenu;
+        }
 
-        _editor.Dock = DockStyle.Fill;
-        Controls.Add(_editor);
-        ActiveControl = _editor;
+        _view.Dock = DockStyle.Fill;
+        Controls.Add(_view);
+        ActiveControl = _view;
         ResumeLayout(performLayout: true);
 
-        // What the commands depend on: the selection, the text and its undo history, the saved state and the load.
-        _editor.SelectionChanged += (editorControl, previousCaret, currentCaret, hasSelection) => ScheduleRefresh();
-        _editor.ModifiedChanged += (editorControl, modified) => ScheduleRefresh();
-        _editor.RangeChanged += (editorControl, start, oldEnd, newEnd) => ScheduleRefresh();
-        _editor.LineChanged += (editorControl, line, column, addedLength, removedLength) => ScheduleRefresh();
-        _editor.KeyUp += (sender, e) => ScheduleRefresh();
-        _editor.SavingChanged += (sender, e) => ScheduleRefresh();
-        _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
-        _editor.FormatChanged += (sender, e) => ScheduleRefresh();
-        _editor.HexModeChanged += (sender, e) => ScheduleRefresh();
-        _editor.HexEditor.StateChanged += (sender, e) => ScheduleRefresh();
-        // Keys handled by the hex control itself (it has the focus while it is shown).
-        _editor.HexEditor.SaveRequested += (sender, e) => SaveRequested?.Invoke(this, EventArgs.Empty);
-        _editor.HexEditor.FindRequested += (sender, e) => FindRequested?.Invoke(this, EventArgs.Empty);
-        _editor.HexEditor.GoToOffsetRequested += (sender, e) => GoToLineRequested?.Invoke(this, EventArgs.Empty);
-        _editor.HexEditor.ViewOptionsChanged += (sender, e) =>
-        {
-            ScheduleRefresh();
-            HexViewOptionsChanged?.Invoke(this, EventArgs.Empty);
-        };
-
+        // What the commands depend on in the text view: the selection, the text and its undo history (the commands follow the rest).
+        _view.SelectionChanged += (editorControl, previousCaret, currentCaret, hasSelection) => Commands.ScheduleRefresh();
+        _view.ModifiedChanged += (editorControl, modified) => Commands.ScheduleRefresh();
+        _view.RangeChanged += (editorControl, start, oldEnd, newEnd) => Commands.ScheduleRefresh();
+        _view.LineChanged += (editorControl, line, column, addedLength, removedLength) => Commands.ScheduleRefresh();
+        _view.KeyUp += (sender, e) => Commands.ScheduleRefresh();
         ThemeManager.ThemeChanged += OnThemeChanged;
         ApplyTheme();
         RefreshState();
@@ -184,229 +135,49 @@ internal sealed class RemoteFileEditorPanel : UserControl
             CheckOnClick = false
         };
         Icons.Apply(menuItem, description.IconName);
-        menuItem.Click += (sender, e) => RunCommand(command);
+        menuItem.Click += (sender, e) => Commands.RunCommand(command);
         _menuItems[command] = menuItem;
         return menuItem;
     }
 
-    /// <summary>Runs a command of the Text menu.</summary>
-    private void RunTransform(LineTransformKind kind)
-    {
-        if (!CaptureState().IsEnabled(kind))
-        {
-            RefreshState();
-            return;
-        }
-        try
-        {
-            _editor.ApplyLineTransform(kind);
-        }
-        catch (Exception exception)
-        {
-            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-        }
-        _editor.FocusActiveView();
-        RefreshState();
-    }
-
-    /// <summary>Runs a command from the tool bar or the context menu.</summary>
-    internal void RunCommand(EditorToolbarCommand command)
-    {
-        // A command that enabled state is stale could slip through between a change and its refresh.
-        if (!CaptureState().IsEnabled(command))
-        {
-            RefreshState();
-            return;
-        }
-        // The search bar and the Go to Line dialog take the focus themselves.
-        bool focusEditor = true;
-        try
-        {
-            switch (command)
-            {
-                case EditorToolbarCommand.Save:
-                    SaveRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.Undo:
-                    if (_editor.IsHexMode)
-                    {
-                        _editor.HexEditor.Undo();
-                    }
-                    else
-                    {
-                        _editor.Undo();
-                    }
-                    break;
-                case EditorToolbarCommand.Redo:
-                    if (_editor.IsHexMode)
-                    {
-                        _editor.HexEditor.Redo();
-                    }
-                    else
-                    {
-                        _editor.Redo();
-                    }
-                    break;
-                case EditorToolbarCommand.Cut:
-                    _editor.Cut();
-                    break;
-                case EditorToolbarCommand.Copy:
-                    _editor.CopySelection();
-                    break;
-                case EditorToolbarCommand.Paste:
-                    _editor.Paste();
-                    break;
-                case EditorToolbarCommand.Delete:
-                    _editor.DeleteSelection();
-                    break;
-                case EditorToolbarCommand.SelectAll:
-                    _editor.SelectAllText();
-                    break;
-                case EditorToolbarCommand.Reload:
-                    if (ConfirmDiscardChanges("Drop your changes and load " + _editor.RemotePath + " from the server again?"))
-                    {
-                        _editor.Reload();
-                    }
-                    break;
-                case EditorToolbarCommand.FollowLog:
-                    focusEditor = false;
-                    FollowLogRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.RunFile:
-                    focusEditor = false;
-                    RunRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.ShowChanges:
-                    focusEditor = false;
-                    ShowChangesRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.Find:
-                    focusEditor = false;
-                    FindRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.Replace:
-                    focusEditor = false;
-                    ReplaceRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.GoToLine:
-                    focusEditor = false;
-                    GoToLineRequested?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.ShowAllCharacters:
-                    _editor.ShowAllCharacters = !_editor.ShowAllCharacters;
-                    ShowAllCharactersChanged?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.WordWrap:
-                    _editor.WordWrap = !_editor.WordWrap;
-                    WordWrapChanged?.Invoke(this, EventArgs.Empty);
-                    break;
-                case EditorToolbarCommand.ToggleHex:
-                    _editor.ToggleHexMode();
-                    break;
-                case EditorToolbarCommand.DataInspector:
-                    _editor.HexEditor.ShowDataInspector = !_editor.HexEditor.ShowDataInspector;
-                    break;
-            }
-        }
-        catch (Exception exception)
-        {
-            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
-        }
-        if (focusEditor)
-        {
-            _editor.FocusActiveView();
-        }
-        RefreshState();
-    }
-
-    internal EditorCommandState CaptureState()
-    {
-        bool hex = _editor.IsHexMode;
-        if (hex)
-        {
-            HexEditorControl hexEditor = _editor.HexEditor;
-            return new EditorCommandState
-            {
-                ReadOnly = hexEditor.ReadOnly,
-                HasSelection = hexEditor.HasSelection,
-                HasText = hexEditor.Length > 0,
-                CanUndo = hexEditor.CanUndo,
-                CanRedo = hexEditor.CanRedo,
-                IsModified = _editor.IsModified,
-                IsNewFile = _editor.IsNewFile,
-                IsSaving = _editor.IsSaving,
-                HexMode = true,
-                ShowDataInspector = hexEditor.ShowDataInspector,
-                CanRun = _editor.CanRunInTerminal,
-                CanFollow = _editor.CanFollowLog,
-                CanUseHex = _editor.CanToggleHexMode,
-                ShowAllCharacters = _editor.ShowAllCharacters,
-                WordWrap = _editor.WordWrap
-            };
-        }
-        int lineCount = _editor.LineCount;
-        return new EditorCommandState
-        {
-            ReadOnly = _editor.ReadOnly,
-            HasLineSelection = _editor.HasLineSelection,
-            HasSelection = _editor.HasSelection && _editor.SelectionStart != _editor.SelectionEnd,
-            HasText = lineCount > 1 || (lineCount == 1 && _editor.EditableDocument.GetLineText(0).Length > 0),
-            CanUndo = _editor.CanUndo,
-            CanRedo = _editor.CanRedo,
-            IsModified = _editor.IsModified,
-            IsNewFile = _editor.IsNewFile,
-            IsSaving = _editor.IsSaving,
-            HexMode = false,
-            CanRun = _editor.CanRunInTerminal,
-            CanFollow = _editor.CanFollowLog,
-            CanUseHex = _editor.CanToggleHexMode,
-            ShowAllCharacters = _editor.ShowAllCharacters,
-            WordWrap = _editor.WordWrap
-        };
-    }
-
-    private bool ConfirmDiscardChanges(string question)
-    {
-        return !_editor.IsModified || ThemedMessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
-    }
-
+    /// <summary>Reads the state of the commands again (the menu, the tool bar and the status bar show it).</summary>
     internal void RefreshState()
     {
-        CommandState = CaptureState();
-        foreach (KeyValuePair<EditorToolbarCommand, ToolStripMenuItem> pair in _menuItems)
-        {
-            pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
-            pair.Value.Checked = CommandState.IsChecked(pair.Key);
-            pair.Value.Visible = CommandState.IsVisible(pair.Key);
-        }
-        _textMenu.Enabled = !CommandState.ReadOnly && !CommandState.HexMode;
-        _hexMenu.Refresh(CommandState.HexMode);
-        foreach (KeyValuePair<LineTransformKind, ToolStripMenuItem> pair in _transformItems)
-        {
-            pair.Value.Enabled = CommandState.IsEnabled(pair.Key);
-        }
-        StateChanged?.Invoke(this, EventArgs.Empty);
+        Commands.RefreshState();
     }
 
-    /// <summary>
-    /// Updates the commands after the editor has finished what it is doing: the events arrive in the middle of an edit,
-    /// before the undo history is complete, and many of them (a mouse drag) come in a row.
-    /// </summary>
-    private void ScheduleRefresh()
+    private void UpdateMenuItems()
     {
-        if (_refreshPending || !IsHandleCreated || IsDisposed)
+        EditorCommandState state = Commands.CommandState;
+        foreach (KeyValuePair<EditorToolbarCommand, ToolStripMenuItem> pair in _menuItems)
         {
-            return;
+            pair.Value.Enabled = state.IsEnabled(pair.Key);
+            pair.Value.Checked = state.IsChecked(pair.Key);
+            pair.Value.Visible = state.IsVisible(pair.Key);
         }
-        _refreshPending = true;
+        _textMenu.Enabled = !state.ReadOnly && !state.HexMode;
+        _hexMenu.Refresh(state.HexMode);
+        foreach (KeyValuePair<LineTransformKind, ToolStripMenuItem> pair in _transformItems)
+        {
+            pair.Value.Enabled = state.IsEnabled(pair.Key);
+        }
+    }
+
+    // The refresh of the commands runs after the editor has finished what it is doing (see RemoteFileEditorCommands.ScheduleRefresh).
+    private bool PostRefresh(Action refresh)
+    {
+        if (!IsHandleCreated || IsDisposed)
+        {
+            return false;
+        }
         BeginInvoke((MethodInvoker)(() =>
         {
-            _refreshPending = false;
             if (!IsDisposed)
             {
-                RefreshState();
+                refresh();
             }
         }));
+        return true;
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -419,7 +190,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
     {
         base.OnGotFocus(e);
         // The host focuses its child: the keys are for the editor, not for the menu.
-        if (!_editor.Focused && !_editor.HexEditor.Focused)
+        if (!_view.Focused && !_editor.HexEditor.Focused)
         {
             _editor.FocusActiveView();
         }
@@ -431,11 +202,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// </summary>
     private void ScaleContextMenu()
     {
-        if (!_editor.IsHandleCreated)
+        if (!_view.IsHandleCreated)
         {
             return;
         }
-        int dpi = DpiScaling.GetWindowDpi(_editor.Handle);
+        int dpi = DpiScaling.GetWindowDpi(_view.Handle);
         if (dpi == _contextMenuDpi)
         {
             return;

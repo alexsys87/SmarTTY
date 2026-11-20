@@ -47,28 +47,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     public ImageList ImageList;
 
-    private SuggestionController _suggestionController;
-
-    // The list the completion popup offers. The catalog is the popup's source: it is filled with the built list
-    // and the popup takes a snapshot of it.
-    private readonly SuggestionCatalog _suggestionCatalog = new SuggestionCatalog();
-
-    private SignatureHintController _signatureHintController;
-
-    // The name of the signature the hint currently shows, so typing inside one call does not rebuild it.
-    private string _signatureHintName;
-
-    private SyntaxHighlighting.Language _completionLanguage = SyntaxHighlighting.Language.Plain;
-
-    private bool _completionEnabled = true;
-
-    private bool _completionOnTyping;
-
-    // The standard API symbols (Python builtins, the C library, the shell builtins, ...). Null when the
-    // feature is switched off, so nothing is loaded and the completion list stays keywords + document words.
-    private ApiSymbolDatabase _apiSymbols;
-
-    private bool _suppressHintClose;
+    // The word list and the parameter hint (made when first used: the base class constructors may type or move the caret).
+    private EditorCompletion _completion;
 
     internal TabHandler _tabHandler;
 
@@ -119,29 +99,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         }
     }
 
-    public bool IsSuggestionVisible
-    {
-        get
-        {
-            if (_suggestionController != null)
-            {
-                return _suggestionController.IsVisible;
-            }
-            return false;
-        }
-    }
+    public bool IsSuggestionVisible => Completion.IsSuggestionVisible;
 
-    public bool IsSignatureHintVisible
-    {
-        get
-        {
-            if (_signatureHintController != null)
-            {
-                return _signatureHintController.IsVisible;
-            }
-            return false;
-        }
-    }
+    public bool IsSignatureHintVisible => Completion.IsSignatureHintVisible;
 
     public Rectangle CaretScreenBounds
     {
@@ -244,24 +204,16 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             colorSpans[listIndex].Start = list[listIndex].Start;
             colorSpans[listIndex].End = list[listIndex].End;
-            if (TokenBrushes == null || TokenBrushes.Length == 0)
-            {
-                colorSpans[listIndex].Foreground = _defaultColors[0].Foreground;
-            }
-            else
-            {
-                colorSpans[listIndex].Foreground = ((list[listIndex].Type >= TokenBrushes.Length) ? TokenBrushes[0] : TokenBrushes[list[listIndex].Type]);
-            }
+            colorSpans[listIndex].Foreground = (TokenBrushes == null || TokenBrushes.Length == 0)
+                ? _defaultColors[0].Foreground
+                : TokenBrushes[SyntaxColoring.ColorIndex(list[listIndex].Type, TokenBrushes.Length)];
         }
         return colorSpans;
     }
 
     protected override void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
-        if (!_applyingMultiCursor)
-        {
-            ClearExtraCursors();
-        }
+        CursorSession.OnViewChanged();
         DateTime now = DateTime.Now;
         int linesRetokenized = _tokenCache.RetokenizeLine(line, Tokenizing);
         Value = (DateTime.Now - now).TotalMilliseconds;
@@ -281,21 +233,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     protected override void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
-        if (!_applyingMultiCursor)
-        {
-            ClearExtraCursors();
-        }
-        int changeStartLine = start.Line;
-        int removedLineCount = oldEnd.Line - start.Line;
-        int addedLineCount = newEnd.Line - start.Line;
-        if (start.Column == 0 && oldEnd == start && newEnd.Line == start.Line + 1 && newEnd.Column == 0 && changeStartLine > 0)
-        {
-            changeStartLine--;
-        }
-        if (start.Column == 0 && newEnd == start && oldEnd.Line == start.Line + 1 && oldEnd.Column == 0 && changeStartLine > 0)
-        {
-            changeStartLine--;
-        }
+        CursorSession.OnViewChanged();
+        SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int changeStartLine, out int removedLineCount, out int addedLineCount);
         _inlineMessageProvider.ShiftLines(changeStartLine, removedLineCount, addedLineCount);
         DateTime now = DateTime.Now;
         _tokenCache.OnLinesChanged(changeStartLine, removedLineCount, addedLineCount, Tokenizing);
@@ -309,80 +248,42 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         CancelHover();
     }
 
+    // The style of the highlight of a pair of brackets of a kind.
+    private HighlightStyle PairHighlightStyle(BracketPairKind kind)
+    {
+        switch (kind)
+        {
+            case BracketPairKind.Paren:
+                return this.ParenHighlightStyle;
+            case BracketPairKind.Bracket:
+                return BracketHighlightStyle;
+            case BracketPairKind.Brace:
+                return BraceHighlightStyle;
+            case BracketPairKind.Angle:
+                return AngleHighlightStyle;
+            case BracketPairKind.Unpaired:
+                return UnpairedHighlightStyle;
+            default:
+                return DefaultPairHighlightStyle;
+        }
+    }
+
     protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
-        if (!_applyingMultiCursor)
-        {
-            // The caret was moved by something that knows of one cursor only (a find, a go to line, a click).
-            ClearExtraCursors();
-        }
+        // The caret was moved by something that knows of one cursor only (a find, a go to line, a click).
+        CursorSession.OnViewChanged();
         CancelHover();
         if (!hasSelection)
         {
-            TokenCache.Token token = _tokenCache.FindNearestToken(currentCaret.Line, currentCaret.Column);
-            if (token == null || token.Kind != TokenCache.Token.TokenKind.Paired || CaretPosition.Line != token.LineNumber || CaretPosition.Column != token.End)
+            BracketPairKind kind = BracketPair.Find(_tokenCache, base.EditableDocument, currentCaret, CaretPosition, out TextDocument.TextPosition pairStart, out TextDocument.TextPosition pairEnd);
+            if (kind == BracketPairKind.None)
             {
                 RemoveHighlight(_pairHighlightId);
                 _pairHighlightId = -1;
             }
-            else
+            else if (kind != BracketPairKind.Keep)
             {
-                string text = base.EditableDocument.GetLineText(token.LineNumber);
-                string tokenText = "";
-                if (token.End <= text.Length)
-                {
-                    tokenText = text.Substring(token.Start, token.End - token.Start);
-                }
-                if (tokenText.Length >= 1)
-                {
-                    HighlightStyle highlightStyle;
-                    switch (tokenText[0])
-                    {
-                        case '(':
-                        case ')':
-                            highlightStyle = this.ParenHighlightStyle;
-                            break;
-                        case '[':
-                        case ']':
-                            highlightStyle = BracketHighlightStyle;
-                            break;
-                        case '{':
-                        case '}':
-                            highlightStyle = BraceHighlightStyle;
-                            break;
-                        case '<':
-                        case '>':
-                            highlightStyle = AngleHighlightStyle;
-                            break;
-                        default:
-                            highlightStyle = DefaultPairHighlightStyle;
-                            break;
-                    }
-                    TextDocument.TextPosition pairStart;
-                    TextDocument.TextPosition pairEnd;
-                    if (token.Partner == null)
-                    {
-                        highlightStyle = UnpairedHighlightStyle;
-                        pairStart = token.StartPosition;
-                        pairEnd = token.EndPosition;
-                        if (pairStart < pairEnd)
-                        {
-                            pairEnd = token.StartPosition;
-                            pairStart = token.EndPosition;
-                        }
-                    }
-                    else if (token.StartPosition < token.Partner.StartPosition)
-                    {
-                        pairStart = token.StartPosition;
-                        pairEnd = token.Partner.EndPosition;
-                    }
-                    else
-                    {
-                        pairStart = token.Partner.StartPosition;
-                        pairEnd = token.EndPosition;
-                    }
-                    _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, highlightStyle);
-                }
+                _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, PairHighlightStyle(kind));
             }
         }
         base.OnSelectionChanged(previousCaret, currentCaret, hasSelection, selectionChangeSource);
@@ -394,17 +295,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     /// </summary>
     public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
-        _inlineMessageProvider.AddMessage(MessageLine(line), messageSeverity, text, column - 1);
+        // A line past the end, which is what a check reports for "unexpected end of file", goes on the last line.
+        _inlineMessageProvider.AddReported(line, messageSeverity, text, column, LineCount);
         RefreshMessages();
-    }
-
-    /// <summary>
-    /// The row index of the line a message is for (the line from 1): a line past the end, which is what a check reports for
-    /// "unexpected end of file", goes on the last line, where there is a row to show it.
-    /// </summary>
-    private int MessageLine(int line)
-    {
-        return Math.Max(0, Math.Min(line - 1, LineCount - 1));
     }
 
     /// <summary>
@@ -415,9 +308,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         foreach (InlineMessageProvider.MessageRequest message in messages)
         {
-            // A message is drawn as a row under its line: the line is 1-based here, the provider counts from 0.
-            // The column is 1-based too, and 0 means "not known": -1 makes the message centre in the row.
-            _inlineMessageProvider.AddMessage(MessageLine(message.Line), message.Severity, message.Text, message.Column - 1);
+            // A message is drawn as a row under its line: the line and the column are 1-based here, and a column of 0 means
+            // "not known" (the message is centred in the row).
+            _inlineMessageProvider.AddReported(message.Line, message.Severity, message.Text, message.Column, LineCount);
         }
         RefreshMessages();
     }
@@ -535,8 +428,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         }
         if (e.KeyCode == Keys.Escape)
         {
-            HideCompletion();
-            HideSignatureHint();
+            Completion.OnEscape();
             if (_hoverControl != null)
             {
                 _hoverControl.Dispose();
@@ -544,19 +436,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
             }
         }
         base.OnKeyDown(e);
-        switch (e.KeyCode)
-        {
-            case Keys.Left:
-            case Keys.Right:
-            case Keys.Up:
-            case Keys.Down:
-            case Keys.Home:
-            case Keys.End:
-            case Keys.Back:
-            case Keys.Delete:
-                UpdateSignatureHint();
-                break;
-        }
+        Completion.AfterKeyDown(e.KeyCode.ToVirtualKey());
     }
 
     public void AcceptSuggestion(ISuggestion suggestion, Keys keys)
@@ -589,15 +469,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         get
         {
-            return _completionLanguage;
+            return Completion.Language;
         }
         set
         {
-            _completionLanguage = value;
-            if (_suggestionController != null && _suggestionController.IsVisible)
-            {
-                HideCompletion();
-            }
+            Completion.Language = value;
         }
     }
 
@@ -607,15 +483,11 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         get
         {
-            return _completionEnabled;
+            return Completion.Enabled;
         }
         set
         {
-            _completionEnabled = value;
-            if (!value)
-            {
-                HideCompletion();
-            }
+            Completion.Enabled = value;
         }
     }
 
@@ -625,16 +497,13 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         get
         {
-            return _completionOnTyping;
+            return Completion.OnTyping;
         }
         set
         {
-            _completionOnTyping = value;
+            Completion.OnTyping = value;
         }
     }
-
-    /// <summary>The number of typed letters that open the popup by themselves.</summary>
-    private const int AutoTriggerLength = 2;
 
     /// <summary>
     /// The standard API symbols offered in the completion list and used by the parameter hint. Set from
@@ -645,45 +514,24 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         get
         {
-            return _apiSymbols;
+            return Completion.ApiSymbols;
         }
         set
         {
-            _apiSymbols = value;
+            Completion.ApiSymbols = value;
         }
-    }
-
-    /// <summary>The text the completion and the parameter hint work on, and where the caret is in it (see <see cref="AnalysisText"/>).</summary>
-    private string GetAnalysisText(out int caretLine, out int caretColumn)
-    {
-        return AnalysisText.Get(base.EditableDocument, CaretPosition.Line, CaretPosition.Column, out caretLine, out caretColumn);
     }
 
     /// <summary>Shows the completion popup for the word the caret is in (Ctrl+Space, or typing).</summary>
     public void ShowCompletion()
     {
-        if (!_completionEnabled || base.EditableDocument == null)
-        {
-            return;
-        }
-        // The whole list is passed to the popup: it narrows itself down to the typed prefix, and can widen
-        // again when letters are deleted, which a list filtered here could not.
-        List<ISuggestion> items = EditorCompletionSource.Build(_completionLanguage, GetAnalysisText(out _, out _), "", _apiSymbols);
-        if (items.Count == 0)
-        {
-            return;
-        }
-        HideSignatureHint();
-        ShowSuggestions(items);
+        Completion.ShowCompletion();
     }
 
     /// <summary>Hides the completion popup, if it is open.</summary>
     public void HideCompletion()
     {
-        if (_suggestionController != null)
-        {
-            _suggestionController.Hide();
-        }
+        Completion.HideCompletion();
     }
 
     /// <summary>The user accepted an item of the popup: the word replaces the one at the caret.</summary>
@@ -698,114 +546,35 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     protected override void OnCharTyped(char ch, TextDocument.TextPosition textPosition)
     {
         base.OnCharTyped(ch, textPosition);
-        if (_completionOnTyping && _completionEnabled && !IsSuggestionVisible
-            && EditorCompletionSource.IsIdentifierChar(ch) && (Control.ModifierKeys & Keys.Control) == 0)
-        {
-            string word = CurrentText;
-            if (word != null && word.Length >= AutoTriggerLength)
-            {
-                ShowCompletion();
-            }
-        }
-        // Only these characters change the call the caret is in; other letters leave the hint alone.
-        if (ch == '(' || ch == ',' || ch == ')')
-        {
-            UpdateSignatureHint();
-        }
+        Completion.OnCharTyped(ch, (Control.ModifierKeys & Keys.Control) != 0);
     }
 
     public void ShowSuggestions(IEnumerable<ISuggestion> items)
     {
-        if (_suggestionController == null)
-        {
-            _suggestionController = new SuggestionController(new SuggestionPopupFactory(this));
-        }
-        _suggestionController.BackColor = SuggestionBackColor.ToRgb();
-        // The catalog is the source of the popup. The whole list is handed over (no prefix): the popup narrows it
-        // to the typed word itself and can widen it again when letters are deleted.
-        _suggestionCatalog.Clear();
-        _suggestionCatalog.Load(items);
-        _suggestionController.Show(_suggestionCatalog, null, autoSize: true, allowMultiSelect: false);
-        UpdateSuggestions();
+        Completion.ShowSuggestions(items);
     }
 
     protected override void OnScroll(ScrollEventArgs e)
     {
         base.OnScroll(e);
-        if (IsSignatureHintVisible)
-        {
-            _signatureHintController.Reposition();
-        }
+        Completion.RepositionHint();
         CancelHover();
     }
 
     public void ShowSignatureHint(ISignatureInfo signatureInfo, int parameterIndex, string text)
     {
-        HideSignatureHint();
-        Control control = null;
-        if (!IsWindows())
-        {
-            control = this;
-        }
-        _signatureHintController = new SignatureHintController(() => HintViewFactory.Create(this, control));
-        _suppressHintClose = true;
-        _signatureHintController.Show(signatureInfo, parameterIndex, (text == null) ? null : ("Press TAB to " + text));
-        Focus();
-        _suppressHintClose = false;
+        Completion.ShowSignatureHint(signatureInfo, parameterIndex, text);
     }
 
     protected override void OnLostFocus(EventArgs e)
     {
-        if (!_suppressHintClose)
-        {
-            HideSignatureHint();
-        }
+        Completion.OnLostFocus();
         base.OnLostFocus(e);
     }
 
     public void HideSignatureHint()
     {
-        _signatureHintName = null;
-        if (_signatureHintController != null)
-        {
-            _signatureHintController.Hide();
-            _signatureHintController = null;
-        }
-    }
-
-    /// <summary>
-    /// Shows, updates or hides the parameter hint for the call the caret is inside. The definitions are
-    /// read from the document, so the hint appears as soon as an opening parenthesis is typed after a
-    /// function the file defines.
-    /// </summary>
-    private void UpdateSignatureHint()
-    {
-        if (!_completionEnabled || base.EditableDocument == null || CaretPosition.Line < 0)
-        {
-            HideSignatureHint();
-            return;
-        }
-        // The word list and the parameter hint would overlap; the list wins while it is open.
-        if (IsSuggestionVisible)
-        {
-            HideSignatureHint();
-            return;
-        }
-        string analysisText = GetAnalysisText(out int analysisLine, out int analysisColumn);
-        ParameterSignature signature = EditorSignatureSource.FindSignature(
-            _completionLanguage, analysisText, analysisLine, analysisColumn, _apiSymbols, out int activeParameter);
-        if (signature == null)
-        {
-            HideSignatureHint();
-            return;
-        }
-        if (IsSignatureHintVisible && _signatureHintName == signature.Name)
-        {
-            SetActiveParameter(activeParameter);
-            return;
-        }
-        ShowSignatureHint(signature, activeParameter, null);
-        _signatureHintName = signature.Name;
+        Completion.HideSignatureHint();
     }
 
     protected virtual bool IsWordSeparator(char ch)
@@ -815,27 +584,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     protected override void OnCharTyping(char ch, ref string text, ref TextDocument.TextPosition textPosition)
     {
-        if (_suggestionController != null && _suggestionController.IsVisible && IsWordSeparator(ch) && (Control.ModifierKeys & Keys.Control) == 0)
-        {
-            _suggestionController.AcceptSelectedIfMatches(CurrentText);
-        }
+        Completion.OnCharTyping(ch, (Control.ModifierKeys & Keys.Control) != 0);
         base.OnCharTyping(ch, ref text, ref textPosition);
-    }
-
-    private void UpdateSuggestions()
-    {
-        if (_suggestionController != null && _suggestionController.IsVisible)
-        {
-            string text = CurrentText;
-            if (text != null && text.Length > 0 && text[0] >= '0' && text[0] <= '9')
-            {
-                _suggestionController.Hide();
-            }
-            else
-            {
-                _suggestionController.SelectMatch(text, exactMatch: true);
-            }
-        }
     }
 
     protected override void OnKeyPress(KeyPressEventArgs e)
@@ -854,10 +604,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
             }
         }
         base.OnKeyPress(e);
-        if (!char.IsControl(e.KeyChar) || e.KeyChar == '\b')
-        {
-            UpdateSuggestions();
-        }
+        Completion.AfterKeyPress(e.KeyChar);
     }
 
     public void SetPopupActive(bool active)
@@ -871,10 +618,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     public void SetActiveParameter(int parameterIndex)
     {
-        if (IsSignatureHintVisible)
-        {
-            _signatureHintController.SetActiveParameter(parameterIndex);
-        }
+        Completion.SetActiveParameter(parameterIndex);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -891,7 +635,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         base.OnMouseDown(e);
         if (e.Button == MouseButtons.Left)
         {
-            _columnAnchor = new SmarTTY.CodeEditing.TextPoint(CaretPosition.Line, CaretPosition.Column);
+            CursorSession.OnCaretClicked(CaretPosition);
         }
         if (!IsWindows())
         {
@@ -905,56 +649,13 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             return false;
         }
-        int step = ((!searchPrevious) ? 1 : (-1));
-        int limitLine = (searchPrevious ? (-1) : LineCount);
-        List<TokenCache.Token> tokens = _tokenCache.GetLineTokens(CaretPosition.Line);
-        int tokenIdx = _tokenCache.FindTokenIndex(tokens, CaretPosition.Column, (!searchPrevious) ? TokenCache.TokenSearchMode.Next : TokenCache.TokenSearchMode.Previous);
-        int currentLine = CaretPosition.Line;
-        if (tokenIdx == -1)
+        if (!TokenMoves.TryFind(_tokenCache, EditableDocument, CaretPosition, searchPrevious, isOpening, callback, out TextDocument.TextPosition target))
         {
-            currentLine += step;
+            return false;
         }
-        for (int line = currentLine; line != limitLine; line += step)
-        {
-            tokens = _tokenCache.GetLineTokens(line);
-            int limitToken = (searchPrevious ? (-1) : tokens.Count);
-            if (tokenIdx == -1)
-            {
-                tokenIdx = tokens.Count - 1;
-            }
-            bool jumped = false;
-            for (; tokenIdx != limitToken && tokenIdx != -1 && tokenIdx < tokens.Count; tokenIdx += step)
-            {
-                TokenCache.Token token = tokens[tokenIdx];
-                if (token.Partner == null)
-                {
-                    continue;
-                }
-                if ((token.Partner.StartPosition > token.StartPosition) != searchPrevious)
-                {
-                    tokenIdx = token.Partner.Index + step;
-                    line = token.Partner.LineNumber - step;
-                    jumped = true;
-                    break;
-                }
-                string text = GetLineOrNull(token.LineNumber).Substring(token.Start, token.End - token.Start);
-                if (callback(text))
-                {
-                    TextDocument.TextPosition targetPos = ((searchPrevious == isOpening) ? token.StartPosition : token.EndPosition);
-                    if (!(targetPos == CaretPosition))
-                    {
-                        SetSelection(selectText, CaretPosition);
-                        SetCaret(targetPos);
-                        return true;
-                    }
-                }
-            }
-            if (!jumped)
-            {
-                tokenIdx = (searchPrevious ? (-1) : 0);
-            }
-        }
-        return false;
+        SetSelection(selectText, CaretPosition);
+        SetCaret(target);
+        return true;
     }
 
     public void ExpandCurrentFold()

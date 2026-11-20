@@ -32,33 +32,16 @@ public class InlineMessageView : ReadonlyTextBrowser.IVirtualLineProvider, Syste
 
         public void Draw(Graphics graphics, ReadonlyTextBrowser readonlyTextBrowser, int virtualLineIndex, int scrollColumn, int lineIndex, Rectangle bounds, SizeF charSize)
         {
-            int indentColumn = -1;
-            if (_message.Column != -1)
-            {
-                indentColumn = readonlyTextBrowser.Document.IndexToColumn(lineIndex, _message.Column, readonlyTextBrowser.TabSize) - scrollColumn;
-                if (indentColumn < 0)
-                {
-                    indentColumn = 0;
-                }
-            }
+            int indentColumn = InlineMessageBand.IndentColumn(_message.Column, readonlyTextBrowser.Document.IndexToColumn(lineIndex, _message.Column, readonlyTextBrowser.TabSize), scrollColumn);
             InlineMessageView provider = _provider;
             provider.EnsureDrawingObjects(bounds.Height);
             Font font = provider._font;
             Image image = (_message.Severity == InlineMessageProvider.MessageSeverity.Error) ? provider._errorIcon : provider._warningIcon;
             int height = bounds.Height;
-            int textWidth = (int)graphics.MeasureString(_message.Text, font).Width + 3;
-            if (textWidth > bounds.Width - (4 + height + 3) * 2)
-            {
-                textWidth = bounds.Width - (4 + height + 3) * 2;
-            }
-            int xPos = (bounds.Width - textWidth) / 2 + 3;
-            if (indentColumn != -1)
-            {
-                xPos = (int)((float)indentColumn * charSize.Width) + height + 4;
-            }
-            Rectangle destRect = new Rectangle(bounds.Left + xPos - height - 4, bounds.Top, height, height);
-            Rectangle textRect = new Rectangle(bounds.Left + xPos, bounds.Top, textWidth + 1, bounds.Height);
-            Rectangle backgroundRect = new Rectangle(destRect.Left - 3, bounds.Top, textRect.Right - destRect.Left, bounds.Height);
+            InlineMessageBand band = InlineMessageBand.Place(bounds.Left, bounds.Width, height, graphics.MeasureString(_message.Text, font).Width, indentColumn, charSize.Width);
+            Rectangle destRect = new Rectangle(band.IconLeft, bounds.Top, height, height);
+            Rectangle textRect = new Rectangle(band.TextLeft, bounds.Top, band.TextWidth, bounds.Height);
+            Rectangle backgroundRect = new Rectangle(band.BandLeft, bounds.Top, band.BandWidth, bounds.Height);
             using (SolidBrush backgroundBrush = new SolidBrush(provider.BackColor))
             {
                 graphics.FillRectangle(backgroundBrush, backgroundRect);

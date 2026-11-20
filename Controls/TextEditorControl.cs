@@ -1,4 +1,5 @@
-﻿using SmarTTY.Native;
+﻿using SmarTTY.CodeEditing;
+using SmarTTY.Native;
 using SmarTTY.TextEditing;
 using System;
 using System.Drawing;
@@ -119,240 +120,22 @@ public partial class TextEditorControl : EditableTextBrowser
         }
     }
 
-    /// <summary>
-    /// Removes the selection, or the word on one side of the caret together with the spaces next to it; at the end or
-    /// the start of a line it removes the line break.
-    /// </summary>
-    private void DeleteWord(bool forward)
-    {
-        if (_hasSelection)
-        {
-            ReplaceText(SelectionEnd, SelectionStart, select: false, "");
-            UpdateMaxLineWidth(CaretPosition.Line);
-            return;
-        }
-        TextDocument.TextPosition caret = CaretPosition;
-        string text = base.EditableDocument.GetLineText(caret.Line);
-        TextDocument.TextPosition other = caret;
-        if (forward)
-        {
-            if (caret.Column >= text.Length)
-            {
-                if (caret.Line >= base.EditableDocument.LineCount - 1)
-                {
-                    return;
-                }
-                other = new TextDocument.TextPosition(0, caret.Line + 1);
-            }
-            else
-            {
-                int i = caret.Column;
-                while (i < text.Length && char.IsWhiteSpace(text[i]))
-                {
-                    i++;
-                }
-                if (i < text.Length)
-                {
-                    bool word = IsWordChar(text[i]);
-                    while (i < text.Length && !char.IsWhiteSpace(text[i]) && IsWordChar(text[i]) == word)
-                    {
-                        i++;
-                    }
-                }
-                other = new TextDocument.TextPosition(i, caret.Line);
-            }
-        }
-        else if (caret.Column == 0)
-        {
-            if (caret.Line == 0)
-            {
-                return;
-            }
-            other = new TextDocument.TextPosition(base.EditableDocument.GetLineText(caret.Line - 1).Length, caret.Line - 1);
-        }
-        else
-        {
-            int i = Math.Min(caret.Column, text.Length);
-            while (i > 0 && char.IsWhiteSpace(text[i - 1]))
-            {
-                i--;
-            }
-            if (i > 0)
-            {
-                bool word = IsWordChar(text[i - 1]);
-                while (i > 0 && !char.IsWhiteSpace(text[i - 1]) && IsWordChar(text[i - 1]) == word)
-                {
-                    i--;
-                }
-            }
-            other = new TextDocument.TextPosition(i, caret.Line);
-        }
-        ReplaceText(caret, other, select: false, "");
-        UpdateMaxLineWidth(CaretPosition.Line);
-    }
-
     /// <summary>Removes the lines together with their line breaks (the line break before them when they are the last ones).</summary>
     protected void RemoveLines(int first, int last)
     {
-        TextDocument.TextPosition start;
-        TextDocument.TextPosition end;
-        if (last < base.EditableDocument.LineCount - 1)
-        {
-            start = new TextDocument.TextPosition(0, first);
-            end = new TextDocument.TextPosition(0, last + 1);
-        }
-        else
-        {
-            // The last lines have no line break of their own: the one before them goes.
-            start = (first > 0)
-                ? new TextDocument.TextPosition(base.EditableDocument.GetLineText(first - 1).Length, first - 1)
-                : new TextDocument.TextPosition(0, 0);
-            end = new TextDocument.TextPosition(base.EditableDocument.GetLineText(last).Length, last);
-        }
-        ReplaceText(start, end, select: false, "");
+        Typing.RemoveLines(first, last);
     }
 
     /// <summary>Removes the selected text; does nothing without a selection (unlike Cut, it leaves the clipboard alone).</summary>
     public virtual void DeleteSelection()
     {
-        if (IsEditable && _hasSelection)
-        {
-            ReplaceText(SelectionEnd, SelectionStart, select: false, "");
-            UpdateMaxLineWidth(CaretPosition.Line);
-        }
+        Typing.DeleteSelection();
     }
 
     protected override void OnKeyPress(KeyPressEventArgs e)
     {
-        // Tab indents a multi-line selection; a selection inside one line is replaced by the tab as usual.
-        if (e.KeyChar == '\t' && ((_hasSelection && SelectionStart.Line != CaretPosition.Line) || (Control.ModifierKeys & Keys.Shift) == Keys.Shift))
-        {
-            int value = 1;
-            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
-            {
-                value = -1;
-            }
-            Indent(value);
-        }
-        else
-        {
-            switch (e.KeyChar)
-            {
-                case '\r':
-                    {
-                        string content = base.EditableDocument.GetLineTerminator(CaretPosition.Line, "\n");
-                        if (content.Length == 0)
-                        {
-                            // The line has an inherited ending (an empty file or a file with a single line
-                            // and no trailing newline): Enter must still insert a line break.
-                            content = TextDocument.GetLineEndingText(base.EditableDocument.DefaultLineEnding);
-                        }
-                        // Only the indentation in front of the caret is carried over: with the caret inside it, the
-                        // rest of the indentation stays with the text that moves to the new line.
-                        string indentation = GetIndentation(CaretPosition.Line);
-                        if (CaretPosition.Column < indentation.Length)
-                        {
-                            indentation = indentation.Substring(0, CaretPosition.Column);
-                        }
-                        ReplaceText(CaretPosition, SelectionStart, !_hasSelection, content + indentation);
-                        break;
-                    }
-                case '\b':
-                    if (_hasSelection)
-                    {
-                        ReplaceText(SelectionEnd, SelectionStart, select: false, "");
-                    }
-                    else if (GetSpaceIndentBackspaceLength() > 0)
-                    {
-                        // In space indentation Backspace removes one level, back to the previous tab stop.
-                        int spaces = GetSpaceIndentBackspaceLength();
-                        ReplaceText(CaretPosition, new TextDocument.TextPosition(CaretPosition.Column - spaces, CaretPosition.Line), select: false, "");
-                    }
-                    else
-                    {
-                        ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Left), select: false, "");
-                    }
-                    UpdateMaxLineWidth(CaretPosition.Line);
-                    break;
-                default:
-                    if (char.IsControl(e.KeyChar) && e.KeyChar != '\t')
-                    {
-                        break;
-                    }
-                    if (!_hasSelection && OverwriteMode && CaretPosition.Column < base.EditableDocument.GetLineText(CaretPosition.Line).Length)
-                    {
-                        ReplaceText(CaretPosition, new TextDocument.TextPosition(CaretPosition.Column + 1, CaretPosition.Line), select: false, new string(e.KeyChar, 1));
-                    }
-                    else
-                    {
-                        string text = new string(e.KeyChar, 1);
-                        if (e.KeyChar == '\t' && InsertSpaces)
-                        {
-                            text = GetSpacesToNextTabStop();
-                        }
-                        TextDocument.TextPosition textPosition = new TextDocument.TextPosition(-1, -1);
-                        OnCharTyping(e.KeyChar, ref text, ref textPosition);
-                        if (text != null)
-                        {
-                            if (!_hasSelection)
-                            {
-                                ReplaceText(CaretPosition, SelectionStart, select: true, text);
-                            }
-                            else
-                            {
-                                ReplaceText(SelectionEnd, SelectionStart, select: false, text);
-                            }
-                        }
-                        if (textPosition.IsValid)
-                        {
-                            SetCaret(textPosition);
-                        }
-                        OnCharTyped(e.KeyChar, CaretPosition);
-                    }
-                    UpdateMaxLineWidth(CaretPosition.Line);
-                    break;
-            }
-        }
+        Typing.TypeCharacter(e.KeyChar, (Control.ModifierKeys & Keys.Shift) == Keys.Shift);
         base.OnKeyPress(e);
-    }
-
-    /// <summary>The spaces that move the insertion point (the caret or the start of the selection) to the next tab stop.</summary>
-    private string GetSpacesToNextTabStop()
-    {
-        TextDocument.TextPosition position = CaretPosition;
-        if (_hasSelection && SelectionStart < position)
-        {
-            position = SelectionStart;
-        }
-        int tabSize = Math.Max(1, TabSize);
-        int column = IndexToColumn(position.Line, position.Column);
-        return new string(' ', tabSize - column % tabSize);
-    }
-
-    /// <summary>
-    /// With InsertSpaces, the number of spaces Backspace removes when the caret is inside leading spaces:
-    /// back to the previous tab stop. 0 when Backspace should remove a single character.
-    /// </summary>
-    private int GetSpaceIndentBackspaceLength()
-    {
-        if (!InsertSpaces || CaretPosition.Column == 0)
-        {
-            return 0;
-        }
-        string lineText = base.EditableDocument.GetLineText(CaretPosition.Line);
-        if (CaretPosition.Column > lineText.Length)
-        {
-            return 0;
-        }
-        for (int i = 0; i < CaretPosition.Column; i++)
-        {
-            if (lineText[i] != ' ')
-            {
-                return 0;
-            }
-        }
-        int tabSize = Math.Max(1, TabSize);
-        return (CaretPosition.Column - 1) % tabSize + 1;
     }
 
     protected virtual void OnCharTyping(char ch, ref string text, ref TextDocument.TextPosition textPosition)
@@ -375,58 +158,14 @@ public partial class TextEditorControl : EditableTextBrowser
     {
         if (IsEditable)
         {
-            // Shift+Delete is Cut (handled below); deleting here first would lose the selection and
-            // make Cut remove the whole caret line as well.
-            if (e.KeyCode == Keys.Back && e.Control && !e.Alt && !e.Shift)
+            TypingKeyResult result = Typing.KeyDown(e.KeyCode.ToVirtualKey(), e.Control, e.Alt, e.Shift);
+            if ((result & TypingKeyResult.Handled) != 0)
             {
-                // Ctrl+Backspace removes the word in front of the caret (the control character it types is ignored).
-                DeleteWord(forward: false);
                 e.Handled = true;
+            }
+            if ((result & TypingKeyResult.SuppressKeyPress) != 0)
+            {
                 e.SuppressKeyPress = true;
-            }
-            else if (e.KeyCode == Keys.Delete && !e.Shift)
-            {
-                if (_hasSelection)
-                {
-                    ReplaceText(SelectionEnd, SelectionStart, select: false, "");
-                }
-                else if (e.Control && !e.Alt)
-                {
-                    DeleteWord(forward: true);
-                    e.Handled = true;
-                }
-                else
-                {
-                    ReplaceText(CaretPosition, GetMovedPosition(CaretMove.Right), select: false, "");
-                }
-                UpdateMaxLineWidth(CaretPosition.Line);
-            }
-            // Ctrl+Alt is AltGr on many keyboards: AltGr+C, V, X, Z, Y type letters there (ć, ż, ...), not commands.
-            bool command = e.Control && !e.Alt;
-            if (command && (e.KeyCode == Keys.Insert || e.KeyCode == Keys.C))
-            {
-                CopySelection(CopyLineWhenNoSelection);
-                e.Handled = true;
-            }
-            else if ((e.Shift && e.KeyCode == Keys.Insert) || (command && e.KeyCode == Keys.V))
-            {
-                Paste();
-                e.Handled = true;
-            }
-            else if ((e.Shift && e.KeyCode == Keys.Delete) || (command && e.KeyCode == Keys.X))
-            {
-                Cut();
-                e.Handled = true;
-            }
-            else if (!e.Shift && command && e.KeyCode == Keys.Z)
-            {
-                Undo();
-                e.Handled = true;
-            }
-            else if ((e.Shift && command && e.KeyCode == Keys.Z) || (command && e.KeyCode == Keys.Y))
-            {
-                Redo();
-                e.Handled = true;
             }
         }
         base.OnKeyDown(e);
@@ -434,40 +173,16 @@ public partial class TextEditorControl : EditableTextBrowser
 
     public void InsertText(string text)
     {
-        ReplaceText(CaretPosition, SelectionStart, !((ReadonlyTextBrowser)this).HasSelection, text);
+        Typing.InsertText(text);
     }
 
     public string GetWordAtCaret(out int column, out int value)
     {
-        column = -1;
-        value = 0;
-        string text = base.EditableDocument.GetLineText(CaretPosition.Line);
-        if (CaretPosition.Column == 0)
-        {
-            return null;
-        }
-        column = CaretPosition.Column;
-        while (column > 0 && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[column - 1]) != -1)
-        {
-            column--;
-        }
-        int itemIndex;
-        for (itemIndex = CaretPosition.Column; itemIndex < text.Length && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".IndexOf(text[itemIndex]) != -1; itemIndex++)
-        {
-        }
-        value = itemIndex - column;
-        return text.Substring(column, value);
+        return Typing.GetWordAtCaret(out column, out value);
     }
 
     public void ReplaceWordAtCaret(string text)
     {
-        if (GetWordAtCaret(out var item, out var entry) == null || entry == 0)
-        {
-            InsertText(text);
-        }
-        else
-        {
-            ReplaceText(new TextDocument.TextPosition(item, CaretPosition.Line), new TextDocument.TextPosition(item + entry, CaretPosition.Line), select: false, text);
-        }
+        Typing.ReplaceWordAtCaret(text);
     }
 }

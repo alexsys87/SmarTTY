@@ -98,11 +98,12 @@ internal sealed class HexHighlightWindow : HexToolWindow
         _label = AddTextBox(label ?? "");
         AddText("Color:", 10);
         bool known = false;
-        foreach (HexHighlightColor preset in HexEditorControl.HighlightColors)
+        foreach (HexHighlightColor preset in HexViewChoices.HighlightColors)
         {
-            bool chosen = preset.Color.ToArgb() == DrawingColor.FromArgb(255, color).ToArgb();
+            DrawingColor presetColor = preset.Color.ToColor();
+            bool chosen = presetColor.ToArgb() == DrawingColor.FromArgb(255, color).ToArgb();
             known |= chosen;
-            AddSwatch(preset.Color, preset.Name, chosen);
+            AddSwatch(presetColor, preset.Name, chosen);
         }
         if (!known)
         {
@@ -195,7 +196,7 @@ internal sealed class HexBytePatternWindow : HexToolWindow
         }
         else
         {
-            AddText("Fill " + HexEditorControl.FormatByteCount(selectionLength) + " with a byte pattern, repeated");
+            AddText("Fill " + HexEditingModel.FormatByteCount(selectionLength) + " with a byte pattern, repeated");
             AddText("(hex, for example FF for erased flash, or DE AD BE EF):");
             _pattern = AddTextBox("FF");
         }

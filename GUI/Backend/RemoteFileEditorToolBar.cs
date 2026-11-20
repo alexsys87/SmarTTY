@@ -18,7 +18,7 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
 {
     private readonly Dictionary<EditorToolbarCommand, ButtonBase> _buttons = new Dictionary<EditorToolbarCommand, ButtonBase>();
 
-    public RemoteFileEditorToolBar(RemoteFileEditorPanel panel)
+    public RemoteFileEditorToolBar(RemoteFileEditorCommands panel)
     {
         if (panel == null)
         {

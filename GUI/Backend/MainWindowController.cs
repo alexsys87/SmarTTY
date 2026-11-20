@@ -359,18 +359,22 @@ public class MainWindowController : INotifyPropertyChanged
                     return;
                 }
             }
-            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception, columnUnit)
+            // The text view and the hex view are the WPF ones (stages 3B-3 and 3E-4): the tab shows one of them.
+            TextView.WpfTextEditor view = new TextView.WpfTextEditor();
+            RemoteFileEditor editor = new RemoteFileEditor(session, fn, _Controller.Settings, initialLoc, MessageBoxes.Exception, columnUnit, new HexView.WpfHexEditor(), view);
+            view.PreviewKeyDown += (object sender, System.Windows.Input.KeyEventArgs e) => Editor_PreviewKeyDown(editor, e);
+            view.KeyUp += (object sender, System.Windows.Input.KeyEventArgs e) =>
             {
-                NativeScrollSemantics = false
+                if (e.Key == System.Windows.Input.Key.LeftCtrl || e.Key == System.Windows.Input.Key.RightCtrl)
+                {
+                    _Controller.ActiveSession?.OnCtrlReleased();
+                }
             };
-            editor.CtrlTabPressed += _Controller.anyctl_CtrlTabPressed;
-            editor.KeyUp += _Controller.anyctl_KeyUp;
-            editor.KeyDown += editor_KeyDown;
-            editor.MouseMove += _Controller.anyctl_MouseMove;
-            ((EditableTextBrowser)editor).ModifiedChanged += editor_UnsavedChanged;
+            view.MouseMove += _Controller.WpfEditor_MouseMove;
+            view.ModifiedChanged += (object sender, EventArgs e) => UpdateEditorTitle(editor);
             editor.LoadFailed += (object sender, EventArgs e) =>
             {
-                session.CloseFirstMatchingPage((ITabContext tabContext) => tabContext.EditorControl == editor, closeSessionIfEmpty: false);
+                session.CloseFirstMatchingPage((ITabContext tabContext) => (tabContext as EditorTabContext)?.Editor == editor, closeSessionIfEmpty: false);
             };
             editor.SavingChanged += (object sender, EventArgs e) => UpdateEditorTitle(editor);
             editor.SyntaxChoiceChanged += (object sender, EventArgs e) => _Controller.ApplySyntaxHighlighting(editor);
@@ -386,30 +390,30 @@ public class MainWindowController : INotifyPropertyChanged
                 }
             };
             _Controller.ApplyEditorSettings(editor);
-            editor.ZoomChanged += (object sender, EventArgs e) => _Controller.ApplyEditorZoom(editor.FontZoom);
+            view.ZoomChanged += (object sender, EventArgs e) => _Controller.ApplyEditorZoom(view.FontZoom);
             EditorTabContext newTab = session.AddNewFileEditorOrThrow(editor, fn);
             editor.Tag = newTab;
             // The tool bar and the context menu of the editor.
-            newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
-            newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
-            newTab.EditorPanel.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
-            newTab.EditorPanel.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
-            newTab.EditorPanel.FollowLogRequested += (object sender, EventArgs e) => FollowLog(editor.RemotePath);
-            newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
+            newTab.Commands.SaveRequested += (object sender, EventArgs e) => SaveFile();
+            newTab.Commands.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
+            newTab.Commands.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
+            newTab.Commands.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
+            newTab.Commands.FollowLogRequested += (object sender, EventArgs e) => FollowLog(editor.RemotePath);
+            newTab.Commands.ShowAllCharactersChanged += (object sender, EventArgs e) =>
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
-                _Controller.Settings.Editor.ShowAllCharacters = editor.ShowAllCharacters;
+                _Controller.Settings.Editor.ShowAllCharacters = view.ShowAllCharacters;
                 _Controller.Settings.Save();
             };
-            newTab.EditorPanel.WordWrapChanged += (object sender, EventArgs e) =>
+            newTab.Commands.WordWrapChanged += (object sender, EventArgs e) =>
             {
-                _Controller.Settings.Editor.WordWrap = editor.WordWrap;
+                _Controller.Settings.Editor.WordWrap = view.WordWrap;
                 _Controller.Settings.Save();
             };
-            newTab.EditorPanel.HexViewOptionsChanged += (object sender, EventArgs e) =>
+            newTab.Commands.HexViewOptionsChanged += (object sender, EventArgs e) =>
             {
                 // The next hex view opens with the byte order, the groups and the row width chosen last.
-                HexEditorControl hex = editor.HexEditor;
+                IHexEditorView hex = editor.HexEditor;
                 _Controller.Settings.Editor.HexBytesPerRow = hex.BytesPerRow;
                 _Controller.Settings.Editor.HexGroupSize = hex.GroupSize;
                 _Controller.Settings.Editor.HexBigEndian = hex.BigEndian;
@@ -454,13 +458,13 @@ public class MainWindowController : INotifyPropertyChanged
                 editor.FocusActiveView();
                 return;
             }
-            GoToLineWindow window = new GoToLineWindow(editor.CaretPosition.Line + 1, Math.Max(1, editor.LineCount))
+            GoToLineWindow window = new GoToLineWindow(editor.TextView.CaretPosition.Line + 1, Math.Max(1, editor.TextView.LineCount))
             {
                 Owner = _Controller._Window
             };
             if (window.ShowDialog() == true)
             {
-                editor.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
+                editor.TextView.GoToPosition(window.Line - 1, Math.Max(0, window.Column - 1));
             }
             editor.FocusActiveView();
         }
@@ -523,11 +527,6 @@ public class MainWindowController : INotifyPropertyChanged
             editor.FocusActiveView();
         }
 
-        private void editor_UnsavedChanged(EditableTextBrowser editor, bool newValue)
-        {
-            UpdateEditorTitle(editor as RemoteFileEditor);
-        }
-
         /// <summary>The tab title: the file name, "(new)" until the file exists, "(saving)" and "*" for unsaved changes.</summary>
         private static void UpdateEditorTitle(RemoteFileEditor editor)
         {
@@ -558,56 +557,64 @@ public class MainWindowController : INotifyPropertyChanged
             }
         }
 
-        private void editor_KeyDown(object sender, KeyEventArgs e)
+        // The keys of the window and of the session in the text view of a file tab: what the WinForms editor's KeyDown handler did, on WPF.
+        private void Editor_PreviewKeyDown(RemoteFileEditor editor, System.Windows.Input.KeyEventArgs e)
         {
-            if (e.Control && !e.Alt && !e.Shift)
+            System.Windows.Input.Key key = e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key;
+            System.Windows.Input.ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
+            bool control = (modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+            bool alt = (modifiers & System.Windows.Input.ModifierKeys.Alt) != 0;
+            bool shift = (modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+            if (control && !alt && key == System.Windows.Input.Key.Tab)
             {
-                switch (e.KeyCode)
+                _Controller.ActiveSession?.OnCtrlTabPressed(shift);
+                e.Handled = true;
+                return;
+            }
+            if (control && !alt && !shift)
+            {
+                switch (key)
                 {
-                    case Keys.S:
+                    case System.Windows.Input.Key.S:
+                        e.Handled = true;
                         SaveFile();
                         break;
-                    case Keys.O:
+                    case System.Windows.Input.Key.O:
+                        e.Handled = true;
                         OpenFile();
                         break;
-                    case Keys.W:
+                    case System.Windows.Input.Key.W:
+                        e.Handled = true;
                         CloseTab();
                         break;
-                    case Keys.F:
-                        Search();
-                        break;
-                    case Keys.H:
+                    case System.Windows.Input.Key.H:
                         // Ctrl+H is also Backspace as a character: keep it from reaching the editor.
-                        e.SuppressKeyPress = true;
-                        if ((sender as RemoteFileEditor)?.IsHexMode != true)
+                        e.Handled = true;
+                        if (!editor.IsHexMode)
                         {
                             _Controller.ActiveSession?.ActiveTab?.Searcher?.ActivateReplace();
                         }
                         break;
-                    case Keys.G:
-                        e.SuppressKeyPress = true;
-                        GoToLine(sender as RemoteFileEditor);
+                    case System.Windows.Input.Key.G:
+                        e.Handled = true;
+                        GoToLine(editor);
                         break;
                 }
             }
-            else if (!e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.F5)
+            else if (!control && !alt && !shift && key == System.Windows.Input.Key.F5)
             {
-                if (sender is RemoteFileEditor runnable && runnable.CanRunInTerminal && runnable.Tag is EditorTabContext runnableTab)
+                if (editor.CanRunInTerminal && editor.Tag is EditorTabContext runnableTab)
                 {
-                    e.SuppressKeyPress = true;
-                    runnableTab.EditorPanel.RunCommand(EditorToolbarCommand.RunFile);
+                    e.Handled = true;
+                    runnableTab.Commands.RunCommand(EditorToolbarCommand.RunFile);
                 }
             }
-            else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3)
+            else if (!control && !alt && key == System.Windows.Input.Key.F3)
             {
-                if (sender is RemoteFileEditor hexEditor && hexEditor.IsHexMode)
+                if (editor.Tag is EditorTabContext editorTabContext)
                 {
-                    e.SuppressKeyPress = true;
-                    hexEditor.HexEditor.FindNext(!e.Shift);
-                }
-                else if ((sender as ReadonlyTextBrowser)?.Tag is EditorTabContext editorTabContext)
-                {
-                    editorTabContext?.Searcher?.Search(e.Shift);
+                    e.Handled = true;
+                    editorTabContext.Searcher?.Search(shift);
                 }
             }
         }
@@ -625,7 +632,7 @@ public class MainWindowController : INotifyPropertyChanged
                 normalTab.Terminal.CopySelection();
                 return;
             }
-            activeTab?.EditorControl?.CopySelection();
+            (activeTab as EditorTabContext)?.Editor.CopySelection();
         }
 
         internal void Paste()
@@ -641,7 +648,7 @@ public class MainWindowController : INotifyPropertyChanged
                 normalTab.Terminal.Paste();
                 return;
             }
-            activeTab?.EditorControl?.Paste();
+            (activeTab as EditorTabContext)?.Editor.Paste();
         }
 
         internal void CopyAll()
@@ -1602,36 +1609,42 @@ public class MainWindowController : INotifyPropertyChanged
         }
     }
 
+    // A colour of the settings as the WPF views take it.
+    private static RgbColor Rgb(System.Drawing.Color color)
+    {
+        return color.ToRgb();
+    }
+
     private void ApplyEditorSettings(RemoteFileEditor edit)
     {
+        TextView.WpfTextEditor view = (TextView.WpfTextEditor)edit.TextView;
         GlobalSettings.EditorColors effectiveColors = Settings.Editor.GetEffectiveColors(Settings.IsLightTheme);
-        edit.BackColor = effectiveColors.BackColor;
-        edit.ForeColor = effectiveColors.TextColor;
-        edit.Brush = new SolidBrush(effectiveColors.LineNumberBackground);
-        edit.LineNumberForegroundBrush = new SolidBrush(effectiveColors.LineNumberForeground);
-        edit.TabSize = Settings.Editor.TabSize;
-        edit.InsertSpaces = Settings.Editor.InsertSpaces;
-        edit.HideMargins = !Settings.Editor.ShowLineNumbers;
-        edit.ShowTabs = Settings.Editor.ShowTabs;
-        edit.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
-        edit.WordWrap = Settings.Editor.WordWrap;
+        view.SetColors(Rgb(effectiveColors.BackColor), Rgb(effectiveColors.TextColor), Rgb(effectiveColors.LineNumberBackground), Rgb(effectiveColors.LineNumberForeground));
+        // The font of the WinForms editor: Courier New of 12 points, with the zoom of the editor.
+        view.SetFont("Courier New", 12);
+        view.TabSize = Settings.Editor.TabSize;
+        view.InsertSpaces = Settings.Editor.InsertSpaces;
+        view.ShowLineNumbers = Settings.Editor.ShowLineNumbers;
+        view.ShowTabs = Settings.Editor.ShowTabs;
+        view.ShowAllCharacters = Settings.Editor.ShowAllCharacters;
+        view.WordWrap = Settings.Editor.WordWrap;
         edit.HexEditor.LoadViewOptions(
             Settings.Editor.HexBytesPerRow > 0 ? Settings.Editor.HexBytesPerRow : 16,
             Settings.Editor.HexGroupSize > 0 ? Settings.Editor.HexGroupSize : 1,
             Settings.Editor.HexBigEndian,
             Settings.Editor.HexColorByValue,
             Settings.Editor.HexShowDataInspector);
-        edit.FontZoom = Settings.Editor.FontZoom > 0f ? Settings.Editor.FontZoom : 1f;
-        edit.CompletionEnabled = Settings.Editor.Autocompletion;
-        edit.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
-        edit.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
+        view.FontZoom = Settings.Editor.FontZoom > 0f ? Settings.Editor.FontZoom : 1f;
+        view.CompletionEnabled = Settings.Editor.Autocompletion;
+        view.CompletionOnTyping = Settings.Editor.AutocompletionOnTyping;
+        view.ApiSymbols = Settings.Editor.ApiSymbols ? ApiSymbols : null;
         ApplySyntaxHighlighting(edit);
         // The inline messages of a check follow the editor theme.
         edit.RefreshMessageColors();
         // The settings window can switch the character marks too, so the tool bar and the menu show the new state.
         if (edit.Tag is EditorTabContext editorTab)
         {
-            editorTab.EditorPanel.RefreshState();
+            editorTab.Commands.RefreshState();
         }
     }
 
@@ -1646,7 +1659,7 @@ public class MainWindowController : INotifyPropertyChanged
             {
                 if (tab is EditorTabContext editorTab)
                 {
-                    editorTab.Editor.FontZoom = zoom;
+                    editorTab.TextView.FontZoom = zoom;
                 }
             }
         }
@@ -1667,25 +1680,47 @@ public class MainWindowController : INotifyPropertyChanged
         }
 
         edit.ReportLanguage(language);
-        edit.SetTokenizer(tokenizer);
-        if (tokenizer != null)
+        // The colours of the token types, the first for the plain text (none without a tokenizer: everything in the colour of the text).
+        ((TextView.WpfTextEditor)edit.TextView).SetSyntax(tokenizer, tokenizer == null ? null : new RgbColor[]
         {
-            edit.TokenBrushes = new SolidBrush[]
-            {
-                new SolidBrush(effectiveColors.TextColor),
-                new SolidBrush(effectiveColors.KeywordColor),
-                new SolidBrush(effectiveColors.StringColor),
-                new SolidBrush(effectiveColors.CommentColor),
-                new SolidBrush(effectiveColors.NumberColor),
-                new SolidBrush(effectiveColors.VariableColor),
-                new SolidBrush(effectiveColors.SectionColor),
-                new SolidBrush(effectiveColors.PreprocessorColor)
-            };
-        }
-        else
+            Rgb(effectiveColors.TextColor),
+            Rgb(effectiveColors.KeywordColor),
+            Rgb(effectiveColors.StringColor),
+            Rgb(effectiveColors.CommentColor),
+            Rgb(effectiveColors.NumberColor),
+            Rgb(effectiveColors.VariableColor),
+            Rgb(effectiveColors.SectionColor),
+            Rgb(effectiveColors.PreprocessorColor)
+        });
+    }
+
+    // The headers of the minimalistic mode follow the mouse at the edges of the WPF text view of a file tab, as for a WPF terminal (the view draws
+    // its own scroll bars).
+    private void WpfEditor_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!(sender is FrameworkElement view) || e.LeftButton == System.Windows.Input.MouseButtonState.Pressed || e.RightButton == System.Windows.Input.MouseButtonState.Pressed)
         {
-            edit.TokenBrushes = null;
+            return;
         }
+        System.Windows.Point point = e.GetPosition(view);
+        ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.EdgeFlags.None;
+        if (point.X < EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Left;
+        }
+        if (point.Y < EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Top;
+        }
+        if (point.X > view.ActualWidth - EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Right;
+        }
+        if (point.Y > view.ActualHeight - EdgeMargin)
+        {
+            edgeFlags |= ScreenEdgeUtils.EdgeFlags.Bottom;
+        }
+        UpdateMinimalisticModeVisibility(edgeFlags);
     }
 
     public MainWindowController(MainWindow wnd)
@@ -1717,7 +1752,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
             else
             {
-                ActiveSession?.ActiveTab?.EditorControl?.CopySelection();
+                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.CopySelection();
             }
         });
         _TerminalContextMenu.Items.Add("Paste", Icons.Load("paste"), (object _, EventArgs e) =>
@@ -1728,7 +1763,7 @@ public class MainWindowController : INotifyPropertyChanged
             }
             else
             {
-                ActiveSession?.ActiveTab?.EditorControl?.Paste();
+                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.Paste();
             }
         });
         ToolStripMenuItem pasteSpecialMenu = new ToolStripMenuItem("Paste special");
@@ -2004,7 +2039,7 @@ public class MainWindowController : INotifyPropertyChanged
             normalTab.Terminal.CopyAll();
             return;
         }
-        (activeTab?.EditorControl)?.CopyAll();
+        (activeTab as EditorTabContext)?.Editor.CopyAll();
     }
 
     internal TcpClient CreateX11Connection()
@@ -2421,19 +2456,6 @@ public class MainWindowController : INotifyPropertyChanged
         session.Dispose();
     }
 
-    private void anyctl_KeyUp(object sender, KeyEventArgs e)
-    {
-        if (e.KeyCode == Keys.ControlKey)
-        {
-            ActiveSession?.OnCtrlReleased();
-        }
-    }
-
-    private void anyctl_CtrlTabPressed(ReadonlyTextBrowser browser, bool bShift)
-    {
-        ActiveSession?.OnCtrlTabPressed(bShift);
-    }
-
     private void terminalEmulatorControl1_TerminalSizeChanged(ITerminalSurface sender, int newWidth, int newHeight)
     {
         TerminalTag tag = sender.Tag as TerminalTag;
@@ -2514,20 +2536,6 @@ public class MainWindowController : INotifyPropertyChanged
         {
             // Typing into a tab whose connection is gone (the reconnect prompt is showing): the input is dropped.
         }
-    }
-
-    private void anyctl_MouseMove(object sender, MouseEventArgs e)
-    {
-        // While a button is held (text is being selected by dragging) the layout stays as it is. The scroll bars in Auto
-        // mode and the headers of the minimalistic mode come and go at the edges of the terminal: a drag that reached the
-        // last lines brought the horizontal scroll bar in, the terminal got shorter under the mouse, scrolled to its end
-        // and (in a shell tab) was redrawn for the new size, so the selection was lost and nothing could be copied.
-        if (e.Button != System.Windows.Forms.MouseButtons.None)
-        {
-            return;
-        }
-        ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.GetNearEdges(sender as Control, e.Location, EdgeMargin);
-        UpdateMinimalisticModeVisibility(edgeFlags);
     }
 
     /// <summary>

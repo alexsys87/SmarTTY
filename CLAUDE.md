@@ -13,12 +13,13 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 130 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 141 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
-  remote editor on OpenSSH and Dropbear), `HexEditorControlTests` (the real hex editor control against a golden file) and
-  `ModelInteropTests` (`VirtualKey` against the real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see
+  remote editor on OpenSSH and Dropbear), `HexEditorControlTests` (the real hex editor control against a golden file), `TextViewTests` (the real text
+  view and code editor against a golden file: the caret, the selection, the edits, the syntax colours, the folds, the messages, the
+  completion) and `ModelInteropTests` (`VirtualKey` against the real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see
   "Done in 2E"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
@@ -48,7 +49,9 @@ PR that changes them.
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
-| `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` hosts the WinForms editor through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
+| `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
+| `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
+| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4, and Tools > WPF text editor lab (`TextLabWindow`) | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar and menus are still WinForms, hosted) | WPF |
@@ -70,15 +73,20 @@ PR that changes them.
 
 ```
 DpiAwareControl (WinForms UserControl)
-└─ ReadonlyTextBrowser            3600 lines (+ .Wrap, .DragScroll): document view, caret, selection, highlights, scrolling
+└─ ReadonlyTextBrowser            (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves and the navigation keys, the wrap map and the selection are CodeEditing/CaretNavigator, WrapMap and TextSelection, the search and the matches of its highlight CodeEditing/TextSearch, the marks of the blanks CodeEditing/BlankMarks
    └─ ReadonlySmartScrollBrowser
-      └─ EditableTextBrowser      undo/redo edit commands
-         └─ TextEditorControl
-            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
-            │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl
+      └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
+         └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
+            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor, .Completion): folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring, the rules of the word list and the parameter hint CodeEditing/EditorCompletion, the line commands, the moves to a bracket and the zoom steps CodeEditing/LineCommands, TokenMoves and EditorZoom, the pair of a bracket at the caret CodeEditing/BracketPair, what several cursors do CodeEditing/MultiCursorSession
+            │  └─ RemoteTextView  the WinForms text view of a RemoteFileEditor (the Mono stands; the tab gives the editor the WPF one): what the editor
+            │                     overrode of its base when it was one, and the host of the editor's own HexEditorControl
             └─ (the WinForms terminals TerminalEmulatorBase, TerminalEmulatorControl, SshTerminalControl, SerialTerminalControl:
                 removed in stage 2, see "Done in 2E")
-HexEditorControl : Control                hex editing inside RemoteFileEditor
+HexEditorControl : Control                hex editing inside RemoteFileEditor (the Mono stands; the tab shows GUI/HexView/WpfHexEditor)
+RemoteFileEditor (+ .Syntax)              not a control since 3E-4: load/save over SSH, drafts, sudo, encodings and the questions, on a text view it is given
+                                          (IRemoteTextView: GUI/TextView/WpfTextEditor in the tab, RemoteTextView when it is given none) and a hex view
+                                          (IHexEditorView, shown through IHexViewPlace); the commands of its tab are RemoteFileEditorCommands, the WinForms
+                                          panel with its context menu RemoteFileEditorPanel (the Mono stands)
 ```
 
 The terminals are WPF (`GUI/TerminalView/`): `WpfTerminal` (a `Border` with `TerminalPanel`: `TerminalRenderView` and a scroll bar) shows
@@ -98,7 +106,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: the device panel's tool bar and menus are WinForms (hosted, they go with stage 4) |
-| 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) in progress: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) done; next 3E-5 (the WinForms editor removed) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -506,7 +514,7 @@ relative linked path (`Terminal/Rendering/LinkedPath`, used by `WpfTerminal`). `
 is gone; `XtermKeyTable` reads the same `XTermKeys.xml`. `CsiRepeatLimitTests`, `PrivateModeTableTests`, `FileDialogTests`,
 `FolderBrowserTests` and `PasteProgressTests` read the WPF files now.
 
-Not in 2A–2E: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl` for the editor tabs), wide (East Asian) characters taking two cells (the
+Not in 2A–2E: the view in the other tabs (`ITabContext.EditorControl` was a `TextEditorControl` for the editor tabs; it went in 3E-4), wide (East Asian) characters taking two cells (the
 screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
 slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
 
@@ -534,3 +542,576 @@ Safety nets that stage 1 adds before moving code: terminal golden snapshots capt
 terminal move (`tests/TerminalSnapshots/`, never re-recorded); `tests/check-model-boundary.sh` with an allowlist that
 only shrinks. Mono tests stay until each of their checks is ported to net8.0 tests on the model (or, for the terminals, until
 the controls they drove are gone: 2E).
+
+### Stage 3 (the editor and the hex editor on WPF)
+
+3A takes out of `RemoteFileEditor` what it still decides itself and that needs no window, so that a WPF hex view (3B) and a WPF text view (3D) can
+be put under the same model; 3A is the same whether the text view is AvalonEdit or a view of its own on the model of the editor, which is not
+decided yet. The rules of stage 1 hold: a net first, then the move, no change of behaviour, faults found are kept and listed.
+
+Done in 3A-1: first a net for the switching between the text and the hex view, which the Mono stand reached only as far as opening the hex view:
+`tests/RemoteFileEditorIntegrationTests` has two more scenarios, `hex-view` and `hex-draft` (what each view shows and which one can be edited, the
+`ModifiedChanged`, `HexModeChanged` and `FormatChanged` events and their order, the text document with its undo history and the caret kept when
+nothing changed, a change of the bytes that makes a new text with its line breaks found again and the caret brought into a shorter line, the
+same hex document shown again for the same text, the question about bytes that are not UTF-8 and both answers, the text made from them saved as
+those bytes, a save in the hex view, the modified state set in the hex view, a reload in the hex view that opens it again at the same offset, the
+encoding and the line breaks that cannot be changed there, Select all and Delete of the hex view, a new encoding that leaves it, the draft of the
+bytes that comes back in the hex view), recorded on the code before the move (258 checks before, 378 after: both servers); seven mutations of the
+old code (the text document never kept, the hex document not saved with the text, no offset after a reload, the line of the caret, a restored
+draft that is not modified, the hex view read-only, the hex view not reset) each make it fail. A text that the encoding cannot store (the error,
+the text view stays) cannot be checked there: the encodings of Mono do not throw for such a letter. Then the content is
+`CodeEditing/RemoteFileContent.cs` (public): the bytes on the server (`RawBytes`) and the encoding they are read with, the encoding and the line
+breaks of a save, the hex view (`HexMode`, `HexDocument`, the text, its saved state and its caret kept while the bytes are shown),
+`EnterHexMode` (with the old `GetBytesForHexView` and `ShowHexView`), `ExitHexMode`, `ShowRestoredHexDraft`, `ResetHexMode`, `IsModified` of
+both views, `ApplyContent`, `SetSaveEncoding`, `SetLineEnding`, `GetChanges` and `CompleteSave` (the bytes of the file and the saved state of
+the view they came from, and of the other one when it holds the same bytes), with the events `HexModeChanged` and `FormatChanged` that the
+editor raises again as its own; the code is as it was. The editor is reached through `CodeEditing/IRemoteFileContentHost` (the text view: its
+document, modified state, read-only state, caret, `SetDocument`, focus, `MarkSaved`, `OnModifiedChanged`; the state: loaded, saving, read-only
+mode; where the hex view is: show, hide; the error and the question), which `RemoteFileEditor` implements explicitly, the hex view through
+`IRemoteHexView` (`Document`, `ReadOnly`, `Focus`, `Invalidate`: members `HexEditorControl` has). One thing is not in the old order:
+`CompleteSave` of the editor sets the bytes of the file after `BackupDone` and `IsNewFile`, not before them (plain fields that nothing reads in
+between). `_content` is made by the constructor that opens a file, after the session; before it `IsModified` is the text's and `IsHexMode` is
+false, as they were. A fault found by the net, kept as it is (the net records it): after a save in the hex view, closing it shows the text from
+before the hex view, as not modified (the bytes are the file's now, so the text kept from before is taken as theirs); an edit of that text and a
+save then write it over the bytes that were saved. `tests/RemoteFileContentTests` (net8.0, a fake editor and hex view that log what they are
+asked, 105 checks) drives the model, including the error of a letter the encoding cannot store; of 24 mutations of it 19 made a check fail at
+once and the other five led to checks (the kept bytes of a hex document that changed after the view was left, an edited text whose bytes were set
+back to the file's in the hex view, the encoding rule in the hex view on its own, the changes read in the encoding of the bytes of the server).
+`RemoteFileEditor.cs` is 1420 lines before and 1233 after. Next, 3A-2: the state of the loading and the saves that the editor keeps in fields
+(`_loaded`, `_reloading`, `_remoteSignature`, `IsSaving`, `_pendingReload`, `_saveRequestedWhileSaving`, what a reload restores) and the
+decisions of `Save`, `SaveInBackground`, `FinishBackgroundSave` and `FinishLoading` that need no control.
+
+Done in 3A-2: first a net for the paths of the loading and the saves that the Mono stand did not take: `tests/RemoteFileEditorIntegrationTests`
+has a `flow` scenario (before the file is loaded nothing can be saved, switched, read again, followed or run, and a save on close, a background
+save and a reload do nothing; the caret of a compiler message in screen columns after a tab; while the file is loaded again a save throws and
+says so, a save on close shows that and keeps the tab, a background save does not start and a second reload does nothing, and the caret comes
+back; a reload that fails (the file made unreadable) keeps the text of the user, modified and editable; a refused write asks about sudo, and
+answered No it cancels the save on close, keeps the tab and leaves the background save silent; the check of a script answered No puts the caret
+on the line it named; a service reload answered Yes that fails offers sudo), recorded on the code before the move (378 checks before, 440
+after: both servers); of seven mutations of the old code five make it fail, one is an equivalent change (`TrySave` before the load: `Save`
+does nothing then either) and one hangs the stand. One check was made looser afterwards in a commit of its own: once on Dropbear the reload
+command of nginx got no exit code (a channel the SSH layer closed early, as in A4a), and the question then has no "(exit code N)"; the
+editor offers sudo all the same, which is what is checked. Then the flow is `CodeEditing/RemoteFileFlow.cs` (public): `IsLoaded`,
+`IsReloading`, `IsSaving` with `SavingChanged`, the signature a save compares with, a save asked for while one runs, a reload asked for by
+the answer No to a conflict, the upload event of a background save; `CanSave`, `CanToggleHexMode`, `CanReopenWithEncoding`, `CanFollowLog`;
+`FinishLoading` (the state part: the signature, the backup, loaded), `LoadFailed` (the old `HandleLoadError`), `Reload`, `TrySave`,
+`Save` (the wait for a background save, the conflict question, sudo, the clean-up), `SaveInBackground` (the body of its thread),
+`FinishBackgroundSave` (an error, the conflict and its three answers, the check of the file, sudo, a superseded save, a save asked for
+meanwhile, a reload), the decision part of `HandleValidationFailure`, `ReloadToOffer`, `OfferReload`, `FinishReload`, `SaveWithSudo` and
+`CompleteSave`; the code is as it was. The editor is reached through `CodeEditing/IRemoteFileFlowHost` (`PrepareSave`; `Ask` with the
+buttons and a `PromptIcon` (question or warning), `Inform`, `ReportError`; the inline messages of the check and going to the first problem;
+the setting of the service reload offer; the check of the connection; a thread of its own, the pool and a post to the UI thread, which is
+the old `BeginInvoke` with its catch; clearing the messages, what a reload keeps of the view (the caret, the offset of the hex view, the
+folds, both views read-only) and starting the loading thread; the text read-only; the `LoadFailed` event; dropping the draft), which
+`RemoteFileEditor` implements explicitly. What stays in the editor: `FinishLoading` (the draft question, the document, the draft timer, the
+caret, the hex view and the folds that a reload puts back), `PrepareSave` (it reads the settings), the drafts, `CanRunInTerminal` (it reads
+the first line). `tests/RemoteFileFlowTests` (net8.0, 88 checks) drives the model with a fake editor that logs what it is asked and keeps the
+threads, the pool and the posts it is given in queues that the checks run, and a fake connection under the real `RemoteFileServer` and
+`RemoteFileSaver`; the session, the content and the loader are the real classes. Of 38 mutations of the model 31 made a check fail at once,
+six led to checks (the check of the file not run on close, the conflict check skipped after "overwrite", the error of a superseded save, the
+check skipped after a conflict answered No, a save again after the check answered Yes for a text that was not edited, the offer of a service
+reload when a save asked for meanwhile runs) and one is an equivalent change (`TrySave` during a reload: a reload needs a loaded file).
+`RemoteFileEditor.cs` is 1233 lines before and 969 after (1420 before 3A). This ends 3A: what is left in `RemoteFileEditor` is the view (the
+text and the hex view, focus, colours, the clipboard, the questions with their icons as `ThemedMessageBox`, the threads as `Thread`,
+`ThreadPool` and `BeginInvoke`, the draft timer and question, `FinishLoading` on the document). Next, 3B: the hex view on WPF under
+`IRemoteHexView` (the window and the host show it in place of the WinForms control).
+
+3B puts the hex view on WPF: 3B-1 takes out of `HexEditorControl` what it decides without a window, so that the WPF view (3B-2) uses the same
+code, and 3B-3 shows the WPF view in the tab in place of the WinForms control.
+
+Done in 3B-1: first a net for what the golden of `tests/HexEditorControlTests` did not reach (the mouse, the page keys, the layout): a run of its
+own at the end of the golden, `== view`, 47 lines written by the code before the move (the first 3608 lines did not change). The control is
+shown in a form whose height gives exactly 12 rows and whose width holds 16 bytes in a row, and every point is found from the cells of the layout
+(by reflection: the metrics, `HexCellX`), so that the lines are the same with another font (checked with a serif font of 15 points). It writes down
+the page keys with and without Shift and at both ends, the scroll that keeps the caret in view (below, above, at the end), clicks on the high and
+the low digit, in the gap after a group, on a character, on the header, left of the bytes and right of the characters, a drag (back to its start,
+into the characters, beyond the table, where the selection ends at the edge without scrolling), the right button inside and outside the
+selection and the middle button, the byte under the mouse (a digit, the gap, a character, right of the characters, past the end, the header),
+the wheel (a notch, the small steps of a touchpad, both ends), the text of the tool tip (groups, both byte orders, a group the end cuts, a
+named block and one without a name, a changed byte) and the colours of the bytes by kind on a dark and a light background. Of 13 mutations of
+the old code 12 make it fail (one after a point was added for it); the 13th is an equivalent change (an anchor equal to the caret is no
+selection either way). Not in it: the shift with the mouse (`ModifierKeys`), the automatic scrolling (it reads the real mouse), the link of the
+data inspector (its place is found when the control paints) and the clipboard. Then the model: `TextEditing/HexViewLayout.cs` (public: the metrics
+from the measured character, the columns and the groups, the rows and the width in view, the rows of the document, the byte under a point,
+where a click puts the caret, the table and a point brought into it, the step of the automatic scrolling, the rows of the wheel with the
+remainder of a touchpad, the first row brought into the content, the place of the caret, the scroll that keeps it in view, which scroll bars
+are needed, whether the data inspector fits; the first row, the horizontal scroll and the group size are its state), which reads the sizes
+of the view through `IHexLayoutView` (client area, inspector, the two scroll bars; implemented explicitly by the control);
+`TextEditing/HexKeyMap.cs` (`Map`: which `HexKeyAction` a key is with Ctrl, Shift and Alt; `Apply`: the movements, the page keys by the rows
+in view less one, Backspace and Delete on the model; the view runs the rest); `TextEditing/HexPointer.cs` (a press with the left button, Shift,
+the right button inside or outside the selection, another button; the drag; the release); `TextEditing/HexByteText.cs` (the tool tip, the
+colour of a byte, `IsDark` with the formula of `Color.GetBrightness` of .NET, `Blend`). The code is as it was. The control keeps the scroll
+bars and their values, the timers, the tool tip, the painting, the measuring of the font and the inspector; `VisibleRows`, `RowCount`,
+`ByteAtPoint`, `DescribeByte`, `ByteTextColor` and `Blend` are forwarders. One thing is not in the old order: a left press starts the timer of
+the automatic scrolling after the model told the change, not before (starting a timer does nothing at once). The golden passes unchanged
+(3655 steps); its accessors read `_layout` instead of the fields that are gone. `tests/HexViewLayoutTests` (net8.0, a fake view, 148 checks)
+drives the four classes; of 41 mutations of them 34 made a check fail at once, six led to checks (a byte behind the edge of a narrow window,
+the place of the caret after the last byte, the first pixel of the low digit, a click well above the view, the first pixel below the table,
+the horizontal bar that the vertical one makes necessary) and one is an equivalent change (End in the last row: `MoveTo` brings the offset into
+the bytes itself). `HexEditorControl.cs` is 1670 lines before and 1395 after.
+
+Done in 3B-2: first the paste: the part of `HexEditorControl.Paste` between reading the clipboard and inserting the bytes (the UTF-8 of the text in
+the character column; in the digits the bytes of a hexadecimal text, the UTF-8 of another one, and the question for a text that can be both) is
+`TextEditing/HexPasteText.cs` (`ToBytes` with the question as a `Func`), as it was; the control asks the question with its message box, and
+`HexViewLayoutTests` has 9 checks of it (157 in all). Then `GUI/HexView/WpfHexEditor.cs` (internal), the view of `HexEditingModel` on WPF: a
+`FrameworkElement` with the same layout (`HexViewLayout`, through `IHexLayoutView`), keys (`HexKeyMap`: KeyDown with the virtual key of the
+WPF key, the characters through TextInput into `TypeCharacter`), mouse selection (`HexPointer`, the mouse captured while a drag runs, the
+automatic scrolling by a `DispatcherTimer`), tool tip and colours (`HexByteText`), the same commands and events as `HexEditorControl` (the
+clipboard of WPF, `MessageDialog` for the questions and the errors) and `IRemoteHexView`, `IHexViewStatus`. It counts in whole device pixels:
+the DPI is read from the visual (again on `Loaded` and on `OnDpiChanged`), the font is measured with its `GlyphTypeface` (the advance of "0" and
+the height, rounded up), the drawing is scaled back by the DPI, and the text is put on the grid of the characters with one `GlyphRun` for each
+run of bytes of one colour in a row (the gaps of the groups are blanks), the backgrounds as rectangles; its two `ScrollBar`s are its visual
+children (a WPF scroll bar goes from 0 to the last first row, with the visible rows as its viewport). Colours and font are set by
+`SetColors` and `SetFont`. Not yet in it: the data inspector (the flag is kept and reported, so the settings keep it), the link to it in the
+header and the context menu (3B-3). Tools > WPF hex editor lab (`GUI/HexView/HexLabWindow.cs`) opens a file of this computer (up to 64 MB) in it
+with the editor colours, font (Courier New 12 points with the zoom) and hex view options of the settings, with the view options on a tool bar
+and the state in a status line; the bytes can be changed but are never saved. The view is compile-checked on Linux only. Manual check on
+Windows (the lab): a file of a few bytes, of some KB and of tens of MB (scrolling and paging stay fast); 100 %, 150 % and 200 % scaling and a
+window moved between monitors (crisp text, the caret and the click on the right digit); light and dark theme; the arrows, Home/End,
+Ctrl+Home/End, PageUp/Down with and without Shift; typing hex digits and characters (Insert for overwrite), Backspace and Delete; Ctrl+A, C,
+X, V (a hexadecimal text, a plain text, "dead" with its question), Ctrl+Z and Ctrl+Y; a click on each digit, in the gap after a group, on a
+character; a drag inside the table and beyond its edges (automatic scrolling), a Shift+click; the wheel and Shift+wheel; the tool tip of a
+byte; colours by kind; 8, 16 and 32 bytes in a row and groups of 1 to 8; read-only.
+
+Done in 3B-3: first a net for what the hex golden did not reach: `tests/HexEditorControlTests` has two more runs at its end, written by the code
+before the move (the first 3655 lines did not change): `== menu` (the real `HexEditorMenu` on the real control: every item with its text, key,
+image, enabled and checked state in nine states, and the items clicked, not Copy As, with the dialog asked for, the calls after a command and the
+message boxes) and `== inspector` (the real `HexDataInspector`: the text an edit starts with for every value at five offsets, Enter with the same,
+a new and a wrong text, Esc, read-only, the keys of its rows, the rows at their edges, the clicks on the byte order, a value and the Hide link);
+of 7 mutations of the old code 6 made it fail at once and the 7th after a state was added for it. Then: the panel, the menu, the find window,
+the dialogs of the tab, the main window and the status source use the hex view through `CodeEditing/IHexEditorView` (the calls they made on
+`HexEditorControl`; `HighlightSelection` takes an `RgbColor`), which `HexEditorControl` and `WpfHexEditor` implement; the marking colours are
+`TextEditing/HexViewChoices.HighlightColors` (`RgbColor`). The items of the hex submenus and their rules are `CodeEditing/HexMenuModel` (with
+`HexDialogKind`), what the data inspector decides is `TextEditing/HexInspectorModel` (through `IHexInspectorSource`), both moved as they were; the
+WinForms menu and inspector use them, and `tests/HexMenuInspectorTests` (net8.0, 219 checks: a fake view for the menu, the real `HexEditingModel`
+for the inspector) drives them; of 26 mutations 24 made a check fail (one after a check was added), two are equivalent changes. The WPF view
+got its data inspector (`GUI/HexView/WpfHexInspector`, on the model, in device pixels, at the right with the whole height, the header link
+while it is hidden; its keys and typed text do not reach the bytes) and the tab its context menu (`GUI/HexView/HexViewContextMenu`: the
+commands of the panel with its state, the Text submenu off, the hex submenus). `RemoteFileEditor` takes a hex view in its constructor (null:
+its own `HexEditorControl`, as the Mono stands use) and shows, hides and styles it through `CodeEditing/IHexViewPlace` (colours, the font family
+and its size at the zoom of the text before the monitor scale); `EditorTabContext` is that place (the WPF view over the `WindowsFormsHost` in a
+grid, one of the two shown; closing the hex view gives the keyboard back to the host when the view had it), and `MainWindowController` makes the
+editor with the WPF view. The Mono stand has a `hex-place` scenario (a WinForms view given to the editor stands in for the WPF one, a place
+logs what it is asked; 486 checks in all). One thing is not word for word: the find window gives the focus back to the view without asking
+whether a WinForms view was disposed (the tab closes it before it disposes the view). Keys while the WPF view has the focus go through WPF:
+Ctrl+F is the main window's (as before), Ctrl+S, Ctrl+G, F3 and the rest are the view's; the shortcuts of the window (Ctrl+W, Ctrl+Tab) may
+now reach the window, which they did not while the WinForms hex control had the focus. Manual check on Windows, in a file tab: the checklist
+of 3B-2 in the tab; Hex Editor on and off from the tool bar and the context menu (the text, its caret and undo history come back, the
+keyboard is in the text); the status bar (offset, selection, INS/OVR, the byte order, groups and row width menus); Ctrl+S, Ctrl+F (the find
+window, F3 and Shift+F3), Ctrl+G (Go to Offset); the context menu over the bytes (each item, the colours, Color and Label, Fill, Insert, Swap,
+Checksums, the view options, Copy As); the data inspector: Ctrl+I, the tool bar button, the header link, the Hide link, the byte order link,
+a double-click or Enter on a value and its edit (Enter, Esc, a wrong value), Up/Down, Ctrl+C, a window too narrow for it; the editor zoom
+(Ctrl+wheel in the text, then the hex view) and the light/dark theme; a reload and a save in the hex view; Ctrl+W and Ctrl+Tab with the
+hex view focused; closing a tab with the hex view open.
+
+3C takes out of the text view (`ReadonlyTextBrowser`, `EditableTextBrowser`) what it decides about the caret, the selection, the wrap and the undo,
+so that a WPF text view (3D) can be put on the same model: 3C-1 the caret moves and the wrap map, 3C-2 the selection (by the keys with Shift,
+the mouse, words, lines, Select all), 3C-3 the undo and redo of the edit commands. The rules of stage 1 hold.
+
+Done in 3C-1: first a net, as nothing drove the text view itself: `tests/TextViewTests` (net48, Mono + xvfb) drives the real text view
+through a `TextEditorControl` in a form sized until it shows 8 rows (and wraps at 20 columns), so that what it writes does not depend on the
+fonts: for every position of a document of 30 lines (empty lines, tabs, words with punctuation, letters that are not ASCII, blanks, lines longer
+than the wrap width) the target of each navigation key as the key handler finds it (`TryGetNavigationTarget`), the word moves, Ctrl+Home and
+Ctrl+End (asked of `ComputeMovedPosition` with the keys: `Control.ModifierKeys` cannot be set by a test) and the word under the caret; runs of
+keys through the real `OnKeyDown` (the kept column, the scroll); the same with word wrap, and the wrap map (breaks, row indexes, segments) at two
+tab sizes and for another text. `TextViewGolden.txt` (1113 lines) was written by the code before the move and is never re-recorded; nine
+mutations of the old code each make it fail. A fault it found, kept as it is: with word wrap on, Right at the end of a wrapped line that is on the
+screen goes to the start of that line instead of the next one (`GetNextRealLine` takes the next row of the screen, a row of the same line). Then
+`CodeEditing/CaretNavigator.cs` (public): `Move` (what `ComputeMovedPosition` did, with Ctrl as a flag; `MoveWrappedRow`, `MoveWrappedRows`),
+`BeginMove` and `DesiredColumn`/`DesiredWrapOffset` (the column Up, Down and the pages keep: the part of `TryGetNavigationTarget` that took and
+dropped it), `TryGetWordBounds`; `CaretMove` is a top-level enum of `CodeEditing` now (it was protected in the view; `TextEditorControl`,
+`SshTerminalControl` and `SerialTerminalControl`, which name it, use `SmarTTY.CodeEditing`). `CodeEditing/WrapMap.cs` (public): the breaks
+and first rows, `Ensure` (built again when the text, the width or the tab size changed, or after `Invalidate`), `RowCount`, `RowIndexToLine`,
+`SegmentOf`, `SegmentStart`, `SegmentEnd`, `PositionToRowIndex`. The code is as it was. The view gives them what they read through
+`ICaretNavigationHost` (the document, the tab size, the rows in view, wrapping and the map, `IsWordChar`, `GetPreviousRealLine`/`GetNextRealLine`,
+`OnMoveBeyondDocument`) and `IWrapMapSource` (the lines, the wrap width, the tab size), implemented explicitly in
+`Controls/ReadonlyTextBrowser.Navigation.cs` and the Wrap partial; both models are made when first used (the base class constructors may ask
+before the view's own has run). `ComputeMovedPosition` stays virtual (the terminals override it) and forwards; the private wrap methods the rest
+of the view calls are one-line forwarders. The text view golden, the three goldens of `TerminalSnapshots`, `SmartTerminalIntegrationTests`
+(253), `RemoteFileEditorIntegrationTests` (486), `DeviceLineEditorTests`, `NetconsoleTerminalTests` and `HexTerminalControlTests` pass
+unchanged; the golden's accessors read `Navigator` and `WrapLayout`. `tests/CaretNavigatorTests` (net8.0, a fake view over a real document,
+106 checks) drives the models; of 17 mutations 14 made a check fail at once, one after a check of the kept place in a row was added, two are
+equivalent changes. `ReadonlyTextBrowser.cs` is 3603 lines before and 3374 after, the Wrap partial 337 and 247.
+
+Done in 3C-2: first a net: `tests/TextViewTests` has a selection run, with and without word wrap, written by the code before the move (the 1113
+lines of before did not change; 1199 in all, the same on every run): a click, a double click (a word, a blank, an empty line), a third click,
+a drag with the left button (down, above the start, back to the start), a move without a button, after a double click and after the release, a
+click left of the text (the line), the right and middle buttons with and without a selection, `ClearSelection`, `SetSelection`,
+`SetSelectionEnd`, a key without Shift, Select all, ranges of lines (reversed, out of the text, one line) and the selected lines of six
+selections, and the same things in terminal mode, where the selection has an end of its own; every step writes the selection, the caret, the
+selected lines and the `SelectionChanged` events. Shift is not in it (the view reads `Control.ModifierKeys`). The clicks are at the left edge of a
+cell found from the view (`ColumnToX`, the row of the line), so the lines do not depend on the fonts; the click timing fields are reset by
+reflection between gestures. Eight mutations of the selection code each make it fail. Recorded as it is: outside terminal mode
+`SelectLineRange` selects from the first line to the caret (the end it sets is the end of a terminal selection; only the terminal calls it,
+through `SelectTerminalLine`). Then `CodeEditing/TextSelection.cs` (public): `HasSelection`, `Anchor`, `TerminalEnd` (the old fields
+`_hasSelection`, `_selectionStart`, `_selectionEnd`), `End` (the caret, or the terminal end), `SetActive`, `MoveAnchor`, `MoveTerminalEnd` (each
+says whether it changed something, as `SetSelectionCore` and `UpdateSelectionFromPoint` compared), `Clear`, `StartIfNone` (a key or a click with
+Shift, a drag), `GetSelectedLines`, `ClampLineRange` and `DocumentEnd` (Select all); the code is as it was. The three fields are aliases into it
+now (properties of the same names, as `_privateModes` in B4b), so that the view and its subclasses (`EditableTextBrowser`, `TextEditorControl`,
+`ReadonlySmartScrollBrowser`, the terminals) read as before; the model is made when first used. The view keeps the mouse, the keys, the clicks
+and their timing, `AdjustSelectionEnd` (still called after the selection is switched on: the serial terminal's override reads `HasSelection`), the
+redraws and the events. All the stands of 3C-1 pass unchanged; `tests/CaretNavigatorTests` has 37 checks of the model (143 in all), and of 12
+mutations of it 11 made a check fail at once, the 12th after a check was added. `ReadonlyTextBrowser.cs` is 3374 lines before and 3343 after.
+
+Done in 3C-3: first a net: `tests/TextViewTests` has an edits run at its end, written by the code before the move (the 1199 lines of before did
+not change; 1261 in all, the same on every run): `ReplaceText` in a line, across lines, at the start only, an empty edit, an end before the start,
+columns of -1, a line break deleted at the end of a line and the join that drops the indentation the lines share; `Indent` and unindent with a
+selection (a tab) and without one (spaces), by more than there is, blank lines left alone; Undo and Redo at both ends and an edit after an undo;
+the modified state with `IsModified`, `CurrentVersion` and `MarkSaved`, undoing to the saved text and past it, a change outside an edit command;
+`ExecuteAsSingleUndoStep` (nested, empty); Replace All (literal, of nothing, of an empty text, in a range with a line break in the replacement);
+read-only; a new document while modified and while saved; every step writes the text, the caret, the selection, the modified state, what can be
+undone and redone, and the `ModifiedChanged`, `LineChanged` and `RangeChanged` events. Nine mutations of the undo and edit code each make it fail.
+A fault it found, kept as it is: an edit within one line puts the caret at the end of the new text in the caret's own line, which is another line
+when the edit was not on the caret's line (`ReplaceInLineCommand` calls `SetCaretColumn`). Then `CodeEditing/UndoHistory.cs` (public): the two
+stacks, the saved step and the marker of a text never saved, the depth of a running edit (`InEdit`), the steps collected as one,
+`IsModified`, `CurrentVersion`, `MarkSaved`, `HasUndo`/`HasRedo`, `Execute`, `ExecuteAsSingleStep`, `Undo`, `Redo`, `Reset`; the steps are
+`IUndoStep` (the edit commands of the view, which keep their view and their code) and `CompoundUndoStep` (the old `CompoundCommand`).
+`CodeEditing/IndentEdits.cs` (public static): `IndentUnit`, `IndentText`, `UnindentWidth`, `SharedIndentLength` (the indentation a join drops).
+The code is as it was. Not word for word: a change outside an edit still sets the view's virtual `IsModified` (the remote editor sends it to the
+hex view) when `History.InEdit` is false; the unindent no longer tests the length of a line with two sentinels added (never 0); the compound step
+no longer takes the caret and the selection at its start (never used). As before, when an edit of a single step throws, the edits made before it
+stay as one step and the modified state is not looked at again. All the stands of 3C-1 and `EditorTextTests` pass unchanged;
+`tests/CaretNavigatorTests` has 64 checks of the two models (207 in all), and all 15 mutations of them make a check fail. `EditableTextBrowser.cs`
+is 763 lines before and 623 after. This ends 3C: what is left in the text view is the view (painting, the caret drawn, scrolling, the mouse and
+the keys with their timing and modifiers, the edit commands' calls on the document and the view, the events). Next, 3D: the text view on WPF.
+
+3D puts the text view on WPF as a view of our own on the models of 3C (not AvalonEdit): 3D-1 takes the edit commands and the typing out of the
+WinForms view, so that the WPF view edits the text with the same code and the same undo; 3D-2 is the WPF view (`GUI/TextView/WpfTextEditor`) with
+a lab window, as 3B-2 was for the hex view; then the highlighting, the folds, the margin, the inline messages and the completion on it, and the view
+in the editor tab.
+
+Done in 3D-1: first a net: `tests/TextViewTests` has a typing run at its end, written by the code before the move (the 1261 lines of before did not
+change; 1315 in all, the same on every run): characters (over a selection, overwrite and at the end of a line, a control character), Enter (the
+indentation carried over, a caret inside it, a selection, a line without a line break of its own), Backspace (a character, the start of a line and
+of the text, a level of space indentation, a selection), Tab (a tab, spaces to the next tab stop, a selection of two lines indents, one in a line is
+replaced), Delete, Ctrl+Delete and Ctrl+Backspace (words, blanks, the ends of a line and of the text, a selection), Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z
+and the AltGr chords that are not commands, the `CharTyping` hook that types a pair and puts the caret inside it or types nothing,
+`GetWordAtCaret`, `ReplaceWordAtCaret`, `InsertText`, `RemoveLines` and `DeleteSelection`. Shift+Tab (it reads `ModifierKeys`) and the clipboard
+are not in it. Of ten mutations of the old typing code nine make it fail (one after a step was added); the tenth is an equivalent change. Then
+`CodeEditing/TextEditCommands.cs` (public): `TextEditCommand : IUndoStep` (the caret and the selection before the edit and putting them back,
+`DeleteRange`), `ReplaceInLineCommand`, `ReplaceRangeCommand`, `IndentCommand`: the nested edit commands of `EditableTextBrowser`, as they were,
+through `ITextEditView` (the document, the caret, the selection, the typing mode, the indentation settings, the change events, the caret moves, the
+redraw and the layout), implemented explicitly in `Controls/EditableTextBrowser.Edits.cs`. And `CodeEditing/TextTyping.cs` (public): `TypeCharacter`
+(the `OnKeyPress` of `TextEditorControl`, with Shift as a flag), `KeyDown` (its edit keys and the Ctrl and Shift chords; it returns
+`TypingKeyResult`, which the control turns into `Handled` and `SuppressKeyPress`), `DeleteWord`, `RemoveLines`, `DeleteSelection`, `InsertText`,
+`GetWordAtCaret`, `ReplaceWordAtCaret`, `SpacesToNextTabStop` and `SpaceIndentBackspaceLength`, as they were, through `ITextTypingHost` (also the
+`CharTyping`/`CharTyped` hooks, the moved position of a caret move, the width of a line, the clipboard commands, Undo and Redo), implemented
+explicitly in `Controls/TextEditorControl.Typing.cs`; the control keeps the clipboard and its events. As before, Ctrl+Delete looks at the width of
+the line twice (in the word and again in Delete), also when it removed nothing. The text view golden, the three goldens of `TerminalSnapshots`,
+the hex editor golden, `SmartTerminalIntegrationTests` (253), `RemoteFileEditorIntegrationTests` (486), `DeviceLineEditorTests`,
+`NetconsoleTerminalTests`, `HexTerminalControlTests`, `EditorTextTests` and `MultiCursorTests` pass unchanged. `tests/CaretNavigatorTests` has 93
+checks of the two models (300 in all: a fake view over a real document that logs what it is told); of 48 mutations of them 44 made a check fail at
+once, three led to checks (the default line break of a line that inherits it, the removal of the last lines from the second one, an unindent by two
+levels) and one is an equivalent change (`DeleteRange` moves its local end line, which is not read
+again). `EditableTextBrowser.cs` is 623 lines before and 358 after, `TextEditorControl.cs` 474 and 188.
+
+Done in 3D-2: first a net for what the edits run of `tests/TextViewTests` did not reach: a replace run at its end, written by the code before the move (the
+1315 lines of before did not change; 1334 in all, the same on every run): a single-line view drops the line breaks of the text, a lone CR in an
+edit within a line breaks the line, an insertion with CR LF takes the line ending of an LF text and keeps its own without the existing one, Replace
+All up to the end column of a range, a replacement with line breaks whose new lines would match again (after LF and after a lone CR), the end of the
+range after line breaks in its last line and in the same line, and the caret brought into a line that became shorter. Of 17 mutations of the old code
+15 make it fail; two are equivalent changes (the read-only test of Replace All, which `ExecuteAsSingleUndoStep` and `ReplaceText` make again, and
+the caret column, which `SetCaret` brings into the line). A fault it found, kept as it is: when a line of the range before the last one gets line
+breaks, Replace All looks for the last line of the range at its old index, so its limit and the new end of the range are worked out for another
+line. Then `CodeEditing/TextReplace.cs` (public): `Replace` (the old `ReplaceTextCore`: an empty edit, the columns -1, a single-line view, the
+indentation a join drops, a replacement within a line or of a range), `ReplaceAll` (one undo step, the range and its new end, the caret brought into
+its line) and `CountLineBreaks`, as they were, through `ITextReplaceHost` (what the edit commands see, `SingleLine`, the line ending flag,
+`GetLineOrNull`, `GetIndentation` and the view's own `ReplaceText`, which the terminals route), implemented in `Controls/EditableTextBrowser.Edits.cs`;
+the view keeps read-only and its events. And the switch of `TryGetNavigationTarget` is `CaretNavigator.TryMapKey` and `KeepsColumn` (the view still
+reads Ctrl from the keyboard and asks its own `GetMovedPosition`, which the terminals override; Ctrl cannot be held by a test, so Ctrl+Left and
+Ctrl+Right are checked on the model only). The golden, the three terminal goldens, the hex editor golden and every stand pass unchanged after each
+move. `CaretNavigatorTests` has 48 more checks (348 in all); of 32 mutations of `TextReplace` 28 made a check fail at once, two after checks were
+added (select within a line, a column -1 at the start of a range) and two are equivalent changes (with select the end is the start already; the
+matcher makes a null replacement empty itself); all 9 of the key map. `EditableTextBrowser.cs` is 358 lines before and 248 after.
+
+Then new code for the new view (not a move; the WinForms view keeps its own): `CodeEditing/TextViewLayout.cs` (public, in device pixels, through
+`ITextLayoutView`: the rows, a line each or the rows of the wrap map, which keeps room for the vertical scroll bar so that showing it does not wrap
+the lines again; the margin of the line numbers; the rows and the width in view; what a row shows with the tabs spread over their columns; the
+selected columns of a row and whether its line break is selected; the widest line; the position under a point, the nearer edge of a character
+brought into its row, and the point of a position; the scroll that keeps the caret in view, with four columns before it on the left; which scroll
+bars are needed; the wheel and the automatic scrolling of a drag with `HexScroll`) and `CodeEditing/TextPointer.cs` (public: a click, a click with
+Shift from where the selection starts or the caret, a double click on a word as the navigator finds it, a triple click or a click in the margin on a
+line, and a drag by the same unit). `tests/TextViewLayoutTests` (net8.0, a fake view over a real document, the real selection and navigator, 155
+checks); of 58 mutations 52 made a check fail at once, two after a check was added, two are equivalent changes and two showed code that changed
+nothing, which was taken out. Then `GUI/TextView/WpfTextEditor.cs` (internal), a `FrameworkElement` on all these models: the keys in the order of
+`TextEditorControl` and its base class (the edit keys and chords of `TextTyping`, Ctrl+Up/Down, Ctrl+A, Ctrl+S as `SaveRequested`, the navigation
+keys with and without Shift, Insert, then Backspace, Enter and Tab as the characters the WinForms view gets as `KeyPress`; the other characters
+through `TextInput`), the mouse through `TextPointer` (the mouse captured while a drag runs, the automatic scrolling by a `DispatcherTimer`, the right
+button moves the caret outside the selection), the wheel (Shift: sideways), the clipboard of WPF (as the WinForms view: the caret line when nothing
+is selected), a context menu of the edit commands, and the drawing in whole device pixels as the WPF hex view does (one `GlyphRun` a colour in a row,
+only the columns in view, the selection with a cell for a selected line break, the caret as a bar or as a block in overwrite mode, the margin with the
+number of the caret line in the colour of the text). With no folds, the line before and after a line are its neighbours (so the fault of Right at
+the end of a wrapped line of 3C-1 is not in it). Not in it yet: the syntax colours, the folds, the inline messages, the completion, the marks of the
+blanks, the search highlights, characters the font has no glyph for (drawn as "?") and characters of two cells. Tools > WPF text editor lab
+(`GUI/TextView/TextLabWindow.cs`) opens a file of this computer (up to 16 MB, UTF-8 unless it has another byte order mark) with the colours, the
+zoom, the tab size, the indentation, word wrap and the line numbers of the editor settings and switches for them; the text is never saved. The view
+is compile-checked on Linux only. Manual check on Windows (the lab): typing, with a selection and in overwrite mode (Insert), Enter with the
+indentation, Backspace in space indentation, Tab and Shift+Tab with and without a selection of lines, Delete, Ctrl+Delete, Ctrl+Backspace; Ctrl+Z,
+Ctrl+Y, Ctrl+Shift+Z; Ctrl+C and Ctrl+X without a selection (the line), Ctrl+V, Shift+Insert, Shift+Delete; the arrows, Ctrl+Left/Right, Home/End,
+Ctrl+Home/End, PageUp/Down with and without Shift, Ctrl+Up/Down, Ctrl+A; a click, a double and a triple click, a click in the margin, a drag inside
+the text and beyond its edges, a Shift+click, the right button and the context menu; the wheel and Shift+wheel; word wrap on and off (the first line
+stays in view), the line numbers, the tab sizes; a file of some MB (scrolling and paging stay fast); 100 %, 150 % and 200 % scaling and a window moved
+between monitors; light and dark theme; AltGr letters and an IME.
+
+Done in 3D-3 (the syntax colours): first a net: `tests/TextViewTests` has a syntax run at its end on a real `CodeEditorPP`, written by the code before
+the move (the 1334 lines of before did not change; 1357 in all, the same on every run): the spans each line of a C text is drawn with (start, end,
+which token brush) after edits that change a line, put a line break in at the start of a line and take an empty line out, open and close a block
+comment over several lines, insert and remove lines, and with two brushes for more token types, none, an empty list and no tokenizer; then the inline
+messages and a collapsed fold after line breaks put in and taken out at the start of the line of a message and of the fold, of the line before them
+and of the first line, and a line added after the last one. Of 9 mutations of the old code 8 make it fail; the 9th is an equivalent change (the
+number of removed lines is counted before the start line moves). What it shows: the rule that a line break put in at the start of a line (or an
+empty line taken out) counts from the line before changes nothing in the colours; it is what makes an inline message (which moves only on the lines
+after the start line) go down with the text of its line. Then `CodeEditing/SyntaxColoring.cs` (public static): `ChangedLines` (the first line, the
+removed and the added lines of a range edit that `CodeEditorPP.OnRangeChanged` tells the token cache, the messages and the folds) and `ColorIndex`
+(the colour of a token type, the first one for a type past them; the view keeps its test for no brushes, so a negative type still throws as
+before), as they were. Every golden and stand passes unchanged. For the WPF view: `TextViewLayout.RowRuns` (the coloured parts of a line, in indexes
+of the line, turned into the runs of a row in its columns: a tab takes its columns, cut to the row of a wrapped line, the rest in the colour of the
+text, neighbours of one colour joined, a part that goes back over an earlier one cut) with the struct `TextRun`; `tests/TextViewLayoutTests` checks
+it and `SyntaxColoring` (183 checks); of 19 mutations 17 made a check fail at once and two after a check was added. `WpfTextEditor` keeps the tokens
+in a `TokenCache` as `CodeEditorPP` does (`SetSyntax(tokenizer, colours)`, the line tokenized again on a line change, the lines of `ChangedLines` on a
+range change) and draws a row by its runs, the selected part of a run in the colour of a selected text. The lab has the syntax menu of the editor:
+a file opened takes the syntax of its name or first line when the highlighting is on in the settings, with the colours of the settings. Not in it
+yet: the highlight of the pair of a bracket at the caret (`CodeEditorPP.OnSelectionChanged`). Manual check on Windows (the lab): the colours of a C,
+a shell, a Python and a YAML file in the light and the dark theme; a block comment opened and closed by typing, the lines after it coloured again;
+lines put in and taken out inside a comment and a string; the colours of a selected text; a syntax chosen in the menu; a large file (typing stays
+fast).
+
+Done in 3D-4 (the folds): first a net: `tests/TextViewTests` has a fold run at its end on a real `CodeEditorPP`, written by the code before the move (the
+1357 lines of before did not change; 1380 in all, the same on every run): a click on the mark of the fold margin (through the real
+`FoldingMarginPainter`) on a block whose brace is on the next line and on one whose brace ends the header line, with the caret inside the block, on
+the line of the closing brace, on the header before the line of the opening brace and outside the block, again to unfold, on a line without a block
+and while the lines are wrapped; the rows the view shows and the text of a folded header with its label; Up, Down and End over a folded block; the
+caret put in a hidden line; Collapse and Expand at the caret line. Of 7 mutations of the old click 4 make it fail at once and two after a step was
+added; the 7th is an equivalent change (`UpdateLayout` builds the rows again too). A fault it found, kept as it is: folding a block whose opening
+brace ends its header line while the caret is inside it puts the caret on the line above the header (the line of the opening brace less one), not on
+the header. Then `FoldingManager.ClickMark` is what `FoldingMarginPainter.OnMouseDown` decided (nothing while wrapping, the fold toggled, where the caret
+goes), as it was; the painter keeps the test for a virtual row, the caret move and the rows built again. Every golden and stand passes unchanged;
+`tests/FoldingTests` has 11 more checks (28 in all), and all 7 mutations of `ClickMark` make one fail. For the WPF view: `TextViewLayout` reads the
+folds through `ITextFolds` (`GetHiddenLineCount`, `GetFoldedText` with the label), which `FoldingManager` implements: while the lines are not wrapped
+the rows are the lines shown (built again after `InvalidateRows`), a hidden line is in the row of its header, a folded header shows and measures the
+text of its fold, its colours end at the label (`FoldLabelColor`) and the rest is in the colour of the text, `LineBefore`/`LineAfter` go past the
+hidden lines, and the margin of the fold marks comes after the numbers (`NumbersWidth`, `FoldMarginWidth`, `IsInFoldMargin`); the columns of a line
+are counted on the text it shows (`IndexToColumn`, `ColumnToIndex`, checked against `TextDocument` on texts with tabs). `tests/TextViewLayoutTests` has
+206 checks; of 22 mutations 20 made a check fail at once, one after a check was added, and one showed a clip that changed nothing, which was taken
+out. `WpfTextEditor` keeps a `FoldingManager` on its tokens as `CodeEditorPP` does (cleared with a new document or syntax, stale folds removed after an
+edit, a caret put inside a folded block unfolds it, Up and Down past the hidden lines, a click on the marks through `ClickMark`, Fold and Unfold in
+the context menu) and draws the marks as `FoldingMarginPainter` does and the label grey in a grey frame; while wrapping nothing is folded, as in the
+WinForms view. Not in it yet: the keys of the fold commands (the key bindings of `CodeEditorPP`). Manual check on Windows (the lab): the marks of a C,
+a shell, a Python and a JSON file; a click on a mark folds and unfolds, the caret inside a folded block moves as in the editor tab; Up, Down, PageUp
+and PageDown over folded blocks; a click and a drag on a folded header and on its label; the caret put into a hidden line by a search or Ctrl+End
+unfolds the block; typing inside and around a folded block (a fold whose tokens change goes away); Fold and Unfold in the context menu; word wrap on
+and off with folds; 100 %, 150 % and 200 % scaling (the marks stay crisp).
+
+Done in 3D-5 (the inline messages): first a net: `tests/TextViewTests` has a message run at its end on a real `CodeEditorPP`, written by the code before
+the move (the 1380 lines of before did not change; 1399 in all, the same on every run): the line and the column a message is added at (counted from
+1, a column of 0 for none, a line past the text on the last line, a line below 1 on the first, a second message of a line in its place, one at a time
+and in a batch), the messages dropped when word wrap is switched on and off; and where the real row of a message (`InlineMessageView`) puts its band,
+drawn into a bitmap with colours of its own (under its column after a tab, scrolled, scrolled past it, in the middle, a text too long for the row, at
+two row heights). The band is found as the frame drawn around it, and its width is written less the width the row measures its text at (and, in the
+middle, its left edge less where the middle puts the text), so that the lines do not depend on the fonts. The colour of the text (an error or a
+warning) was in the first recording and is not any more: whether a pixel of the text has that very colour depends on the fonts of the machine (CI
+found none; the lines without it were written again by the code before the move, on a worktree of that commit, and are the same with the code after
+it). Of 18 mutations of the old code 17 make it fail; the 18th, the colour of a warning, is in the view and did not move. Then `CodeEditing/InlineMessageBand.cs` (public struct): `IndentColumn` and `Place` (the text no wider than
+the row leaves room for, in the middle or under the column, the icon in front of the text, the band behind both), the arithmetic of the row of
+`InlineMessageView`, as it was; and `InlineMessageProvider.AddReported` (the line counted from 1 brought into the text, the column counted from 1),
+what `CodeEditorPP.AddMessage`, `AddMessages` and `MessageLine` did, as it was. Every golden and stand passes unchanged. For the WPF view:
+`TextViewLayout` reads the lines that have a message through `ILineMessages` (`HasMessage`, which `InlineMessageProvider` implements): while the lines
+are not wrapped a message is a row of its own under its line (hidden with a hidden line), with no text, colours, number or selection; it has the
+columns of its line, so that a point on it is a point on its line; a position is in the row of its line, and `LineBefore`/`LineAfter` are lines.
+`tests/TextViewLayoutTests` checks it, `InlineMessageBand` and `AddReported` (230 checks); of 25 mutations 21 made a check fail at once and four after
+a check was added. `WpfTextEditor` keeps an `InlineMessageProvider` as `CodeEditorPP` does (`AddMessages`, `AddMessage`, `ClearMessages`, the messages
+moved with the lines of `ChangedLines`, dropped when word wrap is switched) and draws a message as `InlineMessageView` does: the band of
+`InlineMessageBand.Place` (the columns scrolled away are the pixels of the horizontal scroll over the width of a character), the icon of the WinForms
+view (its resource, magenta made transparent), the text in the colour of its kind in Times New Roman of five eighths of the row in points, clipped to
+its width, and the frame; `SetMessageColors` gives the colours. The lab puts an error or a warning at the caret (every other one without a column)
+and clears them, with the colours of the settings (`RemoteFileEditor.RefreshMessageColors`). As in `CodeEditorPP`, a new document keeps the messages.
+Manual check on Windows (the lab): a message under a column, in the middle, under a line with tabs, a long one; scrolled sideways; under a folded
+header and inside a folded block; lines put in and taken out above a message (it moves with its line), a line break at the start of its line;
+the icons and the colours in the light and the dark theme; word wrap on drops them; Up and Down over a message row; a click on a message row puts the
+caret on its line; 100 %, 150 % and 200 % scaling.
+
+Done in 3D-6 (the completion): first a net: `tests/TextViewTests` has a completion run on a real `CodeEditorPP` (its list replaced by a stand-in
+that logs what it is asked, set into the controller by reflection; the hint is the real one), written by the code before the move (the 1399 lines
+of before did not change; 1433 in all, the same on every run): two letters of a word open the list by themselves and not one, the word it is told
+to select, Backspace, a blank that accepts the selected word when it continues the typed one and a mark that closes the list when it does not, a
+word that starts with a digit, Ctrl+Space with and without a word, Escape, the language and the switches; the hint opened by the parenthesis of a
+call, the active parameter after a comma, closed after the call, opened again by Left (a new window) or kept (the same window), hidden while the
+list is open, Escape, the lost focus, completion switched off. Of 27 mutations of the old code 25 make it fail; two are equivalent changes
+(`ShowCompletion` tests the switch itself; a character that is not a letter or a digit leaves no word before the caret). Then
+`CodeEditing/EditorCompletion.cs` (internal) holds what `CodeEditorPP` decided about the list and the hint, as it was: `ShowCompletion`,
+`HideCompletion`, `OnCharTyping`, `OnCharTyped`, `AfterKeyPress`, `OnEscape`, `AfterKeyDown`, `ShowSuggestions`, `ShowSignatureHint`,
+`UpdateSignatureHint`, `HideSignatureHint`, `SetActiveParameter`, `OnLostFocus` (the hint window that takes the focus while it is shown does not
+close it), `RepositionHint`, `Language`, `Enabled`, `OnTyping`, `ApiSymbols`; through `IEditorCompletionHost` (the document, the caret, the typed
+word, the back colour, the windows of the list and of the hint, the focus, the word separators), implemented in
+`Controls/CodeEditorPP.Completion.cs`; Ctrl is a flag. Every golden and stand passes unchanged; the accessors of the run read the model's fields.
+
+Then the list: first a net: `tests/TextViewTests` has a list run on the real `SuggestionListForm` and `SuggestionListView` (1515 lines in all, the
+1433 of before did not change): the item a typed word selects with and without substrings (the same name, a name it starts, the nearest item
+before it), the items put on top and their order (the abbreviations of the capital letters, digits and words, exact first; a word that is the
+typed one or that it starts; the parts in the same letters, then in others; the rest grey), and the keys (Escape and Alt hide; Enter, Tab and a
+blank accept; a blank after a word the item does not continue, in other letters or longer, is typed instead; Home and End; the keys and the
+characters handed to the editor; a double click). Mono keeps the focused item when the selection is cleared, so a list with nothing focused
+cannot be shown there. Of 35 mutations of the old code 34 make it fail; the 35th is an equivalent change. A fault it found, kept as it is: after
+a filtered list the nearest item is counted in the filtered order and selected after the order is put back, so another item is selected. Then
+`Completion/SuggestionListMatch.cs` (public static): `Find` (the old `SelectMatch` on the names of the list: the index to select, or the indexes
+that go on top), `SplitWords`, `MapKey` (the old `HandleKey` and the keys the view handed on, as a `SuggestionListKeyAction`); the form keeps the
+items, their colours and the order, the view the window and the messages. Not word for word: the typed word is read once for a blank, not twice.
+`tests/EditorCompletionModelTests` (net8.0, compiled like `ModelBuildTests`, a fake editor over a real document and fake windows under the real
+controllers, 166 checks) drives both models; of 63 mutations of `EditorCompletion` 59 make a check fail (some after checks were added: a list
+of another language, a word that starts with 0, a hint window that closed by itself), four are equivalent changes; of 32 of `SuggestionListMatch`
+31 (one is equivalent).
+
+For the WPF view: `WpfTextEditor` keeps an `EditorCompletion` as `CodeEditorPP` does (the typing hooks, `AfterKeyPress` after a typed character,
+`AfterKeyDown` after a key, Escape, Ctrl+Space, the lost focus, the scroll) and `CompletionEnabled`, `CompletionOnTyping`, `CompletionLanguage`,
+`ApiSymbols`, `ShowCompletion`. `GUI/TextView/WpfSuggestionList` is the list on `SuggestionListMatch`: a popup under the caret that never takes
+the keyboard; the editor hands it its keys first (Up, Down and the pages move the selection, the rest as `MapKey`), a click selects and a double
+click accepts, the signature of the selected item is shown beside it; a click in the text and the lost focus close it.
+`GUI/TextView/WpfHintView` is the hint (the active parameter in bold, one per line for a vertical signature, the description, above the caret
+when the controller asks). The lab has switches for the completion and for completion on typing and takes the API symbols of the settings. Manual
+check on Windows (the lab): two letters of a word open the list (with completion on typing), Ctrl+Space; Up, Down, PageUp, PageDown, Home, End;
+Enter, Tab and a blank accept, a blank after a word the item does not continue is typed; a mark closes the list; Escape; a click on an item and a
+double click; the list near the bottom and the right edge of the screen; the hint of a function of the file and of a C library function (API
+symbols on): the parameter after a comma, closed after the call, Left and Right back into it, scrolled; the light and the dark theme; 100 %,
+150 % and 200 % scaling.
+
+3E puts the WPF text view of 3D in the editor tab in place of the WinForms editor: 3E-1 to 3E-3 give the view what `CodeEditorPP` still does that it
+has not (the commands of the editor and their keys; the search highlights, the marks of the blanks and the pair of a bracket; several cursors),
+3E-4 puts `RemoteFileEditor` on a text view it is given (as 3B-3 did for the hex view) with the panel, the tab, the status bar and the search on
+the WPF editor, and 3E-5 removes the WinForms editor, as 2E removed the WinForms terminals. The rules of stage 1 hold for what moves.
+
+Done in 3E-1 (the commands of the editor): first a net: `tests/TextViewTests` has a line command run on a real `CodeEditorPP` (a subclass with a
+comment style it is given), written by the code before the move (the 1515 lines of before did not change; 1623 in all, the same on every run):
+duplicate, move and delete of the caret line and of selected lines (the first and the last line, a selection that ends at the start of a line, a
+text without a final line break, a line before an empty last one), comment and uncomment (a selection, the caret line after its indentation, a
+mark with an end, no comment style), the transforms of the Text menu with and without a selection (sorting and duplicates need two lines, the
+caret moved with its text, a block that loses lines replaced and selected, a final line break added once), read-only, the undo step of each
+command, the zoom steps, a zoom set rounded and its limits with the `ZoomChanged` events, the moves to a bracket forward and back with and
+without the selection, and the key bindings (the keys with their modifiers in `KeyData`) that run them. Of 26 mutations of the old code 23 make it
+fail; three are equivalent changes (a transform that changes nothing makes an empty undo step; `RemoveLines` clears the selection itself;
+`SuppressKeyPress` sets `Handled`). A fault it found, kept as it is and not run by the stand: a search back for a bracket that goes over a pair
+whose opening bracket is the first token of its line never ends (the index before that bracket is -1, which the next turn of the loop reads as the
+end of the line, so the same closing bracket is met again); forward, the search goes over the pair the caret is in, and from a line without a
+token after the caret it goes on from the last token of the next line. Then `CodeEditing/LineCommands.cs` (public, through `ILineCommandHost`:
+the document, the caret, the selection, whether the lines can be edited, the tab size, the comment style, `ReplaceText`,
+`ExecuteAsSingleUndoStep`, `SetSelection`, `SetCaret`, `RemoveLines`, `UpdateMaxLineWidth`, implemented in `Controls/CodeEditorPP.LineEditing.cs`):
+`HasLineSelection`, `ApplyLineTransform`, `DuplicateLines`, `MoveLines`, `DeleteLines`, `ToggleComment`; `CodeEditing/TokenMoves.cs` (public
+static: `TryFind`, the search of `MoveToToken`; the view selects and moves the caret); `CodeEditing/EditorZoom.cs` (public static: `By`, `Round`,
+`Clamp`, `Min`, `Max`; `ReadonlyTextBrowser.MinFontZoom`/`MaxFontZoom` and the `FontZoom` setter take them from it). The code is as it was. Every
+golden and stand passes unchanged. `tests/LineCommandTests` (net8.0, compiled like `ModelBuildTests`, a fake view over a real document that logs
+what it is asked, the real token cache, 87 checks, the search that never ends on a background thread) drives them; of 31 mutations 28 made a
+check fail at once, one after a check was added (a line left without a match: the next one is searched from its first token), two are
+equivalent changes (a document has a line always; the line of a token is never past the text).
+
+For the WPF view: `WpfTextEditor` is an `IEditorCommandTarget` with the key bindings of `CodeEditorPP` (`KeyBindingMap` on `EditorCommands`,
+`SetKeyBindings` for those of the settings; a key that has a command runs it and nothing else, after an open word list has had its keys), the
+line commands through `LineCommands` (it is the `ILineCommandHost`), `MoveToToken` through `TokenMoves`, `Retokenize`, the folds, the completion,
+and the zoom (`FontZoom`, `ZoomBy`, `ResetZoom`, `SetZoom` with `EditorZoom`, `ZoomChanged`, Ctrl+wheel); `CommentStyle` is set by its owner. The
+commands of several cursors did nothing until 3E-3. The lab takes the zoom of the settings as `FontZoom` and the comment marks of the syntax, and
+shows the zoom. Manual check on Windows (the lab): Ctrl+Shift+D, Alt+Up, Alt+Down, Ctrl+Shift+K with the caret and with a selection of lines;
+Ctrl+/ in a C, a shell and an XML file (and the numpad /, and Ctrl+Shift+7 where / is Shift+7); Ctrl+Z after each; Ctrl+Alt+9 and Ctrl+Alt+0,
+Ctrl+Shift+9 and Ctrl+Shift+0, Ctrl+[ and Ctrl+], Ctrl+, and Ctrl+. ; Ctrl+R; Ctrl+Alt+Left and Right on a fold; Ctrl+Plus, Ctrl+Minus, Ctrl+0,
+the numpad keys and Ctrl+wheel (the size in the status line, the text crisp at 150 %); read-only.
+
+Done in 3E-2 (the search, the highlights and the marks): first a net: `tests/TextViewTests` has a search run on a real `CodeEditorPP`, written by the
+code before the move (the 1623 lines of before did not change; 1682 in all, the same on every run): `Find` forward and back, with and without a wrap,
+in a range (a match cut by its start or by its end on the last line, a caret above or below the range), the selection it makes (in terminal mode the
+end of the selection too), the column it scrolls to (a match in the first screen, far right, near the end of its line, wider than the screen); the
+cells the highlight of the matches fills, found by calling `PaintMatches` on a white bitmap and looking at a point of each cell (overlapping matches,
+a regular expression, terminal mode, a long line searched only around the screen with its cap of 500 matches); the range and the style of the
+highlight of the bracket at the caret (paired, unpaired, kept while a selection is made); the mark of every character (a hash of all, the list
+below U+3000); the cells of the marks of a line (any ink in the cell, `PaintInvisibleCharacters` on a white bitmap) and of the grey line under the
+tabs (`DrawToBitmap`, its exact colour at the middle of the row). Of 32 mutations of the old code 30 make it fail; two are equivalent changes (a
+space is white space anyway; a match left of the row is drawn only left of the view). Then `CodeEditing/TextSearch.cs` (public static: `TryFind`,
+the search of `ReadonlyTextBrowser.Find`; `ScrollColumnFor`, the column it scrolled to; `RowMatches`, the matches `PaintMatches` filled, as
+`MatchSpan`s), `CodeEditing/BracketPair.cs` (public static: `Find`, what `CodeEditorPP.OnSelectionChanged` decided, as a `BracketPairKind` the view
+maps to its styles, with `Keep` for a bracket token without text) and `CodeEditing/BlankMarks.cs` (public static: `Marker`, the old
+`GetInvisibleCharacterMarker`, and `LineMarks`, the walk of `PaintInvisibleCharacters`); the code is as it was, the views select, scroll, keep the
+highlights and paint. The grey line under the tabs stays in the painting of a line of the WinForms view. Not word for word: the matches of a row
+are all found before they are painted, so a matcher that throws in a row stops the highlight before that row instead of after its first matches.
+Every golden and stand passes unchanged; `EditorTextTests` reads the marks in their new file. `tests/TextSearchTests` (net8.0, compiled like
+`ModelBuildTests`, 100 checks) drives the three; of 48 mutations 42 make a check fail (two after checks were added: the columns of a long line
+after a tab, a match that ends where the row starts), six are equivalent changes (a document always has a line; a line out of the text has no
+text, so a range past the text needs no clamp; for a match as wide as the screen its middle and its start give the same column; the token found
+is always on the caret's line; one more turn past the last column adds no mark).
+
+For the WPF view: `WpfTextEditor` is an `ISearchTarget` (as `EditableTextBrowser` is): `Find` through `TextSearch` (the caret at the match, the
+selection to its end, the view scrolled to `ScrollColumnFor`; a failed search that clears the selection puts the caret at the end of the text,
+the WinForms view put it below the last line), `ReplaceAll`, `SetMatchHighlight` (the matches of a row drawn from `RowMatches`), `AddHighlight`,
+`SetHighlight`, `RemoveHighlight` (the fill and a frame of a pixel in the colours of the style; the text colour of a style is not used yet),
+`GetLineText`, `GetRangeText` and `RangeChanged`. It keeps the highlight of the pair of the bracket at the caret as `CodeEditorPP` does (`BracketPair`,
+the same styles, updated with the state of the caret) and draws the marks of the blanks (`ShowAllCharacters`, `BlankMarks`, in DarkGray; a mark
+the font has no glyph for is drawn as "?") and the grey line under the tabs (`ShowTabs`). The lab has switches for both marks and a find box
+(Enter, Shift+Enter, every match highlighted). Manual check on Windows (the lab): the find box forward and back with a wrap, a query that is not
+there, the highlight of all matches while scrolling sideways and in a file of some MB with a long line; the pair of a bracket as the caret moves
+past `(`, `)`, `[`, `{` and an unpaired one, and kept while a selection is made; All characters with spaces, tabs, a no-break space, a control
+character and the line ends (not after the last line); Tab lines with tabs at the start and in the middle of a line; word wrap on with both;
+the light and the dark theme.
+
+Done in 3E-3 (several cursors): first a net: `tests/TextViewTests` has a cursor run on a real `CodeEditorPP`, written by the code before the move (the
+1682 lines of before did not change; 1734 in all, the same on every run; the cursors are read from the session by reflection): Ctrl+D and Ctrl+Shift+L,
+Ctrl+Alt+Up and Down by their keys; typing, Enter, Backspace (also a level of spaces), Tab with spaces and with a tab, a control character; the keys
+that move the cursors with Shift and Ctrl, Ctrl+Backspace, Delete and Ctrl+Delete; the keys that go back to one cursor (Escape, the page keys,
+Ctrl+A, Ctrl+Home, Ctrl+End, Ctrl+Z, Ctrl+Y), a command for one cursor (duplicate, zoom), a caret set by something of one cursor and a click; the
+undo step of an edit; Copy, Cut and the paste of a line for each cursor and of one text for all; read-only. Alt+click is not in it (the view reads
+`Control.ModifierKeys`). Of 29 mutations of the old code 24 make it fail; five are equivalent changes (the same set shown again; an empty edit
+made; the cursors not brought into the text, which the plans never leave; PageUp left to the view, which clears the cursors when it moves the
+caret; an empty paste, which the view never hands on). Then `CodeEditing/MultiCursorSession.cs` (public) holds what `CodeEditorPP.MultiCursor`
+decided: the extra cursors, the main one taken from the caret and the selection, the column of the vertical moves, the whole-word mode of Ctrl+D,
+the anchor of Alt+Shift+click, `IsMultiCursorCommand`, `ClearExtraCursors`, `OnViewChanged` (a change that is not the cursors' own clears them),
+`AddNextOccurrence`, `SelectAllOccurrences`, `AddCursorAbove`/`Below`, `TypeCharacter`, `KeyDown` (as a `CursorKeyResult`), `TryCopyCursors`,
+`ForClipboard`, `TryCut`, `TryPaste`, `AltClick`, and the plans of `MultiCursor` made as one undo step, through `IMultiCursorHost` (the document, the
+caret, the selection, whether the cursors can edit, the indentation settings, `SetSelection`, `SetCaret`, `ReplaceText`, `ExecuteAsSingleUndoStep`,
+`UpdateMaxLineWidth`, `HideCompletion`, `Redraw`), which `CodeEditorPP` implements; the code is as it was, the control keeps the keyboard, the
+mouse, the clipboard and the painting of the other carets and selections. Every golden and stand passes unchanged. `tests/MultiCursorSessionTests`
+(net8.0, compiled like `ModelBuildTests`, a fake view over a real document that logs the edits and the undo steps it is asked for, 110 checks) drives it; all 42 mutations of it
+make a check fail.
+
+For the WPF view: `WpfTextEditor` is the `IMultiCursorHost` and keeps a `MultiCursorSession` as `CodeEditorPP` does: a key binding that is not a
+command of several cursors clears them first, then the keys of the session (with several cursors), the characters typed (Enter, Tab and Backspace
+as characters too) at every cursor, copy, cut and paste through the session, Alt+click and Alt+Shift+click (no selection by the mouse then), a click
+that clears the cursors and is the anchor of the next Alt+Shift+click, and `OnViewChanged` where the WinForms view called it (a caret set, a
+selection set, a line or a range changed); a new document clears them. The other selections are drawn as the background of the main one (not as in
+the WinForms view: the text in them keeps the colours of its syntax, and a selected line break is a cell), the other carets as bars while the caret shows. The lab shows the number of cursors. Manual check
+on Windows (the lab): Ctrl+D on a word and again, Ctrl+Shift+L, Ctrl+Alt+Up and Down, Alt+click to add and to take away a cursor, Alt+Shift+click
+down and up; typing, Enter, Tab, Backspace, Delete, Ctrl+Backspace, the arrows with Shift and Ctrl, Home and End at every cursor, then one Ctrl+Z;
+Copy and a paste of one line for each cursor, a paste of one text, Cut; Escape, a click, PageDown and Ctrl+Shift+D go back to one cursor; the cursors
+scrolled sideways and in wrapped lines; read-only.
+
+Done in 3E-4 (the editor tab on the WPF text view), in three parts. 3E-4a: `RemoteFileEditor` is no longer a `CodeEditorPP`: it is given its text view
+through `Controls/IRemoteTextView` (the calls it made on its base class: the document, the modified state of the text, read-only, the caret and the
+selection, the version and the saved mark of the undo history, a new document, the messages and their colours, the folds, the completion language,
+copy, cut, paste, delete and Select all, the colours and the font a hex view takes and their change, closing, posting to the thread of the view, the
+questions of the loading and the owner of the message boxes) and makes the WinForms one, `Controls/RemoteTextView : CodeEditorPP`, when it is given
+none (then it may make its own `HexEditorControl` too, which that view hosts). `RemoteTextView` is the old base with what the editor overrode of it:
+the modified state, copy, cut, paste, delete and Select all go to the editor (which sends them to the hex view while that is shown), the comment
+style is the editor's, and a change of the colours or the font goes to the hosted hex control and to the editor; the posts, the dispatcher and the
+prompt of the loading are the old ones of the control. The editor is `IDisposable` (it closes its view) and has a `Tag`. The Mono stand passed
+unchanged (486 checks), only its accessors of the view following (`TextControl`). 3E-4b: what `RemoteFileEditorPanel` decided about the commands of the
+tab is `Controls/RemoteFileEditorCommands.cs` (the events of the commands the main window runs, `RunCommand`, `RunTransform`, `CaptureState`,
+`CommandState`, `RefreshState` with `StateChanged`, `ScheduleRefresh` posted by the tab, the subscriptions to the editor and its hex view), the members as
+they were (compared text for text), with the text view behind `IRemoteTextView`, which got the members they read and run (undo and redo, the marks,
+the wrap, the lines, the selected lines, the transforms); the panel keeps its WinForms context menu, which runs them and follows their state, and the
+WPF tool bar, the WPF hex context menu, the status source, the tab and the main window use them. The old panel cannot be made under Mono, so no net
+of the old code drove it; the stand got a `commands` scenario after the move (the commands on the real editor and file: the state of a file just
+loaded, a refresh asked for three times posted once, a disabled command, the marks and the wrap with their events, the commands that go to the main
+window, Sort Ascending with Undo and Redo, the hex view with the inspector and a dialog, Reload with its question and without a change, the text of an
+empty, a one-letter and a line-break file; 554 checks on both servers), and all 8 mutations of the commands make it fail (two after cases were added).
+`EditorTextTests` reads the toggle of the marks and the editor's calls on its text view in their new places. 3E-4c (new code, not a move): the tab gives
+the editor the WPF text view (`WpfTextEditor` is an `IRemoteTextView`: `Close`, `IsClosed` and `Closed`, `GoToPosition`, `CopyAll`, `LineCount`, the
+appearance for the hex view raised by `SetColors`, `SetFont` and the zoom, the folds of a reload, and `GUI/TextView/WpfViewDispatcher` for the posts and the
+questions of the loading on its dispatcher, nothing once it is closed) and shows it and the WPF hex view in one grid: no `WindowsFormsHost` is left in
+the tab, and its scroll bars are those the views draw (the tab's are null). The tab owns the `RemoteFileEditorCommands` (refreshed after the view's
+`StateChanged`, `RangeChanged` and `KeyUp`), the tool bar, the status bar, the search bar on the WPF view and its context menu
+(`GUI/TextView/TextViewContextMenu`: the commands of the WinForms menu and the Text submenu). The main window gives the WPF view the settings (the
+colours, Courier New of 12 points at the zoom, as the WinForms editor had, the tab size, the indentation, the line numbers, the marks, the wrap, the
+completion), the colours of the syntax (`SetSyntax`) and the zoom of all the tabs, keeps the keys of the old `KeyDown` handler of the editor (Ctrl+S,
+Ctrl+O, Ctrl+W, Ctrl+H, Ctrl+G, F5, F3 and Shift+F3) and Ctrl+Tab on `PreviewKeyDown`, the release of Ctrl on `KeyUp`, the edges of the minimalistic mode
+on `MouseMove` and the title on `ModifiedChanged`; copy, paste and copy all of the main window go to the editor of an editor tab, and
+`ITabContext.EditorControl` (a WinForms text view, which no tab has now) is gone. The WinForms view and panel stay for the Mono stand until 3E-5. Not as
+before: the selections of the other cursors (3E-3), and the editor's own context menu of the WPF view is replaced by the tab's. Manual check on
+Windows, in a file tab: the checklists of 3D-2 to 3E-3 in the tab; opening a file (a new one, one without the right to write, a large one with its
+question, a preview), the draft question after a lost connection, Ctrl+S and the save in the background, a conflict, sudo, the check of a script with its
+messages in the text and the caret on the problem, the offer to reload a service, Reload from the tool bar with and without a change, the encodings
+and the line ends from the status bar, Show Changes, Run (F5) and Follow Log, Ctrl+F, Ctrl+H, F3 and Shift+F3 with the search bar, Ctrl+G, Ctrl+W
+with unsaved changes, Ctrl+Tab between tabs, the context menu (each item, the Text submenu), the hex view and back (Ctrl+S, Ctrl+F, Ctrl+G and F3 in it),
+the zoom shared by the tabs, the theme switched while a tab is open, the settings window applied to an open tab, and the minimalistic mode at the edges.

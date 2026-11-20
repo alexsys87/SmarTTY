@@ -12,7 +12,7 @@ namespace SmarTTY.GUI.Backend;
 /// <summary>
 /// The status bar below the remote file editor: the file, whether it is saved, the caret, the selection, and the
 /// encoding and the line endings, which are menus. WPF scales it for high-DPI monitors by itself, as the tool bar above
-/// the editor. It reads the editor when the panel reports a change (see <see cref="RemoteFileEditorPanel.StateChanged"/>).
+/// the editor. It reads the editor when the panel reports a change (see <see cref="RemoteFileEditorCommands.StateChanged"/>).
 /// </summary>
 internal sealed class RemoteFileEditorStatusBar : StatusBar
 {

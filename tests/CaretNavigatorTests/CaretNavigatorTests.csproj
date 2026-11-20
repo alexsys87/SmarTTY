@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../CodeEditing/CaretNavigator.cs" Link="CaretNavigator.cs" />
+    <Compile Include="../../CodeEditing/WrapMap.cs" Link="WrapMap.cs" />
+    <Compile Include="../../CodeEditing/TextSelection.cs" Link="TextSelection.cs" />
+    <Compile Include="../../CodeEditing/UndoHistory.cs" Link="UndoHistory.cs" />
+    <Compile Include="../../CodeEditing/IndentEdits.cs" Link="IndentEdits.cs" />
+    <Compile Include="../../CodeEditing/TextEditCommands.cs" Link="TextEditCommands.cs" />
+    <Compile Include="../../CodeEditing/TextTyping.cs" Link="TextTyping.cs" />
+    <Compile Include="../../CodeEditing/TextReplace.cs" Link="TextReplace.cs" />
+    <Compile Include="../../TextEditing/TextMatcher.cs" Link="TextMatcher.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <Compile Include="../../CodeEditing/LineWrapper.cs" Link="LineWrapper.cs" />
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+    <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
+    <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
+  </ItemGroup>
+</Project>

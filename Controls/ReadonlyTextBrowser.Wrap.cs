@@ -8,35 +8,38 @@ namespace SmarTTY.Controls;
 
 // Word wrap. The scroll position (ScrollLine, the vertical scroll bar) counts display rows instead of lines while
 // the text is wrapped: a long line takes several rows, and every row shows the columns [SegStart, SegEnd) of its line.
-// Folded blocks and virtual lines are not shown meanwhile.
-public partial class ReadonlyTextBrowser
+// Folded blocks and virtual lines are not shown meanwhile. Where the lines break is CodeEditing/WrapMap (stage 3C);
+// this partial keeps the width, the rows on the screen and the scrolling.
+public partial class ReadonlyTextBrowser : IWrapMapSource
 {
     private bool _wordWrap;
 
     // The width in columns the lines are wrapped to; set by UpdateLayout.
     private int _wrapWidth = 80;
 
-    private int _wrapBuiltWidth = -1;
-
-    private int _wrapBuiltTabSize = -1;
-
-    private bool _wrapDirty = true;
-
     private bool _wrapRefreshPending;
 
-    // Per line: the display columns where the rows after the first one start (null: the line takes one row).
-    private int[][] _wrapBreaks = new int[0][];
-
-    // Per line: the index of its first row; one more entry holds the number of all rows.
-    private int[] _wrapFirstRow = new int[] { 0 };
+    // Where the lines break (made when it is first used: the base classes may ask before the constructor has run).
+    private WrapMap _wrap;
 
     // While a row is painted: the display column its left edge shows, and the last column that belongs to it (-1: none).
     private int _rowOrigin = -1;
 
     private int _rowLastColumn = -1;
 
-    // Where the caret column sits inside its row, kept while the caret moves up and down.
-    private int _desiredWrapOffset;
+    /// <summary>Where the lines break while word wrap is on.</summary>
+    internal WrapMap WrapLayout => _wrap ?? (_wrap = new WrapMap(this));
+
+    int IWrapMapSource.LineCount => _document.LineCount;
+
+    string IWrapMapSource.GetLineText(int line)
+    {
+        return _document.GetLineText(line);
+    }
+
+    int IWrapMapSource.WrapWidth => _wrapWidth;
+
+    int IWrapMapSource.TabSize => TabSize;
 
     /// <summary>Long lines continue on the next row instead of scrolling sideways.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -55,7 +58,7 @@ public partial class ReadonlyTextBrowser
             bool wasWrapping = IsWrapping;
             int topLine = wasWrapping ? RowIndexToLine(ScrollLine, out _) : ScrollLine;
             _wordWrap = value;
-            _wrapDirty = true;
+            WrapLayout.Invalidate();
             if (_verticalScrollBar == null || _horizontalScrollBar == null)
             {
                 return;
@@ -66,7 +69,7 @@ public partial class ReadonlyTextBrowser
                 // Limits first: the scroll bar clamps the value to them.
                 UpdateLayout();
                 EnsureWrapMap();
-                ScrollLine = _wrapFirstRow[Math.Min(topLine, _document.LineCount)];
+                ScrollLine = WrapLayout.FirstRows[Math.Min(topLine, _document.LineCount)];
             }
             else
             {
@@ -93,8 +96,7 @@ public partial class ReadonlyTextBrowser
         {
             if (IsWrapping)
             {
-                EnsureWrapMap();
-                return _wrapFirstRow[_wrapFirstRow.Length - 1];
+                return WrapLayout.RowCount;
             }
             return LineCount;
         }
@@ -107,7 +109,7 @@ public partial class ReadonlyTextBrowser
         {
             return;
         }
-        _wrapDirty = true;
+        WrapLayout.Invalidate();
         if (_wrapRefreshPending || !IsHandleCreated)
         {
             return;
@@ -127,96 +129,41 @@ public partial class ReadonlyTextBrowser
 
     private void EnsureWrapMap()
     {
-        int lineCount = _document.LineCount;
-        if (!_wrapDirty && _wrapBuiltWidth == _wrapWidth && _wrapBuiltTabSize == TabSize && _wrapBreaks.Length == lineCount)
-        {
-            return;
-        }
-        int[][] breaks = new int[lineCount][];
-        int[] firstRow = new int[lineCount + 1];
-        int rows = 0;
-        for (int line = 0; line < lineCount; line++)
-        {
-            firstRow[line] = rows;
-            int[] lineBreaks = LineWrapper.ComputeBreaks(_document.GetLineText(line), _wrapWidth, TabSize);
-            breaks[line] = lineBreaks;
-            rows += 1 + (lineBreaks == null ? 0 : lineBreaks.Length);
-        }
-        firstRow[lineCount] = rows;
-        _wrapBreaks = breaks;
-        _wrapFirstRow = firstRow;
-        _wrapBuiltWidth = _wrapWidth;
-        _wrapBuiltTabSize = TabSize;
-        _wrapDirty = false;
+        WrapLayout.Ensure();
     }
 
     /// <summary>The line and the row of that line (0 for the first) shown at a row index.</summary>
     private int RowIndexToLine(int rowIndex, out int segment)
     {
-        EnsureWrapMap();
-        int lineCount = _document.LineCount;
-        if (lineCount == 0 || rowIndex <= 0)
-        {
-            segment = 0;
-            return 0;
-        }
-        int low = 0;
-        int high = lineCount - 1;
-        while (low < high)
-        {
-            int middle = (low + high + 1) / 2;
-            if (_wrapFirstRow[middle] <= rowIndex)
-            {
-                low = middle;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-        segment = Math.Min(rowIndex - _wrapFirstRow[low], _wrapBreaks[low] == null ? 0 : _wrapBreaks[low].Length);
-        return low;
+        return WrapLayout.RowIndexToLine(rowIndex, out segment);
     }
 
     /// <summary>The row of a line (0 for the first) that shows a display column.</summary>
     private int WrapSegmentOf(int line, int displayColumn)
     {
-        EnsureWrapMap();
-        if (line < 0 || line >= _wrapBreaks.Length || _wrapBreaks[line] == null)
-        {
-            return 0;
-        }
-        int[] lineBreaks = _wrapBreaks[line];
-        int segment = 0;
-        while (segment < lineBreaks.Length && lineBreaks[segment] <= displayColumn)
-        {
-            segment++;
-        }
-        return segment;
+        return WrapLayout.SegmentOf(line, displayColumn);
     }
 
     private int WrapSegmentStart(int line, int segment)
     {
-        return (segment == 0 || _wrapBreaks[line] == null) ? 0 : _wrapBreaks[line][segment - 1];
+        return WrapLayout.SegmentStart(line, segment);
     }
 
     private int WrapSegmentEnd(int line, int segment)
     {
-        int[] lineBreaks = _wrapBreaks[line];
-        return (lineBreaks == null || segment >= lineBreaks.Length) ? int.MaxValue : lineBreaks[segment];
+        return WrapLayout.SegmentEnd(line, segment);
     }
 
     private int PositionToRowIndex(int line, int displayColumn)
     {
-        EnsureWrapMap();
-        line = Math.Max(0, Math.Min(line, _wrapBreaks.Length - 1));
-        return _wrapFirstRow[line] + WrapSegmentOf(line, displayColumn);
+        return WrapLayout.PositionToRowIndex(line, displayColumn);
     }
 
     private void RebuildWrappedRows()
     {
         EnsureWrapMap();
-        int rowCount = _wrapFirstRow[_wrapFirstRow.Length - 1];
+        int[][] breaks = WrapLayout.Breaks;
+        int rowCount = WrapLayout.FirstRows[WrapLayout.FirstRows.Length - 1];
         int top = Math.Min(ScrollLine, Math.Max(rowCount - 1, 0));
         int line = RowIndexToLine(top, out int segment);
         _firstVisibleLine = line;
@@ -241,7 +188,7 @@ public partial class ReadonlyTextBrowser
             _displayRows[row].Continuation = segment > 0;
             _lastVisibleLine = line;
             segment++;
-            if (_wrapBreaks[line] == null || segment > _wrapBreaks[line].Length)
+            if (breaks[line] == null || segment > breaks[line].Length)
             {
                 line++;
                 segment = 0;
@@ -273,43 +220,6 @@ public partial class ReadonlyTextBrowser
         x = ColumnToXFrom(displayColumn, segmentStart);
         y = RowToY(row);
         return true;
-    }
-
-    /// <summary>Moves a page of display rows up or down; at the top or the bottom the caret goes to the first or the last row.</summary>
-    private TextDocument.TextPosition MoveWrappedRows(TextDocument.TextPosition textPosition, int rows)
-    {
-        int column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
-        int rowIndex = PositionToRowIndex(textPosition.Line, column);
-        int target = Math.Max(0, Math.Min(rowIndex + rows, ScrollRowCount - 1));
-        if (target == rowIndex)
-        {
-            return textPosition;
-        }
-        return MoveWrappedRow(textPosition, target - rowIndex);
-    }
-
-    /// <summary>Moves up or down by display rows, keeping the caret column inside the row.</summary>
-    private TextDocument.TextPosition MoveWrappedRow(TextDocument.TextPosition textPosition, int direction)
-    {
-        int column = _document.IndexToColumn(textPosition.Line, textPosition.Column, TabSize);
-        int rowIndex = PositionToRowIndex(textPosition.Line, column);
-        int target = rowIndex + direction;
-        if (target < 0 || target >= ScrollRowCount)
-        {
-            return textPosition;
-        }
-        int offset = _desiredColumn == -1 ? column - WrapSegmentStart(textPosition.Line, WrapSegmentOf(textPosition.Line, column)) : _desiredWrapOffset;
-        int line = RowIndexToLine(target, out int segment);
-        int targetColumn = WrapSegmentStart(line, segment) + offset;
-        int segmentEnd = WrapSegmentEnd(line, segment);
-        if (segmentEnd != int.MaxValue)
-        {
-            targetColumn = Math.Min(targetColumn, segmentEnd - 1);
-        }
-        int index = _document.ColumnToIndex(line, targetColumn, TabSize);
-        textPosition.Line = line;
-        textPosition.Column = Math.Min(index, _document.GetLineText(line).Length);
-        return textPosition;
     }
 
     private bool EnsureWrappedVisible(TextDocument.TextPosition textPosition, bool center)

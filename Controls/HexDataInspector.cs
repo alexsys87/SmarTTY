@@ -11,46 +11,29 @@ namespace SmarTTY.Controls;
 /// The data inspector beside the bytes of <see cref="HexEditorControl"/>: the bytes at the caret read as integers of
 /// every size, floating point numbers, a 32-bit time and a UTF-8 character, in the byte order of the editor. A click on
 /// the byte order switches it; a double-click (or Enter) on a value lets the user type a new one, which replaces the
-/// bytes at the caret; Ctrl+C copies the chosen value.
+/// bytes at the caret; Ctrl+C copies the chosen value. What it decides is <see cref="HexInspectorModel"/>; this control
+/// draws it, keeps the edit box and the focus, and uses the clipboard.
 /// </summary>
 internal sealed class HexDataInspector : Control
 {
     private const TextFormatFlags TextFlags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis;
 
-    private const int InnerMargin = 6;
+    private const int InnerMargin = HexInspectorModel.InnerMargin;
 
-    private const int LabelChars = 12;
+    private const int LabelChars = HexInspectorModel.LabelChars;
 
-    private const int ValueChars = 25;
-
-    // The rows above the values: the title and the byte order.
-    private const int ValueRowsStart = 2;
+    private const int ValueChars = HexInspectorModel.ValueChars;
 
     private readonly HexEditorControl _owner;
 
+    private readonly HexInspectorModel _model;
+
     private readonly TextBox _editBox = new TextBox();
-
-    // The value being edited, and the value row chosen with the mouse or the arrow keys (-1: none).
-    private HexValueType? _editing;
-
-    // The text the edit box was filled with.
-    private string _editOriginalText;
-
-    private int _selectedRow = -1;
-
-    private int _hoverRow = -1;
-
-    // The answer to the last edit: an error, or empty.
-    private string _message = "";
-
-    private bool _messageIsError;
-
-    // The offset the message is about: it goes away when the caret moves on.
-    private int _messageOffset = -1;
 
     public HexDataInspector(HexEditorControl owner)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        _model = new HexInspectorModel(owner);
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, value: true);
         TabStop = true;
         _editBox.Visible = false;
@@ -68,8 +51,6 @@ internal sealed class HexDataInspector : Control
     private int RowHeight => Math.Max(1, TextRenderer.MeasureText("0", Font, new Size(1000, 1000), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Height) + 3;
 
     private int ValueX => InnerMargin + LabelChars * CharWidth;
-
-    private static IReadOnlyList<HexValueType> Types => HexValueFormats.InspectorTypes;
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -89,58 +70,51 @@ internal sealed class HexDataInspector : Control
         int rowHeight = RowHeight;
         int valueX = ValueX;
         int width = Width - valueX - InnerMargin;
-        int y = 2;
-        TextRenderer.DrawText(graphics, "DATA INSPECTOR", Font, new Point(InnerMargin, y), dim, TextFlags);
+        int y = HexInspectorModel.TitleTop;
+        TextRenderer.DrawText(graphics, HexInspectorModel.Title, Font, new Point(InnerMargin, y), dim, TextFlags);
         Rectangle hide = HideLinkBounds;
         TextRenderer.DrawText(graphics, HideText, Font, new Point(hide.X, y), link, TextFlags);
-        y += rowHeight + 4;
+        y += rowHeight + HexInspectorModel.BlockGap;
 
         DrawText(graphics, "Byte order", new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), dim);
-        DrawText(graphics, _owner.BigEndian ? "Big endian" : "Little endian", new Rectangle(valueX, y, width, rowHeight), link);
+        DrawText(graphics, _model.ByteOrderText, new Rectangle(valueX, y, width, rowHeight), link);
         y += rowHeight;
 
-        byte[] bytes = _owner.GetBytesAtCaret(8);
-        bool readOnly = _owner.ReadOnly;
-        for (int index = 0; index < Types.Count; index++)
+        IReadOnlyList<HexInspectorRow> rows = _model.ReadRows();
+        int selectedRow = _model.SelectedRow;
+        for (int index = 0; index < rows.Count; index++)
         {
-            HexValueType type = Types[index];
+            HexInspectorRow row = rows[index];
             Rectangle rowBounds = new Rectangle(1, y, Width - 1, rowHeight);
-            if (index == _selectedRow && Focused)
+            if (index == selectedRow && Focused)
             {
                 using SolidBrush selection = new SolidBrush(SystemColors.Highlight);
                 graphics.FillRectangle(selection, rowBounds);
             }
-            else if (index == _hoverRow || index == _selectedRow)
+            else if (index == _model.HoverRow || index == selectedRow)
             {
                 using SolidBrush hover = new SolidBrush(HexEditorControl.Blend(back, fore, 0.1f));
                 graphics.FillRectangle(hover, rowBounds);
             }
-            bool selected = index == _selectedRow && Focused;
-            string label = HexValueFormats.GetName(type) + (HexValueFormats.UsesByteOrder(type) ? (_owner.BigEndian ? " BE" : " LE") : "");
-            DrawText(graphics, label, new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), selected ? SystemColors.HighlightText : dim);
-            bool known = HexValueFormats.TryRead(bytes, type, _owner.BigEndian, out string value);
-            DrawText(graphics, known ? value : "-", new Rectangle(valueX, y, width, rowHeight), selected ? SystemColors.HighlightText : (known ? fore : dim));
+            bool selected = index == selectedRow && Focused;
+            DrawText(graphics, row.Label, new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), selected ? SystemColors.HighlightText : dim);
+            DrawText(graphics, row.Value, new Rectangle(valueX, y, width, rowHeight), selected ? SystemColors.HighlightText : (row.Known ? fore : dim));
             y += rowHeight;
         }
 
-        y += 4;
-        int offset = _owner.HasSelection ? _owner.SelectionStart : _owner.CaretOffset;
-        if (offset != _messageOffset && _editing == null)
-        {
-            _message = "";
-            _messageIsError = false;
-        }
+        y += HexInspectorModel.BlockGap;
+        _model.ForgetMessageIfMoved();
         DrawText(graphics, "Offset", new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), dim);
-        DrawText(graphics, "0x" + offset.ToString("X8", CultureInfo.InvariantCulture) + " (" + offset.ToString(CultureInfo.InvariantCulture) + ")",
-            new Rectangle(valueX, y, width, rowHeight), fore);
+        DrawText(graphics, _model.OffsetText, new Rectangle(valueX, y, width, rowHeight), fore);
         y += rowHeight;
-        if (_owner.HasSelection)
+        string selectionText = _model.SelectionText;
+        if (selectionText != null)
         {
             DrawText(graphics, "Selection", new Rectangle(InnerMargin, y, valueX - InnerMargin, rowHeight), dim);
-            DrawText(graphics, HexEditorControl.FormatByteCount(_owner.SelectionLength), new Rectangle(valueX, y, width, rowHeight), fore);
+            DrawText(graphics, selectionText, new Rectangle(valueX, y, width, rowHeight), fore);
             y += rowHeight;
         }
-        HexHighlight highlight = _owner.Document.GetHighlightAt(offset);
+        HexHighlight highlight = _model.Highlight;
         if (highlight != null)
         {
             Rectangle swatch = new Rectangle(InnerMargin, y + 3, rowHeight - 6, rowHeight - 6);
@@ -149,17 +123,13 @@ internal sealed class HexDataInspector : Control
                 graphics.FillRectangle(brush, swatch);
             }
             DrawText(graphics, "Marked", new Rectangle(InnerMargin + rowHeight, y, valueX - InnerMargin - rowHeight, rowHeight), dim);
-            string text = highlight.Label.Length > 0 ? highlight.Label : HexEditorControl.FormatByteCount(highlight.Length);
-            DrawText(graphics, text, new Rectangle(valueX, y, width, rowHeight), fore);
+            DrawText(graphics, HexInspectorModel.HighlightText(highlight), new Rectangle(valueX, y, width, rowHeight), fore);
             y += rowHeight;
         }
 
-        y += 4;
-        string hint = _message.Length > 0
-            ? _message
-            : (readOnly ? "Click the byte order to switch it." : "Double-click a value to change it.");
+        y += HexInspectorModel.BlockGap;
         Rectangle hintBounds = new Rectangle(InnerMargin, y, Width - 2 * InnerMargin, Math.Max(rowHeight, Height - y));
-        TextRenderer.DrawText(graphics, hint, Font, hintBounds, _messageIsError ? error : dim,
+        TextRenderer.DrawText(graphics, _model.Hint, Font, hintBounds, _model.MessageIsError ? error : dim,
             TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak);
     }
 
@@ -169,7 +139,7 @@ internal sealed class HexDataInspector : Control
         TextRenderer.DrawText(graphics, text, Font, new Rectangle(bounds.X, y, Math.Max(1, bounds.Width), Font.Height), color, TextFlags);
     }
 
-    private const string HideText = "Hide (Ctrl+I)";
+    private const string HideText = HexInspectorModel.HideText;
 
     // The link in the title row that hides the inspector.
     private Rectangle HideLinkBounds
@@ -184,24 +154,13 @@ internal sealed class HexDataInspector : Control
     /// <summary>The value row under <paramref name="y"/>, or -1; -2 for the byte order.</summary>
     private int RowAt(int y)
     {
-        int rowHeight = RowHeight;
-        int first = 2 + rowHeight + 4;
-        if (y < first)
-        {
-            return -1;
-        }
-        int row = (y - first) / rowHeight - (ValueRowsStart - 1);
-        if (row == -1)
-        {
-            return -2;
-        }
-        return (row >= 0 && row < Types.Count) ? row : -1;
+        return HexInspectorModel.RowAt(y, RowHeight);
     }
 
     private Rectangle ValueBounds(int row)
     {
         int rowHeight = RowHeight;
-        int y = 2 + rowHeight + 4 + (row + ValueRowsStart - 1) * rowHeight;
+        int y = HexInspectorModel.ValueRowTop(row, rowHeight);
         return new Rectangle(ValueX - 3, y, Math.Max(20, Width - ValueX - InnerMargin + 3), rowHeight);
     }
 
@@ -209,11 +168,9 @@ internal sealed class HexDataInspector : Control
     {
         base.OnMouseMove(e);
         int row = RowAt(e.Y);
-        Cursor = ((row == -2 && e.X >= ValueX) || HideLinkBounds.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
-        int hover = Math.Max(-1, row);
-        if (hover != _hoverRow)
+        Cursor = HexInspectorModel.IsLink(row, e.X >= ValueX, HideLinkBounds.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        if (_model.SetHover(row))
         {
-            _hoverRow = hover;
             Invalidate();
         }
     }
@@ -221,9 +178,8 @@ internal sealed class HexDataInspector : Control
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
-        if (_hoverRow != -1)
+        if (_model.SetHover(-1))
         {
-            _hoverRow = -1;
             Invalidate();
         }
     }
@@ -235,23 +191,20 @@ internal sealed class HexDataInspector : Control
         {
             return;
         }
-        if (HideLinkBounds.Contains(e.Location))
-        {
-            _owner.ShowDataInspector = false;
-            _owner.Focus();
-            return;
-        }
         int row = RowAt(e.Y);
-        if (row == -2)
+        switch (_model.Press(row, HideLinkBounds.Contains(e.Location)))
         {
-            _owner.BigEndian = !_owner.BigEndian;
-            _owner.Focus();
-            return;
+            case HexInspectorCommand.HideInspector:
+                _owner.ShowDataInspector = false;
+                _owner.Focus();
+                return;
+            case HexInspectorCommand.FocusEditor:
+                _owner.Focus();
+                return;
         }
         Focus();
         if (row >= 0)
         {
-            _selectedRow = row;
             Invalidate();
         }
     }
@@ -279,32 +232,22 @@ internal sealed class HexDataInspector : Control
         {
             return;
         }
-        switch (e.KeyCode)
+        switch (_model.Key(e.KeyCode.ToVirtualKey(), e.Control))
         {
-            case Keys.Up:
-                _selectedRow = Math.Max(0, _selectedRow - 1);
+            case HexInspectorCommand.BeginEdit:
+                BeginEdit(_model.SelectedRow);
                 break;
-            case Keys.Down:
-                _selectedRow = Math.Min(Types.Count - 1, _selectedRow + 1);
-                break;
-            case Keys.Enter:
-            case Keys.F2:
-                if (_selectedRow >= 0)
-                {
-                    BeginEdit(_selectedRow);
-                }
-                break;
-            case Keys.Escape:
+            case HexInspectorCommand.FocusEditor:
                 _owner.Focus();
                 break;
-            case Keys.I when e.Control:
+            case HexInspectorCommand.HideInspector:
                 _owner.ShowDataInspector = false;
                 _owner.Focus();
                 break;
-            case Keys.C when e.Control:
+            case HexInspectorCommand.CopyValue:
                 CopySelectedValue();
                 break;
-            default:
+            case HexInspectorCommand.NotHandled:
                 return;
         }
         e.Handled = true;
@@ -315,10 +258,7 @@ internal sealed class HexDataInspector : Control
     protected override void OnGotFocus(EventArgs e)
     {
         base.OnGotFocus(e);
-        if (_selectedRow < 0)
-        {
-            _selectedRow = 0;
-        }
+        _model.OnFocused();
         Invalidate();
     }
 
@@ -330,14 +270,15 @@ internal sealed class HexDataInspector : Control
 
     private void CopySelectedValue()
     {
-        if (_selectedRow < 0 || !HexValueFormats.TryRead(_owner.GetBytesAtCaret(8), Types[_selectedRow], _owner.BigEndian, out string value))
+        if (!_model.TryGetSelectedValue(out string value))
         {
             return;
         }
         try
         {
             Clipboard.SetText(value);
-            ShowMessage(HexValueFormats.GetName(Types[_selectedRow]) + " copied.", isError: false);
+            _model.Copied();
+            Invalidate();
         }
         catch (Exception exception)
         {
@@ -347,28 +288,11 @@ internal sealed class HexDataInspector : Control
 
     private void BeginEdit(int row)
     {
-        if (_owner.ReadOnly)
+        if (!_model.BeginEdit(row, out string value))
         {
-            ShowMessage("The file cannot be changed now.", isError: true);
+            Invalidate();
             return;
         }
-        HexValueType type = Types[row];
-        _selectedRow = row;
-        _editing = type;
-        HexValueFormats.TryRead(_owner.GetBytesAtCaret(8), type, _owner.BigEndian, out string value);
-        if (type == HexValueType.Utf8Char)
-        {
-            // Only the character itself, without its code.
-            int quote = value.LastIndexOf('\'');
-            value = (value.StartsWith("'", StringComparison.Ordinal) && quote > 0) ? value.Substring(1, quote - 1) : "";
-        }
-        else if (type == HexValueType.UnixTime32 && value.EndsWith(" UTC", StringComparison.Ordinal))
-        {
-            value = value.Substring(0, value.Length - 4);
-        }
-        // What the box starts with: Enter on a value that was not changed writes nothing (a float or a time shown rounded
-        // would be written back rounded, and the bytes would change with nothing typed).
-        _editOriginalText = value;
         Rectangle bounds = ValueBounds(row);
         _editBox.Font = Font;
         _editBox.BackColor = _owner.BackColor;
@@ -378,7 +302,7 @@ internal sealed class HexDataInspector : Control
         _editBox.Visible = true;
         _editBox.Focus();
         _editBox.SelectAll();
-        ShowMessage("Enter writes the value at the caret (" + (_owner.BigEndian ? "big" : "little") + " endian), Esc cancels.", isError: false);
+        Invalidate();
     }
 
     private void OnEditBoxKeyDown(object sender, KeyEventArgs e)
@@ -387,7 +311,7 @@ internal sealed class HexDataInspector : Control
         {
             e.Handled = true;
             e.SuppressKeyPress = true;
-            ShowMessage("", isError: false);
+            _model.CancelEdit();
             EndEdit();
             Focus();
         }
@@ -395,34 +319,24 @@ internal sealed class HexDataInspector : Control
         {
             e.Handled = true;
             e.SuppressKeyPress = true;
-            if (_editing == null)
+            switch (_model.Commit(_editBox.Text))
             {
-                return;
-            }
-            if (string.Equals(_editBox.Text, _editOriginalText, StringComparison.Ordinal))
-            {
-                ShowMessage("Unchanged: nothing written.", isError: false);
-                EndEdit();
-                Focus();
-                return;
-            }
-            if (_owner.WriteValue(_editing.Value, _editBox.Text, out string error))
-            {
-                ShowMessage(HexValueFormats.GetName(_editing.Value) + " written: Ctrl+Z in the bytes undoes it.", isError: false);
-                EndEdit();
-                Focus();
-            }
-            else
-            {
-                ShowMessage(error, isError: true);
-                _editBox.SelectAll();
+                case HexInspectorCommit.Unchanged:
+                case HexInspectorCommit.Written:
+                    EndEdit();
+                    Focus();
+                    break;
+                case HexInspectorCommit.Rejected:
+                    Invalidate();
+                    _editBox.SelectAll();
+                    break;
             }
         }
     }
 
     private void EndEdit()
     {
-        _editing = null;
+        _model.EndEdit();
         if (_editBox.Visible)
         {
             _editBox.Visible = false;
@@ -432,9 +346,7 @@ internal sealed class HexDataInspector : Control
 
     private void ShowMessage(string message, bool isError)
     {
-        _message = message ?? "";
-        _messageIsError = isError;
-        _messageOffset = _owner.HasSelection ? _owner.SelectionStart : _owner.CaretOffset;
+        _model.ShowMessage(message, isError);
         Invalidate();
     }
 

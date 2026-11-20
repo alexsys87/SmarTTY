@@ -1,0 +1,2415 @@
+using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
+using SmarTTY.Controls;
+using SmarTTY.TextEditing;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Text;
+using System.Windows.Forms;
+using K = System.Windows.Forms.Keys;
+
+// Drives the real text view (Controls/ReadonlyTextBrowser.cs, through a TextEditorControl shown in a form) and writes down where its caret goes,
+// so that the moves of the caret and the wrap map can be taken out of the control (stage 3C) without changing what they do:
+//   - for every position of a document of 30 lines (empty lines, tabs, words with punctuation, letters that are not ASCII, blanks, a line longer
+//     than the wrap width) the target of each navigation key (Left, Right, Up, Down, Home, End, PageUp, PageDown, as the key handler finds it),
+//     of the word moves and of Ctrl+Home and Ctrl+End (asked of ComputeMovedPosition with the keys, because a test cannot hold Ctrl), and the
+//     word under the caret (TryGetWordBounds);
+//   - runs of keys through the real key handler, where Up, Down and the pages keep the column the caret came from;
+//   - the same with word wrap at 20 columns, and the wrap map (the breaks of every line, the line and the row of every row index, the row index
+//     of positions).
+//   - the selection (3C-2): the clicks, the margin, a drag, the buttons, a key without Shift, Select all, a range of lines, the setters and the
+//     selected lines, also in terminal mode (SelectionRuns).
+//   - the edits and their undo (3C-3): ReplaceText, Indent, Undo, Redo, the modified state, single steps, Replace All, read-only (EditRuns).
+//   - the typing and the edit keys (3D-1): characters, Enter, Backspace, Tab, Delete, the word keys, the hook of typing (TypingRuns).
+// The view is sized until it shows exactly 8 rows (and wraps at 20 columns), so that the lines do not depend on the fonts.
+// TextViewGolden.txt is what the code wrote before the move; it is never written again. Since the move (3C-1) the accessors read the kept column
+// and the wrap map of the model (Navigator, WrapLayout) instead of the fields of the view.
+//   xvfb-run -a mono tests/TextViewTests/bin/Release/net48/TextViewTests.exe            compares with the golden file
+//   ... TextViewTests.exe --record <file>                                                writes the golden file (old code only)
+internal static class Program
+{
+    private static readonly BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    private static readonly Type View = typeof(ReadonlyTextBrowser);
+
+    private static readonly List<string> Lines = new List<string>();
+
+    private static TextEditorControl _editor;
+
+    private static Form _form;
+
+    private static readonly string[] DocumentLines = BuildLines();
+
+    private static string[] BuildLines()
+    {
+        List<string> lines = new List<string>
+        {
+            "",
+            "abc def_ghi  jkl",
+            "\tindent\tx",
+            "  two spaces",
+            "foo.bar(baz, 42);",
+            "the quick brown fox jumps over the lazy dog ok",
+            "x",
+            "été ünï",
+            "    ",
+            "end",
+            "a\tb\tc\td"
+        };
+        for (int i = lines.Count; i < 30; i++)
+        {
+            lines.Add("line " + i.ToString(CultureInfo.InvariantCulture) + new string('.', (i * 7) % 23));
+        }
+        return lines.ToArray();
+    }
+
+    private static T Field<T>(string name)
+    {
+        return (T)View.GetField(name, Private).GetValue(_editor);
+    }
+
+    private static void SetField(string name, object value)
+    {
+        View.GetField(name, Private).SetValue(_editor, value);
+    }
+
+    private static object Call(string name, params object[] arguments)
+    {
+        return View.GetMethod(name, Private).Invoke(_editor, arguments);
+    }
+
+    private static T Property<T>(string name)
+    {
+        return (T)View.GetProperty(name, Private).GetValue(_editor, null);
+    }
+
+    private static string P(TextDocument.TextPosition position)
+    {
+        return position.Line.ToString(CultureInfo.InvariantCulture) + ":" + position.Column.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static TextDocument.TextPosition At(int line, int column)
+    {
+        return new TextDocument.TextPosition(column, line);
+    }
+
+    // The target of a navigation key from a position, as the key handler finds it (the column to keep is taken anew).
+    private static string Target(TextDocument.TextPosition from, Keys key)
+    {
+        _editor.SetCaret(from);
+        _editor.Navigator.DesiredColumn = -1;
+        object[] arguments = { new KeyEventArgs(key), false, null, null };
+        bool found = (bool)View.GetMethod("TryGetNavigationTarget", Private).Invoke(_editor, arguments);
+        return found ? P((TextDocument.TextPosition)arguments[2]) : "-";
+    }
+
+    // CaretMove was a protected enum of the view (CodeEditing/CaretNavigator since 3C).
+    private static string Moved(TextDocument.TextPosition from, string move, Keys keys)
+    {
+        _editor.SetCaret(from);
+        _editor.Navigator.DesiredColumn = -1;
+        object caretMove = Enum.Parse(typeof(SmarTTY.CodeEditing.CaretMove), move);
+        try
+        {
+            return P((TextDocument.TextPosition)View.GetMethod("ComputeMovedPosition", Private).Invoke(_editor, new object[] { caretMove, keys, from, false }));
+        }
+        catch (TargetInvocationException exception)
+        {
+            // Recorded as it is: a fault of the old code is kept by the move.
+            return "throws:" + exception.InnerException.GetType().Name;
+        }
+    }
+
+    private static string Word(TextDocument.TextPosition at)
+    {
+        object[] arguments = { at, null, null };
+        bool found = (bool)View.GetMethod("TryGetWordBounds", Private).Invoke(_editor, arguments);
+        return found ? P((TextDocument.TextPosition)arguments[1]) + "-" + P((TextDocument.TextPosition)arguments[2]) : "none";
+    }
+
+    private static void Moves(string title)
+    {
+        Lines.Add("== moves " + title);
+        for (int line = 0; line < DocumentLines.Length; line++)
+        {
+            for (int column = 0; column <= DocumentLines[line].Length; column++)
+            {
+                TextDocument.TextPosition from = At(line, column);
+                Lines.Add(P(from)
+                    + " L=" + Target(from, Keys.Left) + " R=" + Target(from, Keys.Right)
+                    + " U=" + Target(from, Keys.Up) + " D=" + Target(from, Keys.Down)
+                    + " H=" + Target(from, Keys.Home) + " E=" + Target(from, Keys.End)
+                    + " PU=" + Target(from, Keys.Prior) + " PD=" + Target(from, Keys.Next)
+                    + " WL=" + Moved(from, "WordLeft", Keys.None) + " WR=" + Moved(from, "WordRight", Keys.None)
+                    + " CH=" + Moved(from, "Home", Keys.Control) + " CE=" + Moved(from, "End", Keys.Control)
+                    + " W=" + Word(from));
+            }
+        }
+        Lines.Add("other key: " + Target(At(3, 2), K.A) + ", outside the text: " + Moved(At(-1, 0), "Left", Keys.None));
+    }
+
+    private static void Press(string title, TextDocument.TextPosition start, params Keys[] keys)
+    {
+        _editor.SetCaret(start);
+        _editor.Navigator.DesiredColumn = -1;
+        List<string> steps = new List<string>();
+        MethodInfo keyDown = View.GetMethod("OnKeyDown", Private);
+        foreach (Keys key in keys)
+        {
+            keyDown.Invoke(_editor, new object[] { new KeyEventArgs(key) });
+            steps.Add(key + ">" + P(_editor.CaretPosition) + "@" + Property<int>("ScrollLine").ToString(CultureInfo.InvariantCulture));
+        }
+        Lines.Add("keys " + title + " from " + P(start) + ": " + string.Join(" ", steps));
+    }
+
+    private static void Runs(string title)
+    {
+        Lines.Add("== runs " + title);
+        Press("down through short lines", At(5, 30), K.Down, K.Down, K.Down, K.Down, K.Down, K.Up, K.Up, K.Up);
+        Press("a column kept across tabs", At(1, 9), K.Down, K.Down, K.Up, K.Up);
+        Press("right forgets the column", At(5, 30), K.Down, K.Right, K.Up);
+        Press("pages", At(2, 3), K.Next, K.Next, K.Next, K.Next, K.Prior, K.Prior, K.Prior, K.Prior, K.Prior);
+        Press("down to the end and past it", At(25, 2), K.Down, K.Down, K.Down, K.Down, K.Down, K.Down);
+        Press("up to the start and past it", At(2, 4), K.Up, K.Up, K.Up, K.Up);
+        Press("home and end", At(3, 6), K.Home, K.Home, K.Home, K.End, K.Left, K.Right, K.Right, K.Left);
+        Press("left and right across lines", At(6, 0), K.Left, K.Left, K.Right, K.Right, K.Right);
+        Press("a line off the screen", At(20, 3), K.Up, K.Down, K.Down);
+    }
+
+    private static void WrapMap()
+    {
+        Lines.Add("== wrap map");
+        int[][] breaks = _editor.WrapLayout.Breaks;
+        int[] firstRow = _editor.WrapLayout.FirstRows;
+        for (int line = 0; line < DocumentLines.Length; line++)
+        {
+            Lines.Add("line " + line + " first row " + firstRow[line] + " breaks " + (breaks[line] == null ? "none" : string.Join(",", Array.ConvertAll(breaks[line], b => b.ToString(CultureInfo.InvariantCulture)))));
+        }
+        int rows = Property<int>("ScrollRowCount");
+        Lines.Add("rows " + rows + ", last entry " + firstRow[DocumentLines.Length]);
+        List<string> rowLines = new List<string>();
+        for (int row = -1; row <= rows + 1; row++)
+        {
+            object[] arguments = { row, null };
+            int line = (int)View.GetMethod("RowIndexToLine", Private).Invoke(_editor, arguments);
+            rowLines.Add(row + ">" + line + "." + arguments[1]);
+        }
+        Lines.Add("row index to line: " + string.Join(" ", rowLines));
+        List<string> rowIndexes = new List<string>();
+        foreach (int line in new[] { -3, 0, 1, 2, 5, 10, 29, 40 })
+        {
+            foreach (int column in new[] { -1, 0, 7, 19, 20, 21, 39, 40, 45, 100 })
+            {
+                rowIndexes.Add(line + ":" + column + ">" + Call("PositionToRowIndex", line, column) + "/" + Call("WrapSegmentOf", line, column));
+            }
+        }
+        Lines.Add("position to row index / segment: " + string.Join(" ", rowIndexes));
+        List<string> segments = new List<string>();
+        foreach (int line in new[] { 0, 2, 5, 10 })
+        {
+            for (int segment = 0; segment < 4; segment++)
+            {
+                int end = (breaks[line] == null || segment >= breaks[line].Length) ? int.MaxValue : breaks[line][segment];
+                if (breaks[line] != null && segment > breaks[line].Length)
+                {
+                    break;
+                }
+                segments.Add(line + "." + segment + ">" + Call("WrapSegmentStart", line, segment) + "-" + (end == int.MaxValue ? "max" : ((int)Call("WrapSegmentEnd", line, segment)).ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+        Lines.Add("segments: " + string.Join(" ", segments));
+    }
+
+    private static void SizeTo(int rows, int wrapWidth)
+    {
+        for (int attempt = 0; attempt < 400; attempt++)
+        {
+            Application.DoEvents();
+            int visibleRows = Field<int>("_visibleRows");
+            int width = Field<int>("_wrapWidth");
+            bool rowsDone = visibleRows == rows;
+            bool widthDone = wrapWidth == 0 || width == wrapWidth;
+            if (rowsDone && widthDone)
+            {
+                return;
+            }
+            System.Drawing.Size size = _form.ClientSize;
+            int height = size.Height + (rowsDone ? 0 : (visibleRows < rows ? 1 : -1));
+            int formWidth = size.Width + (widthDone ? 0 : (width < wrapWidth ? 1 : -1));
+            _form.ClientSize = new System.Drawing.Size(formWidth, height);
+        }
+        throw new InvalidOperationException("the view could not be sized to " + rows + " rows and " + wrapWidth + " columns: " + Field<int>("_visibleRows") + ", " + Field<int>("_wrapWidth"));
+    }
+
+    private static void Run()
+    {
+        _form = new Form { FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(0, 0), ClientSize = new System.Drawing.Size(900, 150) };
+        _editor = new TextEditorControl { Dock = DockStyle.Fill };
+        _form.Controls.Add(_editor);
+        _editor.SelectionChanged += (view, previous, current, has) =>
+        {
+            _selectionEvents++;
+            _lastSelectionEvent = P(previous) + ">" + P(current) + (has ? "+sel" : "");
+        };
+        _editor.SetDocument(new EditableTextDocument(DocumentLines, TextDocument.LineEnding.Lf));
+        _editor.TabSize = 4;
+        _form.Show();
+        SizeTo(8, 0);
+        Lines.Add("rows " + Field<int>("_visibleRows") + ", wrapping " + Bool(_editor.IsWrapping));
+        Moves("without wrap");
+        Runs("without wrap");
+        SelectionRuns("without wrap");
+
+        _editor.WordWrap = true;
+        _form.ClientSize = new System.Drawing.Size(300, _form.ClientSize.Height);
+        SizeTo(8, 20);
+        Lines.Add("rows " + Field<int>("_visibleRows") + ", wrapping " + Bool(_editor.IsWrapping) + " at " + Field<int>("_wrapWidth"));
+        WrapMap();
+        Moves("with wrap");
+        Runs("with wrap");
+        Press("down through the rows of a wrapped line", At(4, 15), K.Down, K.Down, K.Down, K.Down, K.Down, K.Up, K.Up, K.Up, K.Up);
+        Press("the end of a row", At(5, 19), K.Down, K.Up, K.End, K.Home, K.Down);
+
+        SelectionRuns("with wrap");
+
+        // The tab size changes the breaks; a text that changes too.
+        _editor.TabSize = 8;
+        WrapMap();
+        _editor.SetDocument(new EditableTextDocument(new[] { "short", new string('w', 61), "\t\t\t\t\tafter tabs that pass the width" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        WrapMap2(3);
+        EditRuns();
+        TypingRuns();
+        ReplaceRuns();
+        SyntaxRuns();
+        FoldRuns();
+        MessageRuns();
+        CompletionRuns();
+        ListRuns();
+        LineCommandRuns();
+        SearchRuns();
+        CursorRuns();
+        _form.Dispose();
+    }
+
+    // The wrap map of a document of a few lines.
+    private static void WrapMap2(int lineCount)
+    {
+        int[][] breaks = _editor.WrapLayout.Breaks;
+        Call("EnsureWrapMap");
+        breaks = _editor.WrapLayout.Breaks;
+        int[] firstRow = _editor.WrapLayout.FirstRows;
+        List<string> parts = new List<string>();
+        for (int line = 0; line < lineCount; line++)
+        {
+            parts.Add(line + ":" + firstRow[line] + "[" + (breaks[line] == null ? "" : string.Join(",", Array.ConvertAll(breaks[line], b => b.ToString(CultureInfo.InvariantCulture)))) + "]");
+        }
+        Lines.Add("== another text: " + string.Join(" ", parts) + " rows " + firstRow[lineCount]);
+    }
+
+    // ---- 3C-2: the selection, written by the code before the selection moved to the model.
+    // The mouse (single, double and triple clicks, the margin, a drag with the left button, a drag after a double click, the right button), a
+    // key without Shift, Select all, a range of lines, the programmatic setters and the selected lines; and the same in terminal mode, where the
+    // selection has an end of its own. Shift cannot be held by a test (the view reads Control.ModifierKeys), so Shift with the keys and the mouse
+    // is not here. The clicks are given at the left edge of a character cell, found from the view (ColumnToX and the row of the line).
+
+    private static int _selectionEvents;
+
+    private static string _lastSelectionEvent = "-";
+
+    private static System.Drawing.Point CellPoint(int line, int column)
+    {
+        float y = (float)View.GetMethod("LineToY", Private).Invoke(_editor, new object[] { line });
+        return new System.Drawing.Point((int)Math.Ceiling(_editor.ColumnToX(column)) + 1, (int)y + 2);
+    }
+
+    private static void ForgetClicks()
+    {
+        SetField("_lastClickTime", DateTime.MinValue);
+        SetField("_lastDoubleClickTime", DateTime.MinValue);
+        SetField("_lastClickPoint", new System.Drawing.Point(-100, -100));
+    }
+
+    private static void Mouse(string method, MouseButtons button, System.Drawing.Point point)
+    {
+        View.GetMethod(method, Private).Invoke(_editor, new object[] { new MouseEventArgs(button, 1, point.X, point.Y, 0) });
+    }
+
+    private static string SelectionState()
+    {
+        ReadonlyTextBrowser.LineRange lines = _editor.SelectedLines;
+        string text = "has=" + Bool(_editor.HasSelection) + " start=" + P(_editor.SelectionStart) + " end=" + P(_editor.SelectionEnd) + " caret=" + P(_editor.CaretPosition)
+            + " lines=" + lines.First + ".." + lines.Last + " events=" + _selectionEvents + " last=" + _lastSelectionEvent;
+        _selectionEvents = 0;
+        _lastSelectionEvent = "-";
+        return text;
+    }
+
+    private static void Sel(string what)
+    {
+        Lines.Add("sel " + what + ": " + SelectionState());
+    }
+
+    private static void SelectionRuns(string title)
+    {
+        Lines.Add("== selection " + title);
+        _editor.SetCaret(At(0, 0));
+        _editor.ClearSelection();
+        ForgetClicks();
+        SelectionState();
+        System.Drawing.Point word = CellPoint(1, 5);
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a click in a word");
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a second click at once: the word");
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a third click at once");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(1, 12));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(1, 12));
+        Sel("a double click on a blank between words");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(0, 0));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(0, 0));
+        Sel("a double click on an empty line");
+        ForgetClicks();
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(0, 0));
+
+        System.Drawing.Point from = CellPoint(3, 2);
+        Mouse("OnMouseDown", MouseButtons.Left, from);
+        Sel("a press for a drag");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(5, 10));
+        Sel("dragged down");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(2, 1));
+        Sel("dragged above the start");
+        Mouse("OnMouseMove", MouseButtons.Left, from);
+        Sel("dragged back to the start");
+        Mouse("OnMouseMove", MouseButtons.None, CellPoint(6, 0));
+        Sel("moved without a button");
+        Mouse("OnMouseUp", MouseButtons.Left, from);
+        ForgetClicks();
+
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 3));
+        Sel("moved after a double click (no drag)");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(4, 3));
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 3));
+        Sel("moved with the button after the release");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(4, 3));
+        ForgetClicks();
+
+        int marginX = ((System.Drawing.Rectangle)View.GetProperty("TextArea", Private).GetValue(_editor, null)).Left - 1;
+        Mouse("OnMouseDown", MouseButtons.Left, new System.Drawing.Point(marginX, CellPoint(2, 0).Y));
+        Sel("a click left of the text");
+        Mouse("OnMouseUp", MouseButtons.Left, new System.Drawing.Point(marginX, CellPoint(2, 0).Y));
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(4, 1));
+        Sel("the right button with a selection");
+        _editor.ClearSelection();
+        Sel("cleared");
+        _editor.ClearSelection();
+        Sel("cleared again");
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(4, 1));
+        Sel("the right button without a selection");
+        Mouse("OnMouseDown", MouseButtons.Middle, CellPoint(6, 0));
+        Sel("the middle button");
+        ForgetClicks();
+
+        _editor.SetSelection(true, At(1, 0));
+        _editor.SetCaret(At(1, 5));
+        Sel("set programmatically");
+        _editor.SetSelection(true, At(1, 0));
+        Sel("set again the same");
+        _editor.SetSelection(false, At(1, 0));
+        Sel("set off");
+        _editor.SetSelection(true, At(2, 3));
+        View.GetMethod("OnKeyDown", Private).Invoke(_editor, new object[] { new KeyEventArgs(K.Right) });
+        Sel("a key without Shift drops it");
+        _editor.SelectAllText();
+        Sel("select all");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { 4, 2 });
+        Sel("lines 4 to 2");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { -3, 100 });
+        Sel("lines -3 to 100");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { 5, 5 });
+        Sel("line 5");
+        foreach (int[] pair in new[] { new[] { 1, 0, 3, 0 }, new[] { 3, 0, 1, 0 }, new[] { 1, 2, 3, 4 }, new[] { 3, 4, 1, 2 }, new[] { 2, 2, 2, 2 }, new[] { 0, 0, 1, 0 } })
+        {
+            _editor.SetCaret(At(pair[2], pair[3]));
+            _editor.SetSelection(true, At(pair[0], pair[1]));
+            Sel("from " + pair[0] + ":" + pair[1] + " to the caret");
+        }
+        _editor.SetSelectionEnd(At(6, 2));
+        Sel("an end set outside terminal mode");
+        _editor.ClearSelection();
+        SelectionState();
+
+        _editor.TerminalMode = true;
+        Sel("terminal mode");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(2, 3));
+        Sel("terminal: a press");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 1));
+        Sel("terminal: dragged");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(2, 3));
+        Sel("terminal: dragged back");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(2, 3));
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(3, 4));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(3, 4));
+        Sel("terminal: a double click selects the line");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(3, 4));
+        ForgetClicks();
+        _editor.SelectAllText();
+        Sel("terminal: select all does nothing");
+        _editor.SetSelectionEnd(At(5, 2));
+        _editor.SetSelection(true, At(1, 1));
+        Sel("terminal: an end set and a start");
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(6, 0));
+        Sel("terminal: the right button with a selection");
+        _editor.ClearSelection();
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(6, 1));
+        Sel("terminal: the right button without one");
+        _editor.TerminalMode = false;
+        _editor.ClearSelection();
+        SelectionState();
+    }
+
+    // ---- 3C-3: the edits and their undo, written by the code before the undo history moved to the model.
+    // ReplaceText in a line, across lines, with the start only (select), an empty edit, the join of two lines that drops the indentation of
+    // the second, Indent and unindent with and without a selection (tabs, spaces, blank lines), Undo and Redo at the ends of the history, an
+    // edit after an undo (the redo is gone), the modified state with IsModified, CurrentVersion and MarkSaved, a change made outside an edit
+    // command, ExecuteAsSingleUndoStep (also nested), Replace All (literal, scoped, with line breaks), read-only, and a new document. Every
+    // step writes the text, the caret, the selection, the modified state, what can be undone and redone, and the events.
+
+    private static readonly List<string> EditEvents = new List<string>();
+
+    private static string Escape(string text)
+    {
+        return text.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+    }
+
+    private static void Edit(string what)
+    {
+        Lines.Add("edit " + what + ": text=" + Escape(_editor.EditableDocument.GetText()) + " caret=" + P(_editor.CaretPosition)
+            + " sel=" + (_editor.HasSelection ? P(_editor.SelectionStart) : "-") + " mod=" + Bool(_editor.IsModified)
+            + " undo=" + Bool(_editor.CanUndo) + " redo=" + Bool(_editor.CanRedo) + " events=" + string.Join(";", EditEvents));
+        EditEvents.Clear();
+    }
+
+    private static void EditRuns()
+    {
+        Lines.Add("== edits");
+        _editor.WordWrap = false;
+        _editor.TabSize = 4;
+        _editor.SetDocument(new EditableTextDocument(new[] { "alpha beta", "    gamma", "delta", "", "\tepsilon" }, TextDocument.LineEnding.Lf));
+        _editor.SetCaret(At(0, 0));
+        _editor.ClearSelection();
+        _editor.IsModified = false;
+        _editor.ModifiedChanged += (view, modified) => EditEvents.Add("mod:" + Bool(modified));
+        _editor.LineChanged += (view, line, column, added, removed) => EditEvents.Add("line:" + line + "," + column + "," + added + "," + removed);
+        _editor.RangeChanged += (view, start, oldEnd, newEnd) => EditEvents.Add("range:" + P(start) + "," + P(oldEnd) + "," + P(newEnd));
+        EditEvents.Clear();
+        Edit("a new document");
+        _editor.ReplaceText(At(0, 6), At(0, 10), false, "BETA!");
+        Edit("a word replaced in a line");
+        _editor.ReplaceText(At(0, 0), At(0, 0), true, "");
+        Edit("an empty edit");
+        _editor.ReplaceText(At(0, 3), At(2, 2), false, "-");
+        Edit("a range across lines replaced");
+        _editor.Undo();
+        Edit("undone");
+        _editor.Undo();
+        Edit("undone again: the start");
+        _editor.Undo();
+        Edit("nothing more to undo");
+        _editor.Redo();
+        Edit("redone");
+        _editor.Redo();
+        Edit("redone again");
+        _editor.Redo();
+        Edit("nothing more to redo");
+        _editor.Undo();
+        _editor.ReplaceText(At(1, 0), At(1, 0), true, "X");
+        Edit("an edit after an undo drops the redo");
+        _editor.ReplaceText(At(0, 2), At(0, 5), false, "1\n2");
+        Edit("a replacement with a line break");
+        _editor.ReplaceText(At(1, 5), At(1, 1), false, "<>");
+        Edit("an end before the start");
+        _editor.ReplaceText(At(2, 1), At(2, -1), false, "!");
+        Edit("an end column of -1 is the end of the line");
+        _editor.ReplaceText(At(3, -1), At(3, -1), true, "?");
+        Edit("a start column of -1 too");
+        _editor.SetCaret(At(3, 1));
+        _editor.ReplaceText(At(2, _editor.EditableDocument.GetLineText(2).Length), At(3, 0), false, "");
+        Edit("the line break at the end of a line deleted (the next line joined)");
+        _editor.SetDocument(new EditableTextDocument(new[] { "    first", "    second", "", "third" }, TextDocument.LineEnding.Lf));
+        EditEvents.Clear();
+        Edit("another document");
+        _editor.ReplaceText(At(0, 9), At(1, 0), false, "");
+        Edit("a join that drops the indentation the lines share");
+        _editor.Undo();
+        Edit("and its undo");
+
+        _editor.InsertSpaces = false;
+        _editor.SetSelection(true, At(0, 2));
+        _editor.SetCaret(At(3, 0));
+        _editor.Indent(1);
+        Edit("indent of lines 0 to 2 (a selection that ends at the start of a line) with a tab");
+        _editor.Indent(-1);
+        Edit("unindent of them");
+        _editor.Undo();
+        Edit("the unindent undone");
+        _editor.Undo();
+        Edit("the indent undone");
+        _editor.ClearSelection();
+        _editor.SetCaret(At(1, 3));
+        _editor.InsertSpaces = true;
+        _editor.Indent(2);
+        Edit("indent of the caret line by two levels of spaces");
+        _editor.Indent(-1);
+        Edit("unindent of the caret line by one");
+        _editor.Indent(-5);
+        Edit("unindent by more than there is");
+        _editor.Undo();
+        _editor.Undo();
+        _editor.Undo();
+        Edit("all three undone");
+        _editor.Redo();
+        Edit("the indent redone");
+
+        _editor.SetDocument(new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf));
+        EditEvents.Clear();
+        Edit("a third document");
+        object saved = _editor.CurrentVersion;
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "!");
+        Edit("an edit");
+        _editor.MarkSaved(_editor.CurrentVersion);
+        Edit("marked saved");
+        _editor.ReplaceText(At(1, 0), At(1, 0), false, "+");
+        Edit("another edit");
+        _editor.Undo();
+        Edit("undone back to the saved text");
+        _editor.Undo();
+        Edit("undone past it");
+        _editor.Redo();
+        Edit("redone to the saved text");
+        _editor.MarkSaved(saved);
+        Edit("marked saved at the version of the start");
+        _editor.Undo();
+        Edit("undone to that version");
+        _editor.IsModified = true;
+        Edit("set modified");
+        _editor.Redo();
+        _editor.Undo();
+        Edit("redone and undone: still modified (never saved)");
+        _editor.IsModified = false;
+        Edit("set saved");
+        typeof(EditableTextBrowser).GetMethod("OnLineChanged", Private).Invoke(_editor, new object[] { 0, 0, 0, 0 });
+        Edit("a change made outside an edit command");
+        _editor.Undo();
+        Edit("undone after it: still modified");
+
+        _editor.SetDocument(new EditableTextDocument(new[] { "aaa", "bab", "cac" }, TextDocument.LineEnding.Lf));
+        _editor.IsModified = false;
+        EditEvents.Clear();
+        _editor.ExecuteAsSingleUndoStep(() =>
+        {
+            _editor.ReplaceText(At(0, 0), At(0, 1), false, "A");
+            _editor.ExecuteAsSingleUndoStep(() => _editor.ReplaceText(At(1, 0), At(1, 1), false, "B"));
+            _editor.ReplaceText(At(2, 0), At(2, 1), false, "C");
+        });
+        Edit("three edits as one step (one of them nested)");
+        _editor.Undo();
+        Edit("undone at once");
+        _editor.Redo();
+        Edit("redone at once");
+        _editor.ExecuteAsSingleUndoStep(() => { });
+        Edit("an empty step");
+        _editor.Undo();
+        Edit("the empty step left no undo of its own");
+        _editor.Redo();
+        _editor.SetCaret(At(2, 3));
+        Edit("before Replace All");
+        Lines.Add("replace all a: " + _editor.ReplaceAll("a", "<a>", false));
+        Edit("Replace All");
+        _editor.Undo();
+        Edit("Replace All undone");
+        Lines.Add("replace all x: " + _editor.ReplaceAll("x", "y", false));
+        Edit("Replace All of nothing");
+        Lines.Add("replace all empty: " + _editor.ReplaceAll("", "y", false));
+        TextDocument.TextPosition newEnd;
+        Lines.Add("scoped: " + _editor.ReplaceAll(TextMatcher.Literal("A", true), "1\n2", At(0, 1), At(1, 2), out newEnd) + " end " + P(newEnd));
+        Edit("Replace All in a range, with a line break in the replacement");
+        _editor.Undo();
+
+        _editor.ReadOnly = true;
+        _editor.ReplaceText(At(0, 0), At(0, 0), false, "no");
+        _editor.Indent(1);
+        _editor.ExecuteAsSingleUndoStep(() => _editor.ReplaceText(At(0, 0), At(0, 0), false, "no"));
+        Lines.Add("replace all read-only: " + _editor.ReplaceAll("a", "b", false));
+        _editor.Undo();
+        Edit("read-only: no edit, no undo, no redo");
+        _editor.ReadOnly = false;
+        Edit("editable again");
+        _editor.IsModified = true;
+        _editor.SetDocument(new EditableTextDocument(new[] { "new" }, TextDocument.LineEnding.Lf));
+        Edit("a new document while modified");
+        _editor.IsModified = false;
+        _editor.SetDocument(new EditableTextDocument(new[] { "newer" }, TextDocument.LineEnding.Lf));
+        Edit("a new document while saved");
+    }
+
+    // ---- 3D-1: the typing and the edit keys of TextEditorControl, written by the code before they moved to the model.
+    // Characters (with and without a selection, overwrite, a control character), Enter (the indentation carried over, a caret inside the
+    // indentation, a selection, a line without a line break of its own), Backspace (a character, a selection, a level of space indentation,
+    // the start of a line, the start of the text), Tab (a tab, spaces to the next tab stop, a multi-line selection indents), Delete,
+    // Ctrl+Delete and Ctrl+Backspace (words, blanks, the ends of a line and of the text), Undo and Redo by the keys, the CharTyping hook that
+    // changes the text and the caret, InsertText, GetWordAtCaret, ReplaceWordAtCaret, RemoveLines and DeleteSelection. Shift cannot be held by a
+    // test (Shift+Tab reads Control.ModifierKeys), and the clipboard is not used. Every step writes what the edits run writes.
+
+    private static readonly MethodInfo KeyPressMethod = typeof(TextEditorControl).GetMethod("OnKeyPress", Private);
+
+    private static readonly MethodInfo EditorKeyDownMethod = typeof(TextEditorControl).GetMethod("OnKeyDown", Private);
+
+    private static void Type(string text)
+    {
+        foreach (char ch in text)
+        {
+            KeyPressMethod.Invoke(_editor, new object[] { new KeyPressEventArgs(ch) });
+        }
+    }
+
+    private static void Key(Keys keyData)
+    {
+        EditorKeyDownMethod.Invoke(_editor, new object[] { new KeyEventArgs(keyData) });
+    }
+
+    private static void Start(params string[] lines)
+    {
+        _editor.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+        _editor.ClearSelection();
+        _editor.SetCaret(At(0, 0));
+        _editor.IsModified = false;
+        EditEvents.Clear();
+    }
+
+    private static void TypingRuns()
+    {
+        Lines.Add("== typing");
+        _editor.InsertSpaces = false;
+        _editor.OverwriteMode = false;
+        Start("abc", "    indented", "\tx", "");
+        _editor.SetCaret(At(0, 3));
+        Type("de");
+        Edit("two characters typed at the end");
+        _editor.SetSelection(true, At(0, 1));
+        _editor.SetCaret(At(0, 4));
+        Type("Z");
+        Edit("a character typed over a selection");
+        Type("\u0001");
+        Edit("a control character does nothing");
+        _editor.OverwriteMode = true;
+        _editor.SetCaret(At(0, 0));
+        Type("xy");
+        Edit("overwrite");
+        _editor.SetCaret(At(0, 4));
+        Type("!");
+        Edit("overwrite at the end of a line inserts");
+        _editor.OverwriteMode = false;
+        _editor.SetCaret(At(1, 12));
+        Type("\r");
+        Edit("Enter after an indented line carries the indentation");
+        _editor.SetCaret(At(1, 2));
+        Type("\r");
+        Edit("Enter inside the indentation carries the part before the caret");
+        _editor.SetSelection(true, At(0, 1));
+        _editor.SetCaret(At(0, 3));
+        Type("\r");
+        Edit("Enter over a selection");
+        Start("one");
+        _editor.SetCaret(At(0, 3));
+        Type("\r");
+        Edit("Enter on a line without a line break of its own");
+        Start("abc", "      sp", "x");
+        _editor.SetCaret(At(0, 2));
+        Type("\b");
+        Edit("Backspace removes a character");
+        _editor.SetCaret(At(1, 0));
+        Type("\b");
+        Edit("Backspace at the start of a line joins it");
+        Type("\b\b\b");
+        _editor.SetCaret(At(0, 0));
+        Type("\b");
+        Edit("three more Backspaces, then one at the start of the text, which does nothing");
+        Start("x", "      sp");
+        _editor.InsertSpaces = true;
+        _editor.SetCaret(At(1, 6));
+        Type("\b");
+        Edit("Backspace in space indentation goes back to the tab stop");
+        Type("\b");
+        Edit("and again");
+        _editor.SetCaret(At(1, 3));
+        Type("\t");
+        Edit("Tab with spaces goes to the next tab stop");
+        _editor.InsertSpaces = false;
+        Type("\t");
+        Edit("Tab without spaces types a tab");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(1, 1));
+        Type("\t");
+        Edit("Tab over a selection of two lines indents them");
+        _editor.SetSelection(true, At(1, 0));
+        _editor.SetCaret(At(1, 2));
+        Type("\t");
+        Edit("Tab over a selection in one line replaces it");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(1, 1));
+        Type("\b");
+        Edit("Backspace over a selection removes it");
+
+        Start("foo  bar.baz", "next");
+        _editor.SetCaret(At(0, 0));
+        Key(K.Delete);
+        Edit("Delete removes a character");
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete removes a word and the blanks before the next");
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete removes the next word");
+        _editor.SetCaret(At(0, _editor.EditableDocument.GetLineText(0).Length));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete at the end of a line removes the line break");
+        _editor.SetCaret(At(0, _editor.EditableDocument.GetLineText(0).Length));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete at the end of the text does nothing");
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace removes the word in front of the caret");
+        Key(K.Back | K.Control);
+        Edit("and the one before it");
+        _editor.SetCaret(At(0, 0));
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace at the start of the text does nothing");
+        Start("a b", "c");
+        _editor.SetCaret(At(1, 0));
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace at the start of a line removes the line break");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(0, 2));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete over a selection removes it");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(0, 1));
+        Key(K.Delete);
+        Edit("Delete over a selection removes it");
+        Key(K.Z | K.Control);
+        Edit("Ctrl+Z undoes");
+        Key(K.Y | K.Control);
+        Edit("Ctrl+Y redoes");
+        Key(K.Z | K.Control);
+        Key(K.Z | K.Control | K.Shift);
+        Edit("Ctrl+Shift+Z redoes too");
+        Key(K.Z | K.Control | K.Alt);
+        Edit("Ctrl+Alt+Z (AltGr) does not undo");
+        _editor.SetCaret(At(0, 1));
+        Key(K.Back | K.Control | K.Alt);
+        Edit("Ctrl+Alt+Backspace (AltGr) does not remove a word");
+
+        Start("word here", "x");
+        TextEditorControl.CharTypingHandler hook = (TextEditorControl view, char ch, ref string text, ref TextDocument.TextPosition position) =>
+        {
+            if (ch == '(')
+            {
+                text = "()";
+                position = new TextDocument.TextPosition(view.CaretPosition.Column + 1, view.CaretPosition.Line);
+            }
+            else if (ch == '#')
+            {
+                text = null;
+            }
+        };
+        string typed = "";
+        TextEditorControl.CharTypedHandler after = (view, ch, position) => typed += ch + "@" + P(position) + " ";
+        _editor.CharTyping += hook;
+        _editor.CharTyped += after;
+        _editor.SetCaret(At(0, 4));
+        Type("(");
+        Edit("a hook that types a pair and puts the caret inside it");
+        Type("#");
+        Edit("a hook that types nothing");
+        _editor.CharTyping -= hook;
+        _editor.CharTyped -= after;
+        Lines.Add("typed: " + typed);
+
+        Start("alpha beta_2 gamma", "x");
+        foreach (int column in new[] { 0, 3, 5, 6, 12, 18 })
+        {
+            _editor.SetCaret(At(0, column));
+            string word = _editor.GetWordAtCaret(out int start, out int length);
+            Lines.Add("word at " + column + ": " + (word ?? "null") + " " + start + "+" + length);
+        }
+        _editor.SetCaret(At(0, 8));
+        _editor.ReplaceWordAtCaret("BETA");
+        Edit("the word at the caret replaced");
+        _editor.SetCaret(At(0, 5));
+        _editor.ReplaceWordAtCaret("+");
+        Edit("a replacement after a word");
+        _editor.SetCaret(At(1, 0));
+        _editor.ReplaceWordAtCaret("y");
+        Edit("no word at the caret: the text is inserted");
+        _editor.InsertText("ins");
+        Edit("InsertText");
+        Start("l0", "l1", "l2", "l3");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 1, 2 });
+        Edit("lines 1 and 2 removed");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 1, 1 });
+        Edit("the last line removed (the line break before it goes)");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 0, 0 });
+        Edit("the only line removed");
+        Start("abc def");
+        _editor.DeleteSelection();
+        Edit("DeleteSelection without a selection");
+        _editor.SetSelection(true, At(0, 4));
+        _editor.SetCaret(At(0, 7));
+        _editor.DeleteSelection();
+        Edit("DeleteSelection");
+    }
+
+    private static string Bool(bool value)
+    {
+        return value ? "T" : "F";
+    }
+
+    private static int Main(string[] args)
+    {
+        try
+        {
+            Run();
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception);
+            Console.WriteLine("after: " + (Lines.Count > 0 ? Lines[Lines.Count - 1] : "nothing"));
+            return 1;
+        }
+        string text = string.Join("\n", Lines) + "\n";
+        if (args.Length == 2 && args[0] == "--record")
+        {
+            File.WriteAllText(args[1], text, new UTF8Encoding(false));
+            Console.WriteLine("Recorded " + Lines.Count + " lines in " + args[1]);
+            return 0;
+        }
+        string goldenPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TextViewGolden.txt");
+        if (!File.Exists(goldenPath))
+        {
+            Console.WriteLine("FAIL: " + goldenPath + " is missing");
+            return 1;
+        }
+        string[] expected = File.ReadAllText(goldenPath).Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+        string[] actual = text.TrimEnd('\n').Split('\n');
+        int mismatches = 0;
+        for (int i = 0; i < Math.Max(expected.Length, actual.Length); i++)
+        {
+            string expectedLine = i < expected.Length ? expected[i] : "(none)";
+            string actualLine = i < actual.Length ? actual[i] : "(none)";
+            if (expectedLine != actualLine)
+            {
+                if (mismatches < 10)
+                {
+                    Console.WriteLine("FAIL: line " + (i + 1));
+                    Console.WriteLine("  expected: " + expectedLine);
+                    Console.WriteLine("  actual:   " + actualLine);
+                }
+                mismatches++;
+            }
+        }
+        if (mismatches > 0)
+        {
+            Console.WriteLine("FAIL: " + mismatches + " of " + actual.Length + " lines differ from the golden file");
+            return 1;
+        }
+        Console.WriteLine("PASS: all " + actual.Length + " lines of the text view match the golden file");
+        Console.WriteLine();
+        Console.WriteLine("All text view checks passed.");
+        return 0;
+    }
+
+    // ---- 3D-2: what ReplaceText and Replace All decide that the edits run did not reach, written by the code before it moved to the model:
+    // a single-line view (line breaks dropped), a lone CR in an edit within a line, the line endings of an insertion with and without the
+    // existing ones, Replace All limited to the end of a range, a replacement with line breaks whose new lines would match again (LF and a lone
+    // CR), the end of the range after it, and the caret brought into a line that became shorter. A fault it found, kept as it is: when a line of the
+    // range before the last one gets line breaks, the last line of the range is looked for at its old index, so its limit and the new end of the
+    // range are worked out for another line.
+
+    private static void ReplaceRuns()
+    {
+        Lines.Add("== replace");
+        Start("one two", "three");
+        _editor.SingleLine = true;
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "+a\nb\r\nc+");
+        Edit("single line: the line breaks of the text are dropped");
+        _editor.SingleLine = false;
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "x\ry");
+        Edit("a lone CR in an edit within a line breaks the line");
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 4), false, "A\r\nB");
+        Edit("an insertion with CRLF into an LF text takes the existing line ending");
+        FieldInfo existing = typeof(EditableTextBrowser).GetField("_useExistingLineEnding", Private);
+        existing.SetValue(_editor, false);
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 4), false, "A\r\nB");
+        Edit("and without the existing line ending its own");
+        existing.SetValue(_editor, true);
+        TextDocument.TextPosition newEnd;
+        Start("aXa aXa", "aXa");
+        Lines.Add("scoped to a column: " + _editor.ReplaceAll(TextMatcher.Literal("a", false), "b", At(0, 1), At(1, 2), out newEnd) + " end " + P(newEnd));
+        Edit("Replace All up to the end of the range only");
+        Start("aaaa", "z");
+        Lines.Add("lines that would match again: " + _editor.ReplaceAll("aa", "a\na", false));
+        Edit("the inserted lines are not searched again");
+        Start("aaaa", "z");
+        Lines.Add("with a lone CR: " + _editor.ReplaceAll("aa", "a\ra", false));
+        Edit("nor after a lone CR");
+        Start("xaay", "aa end");
+        Lines.Add("scoped with breaks: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 4), out newEnd) + " end " + P(newEnd));
+        Edit("line breaks in a line before the last: the last line is taken for another one (recorded as it is)");
+        Start("xy", "aa bb");
+        Lines.Add("breaks in the last line: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 5), out newEnd) + " end " + P(newEnd));
+        Edit("the end of the range after line breaks in the last line");
+        Start("xaay", "aa end");
+        Lines.Add("scoped in one line: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "123", At(0, 0), At(1, 4), out newEnd) + " end " + P(newEnd));
+        Edit("the end of the range in the same line");
+        Start("aaaaaa", "z");
+        _editor.SetCaret(At(0, 6));
+        Lines.Add("shorter: " + _editor.ReplaceAll("aa", "", false));
+        Edit("the caret brought into the shorter line");
+    }
+
+    // ---- 3D-3: the colours of the syntax of CodeEditorPP, written by the code before what it decides about them moved to the model: the spans a
+    // line is drawn with (start, end and which of the token brushes, d for the colour of the text) after edits that change a line, insert and remove
+    // lines (a line break put in at the start of a line and an empty line taken out, the two edits for which the tokens are worked out again from
+    // the line before), open and close a block comment over several lines, and with fewer brushes than token types, none, and no tokenizer.
+
+    private static readonly MethodInfo ColorSpansMethod = typeof(CodeEditorPP).GetMethod("GetLineColorSpans", Private);
+
+    private static void Spans(CodeEditorPP code, string what)
+    {
+        System.Drawing.Brush[] brushes = code.TokenBrushes;
+        List<string> lines = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            ReadonlyTextBrowser.ColorSpan[] spans = (ReadonlyTextBrowser.ColorSpan[])ColorSpansMethod.Invoke(code, new object[] { line });
+            List<string> parts = new List<string>();
+            if (spans != null)
+            {
+                foreach (ReadonlyTextBrowser.ColorSpan span in spans)
+                {
+                    int index = brushes == null ? -1 : Array.IndexOf(brushes, span.Foreground);
+                    parts.Add(span.Start + "-" + span.End + ":" + (index < 0 ? "d" : index.ToString(CultureInfo.InvariantCulture)));
+                }
+            }
+            lines.Add(line + "[" + string.Join(" ", parts) + "]");
+        }
+        Lines.Add("syntax " + what + ": " + string.Join(" ", lines));
+    }
+
+    private static void MessagesAndFolds(CodeEditorPP code, string what)
+    {
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        List<string> messages = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            if (provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+            {
+                messages.Add(line + ":" + message.Text);
+            }
+        }
+        List<string> folds = new List<string>();
+        foreach (FoldedLineInfo fold in code.GetFoldState())
+        {
+            folds.Add(fold.Line + ":" + fold.Text);
+        }
+        Lines.Add("lines " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " messages=" + string.Join(",", messages) + " folds=" + string.Join(",", folds));
+    }
+
+    private static void SyntaxRuns()
+    {
+        Lines.Add("== syntax");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 100) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int a = 1; // one", "/* start", "still comment", "end */ int b;", "char *s = \"text\";", "#define X 2", "  return 0;" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        System.Drawing.Brush[] brushes = new System.Drawing.Brush[8];
+        for (int i = 0; i < brushes.Length; i++)
+        {
+            brushes[i] = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, i, i, i));
+        }
+        code.TokenBrushes = brushes;
+        Spans(code, "C");
+        code.ReplaceText(At(2, 0), At(2, 0), false, "\n");
+        Spans(code, "a line break at the start of a line inside the comment");
+        code.ReplaceText(At(2, 0), At(3, 0), false, "");
+        Spans(code, "the empty line taken out");
+        code.ReplaceText(At(1, 0), At(1, 2), false, "");
+        Spans(code, "the comment no longer opened");
+        code.ReplaceText(At(1, 0), At(1, 0), false, "/*");
+        Spans(code, "opened again");
+        code.ReplaceText(At(2, 5), At(2, 5), false, "*/ x = 3; /*");
+        Spans(code, "closed and opened in a line inside it");
+        code.ReplaceText(At(0, 17), At(0, 17), false, "\nint c; /* new\nline");
+        Spans(code, "lines inserted that open a comment");
+        code.ReplaceText(At(1, 0), At(3, 0), false, "");
+        Spans(code, "lines removed");
+        code.ReplaceText(At(0, 0), At(0, 0), false, "\n");
+        Spans(code, "a line break at the start of the first line");
+        code.ReplaceText(At(0, 0), At(1, 0), false, "");
+        Spans(code, "the first line taken out");
+        code.TokenBrushes = new System.Drawing.Brush[] { brushes[0], brushes[1] };
+        Spans(code, "two brushes: the other types take the first");
+        code.TokenBrushes = null;
+        Spans(code, "no brushes: the colour of the text");
+        code.TokenBrushes = new System.Drawing.Brush[0];
+        Spans(code, "an empty list of brushes: the colour of the text");
+        code.TokenBrushes = brushes;
+        code.SetTokenizer(null);
+        Spans(code, "no tokenizer");
+
+        // The lines an edit changed are also what the inline messages and the folds are told: a message under a line goes with the line when a
+        // line break is put in at its start, and a fold that starts at the line before is looked at again.
+        code.TokenBrushes = brushes;
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        code.SetDocument(new EditableTextDocument(new[] { "int f()", "{", "  int a;", "  {", "    b();", "  }", "}", "x" }, TextDocument.LineEnding.Lf));
+        code.AddMessages(new[]
+        {
+            new InlineMessageProvider.MessageRequest { Line = 3, Severity = InlineMessageProvider.MessageSeverity.Error, Text = "on a", Column = 0 },
+            new InlineMessageProvider.MessageRequest { Line = 4, Severity = InlineMessageProvider.MessageSeverity.Warning, Text = "on the brace", Column = 0 },
+            new InlineMessageProvider.MessageRequest { Line = 8, Severity = InlineMessageProvider.MessageSeverity.Error, Text = "on x", Column = 0 }
+        });
+        code.SetCaret(At(3, 3));
+        code.CollapseCurrentFold();
+        MessagesAndFolds(code, "a document with messages and a fold");
+        code.ReplaceText(At(3, 0), At(3, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the line of a message and a fold");
+        code.ReplaceText(At(3, 0), At(4, 0), false, "");
+        MessagesAndFolds(code, "the empty line taken out");
+        code.ReplaceText(At(2, 0), At(2, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the line before the fold");
+        code.ReplaceText(At(2, 0), At(3, 0), false, "");
+        MessagesAndFolds(code, "taken out again");
+        code.ReplaceText(At(0, 0), At(0, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the first line");
+        code.ReplaceText(At(0, 0), At(1, 0), false, "");
+        MessagesAndFolds(code, "the first line taken out");
+        code.ReplaceText(At(7, 1), At(7, 1), false, "\ny");
+        MessagesAndFolds(code, "a line added after the last one");
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-4: the folds of CodeEditorPP, written by the code before what the view decides about them moved to the model: a click on the mark of
+    // the fold margin (through the real FoldingMarginPainter) on a block whose opening brace is on the next line and on one whose brace ends the
+    // header line, with the caret inside the block and outside it, again to unfold, on a line without a block and while the lines are wrapped; the
+    // rows the view shows (a folded block hides its lines; the folded header shows the text of the fold with its label); the caret moved by Up and
+    // Down over a folded block; the caret put in a hidden line; Collapse and Expand of the caret line.
+
+    private static string FoldState(CodeEditorPP code)
+    {
+        List<string> folds = new List<string>();
+        foreach (FoldedLineInfo fold in code.GetFoldState())
+        {
+            folds.Add(fold.Line.ToString(CultureInfo.InvariantCulture));
+        }
+        folds.Sort(StringComparer.Ordinal);
+        int visibleRows = (int)typeof(ReadonlyTextBrowser).GetField("_visibleRows", Private).GetValue(code);
+        List<string> rows = new List<string>();
+        for (int row = 0; row < visibleRows && row < code.DisplayRows.Length; row++)
+        {
+            ReadonlyTextBrowser.DisplayRow displayRow = code.DisplayRows[row];
+            if (displayRow.VirtualLine != null || displayRow.Line < 0)
+            {
+                continue;
+            }
+            string text = "";
+            if (displayRow.Decorator != null)
+            {
+                text = "=" + Escape(displayRow.Decorator.Transform(code.EditableDocument.GetLineText(displayRow.Line), out System.Drawing.CharacterRange label, out _)) + "@" + label.First + "+" + label.Length;
+            }
+            rows.Add(displayRow.Line + text);
+        }
+        return "folds=" + string.Join(",", folds) + " caret=" + P(code.CaretPosition) + " rows=" + string.Join(" ", rows);
+    }
+
+    private static void MarginClick(CodeEditorPP code, int line)
+    {
+        object painter = null;
+        System.Collections.IList margins = (System.Collections.IList)typeof(ReadonlyTextBrowser).GetField("_margins", Private).GetValue(code);
+        foreach (object slot in margins)
+        {
+            object margin = slot.GetType().GetField("Margin").GetValue(slot);
+            if (margin.GetType().Name == "FoldingMarginPainter")
+            {
+                painter = margin;
+            }
+        }
+        int rowIndex = -1;
+        for (int row = 0; row < code.DisplayRows.Length; row++)
+        {
+            if (code.DisplayRows[row].VirtualLine == null && code.DisplayRows[row].Line == line)
+            {
+                rowIndex = row;
+                break;
+            }
+        }
+        painter.GetType().GetMethod("OnMouseDown").Invoke(painter, new object[] { System.Drawing.Point.Empty, code, 0, 0, System.Drawing.SizeF.Empty, rowIndex });
+    }
+
+    private static void FoldRuns()
+    {
+        Lines.Add("== folds");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 400) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int f()", "{", "  a();", "  if (x)", "  {", "    b();", "  }", "}", "int g() {", "  c();", "}", "", "x" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        Application.DoEvents();
+        void Step(string what)
+        {
+            Application.DoEvents();
+            Lines.Add("fold " + what + ": " + FoldState(code));
+        }
+        void Press(Keys keys)
+        {
+            EditorKeyDownMethod.Invoke(code, new object[] { new KeyEventArgs(keys) });
+        }
+        Step("a C text");
+        code.SetCaret(At(2, 3));
+        MarginClick(code, 0);
+        Step("a click on the header of a block whose brace is on the next line, the caret inside it");
+        MarginClick(code, 0);
+        Step("clicked again: unfolded");
+        code.SetCaret(At(9, 1));
+        MarginClick(code, 8);
+        Step("a block whose brace ends the header line, the caret inside it");
+        MarginClick(code, 8);
+        Step("unfolded");
+        code.SetCaret(At(12, 0));
+        MarginClick(code, 3);
+        Step("an inner block, the caret outside it");
+        code.SetCaret(At(2, 0));
+        Press(Keys.Down);
+        Step("Down onto the folded header");
+        Press(Keys.Down);
+        Step("Down over the folded block");
+        Press(Keys.Up);
+        Step("Up back over it");
+        Press(Keys.End);
+        Step("End of the folded header");
+        Press(Keys.Down);
+        Step("Down again");
+        code.SetCaret(At(5, 2));
+        Step("the caret put in a hidden line");
+        code.SetCaret(At(3, 0));
+        code.CollapseCurrentFold();
+        Step("Collapse at the caret line");
+        code.CollapseCurrentFold();
+        Step("Collapse again");
+        code.ExpandCurrentFold();
+        Step("Expand at the caret line");
+        code.SetCaret(At(12, 0));
+        MarginClick(code, 2);
+        Step("a click on a line without a block");
+        MarginClick(code, 0);
+        MarginClick(code, 8);
+        Step("two blocks folded");
+        code.WordWrap = true;
+        Step("word wrap on");
+        MarginClick(code, 8);
+        Step("a click while wrapping");
+        code.CollapseCurrentFold();
+        code.WordWrap = false;
+        Step("word wrap off");
+        MarginClick(code, 0);
+        MarginClick(code, 8);
+        code.SetCaret(At(10, 0));
+        MarginClick(code, 8);
+        Step("the caret on the line of the closing brace");
+        MarginClick(code, 8);
+        code.SetCaret(At(3, 4));
+        MarginClick(code, 3);
+        Step("the caret on the header, before the line of the opening brace");
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-5: the inline messages of CodeEditorPP, written by the code before what the view decides about them moved to the model: the line and
+    // the column of a message added (counted from 1, a column of 0 for none, a line past the text on the last line, line 0 on the first, a second
+    // message of a line in its place), the messages dropped when word wrap is switched; and where the real row of a message (InlineMessageView)
+    // puts its band, drawn into a bitmap with colours of its own: under its column (after a tab, scrolled, scrolled past it) or in the middle, a
+    // text too long for the row, two row heights. The band is found as the frame drawn around it; its width is written less the width the text is
+    // measured at (the font of the row, as the row measures it), so that the lines do not depend on the fonts. The colour of the text is not
+    // written: whether a pixel of the text has that very colour depends on the fonts of the machine (CI found none where this one found some).
+
+    private static void Messages(CodeEditorPP code, string what)
+    {
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        List<string> messages = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            if (provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+            {
+                messages.Add(line + ":" + message.Column + ":" + message.Severity + ":" + message.Text);
+            }
+        }
+        Lines.Add("messages " + what + ": " + string.Join(", ", messages));
+    }
+
+    private static readonly System.Drawing.Color BandColor = System.Drawing.Color.FromArgb(255, 200, 201, 202);
+
+    private static readonly System.Drawing.Color FrameColor = System.Drawing.Color.FromArgb(255, 10, 20, 30);
+
+    private static readonly System.Drawing.Color ErrorTextColor = System.Drawing.Color.FromArgb(255, 250, 0, 0);
+
+    private static readonly System.Drawing.Color WarningTextColor = System.Drawing.Color.FromArgb(255, 0, 0, 250);
+
+    private static void MessageBand(CodeEditorPP code, int line, int scrollColumn, int rowHeight, string what)
+    {
+        InlineMessageView view = (InlineMessageView)typeof(CodeEditorPP).GetField("_inlineMessageView", Private).GetValue(code);
+        List<ReadonlyTextBrowser.IVirtualLine> rows = new List<ReadonlyTextBrowser.IVirtualLine>();
+        view.GetVirtualLines(line, rows);
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message);
+        const int width = 400;
+        using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(width, rowHeight + 2))
+        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+        using (System.Drawing.Font font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSerif, rowHeight * 5 / 8))
+        {
+            graphics.Clear(System.Drawing.Color.White);
+            int measured = (int)graphics.MeasureString(message.Text, font).Width + 3;
+            rows[0].Draw(graphics, code, 0, scrollColumn, line, new System.Drawing.Rectangle(0, 0, width, rowHeight), new System.Drawing.SizeF(8, rowHeight));
+            int left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
+            for (int y = 0; y < bitmap.Height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int argb = bitmap.GetPixel(x, y).ToArgb();
+                    if (argb == FrameColor.ToArgb())
+                    {
+                        left = Math.Min(left, x);
+                        top = Math.Min(top, y);
+                        right = Math.Max(right, x);
+                        bottom = Math.Max(bottom, y);
+                    }
+                }
+            }
+            int textWidth = Math.Min(measured, width - (4 + rowHeight + 3) * 2);
+            // In the middle the left edge depends on the width of the text: only its distance from where the middle puts the text is written.
+            string place = message.Column == -1 ? "from the middle=" + (left - (width - textWidth) / 2) : "left=" + left;
+            Lines.Add("message band " + what + ": " + place + " top=" + top + " width less the text=" + (right - left + 1 - textWidth)
+                + " height=" + (bottom - top + 1) + " clipped=" + Bool(measured > width - (4 + rowHeight + 3) * 2));
+        }
+    }
+
+    private static void MessageRuns()
+    {
+        Lines.Add("== messages");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "alpha", "\tbeta", "gamma", "", "last" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        InlineMessageProvider.MessageRequest Request(int line, InlineMessageProvider.MessageSeverity severity, string text, int column)
+        {
+            return new InlineMessageProvider.MessageRequest { Line = line, Severity = severity, Text = text, Column = column };
+        }
+        code.AddMessages(new[]
+        {
+            Request(1, InlineMessageProvider.MessageSeverity.Error, "first", 0),
+            Request(2, InlineMessageProvider.MessageSeverity.Warning, "second", 3),
+            Request(9, InlineMessageProvider.MessageSeverity.Error, "past the end", 2),
+            Request(0, InlineMessageProvider.MessageSeverity.Warning, "line zero", 1)
+        });
+        Messages(code, "a batch");
+        code.AddMessage(3, InlineMessageProvider.MessageSeverity.Error, "single", 4);
+        code.AddMessage(-5, InlineMessageProvider.MessageSeverity.Error, "negative", -2);
+        Messages(code, "one at a time, a line below 1");
+        code.WordWrap = true;
+        Messages(code, "word wrap on drops them");
+        code.AddMessage(2, InlineMessageProvider.MessageSeverity.Error, "while wrapped", 1);
+        Messages(code, "added while wrapped");
+        code.WordWrap = false;
+        Messages(code, "word wrap off drops them too");
+        code.ClearMessages();
+        code.ApplyMessageColors(BandColor, ErrorTextColor, WarningTextColor, FrameColor);
+        code.AddMessages(new[]
+        {
+            Request(1, InlineMessageProvider.MessageSeverity.Error, "short", 0),
+            Request(2, InlineMessageProvider.MessageSeverity.Warning, "after the tab", 3),
+            Request(3, InlineMessageProvider.MessageSeverity.Error, "x " + new string('w', 200), 0),
+            Request(4, InlineMessageProvider.MessageSeverity.Warning, "x " + new string('w', 200), 2)
+        });
+        Messages(code, "for the bands");
+        foreach (int rowHeight in new[] { 18, 24 })
+        {
+            MessageBand(code, 0, 0, rowHeight, "in the middle, row " + rowHeight);
+            MessageBand(code, 1, 0, rowHeight, "under its column after a tab, row " + rowHeight);
+            MessageBand(code, 1, 3, rowHeight, "scrolled, row " + rowHeight);
+            MessageBand(code, 1, 9, rowHeight, "scrolled past its column, row " + rowHeight);
+            MessageBand(code, 2, 0, rowHeight, "too long, in the middle, row " + rowHeight);
+            MessageBand(code, 3, 0, rowHeight, "too long, under its column, row " + rowHeight);
+        }
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-6: the completion of CodeEditorPP, written by the code before what the view decides about it moved to the model: the word list opened by
+    // itself after two letters of a word (not after one, not with completion on typing off, not when completion is off), the typed word it is told to
+    // select, a separator that accepts the selected word when it continues what was typed and closes the list when it does not, a word that starts
+    // with a digit closing it, Escape, the list opened by Ctrl+Space (ShowCompletion), the language and the switch closing it; and the parameter hint
+    // of a call (opened by the parenthesis, the active parameter after a comma, closed after the call, opened again by a key that moves the caret
+    // back into it, not while the list is open, closed when the editor loses the focus). The list is a stand-in that logs what it is asked (the real
+    // one is a window of its own); the hint is the real one.
+
+    private static readonly List<string> PopupLog = new List<string>();
+
+    private static object _lastHintView;
+
+    private sealed class LoggingPopup : ISuggestionPopup
+    {
+        private readonly List<ISuggestion> _items;
+
+        private readonly CodeEditorPP _host;
+
+        private string _prefix = "";
+
+        public LoggingPopup(ISuggestionSource source, CodeEditorPP host)
+        {
+            _items = new List<ISuggestion>(source.Items);
+            _host = host;
+            PopupLog.Add("create " + _items.Count);
+        }
+
+        public bool IsVisible { get; private set; }
+
+        public SmarTTY.TextEditing.RgbColor BackColor { set { } }
+
+        public ISuggestion SelectedSuggestion
+        {
+            get
+            {
+                foreach (ISuggestion item in _items)
+                {
+                    if (item.DisplayName.StartsWith(_prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return item;
+                    }
+                }
+                return _items.Count > 0 ? _items[0] : null;
+            }
+        }
+
+        public void Show(bool autoSize)
+        {
+            IsVisible = true;
+            PopupLog.Add("show");
+        }
+
+        public void Hide()
+        {
+            IsVisible = false;
+            PopupLog.Add("hide");
+        }
+
+        public void SelectMatch(string prefix, bool exactMatch)
+        {
+            _prefix = prefix;
+            PopupLog.Add("select " + prefix + (exactMatch ? " exact" : ""));
+        }
+
+        public void AcceptSelected()
+        {
+            ISuggestion selected = SelectedSuggestion;
+            PopupLog.Add("accept " + (selected == null ? "-" : selected.DisplayName));
+            IsVisible = false;
+            _host.AcceptSuggestion(selected, Keys.Return);
+        }
+
+        public void Dispose()
+        {
+            IsVisible = false;
+            PopupLog.Add("dispose");
+        }
+    }
+
+    private sealed class LoggingPopupFactory : ISuggestionPopupFactory
+    {
+        public CodeEditorPP Host;
+
+        public ISuggestionPopup Create(ISuggestionSource suggestionSource, bool allowMultiSelect)
+        {
+            return new LoggingPopup(suggestionSource, Host);
+        }
+    }
+
+    private static void Completion(CodeEditorPP code, string what)
+    {
+        string hint = code.Completion.SignatureHintName;
+        object controller = typeof(EditorCompletion).GetField("_signatureHintController", Private).GetValue(code.Completion);
+        object view = controller == null ? null : typeof(SignatureHintController).GetField("_view", Private).GetValue(controller);
+        if (view != null)
+        {
+            object label = view.GetType().GetField("label1", Private).GetValue(view);
+            hint += " active=" + label.GetType().GetProperty("ActiveIndex").GetValue(label) + " " + Escape(((IHintView)view).SignatureText)
+                + (ReferenceEquals(view, _lastHintView) ? " (the same window)" : " (a new window)");
+        }
+        _lastHintView = view;
+        Lines.Add("completion " + what + ": line=" + Escape(code.EditableDocument.GetLineText(code.CaretPosition.Line)) + " caret=" + P(code.CaretPosition)
+            + " list=" + (code.IsSuggestionVisible ? "shown" : "-") + " log=" + string.Join(";", PopupLog) + " hint=" + (code.IsSignatureHintVisible ? "shown " : "- ") + (hint ?? ""));
+        PopupLog.Clear();
+    }
+
+    private static void CompletionRuns()
+    {
+        Lines.Add("== completion");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int value = 1;", "int valid = 2;", "int sum(int a, int b) { return a + b; }", "" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        code.CompletionLanguage = SyntaxHighlighting.Language.CLike;
+        code.CompletionEnabled = true;
+        code.CompletionOnTyping = true;
+        typeof(EditorCompletion).GetField("_suggestionController", Private).SetValue(code.Completion, new SuggestionController(new LoggingPopupFactory { Host = code }));
+        Application.DoEvents();
+        void TypeInto(string text)
+        {
+            foreach (char ch in text)
+            {
+                KeyPressMethod.Invoke(code, new object[] { new KeyPressEventArgs(ch) });
+            }
+        }
+        void PressKey(Keys keys)
+        {
+            EditorKeyDownMethod.Invoke(code, new object[] { new KeyEventArgs(keys) });
+        }
+        code.SetCaret(At(3, 0));
+        PopupLog.Clear();
+        TypeInto("v");
+        Completion(code, "one letter");
+        TypeInto("a");
+        Completion(code, "two letters open the list by themselves");
+        TypeInto("l");
+        Completion(code, "a third letter");
+        TypeInto("i");
+        Completion(code, "a fourth");
+        TypeInto("\b");
+        Completion(code, "Backspace");
+        TypeInto("i");
+        TypeInto(" ");
+        Completion(code, "a blank accepts the selected word that continues what was typed");
+        TypeInto("xy");
+        Completion(code, "a word no item continues");
+        TypeInto(".");
+        Completion(code, "a mark closes the list without accepting");
+        TypeInto(" 12");
+        Completion(code, "a word that starts with a digit closes the list");
+        TypeInto(" ");
+        code.ShowCompletion();
+        Completion(code, "Ctrl+Space on no word");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape");
+        TypeInto("va");
+        Completion(code, "opened again");
+        code.CompletionLanguage = SyntaxHighlighting.Language.Bash;
+        Completion(code, "another language closes it");
+        code.CompletionLanguage = SyntaxHighlighting.Language.CLike;
+        code.ShowCompletion();
+        code.CompletionEnabled = false;
+        Completion(code, "completion switched off closes it");
+        TypeInto("lu");
+        Completion(code, "and typing does not open it");
+        code.ShowCompletion();
+        Completion(code, "nor Ctrl+Space");
+        code.CompletionEnabled = true;
+        code.CompletionOnTyping = false;
+        TypeInto("e");
+        Completion(code, "completion on typing off");
+        code.CompletionOnTyping = true;
+
+        code.SetDocument(new EditableTextDocument(new[] { "int sum(int a, int b) { return a + b; }", "" }, TextDocument.LineEnding.Lf));
+        code.SetCaret(At(1, 0));
+        TypeInto(";");
+        PopupLog.Clear();
+        code.SetCaret(At(1, 0));
+        TypeInto("x = sum(");
+        Completion(code, "the parenthesis of a call opens the hint");
+        TypeInto("1");
+        Completion(code, "a digit leaves it");
+        TypeInto(",");
+        Completion(code, "a comma: the next parameter");
+        TypeInto(" 2)");
+        Completion(code, "after the call it closes");
+        PressKey(Keys.Left);
+        Completion(code, "Left back into the call");
+        code.ShowCompletion();
+        Completion(code, "Ctrl+Space on a number");
+        PressKey(Keys.Left);
+        PressKey(Keys.Right);
+        Completion(code, "Left and Right");
+        TypeInto("+ab");
+        Completion(code, "the list opened by typing closes the hint");
+        PressKey(Keys.Left);
+        Completion(code, "no hint while the list is open");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape closes both");
+        PressKey(Keys.Left);
+        Completion(code, "Left again");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape closes the hint");
+        PressKey(Keys.Left);
+        typeof(CodeEditorPP).GetMethod("OnLostFocus", Private).Invoke(code, new object[] { EventArgs.Empty });
+        Completion(code, "the focus lost");
+        PressKey(Keys.Right);
+        Completion(code, "Right");
+        code.CompletionEnabled = false;
+        Completion(code, "completion switched off");
+        PressKey(Keys.Left);
+        Completion(code, "no hint with completion off");
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-6: the list of the completion (Forms/SuggestionListForm with its Controls/SuggestionListView), written by the code before what it decides
+    // moved to the model: the item a typed word selects (the same name, a name it starts, the nearest one before it), the items it puts on top when
+    // substrings are allowed (an abbreviation of the capital letters and the words, a word of the name, a part of it; the rest grey) and the order
+    // they come back in, and the keys of the list (Escape and Alt hide it, Enter, Tab and a blank accept the selected item, a blank that does not
+    // continue the typed word is typed instead, Home and End select the first and the last item and move the caret too, the other keys and the
+    // characters go to the editor).
+
+    private sealed class ListItem : ISuggestion
+    {
+        public ListItem(string name) { DisplayName = name; }
+
+        public int ImageIndex => -1;
+
+        public string DisplayName { get; }
+
+        public string DetailText => "";
+
+        public string HintText => "";
+
+        public bool IsBold => false;
+
+        public string HintDescription => null;
+    }
+
+    private sealed class ListSource : ISuggestionSource
+    {
+        public List<ISuggestion> List = new List<ISuggestion>();
+
+        public System.Collections.IEnumerable Images => new object[0];
+
+        public IEnumerable<ISuggestion> Items => List;
+    }
+
+    private sealed class ListHost : ICompletionHost
+    {
+        public readonly List<string> Log = new List<string>();
+
+        public Control Control;
+
+        public string Text = "";
+
+        public Control HostControl => Control;
+
+        public string CurrentText => Text;
+
+        public System.Drawing.Rectangle CaretScreenBounds => new System.Drawing.Rectangle(10, 10, 100, 16);
+
+        public void AcceptSuggestion(ISuggestion suggestion, Keys keys) { Log.Add("accept " + suggestion.DisplayName + " " + keys); }
+
+        public void ForwardMessage(Message message) { Log.Add("forward " + message.Msg + " " + message.WParam.ToInt64()); }
+
+        public void SetPopupActive(bool changed) { Log.Add("active " + changed); }
+    }
+
+    private static string ListState(SmarTTY.Forms.SuggestionListForm form, ListView view)
+    {
+        StringBuilder text = new StringBuilder();
+        foreach (ListViewItem item in view.Items)
+        {
+            text.Append(item.Text);
+            if (item.ForeColor == System.Drawing.Color.DarkGray)
+            {
+                text.Append("~");
+            }
+            else if (item.ForeColor == System.Drawing.Color.Black)
+            {
+                text.Append("!");
+            }
+            else if (item.ForeColor != view.ForeColor)
+            {
+                text.Append("?");
+            }
+            text.Append(' ');
+        }
+        string selected = "";
+        foreach (int index in view.SelectedIndices)
+        {
+            selected += index + " ";
+        }
+        return "items=" + text.ToString().TrimEnd() + " selected=" + selected.TrimEnd() + " focused=" + (view.FocusedItem == null ? "-" : view.FocusedItem.Text)
+            + " filtered=" + typeof(SmarTTY.Forms.SuggestionListForm).GetField("_isFiltered", Private).GetValue(form) + " visible=" + form.Visible;
+    }
+
+    private static void ListRuns()
+    {
+        Lines.Add("== list");
+        ListSource source = new ListSource();
+        foreach (string name in new[] { "Value", "ValueType", "get_value", "getValue", "int", "MAX_VALUE", "max", "sum", "valid", "value", "values", "xvalue", "my_get_value", "MaxAllowed", "ReadAllText", "ReadAllLines", "SunRa", "Vector3d", "ReadAll", "GetAllItems", "OmeGa" })
+        {
+            source.List.Add(new ListItem(name));
+        }
+        ListHost host = new ListHost { Control = _form };
+        SmarTTY.Forms.SuggestionListForm form = new SmarTTY.Forms.SuggestionListForm(host, false);
+        ListView view = (ListView)typeof(SmarTTY.Forms.SuggestionListForm).GetField("listView1", Private).GetValue(form);
+        // The list keeps its selection only once its window exists.
+        form.CreateControl();
+        GC.KeepAlive(view.Handle);
+        form.SetSource(source);
+        Lines.Add("list source: " + ListState(form, view));
+        foreach (bool substrings in new[] { false, true })
+        {
+            foreach (string prefix in new[] { "", "va", "VAL", "value", "Value", "values", "vx", "gv", "GV", "GetV", "type", "max", "MV", "alu", "ALU", "zz", "_", "my", "VT", "get", "value", "a", "RA", "RAT", "all", "V3", "ra", "GA" })
+            {
+                form.SelectMatch(prefix, substrings);
+                Lines.Add("list " + (substrings ? "substrings" : "prefix") + " '" + prefix + "': " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+                host.Log.Clear();
+            }
+        }
+        // After a filtered list the nearest item is counted in the filtered order and selected in the order put back (recorded as it is).
+        form.SelectMatch("gv", true);
+        Lines.Add("list substrings 'gv' after a filtered list: " + ListState(form, view));
+        form.SelectMatch("getV", false);
+        form.Show();
+        Application.DoEvents();
+        host.Log.Clear();
+        void Press(string what, int msg, long key, string currentText)
+        {
+            host.Text = currentText;
+            if (!form.Visible)
+            {
+                form.Show();
+                Application.DoEvents();
+            }
+            host.Log.Clear();
+            Message message = Message.Create(view.Handle, msg, (IntPtr)key, IntPtr.Zero);
+            bool handled = view.PreProcessMessage(ref message);
+            Lines.Add("list key " + what + ": handled=" + handled + " " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        }
+        Press("Escape", 256, (long)Keys.Escape, "gv");
+        Press("Alt", 260, (long)Keys.Menu, "gv");
+        Press("Enter", 256, (long)Keys.Return, "gv");
+        Press("Tab", 256, (long)Keys.Tab, "gv");
+        Press("a blank after a word the item does not continue", 256, (long)Keys.Space, "gv");
+        Press("a blank after a word the item continues", 256, (long)Keys.Space, "getV");
+        Press("a blank after the word in other letters", 256, (long)Keys.Space, "GETV");
+        Press("a blank after a longer word", 256, (long)Keys.Space, "getValues");
+        Press("a blank after no word", 256, (long)Keys.Space, "");
+        Press("Home", 256, (long)Keys.Home, "gv");
+        Press("End", 256, (long)Keys.End, "gv");
+        Press("Left", 256, (long)Keys.Left, "gv");
+        Press("Right", 256, (long)Keys.Right, "gv");
+        Press("Delete", 256, (long)Keys.Delete, "gv");
+        Press("a system key Left", 260, (long)Keys.Left, "gv");
+        Press("a character", 258, 'q', "gv");
+        Press("Down", 256, (long)Keys.Down, "gv");
+        Press("a letter key", 256, (long)Keys.Q, "gv");
+        // Mono keeps the focused item when the selection is cleared and does not take a null one.
+        view.SelectedIndices.Clear();
+        view.FocusedItem = null;
+        Press("Enter with nothing selected", 256, (long)Keys.Return, "gv");
+        Press("Tab with nothing selected", 256, (long)Keys.Tab, "gv");
+        Press("a blank with nothing selected", 256, (long)Keys.Space, "gv");
+        form.SelectMatch("sum", false);
+        host.Log.Clear();
+        typeof(SmarTTY.Controls.SuggestionListView).GetMethod("OnDoubleClick", Private).Invoke(view, new object[] { EventArgs.Empty });
+        Lines.Add("list double click: " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        form.Show();
+        Application.DoEvents();
+        view.SelectedIndices.Clear();
+        host.Log.Clear();
+        form.AcceptSelected();
+        Lines.Add("list accept with nothing selected: " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        form.Dispose();
+    }
+
+    // ---- 3E-1: the line commands of CodeEditorPP (duplicate, move, delete, comment, the transforms of the Text menu), the moves to a bracket,
+    // the zoom and the key bindings that run them, written by the code before they moved to the model: the caret line and a selection of
+    // lines, the first and the last line, a text without a final line break, read-only, no comment style, the undo step each command makes,
+    // the zoom steps and their limits with the ZoomChanged events, and the bracket moves forward and back with and without the selection.
+
+    private sealed class CommentingEditor : CodeEditorPP
+    {
+        public CommentStyle Comment;
+
+        public override CommentStyle CommentStyle => Comment;
+    }
+
+    private static void Command(CodeEditorPP code, string what, List<string> events)
+    {
+        Lines.Add("command " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " caret=" + P(code.CaretPosition)
+            + " sel=" + (code.HasSelection ? P(code.SelectionStart) : "-") + " undo=" + Bool(code.CanUndo) + " zoom="
+            + code.FontZoom.ToString("0.000", CultureInfo.InvariantCulture) + " events=" + string.Join(";", events));
+        events.Clear();
+    }
+
+    private static void LineCommandRuns()
+    {
+        Lines.Add("== line commands");
+        CommentingEditor code = new CommentingEditor { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        List<string> events = new List<string>();
+        code.ZoomChanged += (sender, e) => events.Add("zoom");
+        void Reset(string[] lines, int caretLine, int caretColumn)
+        {
+            code.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+            code.ClearSelection();
+            code.SetCaret(At(caretLine, caretColumn));
+            events.Clear();
+        }
+        string[] text = { "one", "two", "three", "four" };
+        Reset(text, 1, 2);
+        code.DuplicateLines();
+        Command(code, "duplicate the caret line", events);
+        code.Undo();
+        Command(code, "undone in one step", events);
+        code.SetSelection(true, At(1, 1));
+        code.SetCaret(At(2, 2));
+        code.DuplicateLines();
+        Command(code, "duplicate two selected lines", events);
+        Reset(text, 3, 1);
+        code.DuplicateLines();
+        Command(code, "duplicate the last line (no final line break)", events);
+        Reset(new[] { "one", "two", "" }, 1, 0);
+        code.DuplicateLines();
+        Command(code, "duplicate a line before an empty last line", events);
+        Reset(text, 1, 1);
+        code.MoveLines(-1);
+        Command(code, "move the caret line up", events);
+        code.MoveLines(-1);
+        Command(code, "move it up at the first line", events);
+        code.MoveLines(1);
+        code.MoveLines(1);
+        Command(code, "move it down twice", events);
+        code.SetCaret(At(3, 0));
+        code.MoveLines(1);
+        Command(code, "move the last line down", events);
+        Reset(text, 2, 0);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 0));
+        code.MoveLines(1);
+        Command(code, "a selection ending at the start of a line: down at the last line", events);
+        code.MoveLines(-1);
+        Command(code, "and up", events);
+        code.Undo();
+        Command(code, "undone", events);
+        Reset(text, 1, 2);
+        code.DeleteLines();
+        Command(code, "delete the caret line", events);
+        Reset(text, 3, 2);
+        code.DeleteLines();
+        Command(code, "delete the last line", events);
+        Reset(text, 0, 1);
+        code.SetSelection(true, At(0, 1));
+        code.SetCaret(At(2, 1));
+        code.DeleteLines();
+        Command(code, "delete three selected lines", events);
+        Reset(new[] { "a", "  b", "", "c" }, 0, 1);
+        Lines.Add("command no comment style: " + Bool(code.ToggleComment()));
+        code.Comment = new CommentStyle("// ");
+        code.SetSelection(true, At(0, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command comment: " + Bool(code.ToggleComment()));
+        Command(code, "four lines commented", events);
+        code.ToggleComment();
+        Command(code, "and uncommented", events);
+        code.ClearSelection();
+        code.SetCaret(At(1, 3));
+        code.ToggleComment();
+        Command(code, "the caret line commented, the caret moved with its text", events);
+        code.Comment = new CommentStyle("<!-- ", " -->");
+        code.SetCaret(At(3, 0));
+        code.ToggleComment();
+        Command(code, "a comment with an end", events);
+        Reset(new[] { "b ", "a", "b ", "\tc  ", "a" }, 3, 2);
+        foreach (LineTransformKind kind in new[] { LineTransformKind.TrimTrailingWhitespace, LineTransformKind.SortAscending, LineTransformKind.RemoveDuplicateLines,
+            LineTransformKind.IndentationToSpaces, LineTransformKind.IndentationToTabs, LineTransformKind.SortDescending, LineTransformKind.EnsureFinalNewline })
+        {
+            Lines.Add("command transform " + kind + " without a selection: " + Bool(code.ApplyLineTransform(kind)));
+            Command(code, kind.ToString(), events);
+        }
+        Lines.Add("command final newline again: " + Bool(code.ApplyLineTransform(LineTransformKind.EnsureFinalNewline)));
+        Command(code, "nothing to add", events);
+        Reset(new[] { "c", "b", "a", "b" }, 1, 0);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command sort of three lines: " + Bool(code.ApplyLineTransform(LineTransformKind.SortAscending)));
+        Command(code, "sorted", events);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command duplicates of the sorted lines: " + Bool(code.ApplyLineTransform(LineTransformKind.RemoveDuplicateLines)));
+        Command(code, "the block replaced and selected", events);
+        code.ClearSelection();
+        Lines.Add("command line selection: " + Bool(code.HasLineSelection));
+        Lines.Add("command sort of one line: " + Bool(code.ApplyLineTransform(LineTransformKind.SortAscending)));
+        Lines.Add("command trim without a selection: " + Bool(code.ApplyLineTransform(LineTransformKind.TrimTrailingWhitespace)));
+        code.ReadOnly = true;
+        code.DuplicateLines();
+        code.MoveLines(1);
+        code.DeleteLines();
+        Lines.Add("command read-only: comment " + Bool(code.ToggleComment()) + ", transform " + Bool(code.ApplyLineTransform(LineTransformKind.SortDescending)));
+        Command(code, "nothing changed while read-only", events);
+        code.ReadOnly = false;
+
+        code.ResetZoom();
+        events.Clear();
+        code.ZoomBy(1);
+        Command(code, "zoom in", events);
+        code.ZoomBy(-1);
+        code.ZoomBy(-1);
+        Command(code, "zoom out twice", events);
+        code.ResetZoom();
+        Command(code, "reset", events);
+        code.ResetZoom();
+        Command(code, "reset again: no event", events);
+        code.SetZoom(10f);
+        Command(code, "a zoom past the largest", events);
+        code.ZoomBy(1);
+        Command(code, "zoom in at the largest", events);
+        code.SetZoom(0.123f);
+        Command(code, "a zoom below the smallest", events);
+        code.SetZoom(1.234f);
+        Command(code, "a zoom rounded", events);
+        code.ZoomBy(1);
+        Command(code, "zoom in from it: to the next tenth", events);
+        code.ResetZoom();
+
+        Reset(new[] { "f(a, g(b), [c]) {", "  x = <y>;", "}" }, 0, 0);
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        events.Clear();
+        foreach (string token in new[] { "(", ")", "[", "]", "{", "}", "<", ">" })
+        {
+            foreach (bool back in new[] { false, true })
+            {
+                foreach (bool opening in new[] { true, false })
+                {
+                    // Backward from the end of the call, not from the end of the text: a search backward that skips a pair whose opening bracket is
+                    // the first token of its line never ends (recorded in CLAUDE.md, not run here).
+                    code.SetCaret(back ? At(0, 10) : At(0, 3));
+                    code.ClearSelection();
+                    bool moved = code.MoveToToken(back, opening, false, t => t == token);
+                    Lines.Add("command to " + token + (back ? " back" : " forward") + (opening ? " opening" : " closing") + ": " + Bool(moved) + " caret=" + P(code.CaretPosition));
+                }
+            }
+        }
+        code.SetCaret(At(0, 7));
+        code.ClearSelection();
+        code.MoveToToken(true, false, false, t => t == "(");
+        Command(code, "back to the end of a ( the caret is at: the one before it", events);
+        code.SetCaret(At(0, 3));
+        code.ClearSelection();
+        code.MoveToToken(false, false, true, t => t == ")");
+        Command(code, "select to the next )", events);
+        code.SetCaret(At(0, 4));
+        code.MoveToToken(false, true, false, t => t == "(");
+        Command(code, "the next ( from inside a call", events);
+        code.MoveToToken(false, true, false, t => t == "(");
+        Command(code, "and the one after it", events);
+
+        // The key bindings run the commands (the keys with their modifiers in KeyData).
+        Reset(text, 1, 0);
+        code.Comment = new CommentStyle("# ");
+        foreach (Keys keys in new[] { Keys.Control | Keys.Shift | Keys.D, Keys.Alt | Keys.Down, Keys.Alt | Keys.Up, Keys.Control | Keys.OemQuestion,
+            Keys.Control | Keys.Divide, Keys.Control | Keys.Shift | Keys.K, Keys.Control | Keys.Oemplus, Keys.Control | Keys.Shift | Keys.Oemplus,
+            Keys.Control | Keys.Add, Keys.Control | Keys.OemMinus, Keys.Control | Keys.Subtract, Keys.Control | Keys.D0, Keys.Control | Keys.NumPad0,
+            Keys.Control | Keys.Alt | Keys.D9, Keys.Control | Keys.R, Keys.Control | Keys.Q })
+        {
+            KeyEventArgs args = new KeyEventArgs(keys);
+            EditorKeyDownMethod.Invoke(code, new object[] { args });
+            Command(code, "key " + keys + " handled=" + Bool(args.Handled), events);
+        }
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3E-2: the search, the highlight of the matches, the pair of a bracket and the marks of the blanks, written by the code before they moved
+    // to the model: Find forward and back, with and without a wrap, limited to a range, from a caret outside the lines, the selection it makes
+    // (also in terminal mode) and the column it scrolls to; the cells the highlight of the matches fills (a short line, a long one that is
+    // searched only around the screen, a regular expression); the range highlighted for the bracket at the caret and its style; the cells of the
+    // grey line under the tabs; the mark of each character and the cells of the marks of a line.
+
+    private static string StyleName(CodeEditorPP code, HighlightStyle style)
+    {
+        if (ReferenceEquals(style, code.ParenHighlightStyle)) return "paren";
+        if (ReferenceEquals(style, code.BracketHighlightStyle)) return "bracket";
+        if (ReferenceEquals(style, code.BraceHighlightStyle)) return "brace";
+        if (ReferenceEquals(style, code.AngleHighlightStyle)) return "angle";
+        if (ReferenceEquals(style, code.UnpairedHighlightStyle)) return "unpaired";
+        if (ReferenceEquals(style, code.DefaultPairHighlightStyle)) return "default";
+        return "other";
+    }
+
+    private static string Highlights(CodeEditorPP code)
+    {
+        System.Collections.IDictionary highlights = (System.Collections.IDictionary)typeof(ReadonlyTextBrowser).GetField("_highlights", Private).GetValue(code);
+        List<string> items = new List<string>();
+        foreach (System.Collections.DictionaryEntry entry in highlights)
+        {
+            ReadonlyTextBrowser.Highlight highlight = (ReadonlyTextBrowser.Highlight)entry.Value;
+            items.Add(entry.Key + ":" + P(highlight.Start) + "-" + P(highlight.End) + " " + StyleName(code, highlight.Style));
+        }
+        items.Sort(StringComparer.Ordinal);
+        return items.Count == 0 ? "-" : string.Join(" ", items);
+    }
+
+    private static int ScrollColumnOf(ReadonlyTextBrowser view)
+    {
+        return (int)typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).GetValue(view);
+    }
+
+    private static void Found(CodeEditorPP code, TextDocument.TextPosition result, string what)
+    {
+        Lines.Add("search " + what + ": found=" + P(result) + " caret=" + P(code.CaretPosition) + " sel=" + (code.HasSelection ? P(code.SelectionStart) + "-" + P(code.SelectionEnd) : "-")
+            + " scroll=" + ScrollColumnOf(code));
+    }
+
+    // The cells of the rows in view that a painting step filled: the step paints on a white bitmap of the size of the view, and a cell counts when the
+    // pixel a quarter into it from the left and the top (or on the given height) is not white.
+    private static string PaintedCells(CodeEditorPP code, Action<System.Drawing.Graphics> paint, int rows, int columns, float yFraction, Func<System.Drawing.Color, bool> counts, bool wholeCell = false)
+    {
+        System.Drawing.SizeF cell = (System.Drawing.SizeF)typeof(ReadonlyTextBrowser).GetField("_charSize", Private).GetValue(code);
+        using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(code.Width, code.Height))
+        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(System.Drawing.Color.White);
+            paint(graphics);
+            StringBuilder text = new StringBuilder();
+            for (int row = 0; row < rows; row++)
+            {
+                int y = (int)(RowTop(code, row) + cell.Height * yFraction);
+                text.Append(row == 0 ? "" : "|");
+                for (int column = 0; column < columns; column++)
+                {
+                    int x = (int)(code.ColumnToX(column + ScrollColumnOf(code)) + cell.Width / 4);
+                    bool inside = x >= 0 && x < bitmap.Width && y >= 0 && y < bitmap.Height;
+                    bool painted = inside && counts(bitmap.GetPixel(x, y));
+                    if (wholeCell)
+                    {
+                        // Any ink inside the cell (a mark is a thin glyph): the cell less a pixel on each side.
+                        int left = (int)Math.Ceiling(code.ColumnToX(column + ScrollColumnOf(code))) + 1;
+                        int right = (int)code.ColumnToX(column + 1 + ScrollColumnOf(code)) - 1;
+                        int top = (int)Math.Ceiling(RowTop(code, row)) + 1;
+                        int bottom = (int)(RowTop(code, row) + cell.Height) - 1;
+                        painted = false;
+                        for (int py = Math.Max(0, top); py < Math.Min(bitmap.Height, bottom) && !painted; py++)
+                        {
+                            for (int px = Math.Max(0, left); px < Math.Min(bitmap.Width, right) && !painted; px++)
+                            {
+                                painted = counts(bitmap.GetPixel(px, py));
+                            }
+                        }
+                    }
+                    text.Append(painted ? '#' : '.');
+                }
+            }
+            return text.ToString();
+        }
+    }
+
+    private static float RowTop(ReadonlyTextBrowser view, int line)
+    {
+        return ((System.Drawing.PointF)typeof(ReadonlyTextBrowser).GetMethod("PositionToPoint", Private, null, new[] { typeof(int), typeof(int) }, null).Invoke(view, new object[] { 0, line })).Y;
+    }
+
+    private static bool NotWhite(System.Drawing.Color color) => color.ToArgb() != System.Drawing.Color.White.ToArgb();
+
+    private static void SearchRuns()
+    {
+        Lines.Add("== search and marks");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 200) };
+        _form.Controls.Add(code);
+        code.WordWrap = false;
+        code.SetDocument(new EditableTextDocument(new[] { "one two one", "two", "", "one" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        TextMatcher one = TextMatcher.Literal("one", true);
+        TextDocument.TextPosition none = TextDocument.TextPosition.Invalid;
+        code.SetCaret(At(0, 0));
+        Found(code, code.Find(At(0, 0), one, false, false, FindSelectMode.None, none, none), "forward, no select");
+        Found(code, code.Find(At(0, 1), one, false, false, FindSelectMode.Select, none, none), "forward from inside the first, select");
+        Found(code, code.Find(At(0, 9), one, false, false, FindSelectMode.Select, none, none), "on to the last line");
+        Found(code, code.Find(At(3, 1), one, false, false, FindSelectMode.Select, none, none), "past the last match without a wrap");
+        Found(code, code.Find(At(3, 1), one, false, true, FindSelectMode.Select, none, none), "with a wrap");
+        Found(code, code.Find(At(3, 0), one, true, false, FindSelectMode.Select, none, none), "back from the start of the last line");
+        Found(code, code.Find(At(0, 3), one, true, false, FindSelectMode.Select, none, none), "back to the first");
+        Found(code, code.Find(At(0, 0), one, true, false, FindSelectMode.Select, none, none), "back from the start without a wrap");
+        Found(code, code.Find(At(0, 0), one, true, true, FindSelectMode.Select, none, none), "back with a wrap");
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("zzz", true), false, true, FindSelectMode.SelectOrClear, none, none), "no match, select or clear");
+        Found(code, code.Find(At(1, 0), TextMatcher.Literal("ONE", false), false, false, FindSelectMode.Select, none, none), "the case of the text kept: no match");
+        Found(code, code.Find(At(0, 0), one, false, false, FindSelectMode.Select, At(0, 2), At(1, 3)), "in a range: the first match is cut by its start");
+        Found(code, code.Find(At(0, 0), one, false, true, FindSelectMode.Select, At(0, 2), At(3, 2)), "in a range that cuts the last match");
+        Found(code, code.Find(At(1, 0), one, false, false, FindSelectMode.Select, At(0, 0), At(3, 2)), "forward to a last line of the range that cuts its match");
+        Found(code, code.Find(At(5, 0), one, true, false, FindSelectMode.Select, At(0, 0), At(3, 3)), "back from a caret below the range");
+        Found(code, code.Find(At(-1, 0), one, false, false, FindSelectMode.Select, At(1, 0), At(3, 3)), "forward from a caret above the range");
+        Found(code, code.Find(At(0, 0), TextMatcher.Create("o.e", true, false, true), false, false, FindSelectMode.Select, none, none), "a regular expression");
+        Found(code, code.Find(At(0, 0), TextMatcher.Create("one", true, true, false), false, false, FindSelectMode.Select, At(0, 1), none), "a range with an invalid end is no range");
+        Found(code, code.Find(At(0, 0), null, false, false, FindSelectMode.Select, none, none), "no matcher");
+
+        string wide = new string('x', 120) + "needle" + new string('y', 120);
+        code.SetDocument(new EditableTextDocument(new[] { "needle", wide, new string('z', 30) + "needle", new string('w', 300) + new string('n', 100) }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        Lines.Add("search visible columns=" + (int)typeof(ReadonlyTextBrowser).GetField("_visibleColumns", Private).GetValue(code));
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match in view: column 0");
+        Found(code, code.Find(At(0, 1), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match far right: centred");
+        Found(code, code.Find(At(1, 127), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match near the end of its line");
+        Found(code, code.Find(At(3, 0), TextMatcher.Create("n+", true, false, true), false, false, FindSelectMode.Select, none, none), "a match wider than the view");
+        code.TerminalMode = true;
+        code.SetSelectionEnd(At(2, 3));
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "terminal mode: the selection ends at the match");
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("absent", true), false, false, FindSelectMode.SelectOrClear, none, none), "terminal mode: no match clears");
+        code.TerminalMode = false;
+
+        // The highlight of every match (the search bar's query): the cells it fills.
+        code.SetDocument(new EditableTextDocument(new[] { "ab ab\tab", "xabx", "aaa", "\tab", "aab" }, TextDocument.LineEnding.Lf));
+        code.TabSize = 4;
+        Application.DoEvents();
+        MethodInfo paintMatches = typeof(ReadonlyTextBrowser).GetMethod("PaintMatches", Private);
+        void Matches(TextMatcher matcher, string what)
+        {
+            code.SetMatchHighlight(matcher);
+            Lines.Add("matches " + what + ": " + PaintedCells(code, g => paintMatches.Invoke(code, new object[] { g }), 5, 12, 0.5f, NotWhite));
+        }
+        Matches(TextMatcher.Literal("ab", true), "ab");
+        Matches(TextMatcher.Create("a+b", true, false, true), "a+b");
+        Matches(TextMatcher.Literal("AB", true), "AB in the case of the text");
+        Matches(TextMatcher.Literal("aa", true), "aa: matches do not overlap");
+        code.TerminalMode = true;
+        Matches(TextMatcher.Literal("ab", true), "terminal mode: none");
+        code.TerminalMode = false;
+        Matches(null, "none");
+        string longLine = new string('q', 5000) + "ab" + new string('q', 2100) + "ab";
+        code.SetDocument(new EditableTextDocument(new[] { longLine, "ab" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 4995);
+        Matches(TextMatcher.Literal("ab", true), "a long line scrolled to the first match (the second is past the margin)");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 7095);
+        Matches(TextMatcher.Literal("ab", true), "scrolled to the second");
+        // A long line of 6000 characters full of matches: only 500 are shown from where the search starts, which is the screen less 2048
+        // characters; a match that starts left of the screen is shown where it reaches into it.
+        code.SetDocument(new EditableTextDocument(new[] { string.Concat(System.Linq.Enumerable.Repeat("ab", 3000)) }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 4001);
+        Matches(TextMatcher.Literal("abababab", true), "a line full of matches, scrolled far right");
+        bool LeftOfText()
+        {
+            using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(code.Width, code.Height))
+            using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(System.Drawing.Color.White);
+                paintMatches.Invoke(code, new object[] { graphics });
+                int edge = (int)code.ColumnToX(ScrollColumnOf(code));
+                int y = (int)(RowTop(code, 0) + 2);
+                for (int x = 0; x < edge - 1; x++)
+                {
+                    if (NotWhite(bitmap.GetPixel(x, y)))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        Lines.Add("matches left of the text (the matches before the screen are not drawn there): " + Bool(LeftOfText()));
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 0);
+        code.SetMatchHighlight(null);
+
+        // The pair of the bracket at the caret.
+        code.SetDocument(new EditableTextDocument(new[] { "f(a[1]) {", "  x = <y>; ) }", "(" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        Application.DoEvents();
+        foreach (TextDocument.TextPosition caret in new[] { At(0, 2), At(0, 1), At(0, 4), At(0, 6), At(0, 7), At(0, 9), At(1, 0), At(1, 11), At(1, 13), At(1, 14), At(2, 1), At(1, 9), At(2, 0) })
+        {
+            code.ClearSelection();
+            code.SetCaret(caret);
+            Lines.Add("pair at " + P(caret) + ": " + Highlights(code));
+        }
+        code.SetCaret(At(0, 2));
+        code.SetSelection(true, At(0, 0));
+        Lines.Add("pair with a selection: " + Highlights(code));
+        code.SetCaret(At(0, 4));
+        Lines.Add("pair with a selection, the caret moved to a bracket: kept " + Highlights(code));
+        code.ClearSelection();
+        code.SetCaret(At(0, 2));
+        code.SetTokenizer(null);
+        code.SetCaret(At(0, 7));
+        Lines.Add("pair without tokens: " + Highlights(code));
+
+        // The marks of the blanks.
+        StringBuilder markers = new StringBuilder();
+        MethodInfo marker = typeof(ReadonlyTextBrowser).GetMethod("GetInvisibleCharacterMarker", BindingFlags.Static | BindingFlags.NonPublic);
+        int hash = 17;
+        for (int ch = 0; ch < 0x10000; ch++)
+        {
+            string mark = (string)marker.Invoke(null, new object[] { (char)ch });
+            hash = unchecked(hash * 31 + (mark == null ? 0 : mark[0]));
+            if (mark != null && ch < 0x3000 && markers.Length < 2000)
+            {
+                markers.Append(((int)ch).ToString("X4")).Append('=').Append(((int)mark[0]).ToString("X4")).Append(' ');
+            }
+        }
+        Lines.Add("marks of the characters below 3000: " + markers.ToString().TrimEnd());
+        Lines.Add("marks of all characters: hash=" + hash);
+        code.SetDocument(new EditableTextDocument(new[] { "a b\t\tc", "\t \tx", "", "end" }, TextDocument.LineEnding.Lf));
+        code.TabSize = 4;
+        Application.DoEvents();
+        MethodInfo paintMarks = typeof(ReadonlyTextBrowser).GetMethod("PaintInvisibleCharacters", Private);
+        void Marks(string what)
+        {
+            Lines.Add("marks " + what + ": " + PaintedCells(code, g =>
+            {
+                for (int line = 0; line < 4; line++)
+                {
+                    int top = (int)RowTop(code, line);
+                    paintMarks.Invoke(code, new object[] { g, line, code.EditableDocument.GetLineText(line), ScrollColumnOf(code), top });
+                }
+            }, 4, 14, 0.5f, NotWhite, wholeCell: true));
+        }
+        typeof(ReadonlyTextBrowser).GetField("_rowLastColumn", Private).SetValue(code, -1);
+        Marks("the lines, the dot of a space, the arrow of a tab, the line ends but the last");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 2);
+        Marks("scrolled by two columns");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 0);
+
+        // The grey line under the tabs, as the painting of a line draws it (only its colour counts, at the middle of the row).
+        System.Drawing.Color darkGray = System.Drawing.Color.DarkGray;
+        foreach (bool tabs in new[] { false, true })
+        {
+            code.ShowTabs = tabs;
+            Lines.Add("tab lines " + (tabs ? "shown" : "not shown") + ": " + PaintedCells(code, g =>
+            {
+                using (System.Drawing.Bitmap full = new System.Drawing.Bitmap(code.Width, code.Height))
+                {
+                    code.DrawToBitmap(full, new System.Drawing.Rectangle(0, 0, code.Width, code.Height));
+                    g.DrawImage(full, 0, 0);
+                }
+            }, 4, 14, 0.5f, color => color.ToArgb() == darkGray.ToArgb()));
+        }
+        code.ShowTabs = false;
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3E-3: several cursors in CodeEditorPP, written by the code before what the editor decides about them moved to the model: the commands
+    // that make them (Ctrl+D, Ctrl+Shift+L, Ctrl+Alt+Up/Down by their keys), typing, Enter, Backspace with space indentation, Tab, a control
+    // character, the keys that move them with and without Shift and Ctrl, Ctrl+Backspace, Delete, Ctrl+Delete, the keys that go back to one cursor
+    // (Escape, PageUp, Ctrl+A, Ctrl+Z, Ctrl+Home), a command for one cursor, the undo step of an edit, Copy and Cut with several cursors, a paste of a
+    // line for each cursor and of one text for all, read-only, and a caret moved by something that knows of one cursor (a click, SetCaret).
+
+    private static string Cursors(CodeEditorPP code)
+    {
+        object session = typeof(CodeEditorPP).GetProperty("CursorSession", Private).GetValue(code);
+        System.Collections.IList extra = (System.Collections.IList)typeof(MultiCursorSession).GetField("_extraCursors", Private).GetValue(session);
+        List<string> items = new List<string>();
+        foreach (object item in extra)
+        {
+            TextCursor cursor = (TextCursor)item;
+            items.Add(cursor.Anchor.Line + ":" + cursor.Anchor.Column + (cursor.HasSelection ? ">" + cursor.Caret.Line + ":" + cursor.Caret.Column : "") + (cursor.Goal >= 0 ? "g" + cursor.Goal : ""));
+        }
+        return "main=" + (code.HasSelection ? P(code.SelectionStart) + ">" : "") + P(code.CaretPosition) + " goal=" + typeof(MultiCursorSession).GetField("_primaryGoal", Private).GetValue(session)
+            + " whole=" + Bool((bool)typeof(MultiCursorSession).GetField("_wholeWordOccurrences", Private).GetValue(session)) + " extra=" + (items.Count == 0 ? "-" : string.Join(" ", items));
+    }
+
+    private static void CursorState(CodeEditorPP code, string what)
+    {
+        Lines.Add("cursors " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " " + Cursors(code) + " undo=" + Bool(code.CanUndo));
+    }
+
+    private static void CursorRuns()
+    {
+        Lines.Add("== cursors");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 200) };
+        _form.Controls.Add(code);
+        code.WordWrap = false;
+        code.TabSize = 4;
+        Application.DoEvents();
+        void Reset(params string[] lines)
+        {
+            code.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+            code.ClearSelection();
+            code.SetCaret(At(0, 0));
+        }
+        bool KeyDown(Keys keys)
+        {
+            KeyEventArgs args = new KeyEventArgs(keys);
+            EditorKeyDownMethod.Invoke(code, new object[] { args });
+            return args.Handled;
+        }
+        void Press(char ch)
+        {
+            KeyPressMethod.Invoke(code, new object[] { new KeyPressEventArgs(ch) });
+        }
+        Reset("foo bar foo", "baz foo", "foo");
+        code.SetCaret(At(0, 1));
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "Ctrl+D selects the word under the caret");
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "again: the next occurrence of the whole word");
+        KeyDown(Keys.Control | Keys.D);
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "and the others, round to the start");
+        Press('X');
+        CursorState(code, "typing replaces every selection");
+        code.Undo();
+        CursorState(code, "one undo step (one cursor after it)");
+        code.SetCaret(At(0, 1));
+        code.ClearSelection();
+        KeyDown(Keys.Control | Keys.Shift | Keys.L);
+        CursorState(code, "Ctrl+Shift+L: every occurrence of the word");
+        KeyDown(Keys.Right);
+        CursorState(code, "Right ends every selection at its end");
+        KeyDown(Keys.Shift | Keys.Left);
+        CursorState(code, "Shift+Left selects a letter back");
+        KeyDown(Keys.Control | Keys.Left);
+        CursorState(code, "Ctrl+Left: word left");
+        KeyDown(Keys.Control | Keys.Right);
+        CursorState(code, "Ctrl+Right: word right");
+        KeyDown(Keys.End);
+        CursorState(code, "End");
+        KeyDown(Keys.Home);
+        CursorState(code, "Home");
+        KeyDown(Keys.Down);
+        CursorState(code, "Down");
+        KeyDown(Keys.Up);
+        CursorState(code, "Up");
+        bool altLeft = KeyDown(Keys.Alt | Keys.Left);
+        CursorState(code, "Alt+Left is not a move of the cursors: handled=" + Bool(altLeft));
+        KeyDown(Keys.Escape);
+        CursorState(code, "Escape: one cursor");
+
+        Reset("a", "bb", "ccc", "");
+        code.SetCaret(At(0, 1));
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        CursorState(code, "Ctrl+Alt+Down twice: a cursor on each line below");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Up);
+        CursorState(code, "Ctrl+Alt+Up");
+        Press('-');
+        CursorState(code, "a letter typed at each cursor");
+        Press('\r');
+        CursorState(code, "Enter at each");
+        Press('\b');
+        CursorState(code, "Backspace at each");
+        code.InsertSpaces = true;
+        Press('\t');
+        CursorState(code, "Tab with spaces");
+        Press('\b');
+        CursorState(code, "Backspace takes a level of spaces");
+        code.InsertSpaces = false;
+        Press('\t');
+        CursorState(code, "Tab with a tab");
+        Press((char)1);
+        CursorState(code, "a control character types nothing");
+        KeyDown(Keys.Delete);
+        CursorState(code, "Delete at each");
+        KeyDown(Keys.Control | Keys.Back);
+        CursorState(code, "Ctrl+Backspace at each");
+        KeyDown(Keys.Control | Keys.Delete);
+        CursorState(code, "Ctrl+Delete at each");
+        bool shiftDelete = KeyDown(Keys.Shift | Keys.Delete);
+        CursorState(code, "Shift+Delete is not a delete of the cursors: handled=" + Bool(shiftDelete));
+
+        foreach (Keys keys in new[] { Keys.PageDown, Keys.Control | Keys.A, Keys.Control | Keys.Home, Keys.Control | Keys.End, Keys.Control | Keys.Z, Keys.Control | Keys.Y, Keys.PageUp })
+        {
+            Reset("a1", "a2", "a3");
+            KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+            bool handled = KeyDown(keys);
+            CursorState(code, keys + " goes back to one cursor first: handled=" + Bool(handled));
+        }
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Shift | Keys.D);
+        CursorState(code, "a command of one cursor (duplicate lines) drops the others first");
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Oemplus);
+        CursorState(code, "a command that does not move the caret (zoom) drops the others first");
+        code.ResetZoom();
+        Reset("foo bar", "foo bar");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Delete);
+        CursorState(code, "Ctrl+Delete takes a word at each");
+        Reset("x", "x");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        code.InsertSpaces = true;
+        Press('\t');
+        Press('\b');
+        CursorState(code, "Backspace after a tab of spaces takes the level");
+        code.InsertSpaces = false;
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        code.SetCaret(At(2, 1));
+        CursorState(code, "a caret set by something of one cursor drops the others");
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        typeof(CodeEditorPP).GetMethod("OnMouseDown", Private).Invoke(code, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 5, 5, 0) });
+        typeof(ReadonlyTextBrowser).GetMethod("OnMouseUp", Private).Invoke(code, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 5, 5, 0) });
+        CursorState(code, "a click drops them");
+
+        // Copy, cut and paste with several cursors.
+        Reset("one two", "three four", "five");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Shift | Keys.Right);
+        CursorState(code, "a word selected at each of three cursors");
+        object[] copyArgs = { null };
+        MultiCursorSession cursorSession = (MultiCursorSession)typeof(CodeEditorPP).GetProperty("CursorSession", Private).GetValue(code);
+        bool copied = cursorSession.TryCopyCursors(out List<string> copiedTexts);
+        copyArgs[0] = copiedTexts;
+        string clip = MultiCursorSession.ForClipboard(copiedTexts);
+        Lines.Add("cursors copy: " + Bool(copied) + " text=" + Escape(clip));
+        code.PasteText("A\r\nB\r\nC");
+        CursorState(code, "a paste of a line for each cursor");
+        code.PasteText("Z");
+        CursorState(code, "a paste of one text for all");
+        code.PasteText("p\nq");
+        CursorState(code, "a paste of two lines at three cursors: all of it at each");
+        code.PasteText("");
+        CursorState(code, "an empty paste");
+        KeyDown(Keys.Control | Keys.Shift | Keys.Left);
+        bool cut = false;
+        try
+        {
+            code.Cut();
+            cut = true;
+        }
+        catch (Exception exception)
+        {
+            Lines.Add("cursors cut threw " + exception.GetType().Name);
+        }
+        CursorState(code, "Cut takes every selection out (" + Bool(cut) + ")");
+        code.ReadOnly = true;
+        Press('Q');
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        CursorState(code, "read-only: typing with several cursors and a new one do nothing to the text");
+        code.ReadOnly = false;
+        object[] none = { null };
+        code.ClearExtraCursors();
+        bool copiedOne = cursorSession.TryCopyCursors(out _);
+        Lines.Add("cursors copy with one cursor: " + Bool(copiedOne));
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+}
