@@ -26,7 +26,7 @@ using VisualTTY;
 namespace SmarTTY.GUI.TerminalView;
 
 /// <summary>
-/// The classic terminal of a tab on the WPF view (stage 2B): what <see cref="TerminalEmulatorControl"/> did for a classic SSH tab, without
+/// The classic terminal of a tab on the WPF view (stage 2B): what <c>TerminalEmulatorControl</c> did for a classic SSH tab, without
 /// WinForms. The screen and the escape sequences are <see cref="TerminalDisplayModel"/>, the drawing and the keyboard
 /// <see cref="TerminalRenderView"/>; this class adds what a tab needs around them: the output queue of the channel, the paste with its
 /// guard, its progress window and its menu, the links, the log file, the bell, the settings, the search of the window, and the events the
@@ -163,7 +163,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     /// <summary>Serializes the input of all tabs and the beeps (the worker of the window), as for the WinForms terminal.</summary>
     public TerminalEventDispatcher InputDispatcher { get; set; }
 
-    public TerminalEmulatorControl.BeepMode BellMode { get; set; } = TerminalEmulatorControl.BeepMode.SystemBeep;
+    public BeepMode BellMode { get; set; } = BeepMode.SystemBeep;
 
     public string BellSoundFile { get; set; }
 
@@ -896,16 +896,16 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         {
             switch (BellMode)
             {
-                case TerminalEmulatorControl.BeepMode.ConsoleBeep:
+                case BeepMode.ConsoleBeep:
                     Console.Beep();
                     break;
-                case TerminalEmulatorControl.BeepMode.WaveFile:
+                case BeepMode.WaveFile:
                     if (BellSoundFile != null)
                     {
                         new SoundPlayer(BellSoundFile).PlaySync();
                     }
                     break;
-                case TerminalEmulatorControl.BeepMode.SystemBeep:
+                case BeepMode.SystemBeep:
                     PlaySound(".Default", UIntPtr.Zero, 65536u);
                     break;
             }

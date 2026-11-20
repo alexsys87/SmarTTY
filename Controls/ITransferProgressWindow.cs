@@ -7,7 +7,7 @@ namespace SmarTTY.Controls;
 /// The progress window of a file transfer protocol (XMODEM, YMODEM, ZMODEM, Kermit): it shows the transferred bytes
 /// and errors, and its close button stops the transfer. The device terminal is compiled by the Mono test harness,
 /// which cannot reference the themed WPF window, so the window is injected through
-/// <see cref="DeviceTerminalControl.TransferProgressWindowFactory"/>.
+/// <c>WpfDeviceTerminal.TransferProgressWindowFactory</c>.
 /// </summary>
 public interface ITransferProgressWindow : IDisposable
 {

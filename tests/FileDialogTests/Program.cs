@@ -167,11 +167,11 @@ internal static class Program
 
         string[] migrated = new string[]
         {
-            Path.Combine(root, "Controls", "DeviceTerminalControl.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.ZModem.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.Kermit.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.YModem.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.Designer.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.ZModem.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.Kermit.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.YModem.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.Toolbar.cs"),
             Path.Combine(root, "VisualTTY", "Backend", "NewConnectionController.cs"),
             Path.Combine(root, "VisualTTY", "XServerLaunchController.cs"),
             Path.Combine(root, "GUI", "Backend", "MainWindowController.cs"),
@@ -202,10 +202,10 @@ internal static class Program
             Check(!Regex.IsMatch(code, @"\bMicrosoft\.Win32\b"), $"the Microsoft.Win32 import is gone from {Path.GetFileName(path)}");
         }
 
-        string device = File.ReadAllText(Path.Combine(root, "Controls", "DeviceTerminalControl.cs"));
+        string device = File.ReadAllText(Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.cs"));
         Check(device.Contains("ThemedFileDialog.OpenFile"), "the device terminal opens files through the themed dialog");
         Check(device.Contains("ThemedFileDialog.SaveFile"), "the device terminal saves files through the themed dialog");
-        Check(File.ReadAllText(Path.Combine(root, "Controls", "DeviceTerminalControl.ZModem.cs")).Contains("ThemedFileDialog.OpenFiles"),
+        Check(File.ReadAllText(Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.ZModem.cs")).Contains("ThemedFileDialog.OpenFiles"),
             "the ZMODEM send path uses the themed multiselect dialog");
 
         // The WPF callers that own a Window use the LocalFileDialogWindow helpers directly.

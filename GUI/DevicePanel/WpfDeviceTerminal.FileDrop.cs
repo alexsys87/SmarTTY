@@ -67,7 +67,7 @@ public partial class WpfDeviceTerminal
             ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        Func<string[], DeviceFileDropProtocol?> prompt = DeviceTerminalControl.FileDropProtocolPrompt;
+        Func<string[], DeviceFileDropProtocol?> prompt = FileDropProtocolPrompt;
         if (prompt == null)
         {
             return;

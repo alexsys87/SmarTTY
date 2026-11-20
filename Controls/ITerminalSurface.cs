@@ -6,7 +6,7 @@ namespace SmarTTY.Controls;
 
 /// <summary>
 /// The terminal of a tab as the window, the session and the menus use it, whatever draws it: the WPF terminal of stage 2
-/// (<c>GUI/TerminalView/WpfTerminal</c>) or, until the Smart Terminal moves to WPF too, the WinForms <see cref="TerminalEmulatorControl"/>.
+/// (<c>GUI/TerminalView/WpfTerminal</c> and its subclasses; the WinForms terminal was one too until stage 2).
 /// Every member is one that the code outside the control called on it. Most calls come from the UI thread; these come from other threads
 /// too and must not touch anything that belongs to the UI thread (a WPF dependency property throws there): <see cref="Tag"/>,
 /// <see cref="IsDisposed"/> and <see cref="ByteOrientedLineEditing"/> (the reading thread of the channel and the thread of the input
@@ -38,7 +38,7 @@ public interface ITerminalSurface
     /// <summary>The directory the shell reported with OSC 7, or null.</summary>
     string ReportedDirectory { get; }
 
-    /// <summary>The remote line editor counts UTF-8 bytes (see <see cref="TerminalEmulatorControl.ByteOrientedLineEditing"/>).</summary>
+    /// <summary>The remote line editor counts UTF-8 bytes (see <c>TerminalDisplayModel.ByteOrientedLineEditing</c>).</summary>
     bool ByteOrientedLineEditing { get; set; }
 
     /// <summary>No answers to the queries of the program are sent (a replayed log).</summary>

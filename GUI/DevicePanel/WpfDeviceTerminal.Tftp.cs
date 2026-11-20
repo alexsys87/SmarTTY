@@ -1,3 +1,4 @@
+using SmarTTY.Transport;
 using SmarTTY.Terminal.Input;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
@@ -12,7 +13,7 @@ namespace SmarTTY.GUI.DevicePanel;
 // through a tap on the received data and writes its commands through the connection like typed text.
 //
 // The window is the themed WPF GUI/TftpFirmwareWindow, which this harness-compiled control cannot reference: App injects it
-// through DeviceTerminalControl.TftpFirmwareWindowFactory.
+// through TftpFirmwareWindowFactory.
 public partial class WpfDeviceTerminal
 {
 
@@ -46,7 +47,7 @@ public partial class WpfDeviceTerminal
     /// <summary>Opens the TFTP server window of this terminal, or brings it forward when it is open already. Call on the UI thread.</summary>
     public void ShowTftpFirmwareWindow()
     {
-        Func<IDeviceConsole, string, ITftpFirmwareWindow> factory = DeviceTerminalControl.TftpFirmwareWindowFactory;
+        Func<IDeviceConsole, string, ITftpFirmwareWindow> factory = TftpFirmwareWindowFactory;
         if (factory == null)
         {
             return;
@@ -57,7 +58,7 @@ public partial class WpfDeviceTerminal
             existing.Activate();
             return;
         }
-        _tftpWindow = factory(this, DeviceTerminalControl.GetConnectionTitle(_deviceTerminalSettings.Connection));
+        _tftpWindow = factory(this, DeviceConnections.GetConnectionTitle(_deviceTerminalSettings.Connection));
         _tftpWindow.Show();
     }
 

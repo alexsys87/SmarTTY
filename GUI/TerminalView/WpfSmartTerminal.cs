@@ -452,7 +452,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
             if (_previousDirectory == null)
             {
                 _lastCommandFailed = true;
-                PrintLines(new[] { TerminalEmulatorControl.Colorize("cd: OLDPWD not set", 1) });
+                PrintLines(new[] { AnsiEscapeUtils.Colorize("cd: OLDPWD not set", 1) });
                 return;
             }
             resolvedArguments = RemotePathUtils.ShellQuote(_previousDirectory);
@@ -475,7 +475,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
                     : $"'cd {arguments}' did not report an exit code");
             }
             _lastCommandFailed = true;
-            PrintLines(errors.Select((string line) => TerminalEmulatorControl.Colorize(line, 1)));
+            PrintLines(errors.Select((string line) => AnsiEscapeUtils.Colorize(line, 1)));
             return;
         }
         if (arguments == "-")
@@ -1492,7 +1492,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
         catch (Exception exception)
         {
             _lastCommandFailed = true;
-            ProcessOutput(TerminalEmulatorControl.Colorize(exception.Message, 1));
+            ProcessOutput(AnsiEscapeUtils.Colorize(exception.Message, 1));
             ShowPrompt();
             return true;
         }
@@ -1516,7 +1516,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
         {
             if (name == "cd" || name == "export" || name == "unset")
             {
-                ProcessOutput(TerminalEmulatorControl.Colorize($"Note: '{name}' in a compound command does not affect the next commands; type it on a line of its own.", 3) + "\r\n");
+                ProcessOutput(AnsiEscapeUtils.Colorize($"Note: '{name}' in a compound command does not affect the next commands; type it on a line of its own.", 3) + "\r\n");
             }
             return false;
         }
@@ -1669,7 +1669,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
         }
         catch (Exception exception)
         {
-            ProcessOutput(TerminalEmulatorControl.Colorize(exception.Message, 1));
+            ProcessOutput(AnsiEscapeUtils.Colorize(exception.Message, 1));
             if (_channel == null)
             {
                 // Nothing runs: the channel was never attached, so it is closed here and the prompt comes back.
@@ -1697,7 +1697,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
             string message = null;
             if (connectionLost)
             {
-                message = TerminalEmulatorControl.Colorize("Connection lost.", 1);
+                message = AnsiEscapeUtils.Colorize("Connection lost.", 1);
             }
             else if (!(_context.VTSettings?.ShowExitCodes ?? true))
             {
@@ -1705,15 +1705,15 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
             }
             else if (!statusKnown)
             {
-                message = TerminalEmulatorControl.Colorize("[exit status not reported]", 3);
+                message = AnsiEscapeUtils.Colorize("[exit status not reported]", 3);
             }
             else if (exitStatus > 0)
             {
-                message = TerminalEmulatorControl.Colorize($"[exit code {exitStatus}]", 3);
+                message = AnsiEscapeUtils.Colorize($"[exit code {exitStatus}]", 3);
             }
             else if (exitStatus < 0)
             {
-                message = TerminalEmulatorControl.Colorize("[terminated by a signal]", 3);
+                message = AnsiEscapeUtils.Colorize("[terminated by a signal]", 3);
             }
             if (message != null)
             {
@@ -1911,7 +1911,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
             return;
         }
         EndLinePaste();
-        ProcessOutput((CursorCell.X > 0 ? "\r\n" : "") + TerminalEmulatorControl.Colorize(note, 3) + "\r\n");
+        ProcessOutput((CursorCell.X > 0 ? "\r\n" : "") + AnsiEscapeUtils.Colorize(note, 3) + "\r\n");
     }
 
     protected override bool CancelActivePaste()

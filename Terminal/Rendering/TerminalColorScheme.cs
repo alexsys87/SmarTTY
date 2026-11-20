@@ -24,7 +24,7 @@ public struct ResolvedCellColors
 
 /// <summary>
 /// The colours of a terminal and the rule that turns the style of a cell into the colours it is painted with. It is the rule that
-/// <c>TerminalEmulatorBase.CreateColorSpan</c> applied with brushes (the WinForms view uses it too, so both views paint the same colours):
+/// <c>TerminalEmulatorBase.CreateColorSpan</c> applied with brushes (the WinForms view used it too until stage 2, so both painted the same colours):
 /// the 16 colours of the palette, bold that brightens a palette colour, the 256 and 24-bit colours, inverse, the colour that a cell overrides
 /// (the echo of a HEX terminal) and the colour of a diagnostic that the program wrote without a colour of its own.
 /// </summary>

@@ -136,7 +136,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private static ITransferProgressWindow CreateTransferProgressWindow(string title, bool showErrorCount)
     {
-        Func<string, bool, ITransferProgressWindow> factory = DeviceTerminalControl.TransferProgressWindowFactory;
+        Func<string, bool, ITransferProgressWindow> factory = TransferProgressWindowFactory;
         return factory != null ? factory(title, showErrorCount) : new HeadlessTransferProgressWindow();
     }
 
@@ -160,7 +160,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     public DeviceTerminalSettings Settings => _deviceTerminalSettings;
 
     /// <summary>Short name for a tab header, e.g. "COM3" or "192.168.0.5:23".</summary>
-    public string ConnectionTitle => DeviceTerminalControl.GetConnectionTitle(_deviceTerminalSettings?.Connection);
+    public string ConnectionTitle => DeviceConnections.GetConnectionTitle(_deviceTerminalSettings?.Connection);
 
     /// <summary>
     /// One-line description for the status bar, e.g. "COM3 (115200 bps): connected". While the connection is up it
@@ -735,7 +735,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         _serialTerminalControl = new WpfSerialTerminal
         {
             AutoWrap = true,
-            BellMode = TerminalEmulatorControl.BeepMode.None,
+            BellMode = BeepMode.None,
             EnterSequence = null,
             CaretWhenUnfocused = false,
             ContextMenuReference = contextMenuStrip1,
@@ -910,7 +910,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         _deviceTerminalSettings = deviceTerminalSettings;
         // The automatic login of a telnet connection ends its lines like the Enter key does (a bare CR when none is set).
-        CallbackTransportFactory.TransportCallback callback = DeviceTerminalControl.CreateTransportCallback(deviceTerminalSettings.Connection, GetLineEnding(deviceTerminalSettings.LineEnding) ?? "\r");
+        CallbackTransportFactory.TransportCallback callback = DeviceConnections.CreateTransportCallback(deviceTerminalSettings.Connection, GetLineEnding(deviceTerminalSettings.LineEnding) ?? "\r");
         if (callback != null)
         {
             _transportFactory = new CallbackTransportFactory(callback);
@@ -2263,7 +2263,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             ThemedMessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
-        DeviceTerminalControl.LogReplayPrompt?.Invoke(bytes, this);
+        LogReplayPrompt?.Invoke(bytes, this);
     }
 
     private void btnLog_Click(object sender, EventArgs e)
@@ -2442,12 +2442,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             return;
         }
-        if (DeviceTerminalControl.SerialSettingsPrompt == null)
+        if (SerialSettingsPrompt == null)
         {
             return;
         }
         (bool accepted, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings chosen) =
-            DeviceTerminalControl.SerialSettingsPrompt(serial.AdvancedSettings, serial.ComPortName);
+            SerialSettingsPrompt(serial.AdvancedSettings, serial.ComPortName);
         if (accepted)
         {
             TryApplySerialSettings(serial, chosen);

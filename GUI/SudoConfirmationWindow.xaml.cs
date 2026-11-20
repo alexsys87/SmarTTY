@@ -1,3 +1,4 @@
+using VisualTTY;
 using System;
 using System.Windows;
 using SmarTTY.Controls;
@@ -28,7 +29,7 @@ public partial class SudoConfirmationWindow : Window
         // The WPF terminal of the tabs, with no bell and no scroll bar; it is a terminal like a tab, so the prompt looks the same.
         _terminal = new WpfTerminal
         {
-            BellMode = TerminalEmulatorControl.BeepMode.None,
+            BellMode = BeepMode.None,
             ScrollBarVisible = false,
             CaretWhenUnfocused = true
         };

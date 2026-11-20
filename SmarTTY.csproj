@@ -114,9 +114,6 @@
     <Compile Update="Controls\CodeEditorPP.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="Controls\DeviceTerminalControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Update="Controls\DoubleBufferedListView.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -124,9 +121,6 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\EditableTextBrowser.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\HexTerminalControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\ReadonlySmartScrollBrowser.cs">
@@ -138,20 +132,8 @@
     <Compile Update="Controls\RemoteFileEditor.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="Controls\SshTerminalControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\SerialTerminalControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Update="Controls\SuggestionListView.cs">
       <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Controls\TerminalEmulatorBase.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\TerminalEmulatorControl.cs">
-      <SubType>UserControl</SubType>
     </Compile>
     <Compile Update="Controls\TextEditorControl.cs">
       <SubType>UserControl</SubType>
@@ -183,9 +165,6 @@
     <Compile Update="Controls\CodeEditorPP.Designer.cs">
       <DependentUpon>CodeEditorPP.cs</DependentUpon>
     </Compile>
-    <Compile Update="Controls\DeviceTerminalControl.Designer.cs">
-      <DependentUpon>DeviceTerminalControl.cs</DependentUpon>
-    </Compile>
     <Compile Update="Controls\DoubleBufferedListView.Designer.cs">
       <DependentUpon>DoubleBufferedListView.cs</DependentUpon>
     </Compile>
@@ -194,9 +173,6 @@
     </Compile>
     <Compile Update="Controls\EditableTextBrowser.Designer.cs">
       <DependentUpon>EditableTextBrowser.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\HexTerminalControl.Designer.cs">
-      <DependentUpon>HexTerminalControl.cs</DependentUpon>
     </Compile>
     <Compile Update="Controls\ReadonlySmartScrollBrowser.Designer.cs">
       <DependentUpon>ReadonlySmartScrollBrowser.cs</DependentUpon>
@@ -209,12 +185,6 @@
     </Compile>
     <Compile Update="Controls\SuggestionListView.Designer.cs">
       <DependentUpon>SuggestionListView.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\TerminalEmulatorBase.Designer.cs">
-      <DependentUpon>TerminalEmulatorBase.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\TerminalEmulatorControl.Designer.cs">
-      <DependentUpon>TerminalEmulatorControl.cs</DependentUpon>
     </Compile>
     <Compile Update="Controls\TextEditorControl.Designer.cs">
       <DependentUpon>TextEditorControl.cs</DependentUpon>

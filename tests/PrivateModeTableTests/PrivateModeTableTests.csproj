@@ -7,8 +7,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
-    <!-- The emulator is read as text: it must reach the modes only through the table. -->
-    <AssemblyMetadata Include="EmulatorSource" Value="$(MSBuildProjectDirectory)/../../Controls/TerminalEmulatorControl.cs" />
+    <!-- The terminal that reads the modes (the display model of the WPF view; the WinForms control until stage 2) is read as text: it must
+         reach the modes only through the table. -->
+    <AssemblyMetadata Include="EmulatorSource" Value="$(MSBuildProjectDirectory)/../../Terminal/Rendering/TerminalDisplayModel.cs" />
     <!-- ...and so is the emulator that carries out the escape sequences (since stage 1B, B4c-1) -->
     <AssemblyMetadata Include="ParserSource" Value="$(MSBuildProjectDirectory)/../../Terminal/Emulation/TerminalEmulator.cs" />
     <!-- ...and so is the class that holds the modes (the reset clears the table there since stage 1B, B4b). -->

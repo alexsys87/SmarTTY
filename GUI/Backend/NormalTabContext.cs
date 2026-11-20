@@ -1,3 +1,4 @@
+using SmarTTY.Terminal;
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
@@ -275,7 +276,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             // one, and the session counts as healthy, so nothing else would ever try again: a key press does.
             terminalTag.ShellOpenFailed = true;
             DisposeChannel(opened);
-            Terminal.ProcessOutput(TerminalEmulatorControl.Colorize("Failed to open a shell: " + exception.Message + ". Press any key to try again.", 1) + "\r\n");
+            Terminal.ProcessOutput(AnsiEscapeUtils.Colorize("Failed to open a shell: " + exception.Message + ". Press any key to try again.", 1) + "\r\n");
         }
         DisposeChannel(previousChannel);
     }

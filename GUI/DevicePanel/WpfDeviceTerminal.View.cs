@@ -1,13 +1,17 @@
 using SmarTTY.Terminal.Input;
 using SmarTTY.GUI.TerminalView;
 using SmarTTY.TextEditing;
+using SmarTTY.Controls;
+using SmarTTY.IO;
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.GUI.DevicePanel;
 
@@ -21,6 +25,41 @@ namespace SmarTTY.GUI.DevicePanel;
 /// </summary>
 public partial class WpfDeviceTerminal
 {
+    // The windows of the panel, set by App (they were hooks of the WinForms panel, which the Mono stands compiled without WPF).
+
+    /// <summary>Replays a recorded raw byte log (the bytes, this terminal).</summary>
+    public static Action<byte[], IDeviceReplayTarget> LogReplayPrompt;
+
+    /// <summary>
+    /// Lets the user change the serial port settings (the settings to edit, or null to keep the driver's; the port name). Returns whether the
+    /// dialog was accepted and the chosen settings (null to keep the driver's settings).
+    /// </summary>
+    public static Func<DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings, string, (bool Accepted, DeviceTerminalSettings.ConnectionSettings.Serial.AdvancedSerialPortSettings Settings)> SerialSettingsPrompt;
+
+    /// <summary>Creates the progress window of a file transfer (the title, whether the error count is shown); null: a transfer runs without one.</summary>
+    public static Func<string, bool, ITransferProgressWindow> TransferProgressWindowFactory;
+
+    /// <summary>Edits a command list of the line input (the title, the explanation, the commands); null when the user cancelled.</summary>
+    public static Func<string, string, IEnumerable<string>, List<string>> CommandListEditor;
+
+    /// <summary>Asks how dropped files are to be sent (their full paths); null when the user cancelled. Null hook: a drop is ignored.</summary>
+    public static Func<string[], DeviceFileDropProtocol?> FileDropProtocolPrompt;
+
+    /// <summary>Asks for the gzip + base64 transfer of a dropped file (its full path); null when the user cancelled.</summary>
+    public static Func<string, GzipBase64Transfer.Request> GzipBase64DropPrompt;
+
+    /// <summary>The same for the raw form, gzip + cat.</summary>
+    public static Func<string, GzipBase64Transfer.Request> GzipCatDropPrompt;
+
+    /// <summary>Asks what to transfer with gzip + base64: true to send a file, false to receive one; null when the user cancelled.</summary>
+    public static Func<bool, GzipBase64Transfer.Request> GzipBase64RequestPrompt;
+
+    /// <summary>The same for the raw form, gzip + cat.</summary>
+    public static Func<bool, GzipBase64Transfer.Request> GzipCatRequestPrompt;
+
+    /// <summary>Creates the TFTP/U-Boot window of a terminal (the terminal, its title); null when the window is unavailable.</summary>
+    public static Func<IDeviceConsole, string, ITftpFirmwareWindow> TftpFirmwareWindowFactory;
+
     // The tool bar row (WinForms), the area of the terminals with the prompt over them, and the netconsole bar below them.
     private WindowsFormsHost _toolStripHost;
 

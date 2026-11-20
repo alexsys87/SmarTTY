@@ -60,9 +60,9 @@ internal static class Program
 
         string[] receivePaths = new string[]
         {
-            Path.Combine(root, "Controls", "DeviceTerminalControl.ZModem.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.Kermit.cs"),
-            Path.Combine(root, "Controls", "DeviceTerminalControl.YModem.cs")
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.ZModem.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.Kermit.cs"),
+            Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.YModem.cs")
         };
         foreach (string path in receivePaths)
         {

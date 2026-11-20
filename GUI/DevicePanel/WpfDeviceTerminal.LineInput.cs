@@ -129,12 +129,12 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
     }
 
     /// <summary>
-    /// Shows the command-list editor through <see cref="DeviceTerminalControl.CommandListEditor"/>, which <c>App</c> wires to the themed WPF
+    /// Shows the command-list editor through <see cref="CommandListEditor"/>, which <c>App</c> wires to the themed WPF
     /// window. Returns null when the editor is unavailable (the Mono test harness) or the user cancelled.
     /// </summary>
     private static List<string> EditCommandList(string title, string description, List<string> commands)
     {
-        Func<string, string, IEnumerable<string>, List<string>> editor = DeviceTerminalControl.CommandListEditor;
+        Func<string, string, IEnumerable<string>, List<string>> editor = CommandListEditor;
         return editor != null ? editor(title, description, commands) : null;
     }
 

@@ -7,8 +7,7 @@ namespace SmarTTY.Terminal.Input;
 
 /// <summary>
 /// The escape sequences of the keys that do not type a character (arrows, function keys, the editing keys, the keypad in application mode),
-/// read from the key layout of the application (<c>VisualTTY/XTermKeys.xml</c>, the file that <c>VisualTTY.XTermKeyMap</c> reads for the
-/// WinForms view). The names of the keys in the file are those of <c>Keys</c>, which <see cref="VirtualKey"/> has with the same values.
+/// read from the key layout of the application (<c>VisualTTY/XTermKeys.xml</c>, which the WinForms terminal read too until stage 2). The names of the keys in the file are those of <c>Keys</c>, which <see cref="VirtualKey"/> has with the same values.
 /// A sequence is stored without its leading ESC.
 /// </summary>
 public sealed class XtermKeyTable

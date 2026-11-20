@@ -77,10 +77,10 @@ public partial class WpfDeviceTerminal
             return;
         }
         // A dropped file is already chosen: the window asks only for the rest (the path on the device and the options).
-        Func<string, GzipBase64Transfer.Request> dropPrompt = raw ? DeviceTerminalControl.GzipCatDropPrompt : DeviceTerminalControl.GzipBase64DropPrompt;
+        Func<string, GzipBase64Transfer.Request> dropPrompt = raw ? GzipCatDropPrompt : GzipBase64DropPrompt;
         Func<bool, GzipBase64Transfer.Request> prompt = droppedFile != null && dropPrompt != null
             ? (Func<bool, GzipBase64Transfer.Request>)(s => dropPrompt(droppedFile))
-            : raw ? DeviceTerminalControl.GzipCatRequestPrompt : DeviceTerminalControl.GzipBase64RequestPrompt;
+            : raw ? GzipCatRequestPrompt : GzipBase64RequestPrompt;
         if (prompt == null)
         {
             ThemedMessageBox.Show("The " + form + " transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);

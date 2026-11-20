@@ -3,8 +3,8 @@ using System;
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// The console line of a device terminal as the TFTP firmware window uses it (the WinForms <see cref="DeviceTerminalControl"/> and the WPF
-/// device terminal both are one): whether the device is connected, whether a file transfer has the line, the text the device prints, and
+/// The console line of a device terminal as the TFTP firmware window uses it (the WPF device terminal,
+/// <c>GUI/DevicePanel/WpfDeviceTerminal</c>; the WinForms panel was one too until stage 2): whether the device is connected, whether a file transfer has the line, the text the device prints, and
 /// lines and a break typed into it.
 /// </summary>
 public interface IDeviceConsole

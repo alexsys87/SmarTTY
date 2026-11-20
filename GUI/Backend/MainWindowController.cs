@@ -1,3 +1,4 @@
+using SmarTTY.Transport;
 using SmarTTY.Ssh;
 using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
@@ -2061,7 +2062,7 @@ public class MainWindowController : INotifyPropertyChanged
         }
         int firstPseudoPage = FirstPseudoPage;
         DeviceTerminalSettings sessionSettings = CloneForSession(settings);
-        string title = MakeUniqueDeviceTitle(DeviceTerminalControl.GetConnectionTitle(sessionSettings.Connection));
+        string title = MakeUniqueDeviceTitle(DeviceConnections.GetConnectionTitle(sessionSettings.Connection));
         SessionWrapper sessionWrapper = SessionWrapper.CreateDeviceSession(this, sessionSettings, title);
         sessionWrapper.DeviceTab.Terminal.CompletionPopupRequested += MainWindowController_VirtualTerminalPopupRequested;
         sessionWrapper.DeviceTab.Terminal.OpenFileRequested += DeviceTab_OpenFileRequested;
@@ -2526,33 +2527,6 @@ public class MainWindowController : INotifyPropertyChanged
             return;
         }
         ScreenEdgeUtils.EdgeFlags edgeFlags = ScreenEdgeUtils.GetNearEdges(sender as Control, e.Location, EdgeMargin);
-        if (sender is TerminalEmulatorControl terminalEmulatorControl)
-        {
-            switch (Settings.VerticalScrollbarMode)
-            {
-                case GlobalSettings.ScrollbarMode.Show:
-                    terminalEmulatorControl.VerticalScrollBarVisible = true;
-                    break;
-                case GlobalSettings.ScrollbarMode.Hide:
-                    terminalEmulatorControl.VerticalScrollBarVisible = false;
-                    break;
-                case GlobalSettings.ScrollbarMode.Auto:
-                    terminalEmulatorControl.VerticalScrollBarVisible = (edgeFlags & ScreenEdgeUtils.EdgeFlags.Right) != 0;
-                    break;
-            }
-            switch (Settings.HorizontalScrollbarMode)
-            {
-                case GlobalSettings.ScrollbarMode.Show:
-                    terminalEmulatorControl.HorizontalScrollBarVisible = true;
-                    break;
-                case GlobalSettings.ScrollbarMode.Hide:
-                    terminalEmulatorControl.HorizontalScrollBarVisible = false;
-                    break;
-                case GlobalSettings.ScrollbarMode.Auto:
-                    terminalEmulatorControl.HorizontalScrollBarVisible = (edgeFlags & ScreenEdgeUtils.EdgeFlags.Bottom) != 0;
-                    break;
-            }
-        }
         UpdateMinimalisticModeVisibility(edgeFlags);
     }
 
