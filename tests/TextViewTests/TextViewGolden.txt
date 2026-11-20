@@ -1385,15 +1385,15 @@ messages word wrap on drops them:
 messages added while wrapped: 1:0:Error:while wrapped
 messages word wrap off drops them too: 
 messages for the bands: 0:-1:Error:short, 1:2:Warning:after the tab, 2:-1:Error:x wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww, 3:1:Warning:x wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
-message band in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=F text=error
-message band under its column after a tab, row 18: left=37 top=0 width less the text=24 height=19 clipped=F text=warning
-message band scrolled, row 18: left=13 top=0 width less the text=24 height=19 clipped=F text=warning
-message band scrolled past its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=F text=warning
-message band too long, in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=T text=error
-message band too long, under its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=T text=warning
-message band in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=F text=error
-message band under its column after a tab, row 24: left=37 top=0 width less the text=30 height=25 clipped=F text=warning
-message band scrolled, row 24: left=13 top=0 width less the text=30 height=25 clipped=F text=warning
-message band scrolled past its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=F text=warning
-message band too long, in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=T text=error
-message band too long, under its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=T text=warning
+message band in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=F
+message band under its column after a tab, row 18: left=37 top=0 width less the text=24 height=19 clipped=F
+message band scrolled, row 18: left=13 top=0 width less the text=24 height=19 clipped=F
+message band scrolled past its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=F
+message band too long, in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=T
+message band too long, under its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=T
+message band in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=F
+message band under its column after a tab, row 24: left=37 top=0 width less the text=30 height=25 clipped=F
+message band scrolled, row 24: left=13 top=0 width less the text=30 height=25 clipped=F
+message band scrolled past its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=F
+message band too long, in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=T
+message band too long, under its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=T

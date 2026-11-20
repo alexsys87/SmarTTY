@@ -1245,9 +1245,9 @@ internal static class Program
     // the column of a message added (counted from 1, a column of 0 for none, a line past the text on the last line, line 0 on the first, a second
     // message of a line in its place), the messages dropped when word wrap is switched; and where the real row of a message (InlineMessageView)
     // puts its band, drawn into a bitmap with colours of its own: under its column (after a tab, scrolled, scrolled past it) or in the middle, a
-    // text too long for the row, two row heights, and the colour of an error and of a warning. The band is found as the frame drawn around it; its
-    // width is written less the width the text is measured at (the font of the row, as the row measures it), so that the lines do not depend on
-    // the fonts.
+    // text too long for the row, two row heights. The band is found as the frame drawn around it; its width is written less the width the text is
+    // measured at (the font of the row, as the row measures it), so that the lines do not depend on the fonts. The colour of the text is not
+    // written: whether a pixel of the text has that very colour depends on the fonts of the machine (CI found none where this one found some).
 
     private static void Messages(CodeEditorPP code, string what)
     {
@@ -1284,11 +1284,9 @@ internal static class Program
         using (System.Drawing.Font font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSerif, rowHeight * 5 / 8))
         {
             graphics.Clear(System.Drawing.Color.White);
-            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
             int measured = (int)graphics.MeasureString(message.Text, font).Width + 3;
             rows[0].Draw(graphics, code, 0, scrollColumn, line, new System.Drawing.Rectangle(0, 0, width, rowHeight), new System.Drawing.SizeF(8, rowHeight));
             int left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
-            bool error = false, warning = false;
             for (int y = 0; y < bitmap.Height; y++)
             {
                 for (int x = 0; x < width; x++)
@@ -1301,15 +1299,13 @@ internal static class Program
                         right = Math.Max(right, x);
                         bottom = Math.Max(bottom, y);
                     }
-                    error |= argb == ErrorTextColor.ToArgb();
-                    warning |= argb == WarningTextColor.ToArgb();
                 }
             }
             int textWidth = Math.Min(measured, width - (4 + rowHeight + 3) * 2);
             // In the middle the left edge depends on the width of the text: only its distance from where the middle puts the text is written.
             string place = message.Column == -1 ? "from the middle=" + (left - (width - textWidth) / 2) : "left=" + left;
             Lines.Add("message band " + what + ": " + place + " top=" + top + " width less the text=" + (right - left + 1 - textWidth)
-                + " height=" + (bottom - top + 1) + " clipped=" + Bool(measured > width - (4 + rowHeight + 3) * 2) + " text=" + (error ? "error" : "") + (warning ? "warning" : ""));
+                + " height=" + (bottom - top + 1) + " clipped=" + Bool(measured > width - (4 + rowHeight + 3) * 2));
         }
     }
 

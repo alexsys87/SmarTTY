@@ -762,9 +762,11 @@ the move (the 1380 lines of before did not change; 1399 in all, the same on ever
 1, a column of 0 for none, a line past the text on the last line, a line below 1 on the first, a second message of a line in its place, one at a time
 and in a batch), the messages dropped when word wrap is switched on and off; and where the real row of a message (`InlineMessageView`) puts its band,
 drawn into a bitmap with colours of its own (under its column after a tab, scrolled, scrolled past it, in the middle, a text too long for the row, at
-two row heights, the colour of an error and of a warning). The band is found as the frame drawn around it, and its width is written less the width the
-row measures its text at (and, in the middle, its left edge less where the middle puts the text), so that the lines do not depend on the fonts. All
-18 mutations of the old code make it fail. Then `CodeEditing/InlineMessageBand.cs` (public struct): `IndentColumn` and `Place` (the text no wider than
+two row heights). The band is found as the frame drawn around it, and its width is written less the width the row measures its text at (and, in the
+middle, its left edge less where the middle puts the text), so that the lines do not depend on the fonts. The colour of the text (an error or a
+warning) was in the first recording and is not any more: whether a pixel of the text has that very colour depends on the fonts of the machine (CI
+found none; the lines without it were written again by the code before the move, on a worktree of that commit, and are the same with the code after
+it). Of 18 mutations of the old code 17 make it fail; the 18th, the colour of a warning, is in the view and did not move. Then `CodeEditing/InlineMessageBand.cs` (public struct): `IndentColumn` and `Place` (the text no wider than
 the row leaves room for, in the middle or under the column, the icon in front of the text, the band behind both), the arithmetic of the row of
 `InlineMessageView`, as it was; and `InlineMessageProvider.AddReported` (the line counted from 1 brought into the text, the column counted from 1),
 what `CodeEditorPP.AddMessage`, `AddMessages` and `MessageLine` did, as it was. Every golden and stand passes unchanged. For the WPF view:
