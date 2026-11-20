@@ -1200,6 +1200,25 @@ internal static class Program
         Check(thrown, "the replacement needs its undo history");
     }
 
+    private static void KeyMap()
+    {
+        List<string> keys = new List<string>();
+        foreach (VirtualKey key in new[] { VirtualKey.Left, VirtualKey.Right, VirtualKey.Up, VirtualKey.Down, VirtualKey.Home, VirtualKey.End, VirtualKey.Prior, VirtualKey.Next, VirtualKey.Tab, VirtualKey.A, VirtualKey.Insert, VirtualKey.Delete })
+        {
+            foreach (bool control in new[] { false, true })
+            {
+                bool mapped = CaretNavigator.TryMapKey(key, control, out CaretMove move, out int direction);
+                keys.Add(key + (control ? "+Ctrl" : "") + "=" + (mapped ? move + "/" + direction : "-") + (CaretNavigator.KeepsColumn(key) ? "/keeps" : ""));
+            }
+        }
+        Equal(string.Join(" ", keys),
+            "Left=Left/-1 Left+Ctrl=WordLeft/-1 Right=Right/1 Right+Ctrl=WordRight/1 Up=Up/0/keeps Up+Ctrl=Up/0/keeps Down=Down/0/keeps Down+Ctrl=Down/0/keeps"
+            + " Home=Home/0 Home+Ctrl=Home/0 End=End/0 End+Ctrl=End/0 PageUp=PageUp/0/keeps PageUp+Ctrl=PageUp/0/keeps Next=PageDown/0/keeps Next+Ctrl=PageDown/0/keeps"
+            + " Tab=- Tab+Ctrl=- A=- A+Ctrl=- Insert=- Insert+Ctrl=- Delete=- Delete+Ctrl=-",
+            "the caret move of each navigation key, its direction, and the keys that keep the column");
+        Check(!CaretNavigator.KeepsColumn(VirtualKey.Space) && !CaretNavigator.KeepsColumn((VirtualKey)35) && !CaretNavigator.KeepsColumn((VirtualKey)32), "End, Space and the key before the page keys drop the column");
+    }
+
     private static int Main()
     {
         try
@@ -1216,6 +1235,7 @@ internal static class Program
             EditCommands();
             Typing();
             Replacing();
+            KeyMap();
         }
         catch (Exception exception)
         {
