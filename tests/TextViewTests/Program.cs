@@ -290,6 +290,7 @@ internal static class Program
         CompletionRuns();
         ListRuns();
         LineCommandRuns();
+        SearchRuns();
         _form.Dispose();
     }
 
@@ -1940,6 +1941,272 @@ internal static class Program
             EditorKeyDownMethod.Invoke(code, new object[] { args });
             Command(code, "key " + keys + " handled=" + Bool(args.Handled), events);
         }
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3E-2: the search, the highlight of the matches, the pair of a bracket and the marks of the blanks, written by the code before they moved
+    // to the model: Find forward and back, with and without a wrap, limited to a range, from a caret outside the lines, the selection it makes
+    // (also in terminal mode) and the column it scrolls to; the cells the highlight of the matches fills (a short line, a long one that is
+    // searched only around the screen, a regular expression); the range highlighted for the bracket at the caret and its style; the cells of the
+    // grey line under the tabs; the mark of each character and the cells of the marks of a line.
+
+    private static string StyleName(CodeEditorPP code, HighlightStyle style)
+    {
+        if (ReferenceEquals(style, code.ParenHighlightStyle)) return "paren";
+        if (ReferenceEquals(style, code.BracketHighlightStyle)) return "bracket";
+        if (ReferenceEquals(style, code.BraceHighlightStyle)) return "brace";
+        if (ReferenceEquals(style, code.AngleHighlightStyle)) return "angle";
+        if (ReferenceEquals(style, code.UnpairedHighlightStyle)) return "unpaired";
+        if (ReferenceEquals(style, code.DefaultPairHighlightStyle)) return "default";
+        return "other";
+    }
+
+    private static string Highlights(CodeEditorPP code)
+    {
+        System.Collections.IDictionary highlights = (System.Collections.IDictionary)typeof(ReadonlyTextBrowser).GetField("_highlights", Private).GetValue(code);
+        List<string> items = new List<string>();
+        foreach (System.Collections.DictionaryEntry entry in highlights)
+        {
+            ReadonlyTextBrowser.Highlight highlight = (ReadonlyTextBrowser.Highlight)entry.Value;
+            items.Add(entry.Key + ":" + P(highlight.Start) + "-" + P(highlight.End) + " " + StyleName(code, highlight.Style));
+        }
+        items.Sort(StringComparer.Ordinal);
+        return items.Count == 0 ? "-" : string.Join(" ", items);
+    }
+
+    private static int ScrollColumnOf(ReadonlyTextBrowser view)
+    {
+        return (int)typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).GetValue(view);
+    }
+
+    private static void Found(CodeEditorPP code, TextDocument.TextPosition result, string what)
+    {
+        Lines.Add("search " + what + ": found=" + P(result) + " caret=" + P(code.CaretPosition) + " sel=" + (code.HasSelection ? P(code.SelectionStart) + "-" + P(code.SelectionEnd) : "-")
+            + " scroll=" + ScrollColumnOf(code));
+    }
+
+    // The cells of the rows in view that a painting step filled: the step paints on a white bitmap of the size of the view, and a cell counts when the
+    // pixel a quarter into it from the left and the top (or on the given height) is not white.
+    private static string PaintedCells(CodeEditorPP code, Action<System.Drawing.Graphics> paint, int rows, int columns, float yFraction, Func<System.Drawing.Color, bool> counts, bool wholeCell = false)
+    {
+        System.Drawing.SizeF cell = (System.Drawing.SizeF)typeof(ReadonlyTextBrowser).GetField("_charSize", Private).GetValue(code);
+        using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(code.Width, code.Height))
+        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(System.Drawing.Color.White);
+            paint(graphics);
+            StringBuilder text = new StringBuilder();
+            for (int row = 0; row < rows; row++)
+            {
+                int y = (int)(RowTop(code, row) + cell.Height * yFraction);
+                text.Append(row == 0 ? "" : "|");
+                for (int column = 0; column < columns; column++)
+                {
+                    int x = (int)(code.ColumnToX(column + ScrollColumnOf(code)) + cell.Width / 4);
+                    bool inside = x >= 0 && x < bitmap.Width && y >= 0 && y < bitmap.Height;
+                    bool painted = inside && counts(bitmap.GetPixel(x, y));
+                    if (wholeCell)
+                    {
+                        // Any ink inside the cell (a mark is a thin glyph): the cell less a pixel on each side.
+                        int left = (int)Math.Ceiling(code.ColumnToX(column + ScrollColumnOf(code))) + 1;
+                        int right = (int)code.ColumnToX(column + 1 + ScrollColumnOf(code)) - 1;
+                        int top = (int)Math.Ceiling(RowTop(code, row)) + 1;
+                        int bottom = (int)(RowTop(code, row) + cell.Height) - 1;
+                        painted = false;
+                        for (int py = Math.Max(0, top); py < Math.Min(bitmap.Height, bottom) && !painted; py++)
+                        {
+                            for (int px = Math.Max(0, left); px < Math.Min(bitmap.Width, right) && !painted; px++)
+                            {
+                                painted = counts(bitmap.GetPixel(px, py));
+                            }
+                        }
+                    }
+                    text.Append(painted ? '#' : '.');
+                }
+            }
+            return text.ToString();
+        }
+    }
+
+    private static float RowTop(ReadonlyTextBrowser view, int line)
+    {
+        return ((System.Drawing.PointF)typeof(ReadonlyTextBrowser).GetMethod("PositionToPoint", Private, null, new[] { typeof(int), typeof(int) }, null).Invoke(view, new object[] { 0, line })).Y;
+    }
+
+    private static bool NotWhite(System.Drawing.Color color) => color.ToArgb() != System.Drawing.Color.White.ToArgb();
+
+    private static void SearchRuns()
+    {
+        Lines.Add("== search and marks");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 200) };
+        _form.Controls.Add(code);
+        code.WordWrap = false;
+        code.SetDocument(new EditableTextDocument(new[] { "one two one", "two", "", "one" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        TextMatcher one = TextMatcher.Literal("one", true);
+        TextDocument.TextPosition none = TextDocument.TextPosition.Invalid;
+        code.SetCaret(At(0, 0));
+        Found(code, code.Find(At(0, 0), one, false, false, FindSelectMode.None, none, none), "forward, no select");
+        Found(code, code.Find(At(0, 1), one, false, false, FindSelectMode.Select, none, none), "forward from inside the first, select");
+        Found(code, code.Find(At(0, 9), one, false, false, FindSelectMode.Select, none, none), "on to the last line");
+        Found(code, code.Find(At(3, 1), one, false, false, FindSelectMode.Select, none, none), "past the last match without a wrap");
+        Found(code, code.Find(At(3, 1), one, false, true, FindSelectMode.Select, none, none), "with a wrap");
+        Found(code, code.Find(At(3, 0), one, true, false, FindSelectMode.Select, none, none), "back from the start of the last line");
+        Found(code, code.Find(At(0, 3), one, true, false, FindSelectMode.Select, none, none), "back to the first");
+        Found(code, code.Find(At(0, 0), one, true, false, FindSelectMode.Select, none, none), "back from the start without a wrap");
+        Found(code, code.Find(At(0, 0), one, true, true, FindSelectMode.Select, none, none), "back with a wrap");
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("zzz", true), false, true, FindSelectMode.SelectOrClear, none, none), "no match, select or clear");
+        Found(code, code.Find(At(1, 0), TextMatcher.Literal("ONE", false), false, false, FindSelectMode.Select, none, none), "the case of the text kept: no match");
+        Found(code, code.Find(At(0, 0), one, false, false, FindSelectMode.Select, At(0, 2), At(1, 3)), "in a range: the first match is cut by its start");
+        Found(code, code.Find(At(0, 0), one, false, true, FindSelectMode.Select, At(0, 2), At(3, 2)), "in a range that cuts the last match");
+        Found(code, code.Find(At(1, 0), one, false, false, FindSelectMode.Select, At(0, 0), At(3, 2)), "forward to a last line of the range that cuts its match");
+        Found(code, code.Find(At(5, 0), one, true, false, FindSelectMode.Select, At(0, 0), At(3, 3)), "back from a caret below the range");
+        Found(code, code.Find(At(-1, 0), one, false, false, FindSelectMode.Select, At(1, 0), At(3, 3)), "forward from a caret above the range");
+        Found(code, code.Find(At(0, 0), TextMatcher.Create("o.e", true, false, true), false, false, FindSelectMode.Select, none, none), "a regular expression");
+        Found(code, code.Find(At(0, 0), TextMatcher.Create("one", true, true, false), false, false, FindSelectMode.Select, At(0, 1), none), "a range with an invalid end is no range");
+        Found(code, code.Find(At(0, 0), null, false, false, FindSelectMode.Select, none, none), "no matcher");
+
+        string wide = new string('x', 120) + "needle" + new string('y', 120);
+        code.SetDocument(new EditableTextDocument(new[] { "needle", wide, new string('z', 30) + "needle", new string('w', 300) + new string('n', 100) }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        Lines.Add("search visible columns=" + (int)typeof(ReadonlyTextBrowser).GetField("_visibleColumns", Private).GetValue(code));
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match in view: column 0");
+        Found(code, code.Find(At(0, 1), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match far right: centred");
+        Found(code, code.Find(At(1, 127), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "a match near the end of its line");
+        Found(code, code.Find(At(3, 0), TextMatcher.Create("n+", true, false, true), false, false, FindSelectMode.Select, none, none), "a match wider than the view");
+        code.TerminalMode = true;
+        code.SetSelectionEnd(At(2, 3));
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("needle", true), false, false, FindSelectMode.Select, none, none), "terminal mode: the selection ends at the match");
+        Found(code, code.Find(At(0, 0), TextMatcher.Literal("absent", true), false, false, FindSelectMode.SelectOrClear, none, none), "terminal mode: no match clears");
+        code.TerminalMode = false;
+
+        // The highlight of every match (the search bar's query): the cells it fills.
+        code.SetDocument(new EditableTextDocument(new[] { "ab ab\tab", "xabx", "aaa", "\tab", "aab" }, TextDocument.LineEnding.Lf));
+        code.TabSize = 4;
+        Application.DoEvents();
+        MethodInfo paintMatches = typeof(ReadonlyTextBrowser).GetMethod("PaintMatches", Private);
+        void Matches(TextMatcher matcher, string what)
+        {
+            code.SetMatchHighlight(matcher);
+            Lines.Add("matches " + what + ": " + PaintedCells(code, g => paintMatches.Invoke(code, new object[] { g }), 5, 12, 0.5f, NotWhite));
+        }
+        Matches(TextMatcher.Literal("ab", true), "ab");
+        Matches(TextMatcher.Create("a+b", true, false, true), "a+b");
+        Matches(TextMatcher.Literal("AB", true), "AB in the case of the text");
+        Matches(TextMatcher.Literal("aa", true), "aa: matches do not overlap");
+        code.TerminalMode = true;
+        Matches(TextMatcher.Literal("ab", true), "terminal mode: none");
+        code.TerminalMode = false;
+        Matches(null, "none");
+        string longLine = new string('q', 5000) + "ab" + new string('q', 2100) + "ab";
+        code.SetDocument(new EditableTextDocument(new[] { longLine, "ab" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 4995);
+        Matches(TextMatcher.Literal("ab", true), "a long line scrolled to the first match (the second is past the margin)");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 7095);
+        Matches(TextMatcher.Literal("ab", true), "scrolled to the second");
+        // A long line of 6000 characters full of matches: only 500 are shown from where the search starts, which is the screen less 2048
+        // characters; a match that starts left of the screen is shown where it reaches into it.
+        code.SetDocument(new EditableTextDocument(new[] { string.Concat(System.Linq.Enumerable.Repeat("ab", 3000)) }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 4001);
+        Matches(TextMatcher.Literal("abababab", true), "a line full of matches, scrolled far right");
+        bool LeftOfText()
+        {
+            using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(code.Width, code.Height))
+            using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+            {
+                graphics.Clear(System.Drawing.Color.White);
+                paintMatches.Invoke(code, new object[] { graphics });
+                int edge = (int)code.ColumnToX(ScrollColumnOf(code));
+                int y = (int)(RowTop(code, 0) + 2);
+                for (int x = 0; x < edge - 1; x++)
+                {
+                    if (NotWhite(bitmap.GetPixel(x, y)))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        Lines.Add("matches left of the text (the matches before the screen are not drawn there): " + Bool(LeftOfText()));
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 0);
+        code.SetMatchHighlight(null);
+
+        // The pair of the bracket at the caret.
+        code.SetDocument(new EditableTextDocument(new[] { "f(a[1]) {", "  x = <y>; ) }", "(" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        Application.DoEvents();
+        foreach (TextDocument.TextPosition caret in new[] { At(0, 2), At(0, 1), At(0, 4), At(0, 6), At(0, 7), At(0, 9), At(1, 0), At(1, 11), At(1, 13), At(1, 14), At(2, 1), At(1, 9), At(2, 0) })
+        {
+            code.ClearSelection();
+            code.SetCaret(caret);
+            Lines.Add("pair at " + P(caret) + ": " + Highlights(code));
+        }
+        code.SetCaret(At(0, 2));
+        code.SetSelection(true, At(0, 0));
+        Lines.Add("pair with a selection: " + Highlights(code));
+        code.SetCaret(At(0, 4));
+        Lines.Add("pair with a selection, the caret moved to a bracket: kept " + Highlights(code));
+        code.ClearSelection();
+        code.SetCaret(At(0, 2));
+        code.SetTokenizer(null);
+        code.SetCaret(At(0, 7));
+        Lines.Add("pair without tokens: " + Highlights(code));
+
+        // The marks of the blanks.
+        StringBuilder markers = new StringBuilder();
+        MethodInfo marker = typeof(ReadonlyTextBrowser).GetMethod("GetInvisibleCharacterMarker", BindingFlags.Static | BindingFlags.NonPublic);
+        int hash = 17;
+        for (int ch = 0; ch < 0x10000; ch++)
+        {
+            string mark = (string)marker.Invoke(null, new object[] { (char)ch });
+            hash = unchecked(hash * 31 + (mark == null ? 0 : mark[0]));
+            if (mark != null && ch < 0x3000 && markers.Length < 2000)
+            {
+                markers.Append(((int)ch).ToString("X4")).Append('=').Append(((int)mark[0]).ToString("X4")).Append(' ');
+            }
+        }
+        Lines.Add("marks of the characters below 3000: " + markers.ToString().TrimEnd());
+        Lines.Add("marks of all characters: hash=" + hash);
+        code.SetDocument(new EditableTextDocument(new[] { "a b\t\tc", "\t \tx", "", "end" }, TextDocument.LineEnding.Lf));
+        code.TabSize = 4;
+        Application.DoEvents();
+        MethodInfo paintMarks = typeof(ReadonlyTextBrowser).GetMethod("PaintInvisibleCharacters", Private);
+        void Marks(string what)
+        {
+            Lines.Add("marks " + what + ": " + PaintedCells(code, g =>
+            {
+                for (int line = 0; line < 4; line++)
+                {
+                    int top = (int)RowTop(code, line);
+                    paintMarks.Invoke(code, new object[] { g, line, code.EditableDocument.GetLineText(line), ScrollColumnOf(code), top });
+                }
+            }, 4, 14, 0.5f, NotWhite, wholeCell: true));
+        }
+        typeof(ReadonlyTextBrowser).GetField("_rowLastColumn", Private).SetValue(code, -1);
+        Marks("the lines, the dot of a space, the arrow of a tab, the line ends but the last");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 2);
+        Marks("scrolled by two columns");
+        typeof(ReadonlyTextBrowser).GetProperty("ScrollColumn", Private).SetValue(code, 0);
+
+        // The grey line under the tabs, as the painting of a line draws it (only its colour counts, at the middle of the row).
+        System.Drawing.Color darkGray = System.Drawing.Color.DarkGray;
+        foreach (bool tabs in new[] { false, true })
+        {
+            code.ShowTabs = tabs;
+            Lines.Add("tab lines " + (tabs ? "shown" : "not shown") + ": " + PaintedCells(code, g =>
+            {
+                using (System.Drawing.Bitmap full = new System.Drawing.Bitmap(code.Width, code.Height))
+                {
+                    code.DrawToBitmap(full, new System.Drawing.Rectangle(0, 0, code.Width, code.Height));
+                    g.DrawImage(full, 0, 0);
+                }
+            }, 4, 14, 0.5f, color => color.ToArgb() == darkGray.ToArgb()));
+        }
+        code.ShowTabs = false;
         _form.Controls.Remove(code);
         code.Dispose();
     }

@@ -1621,3 +1621,62 @@ command key NumPad0, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel
 command key D9, Control, Alt handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
 command key R, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
 command key Q, Control handled=F: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+== search and marks
+search forward, no select: found=0:0 caret=0:0 sel=- scroll=0
+search forward from inside the first, select: found=0:8 caret=0:8 sel=0:11-0:8 scroll=0
+search on to the last line: found=3:0 caret=3:0 sel=3:3-3:0 scroll=0
+search past the last match without a wrap: found=-1:-1 caret=3:0 sel=3:3-3:0 scroll=0
+search with a wrap: found=0:0 caret=0:0 sel=0:3-0:0 scroll=0
+search back from the start of the last line: found=0:8 caret=0:8 sel=0:11-0:8 scroll=0
+search back to the first: found=0:0 caret=0:0 sel=0:3-0:0 scroll=0
+search back from the start without a wrap: found=-1:-1 caret=0:0 sel=0:3-0:0 scroll=0
+search back with a wrap: found=3:0 caret=3:0 sel=3:3-3:0 scroll=0
+search no match, select or clear: found=-1:-1 caret=4:0 sel=- scroll=0
+search the case of the text kept: no match: found=-1:-1 caret=4:0 sel=- scroll=0
+search in a range: the first match is cut by its start: found=0:8 caret=0:8 sel=0:11-0:8 scroll=0
+search in a range that cuts the last match: found=0:8 caret=0:8 sel=0:11-0:8 scroll=0
+search forward to a last line of the range that cuts its match: found=-1:-1 caret=0:8 sel=0:11-0:8 scroll=0
+search back from a caret below the range: found=3:0 caret=3:0 sel=3:3-3:0 scroll=0
+search forward from a caret above the range: found=3:0 caret=3:0 sel=3:3-3:0 scroll=0
+search a regular expression: found=0:0 caret=0:0 sel=0:3-0:0 scroll=0
+search a range with an invalid end is no range: found=0:0 caret=0:0 sel=0:3-0:0 scroll=0
+search no matcher: found=-1:-1 caret=0:0 sel=0:3-0:0 scroll=0
+search visible columns=31
+search a match in view: column 0: found=0:0 caret=0:0 sel=0:6-0:0 scroll=0
+search a match far right: centred: found=1:120 caret=1:120 sel=1:126-1:120 scroll=108
+search a match near the end of its line: found=2:30 caret=2:30 sel=2:36-2:30 scroll=5
+search a match wider than the view: found=3:300 caret=3:300 sel=3:400-3:300 scroll=300
+search terminal mode: the selection ends at the match: found=0:0 caret=3:300 sel=0:6-0:0 scroll=0
+search terminal mode: no match clears: found=-1:-1 caret=3:300 sel=- scroll=0
+matches ab: ##.##...##..|.##.........|............|....##......|.##.........
+matches a+b: ##.##...##..|.##.........|............|....##......|###.........
+matches AB in the case of the text: ##.##...##..|.##.........|............|....##......|.##.........
+matches aa: matches do not overlap: ............|............|##..........|............|##..........
+matches terminal mode: none: ............|............|............|............|............
+matches none: ............|............|............|............|............
+matches a long line scrolled to the first match (the second is past the margin): .....##.....|............|.....##.....|.....##.....|.....##.....
+matches scrolled to the second: .......##...|............|.......##...|.......##...|.......##...
+matches a line full of matches, scrolled far right: ############|############|############|############|############
+matches left of the text (the matches before the screen are not drawn there): F
+pair at 0:2: 1:0:1-0:7 paren
+pair at 0:1: -
+pair at 0:4: 2:0:3-0:6 bracket
+pair at 0:6: 2:0:3-0:6 bracket
+pair at 0:7: 2:0:1-0:7 paren
+pair at 0:9: 2:0:9-0:8 unpaired
+pair at 1:0: -
+pair at 1:11: -
+pair at 1:13: -
+pair at 1:14: 3:1:14-1:13 unpaired
+pair at 2:1: 3:2:1-2:0 unpaired
+pair at 1:9: -
+pair at 2:0: -
+pair with a selection: 4:0:1-0:7 paren
+pair with a selection, the caret moved to a bracket: kept 4:0:1-0:7 paren
+pair without tokens: -
+marks of the characters below 3000: 0000=2400 0001=2401 0002=2402 0003=2403 0004=2404 0005=2405 0006=2406 0007=2407 0008=2408 0009=2409 000A=240A 000B=240B 000C=240C 000D=240D 000E=240E 000F=240F 0010=2410 0011=2411 0012=2412 0013=2413 0014=2414 0015=2415 0016=2416 0017=2417 0018=2418 0019=2419 001A=241A 001B=241B 001C=241C 001D=241D 001E=241E 001F=241F 0020=00B7 007F=2421 0080=FFFD 0081=FFFD 0082=FFFD 0083=FFFD 0084=FFFD 0085=FFFD 0086=FFFD 0087=FFFD 0088=FFFD 0089=FFFD 008A=FFFD 008B=FFFD 008C=FFFD 008D=FFFD 008E=FFFD 008F=FFFD 0090=FFFD 0091=FFFD 0092=FFFD 0093=FFFD 0094=FFFD 0095=FFFD 0096=FFFD 0097=FFFD 0098=FFFD 0099=FFFD 009A=FFFD 009B=FFFD 009C=FFFD 009D=FFFD 009E=FFFD 009F=FFFD 00A0=00B0 0600=FFFD 0601=FFFD 0602=FFFD 0603=FFFD 0604=FFFD 061C=FFFD 06DD=FFFD 070F=FFFD 1680=00B7 180E=FFFD 2000=00B7 2001=00B7 2002=00B7 2003=00B7 2004=00B7 2005=00B7 2006=00B7 2007=00B7 2008=00B7 2009=00B7 200A=00B7 200B=FFFD 200C=FFFD 200D=FFFD 200E=FFFD 200F=FFFD 2028=00B7 2029=00B7 202A=FFFD 202B=FFFD 202C=FFFD 202D=FFFD 202E=FFFD 202F=00B7 205F=00B7 2060=FFFD 2061=FFFD 2062=FFFD 2063=FFFD 2064=FFFD 2066=FFFD 2067=FFFD 2068=FFFD 2069=FFFD 206A=FFFD 206B=FFFD 206C=FFFD 206D=FFFD 206E=FFFD 206F=FFFD
+marks of all characters: hash=-241933756
+marks the lines, the dot of a space, the arrow of a tab, the line ends but the last: .#.##....#....|#...##...#....|#.............|..............
+marks scrolled by two columns: .##....#......|..##...#......|..............|..............
+tab lines not shown: ..............|..............|..............|..............
+tab lines shown: ...#####......|####.###......|..............|..............
