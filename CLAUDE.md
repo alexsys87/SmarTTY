@@ -48,7 +48,7 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
-| `GUI/TextView/` | Stage 3D-2: the text view on WPF on the models of the text view (`WpfTextEditor`) and Tools > WPF text editor lab (`TextLabWindow`); not in the editor tab yet | WPF |
+| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours (`WpfTextEditor`), and Tools > WPF text editor lab (`TextLabWindow`); not in the editor tab yet | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
@@ -72,7 +72,7 @@ DpiAwareControl (WinForms UserControl)
    └─ ReadonlySmartScrollBrowser
       └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
          └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
-            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
+            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
             │                                   shows a hex view it is given (the tab gives it the WPF one) through IHexViewPlace
             └─ TerminalEmulatorBase   the view of a TerminalScreen (Terminal/Emulation): forwards the cursor, the buffers, tab stops, scroll region, writing
@@ -101,7 +101,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) done; next 3D-3, what `CodeEditorPP` draws (the syntax colours, the folds, the inline messages, the completion) on the WPF view, then the view in the editor tab |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) and 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) done; next 3D-4, the folds of `CodeEditorPP` on the WPF view, then the inline messages, the completion and the view in the editor tab |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -707,3 +707,26 @@ Ctrl+Home/End, PageUp/Down with and without Shift, Ctrl+Up/Down, Ctrl+A; a click
 the text and beyond its edges, a Shift+click, the right button and the context menu; the wheel and Shift+wheel; word wrap on and off (the first line
 stays in view), the line numbers, the tab sizes; a file of some MB (scrolling and paging stay fast); 100 %, 150 % and 200 % scaling and a window moved
 between monitors; light and dark theme; AltGr letters and an IME.
+
+Done in 3D-3 (the syntax colours): first a net: `tests/TextViewTests` has a syntax run at its end on a real `CodeEditorPP`, written by the code before
+the move (the 1334 lines of before did not change; 1357 in all, the same on every run): the spans each line of a C text is drawn with (start, end,
+which token brush) after edits that change a line, put a line break in at the start of a line and take an empty line out, open and close a block
+comment over several lines, insert and remove lines, and with two brushes for more token types, none, an empty list and no tokenizer; then the inline
+messages and a collapsed fold after line breaks put in and taken out at the start of the line of a message and of the fold, of the line before them
+and of the first line, and a line added after the last one. Of 9 mutations of the old code 8 make it fail; the 9th is an equivalent change (the
+number of removed lines is counted before the start line moves). What it shows: the rule that a line break put in at the start of a line (or an
+empty line taken out) counts from the line before changes nothing in the colours; it is what makes an inline message (which moves only on the lines
+after the start line) go down with the text of its line. Then `CodeEditing/SyntaxColoring.cs` (public static): `ChangedLines` (the first line, the
+removed and the added lines of a range edit that `CodeEditorPP.OnRangeChanged` tells the token cache, the messages and the folds) and `ColorIndex`
+(the colour of a token type, the first one for a type past them; the view keeps its test for no brushes, so a negative type still throws as
+before), as they were. Every golden and stand passes unchanged. For the WPF view: `TextViewLayout.RowRuns` (the coloured parts of a line, in indexes
+of the line, turned into the runs of a row in its columns: a tab takes its columns, cut to the row of a wrapped line, the rest in the colour of the
+text, neighbours of one colour joined, a part that goes back over an earlier one cut) with the struct `TextRun`; `tests/TextViewLayoutTests` checks
+it and `SyntaxColoring` (183 checks); of 19 mutations 17 made a check fail at once and two after a check was added. `WpfTextEditor` keeps the tokens
+in a `TokenCache` as `CodeEditorPP` does (`SetSyntax(tokenizer, colours)`, the line tokenized again on a line change, the lines of `ChangedLines` on a
+range change) and draws a row by its runs, the selected part of a run in the colour of a selected text. The lab has the syntax menu of the editor:
+a file opened takes the syntax of its name or first line when the highlighting is on in the settings, with the colours of the settings. Not in it
+yet: the highlight of the pair of a bracket at the caret (`CodeEditorPP.OnSelectionChanged`). Manual check on Windows (the lab): the colours of a C,
+a shell, a Python and a YAML file in the light and the dark theme; a block comment opened and closed by typing, the lines after it coloured again;
+lines put in and taken out inside a comment and a string; the colours of a selected text; a syntax chosen in the menu; a large file (typing stays
+fast).
