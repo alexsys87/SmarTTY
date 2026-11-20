@@ -1355,3 +1355,26 @@ lines taken out again: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messa
 lines a line break at the start of the first line: text=\nint f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=3:on a,4:on the brace,8:on x folds=4:  {
 lines the first line taken out: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=2:on a,3:on the brace,7:on x folds=3:  {
 lines a line added after the last one: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx\ny messages=2:on a,3:on the brace,7:on x folds=3:  {
+== folds
+fold a C text: folds= caret=0:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold a click on the header of a block whose brace is on the next line, the caret inside it: folds=0 caret=0:0 rows=0=int f() {...}@9+3 8 9 10 11 12
+fold clicked again: unfolded: folds= caret=0:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold a block whose brace ends the header line, the caret inside it: folds=8 caret=7:0 rows=0 1 2 3 4 5 6 7 8=int g() {...}@9+3 11 12
+fold unfolded: folds= caret=7:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold an inner block, the caret outside it: folds=3 caret=12:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Down onto the folded header: folds=3 caret=3:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Down over the folded block: folds=3 caret=7:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Up back over it: folds=3 caret=3:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold End of the folded header: folds=3 caret=3:8 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Down again: folds=3 caret=7:1 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold the caret put in a hidden line: folds= caret=5:2 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold Collapse at the caret line: folds=3 caret=3:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Collapse again: folds=3 caret=3:0 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+fold Expand at the caret line: folds= caret=3:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold a click on a line without a block: folds= caret=12:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold two blocks folded: folds=0,8 caret=12:0 rows=0=int f() {...}@9+3 8=int g() {...}@9+3 11 12
+fold word wrap on: folds=0,8 caret=12:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold a click while wrapping: folds=0,8 caret=12:0 rows=0 1 2 3 4 5 6 7 8 9 10 11 12
+fold word wrap off: folds=0,8 caret=12:0 rows=0=int f() {...}@9+3 8=int g() {...}@9+3 11 12
+fold the caret on the line of the closing brace: folds=8 caret=7:0 rows=0 1 2 3 4 5 6 7 8=int g() {...}@9+3 11 12
+fold the caret on the header, before the line of the opening brace: folds=3 caret=3:4 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12

@@ -284,6 +284,7 @@ internal static class Program
         TypingRuns();
         ReplaceRuns();
         SyntaxRuns();
+        FoldRuns();
         _form.Dispose();
     }
 
@@ -1101,6 +1102,140 @@ internal static class Program
         MessagesAndFolds(code, "the first line taken out");
         code.ReplaceText(At(7, 1), At(7, 1), false, "\ny");
         MessagesAndFolds(code, "a line added after the last one");
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-4: the folds of CodeEditorPP, written by the code before what the view decides about them moved to the model: a click on the mark of
+    // the fold margin (through the real FoldingMarginPainter) on a block whose opening brace is on the next line and on one whose brace ends the
+    // header line, with the caret inside the block and outside it, again to unfold, on a line without a block and while the lines are wrapped; the
+    // rows the view shows (a folded block hides its lines; the folded header shows the text of the fold with its label); the caret moved by Up and
+    // Down over a folded block; the caret put in a hidden line; Collapse and Expand of the caret line.
+
+    private static string FoldState(CodeEditorPP code)
+    {
+        List<string> folds = new List<string>();
+        foreach (FoldedLineInfo fold in code.GetFoldState())
+        {
+            folds.Add(fold.Line.ToString(CultureInfo.InvariantCulture));
+        }
+        folds.Sort(StringComparer.Ordinal);
+        int visibleRows = (int)typeof(ReadonlyTextBrowser).GetField("_visibleRows", Private).GetValue(code);
+        List<string> rows = new List<string>();
+        for (int row = 0; row < visibleRows && row < code.DisplayRows.Length; row++)
+        {
+            ReadonlyTextBrowser.DisplayRow displayRow = code.DisplayRows[row];
+            if (displayRow.VirtualLine != null || displayRow.Line < 0)
+            {
+                continue;
+            }
+            string text = "";
+            if (displayRow.Decorator != null)
+            {
+                text = "=" + Escape(displayRow.Decorator.Transform(code.EditableDocument.GetLineText(displayRow.Line), out System.Drawing.CharacterRange label, out _)) + "@" + label.First + "+" + label.Length;
+            }
+            rows.Add(displayRow.Line + text);
+        }
+        return "folds=" + string.Join(",", folds) + " caret=" + P(code.CaretPosition) + " rows=" + string.Join(" ", rows);
+    }
+
+    private static void MarginClick(CodeEditorPP code, int line)
+    {
+        object painter = null;
+        System.Collections.IList margins = (System.Collections.IList)typeof(ReadonlyTextBrowser).GetField("_margins", Private).GetValue(code);
+        foreach (object slot in margins)
+        {
+            object margin = slot.GetType().GetField("Margin").GetValue(slot);
+            if (margin.GetType().Name == "FoldingMarginPainter")
+            {
+                painter = margin;
+            }
+        }
+        int rowIndex = -1;
+        for (int row = 0; row < code.DisplayRows.Length; row++)
+        {
+            if (code.DisplayRows[row].VirtualLine == null && code.DisplayRows[row].Line == line)
+            {
+                rowIndex = row;
+                break;
+            }
+        }
+        painter.GetType().GetMethod("OnMouseDown").Invoke(painter, new object[] { System.Drawing.Point.Empty, code, 0, 0, System.Drawing.SizeF.Empty, rowIndex });
+    }
+
+    private static void FoldRuns()
+    {
+        Lines.Add("== folds");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 400) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int f()", "{", "  a();", "  if (x)", "  {", "    b();", "  }", "}", "int g() {", "  c();", "}", "", "x" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        Application.DoEvents();
+        void Step(string what)
+        {
+            Application.DoEvents();
+            Lines.Add("fold " + what + ": " + FoldState(code));
+        }
+        void Press(Keys keys)
+        {
+            EditorKeyDownMethod.Invoke(code, new object[] { new KeyEventArgs(keys) });
+        }
+        Step("a C text");
+        code.SetCaret(At(2, 3));
+        MarginClick(code, 0);
+        Step("a click on the header of a block whose brace is on the next line, the caret inside it");
+        MarginClick(code, 0);
+        Step("clicked again: unfolded");
+        code.SetCaret(At(9, 1));
+        MarginClick(code, 8);
+        Step("a block whose brace ends the header line, the caret inside it");
+        MarginClick(code, 8);
+        Step("unfolded");
+        code.SetCaret(At(12, 0));
+        MarginClick(code, 3);
+        Step("an inner block, the caret outside it");
+        code.SetCaret(At(2, 0));
+        Press(Keys.Down);
+        Step("Down onto the folded header");
+        Press(Keys.Down);
+        Step("Down over the folded block");
+        Press(Keys.Up);
+        Step("Up back over it");
+        Press(Keys.End);
+        Step("End of the folded header");
+        Press(Keys.Down);
+        Step("Down again");
+        code.SetCaret(At(5, 2));
+        Step("the caret put in a hidden line");
+        code.SetCaret(At(3, 0));
+        code.CollapseCurrentFold();
+        Step("Collapse at the caret line");
+        code.CollapseCurrentFold();
+        Step("Collapse again");
+        code.ExpandCurrentFold();
+        Step("Expand at the caret line");
+        code.SetCaret(At(12, 0));
+        MarginClick(code, 2);
+        Step("a click on a line without a block");
+        MarginClick(code, 0);
+        MarginClick(code, 8);
+        Step("two blocks folded");
+        code.WordWrap = true;
+        Step("word wrap on");
+        MarginClick(code, 8);
+        Step("a click while wrapping");
+        code.CollapseCurrentFold();
+        code.WordWrap = false;
+        Step("word wrap off");
+        MarginClick(code, 0);
+        MarginClick(code, 8);
+        code.SetCaret(At(10, 0));
+        MarginClick(code, 8);
+        Step("the caret on the line of the closing brace");
+        MarginClick(code, 8);
+        code.SetCaret(At(3, 4));
+        MarginClick(code, 3);
+        Step("the caret on the header, before the line of the opening brace");
         _form.Controls.Remove(code);
         code.Dispose();
     }
