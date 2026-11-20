@@ -28,12 +28,6 @@ public partial class App : Application
         CrashLog.Install(this);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
         ThemeManager.Apply(GlobalSettings.Load());
-        // The device terminals (WinForms) show the very same "connection closed" popup as the SSH sessions.
-        DeviceTerminalControl.ConnectionPromptHostFactory = prompt => new System.Windows.Forms.Integration.ElementHost
-        {
-            AutoSize = true,
-            Child = new ConnectionClosedPopup { DataContext = prompt }
-        };
 
         // The message boxes of the harness-compiled controls become the themed WPF dialogs.
         ThemedMessageBoxAdapter.Install();
@@ -70,24 +64,24 @@ public partial class App : Application
         // Saves can come from any thread.
         SmarTTY.Utilities.XmlStorage.ProblemNotice = message => Dispatcher.BeginInvoke((Action)(() => MessageBoxes.Warning(message)));
         // The device terminal (COM/TCP/telnet) raises its dialogs from harness-compiled code as well.
-        DeviceTerminalControl.LogReplayPrompt = (bytes, terminal) => LogReplayWindow.Replay(bytes, terminal);
-        DeviceTerminalControl.SerialSettingsPrompt = (settings, portName) =>
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.LogReplayPrompt = (bytes, terminal) => LogReplayWindow.Replay(bytes, terminal);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.SerialSettingsPrompt = (settings, portName) =>
             SerialPortSettingsWindow.Prompt(WindowOwnership.ActiveWindow(), settings, portName);
-        DeviceTerminalControl.TransferProgressWindowFactory = (title, showErrorCount) => XModemTransferWindow.Create(title, showErrorCount);
-        DeviceTerminalControl.GzipBase64RequestPrompt = sending => sending
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.TransferProgressWindowFactory = (title, showErrorCount) => XModemTransferWindow.Create(title, showErrorCount);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.GzipBase64RequestPrompt = sending => sending
             ? GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow())
             : GzipBase64TransferWindow.ShowReceive(WindowOwnership.ActiveWindow());
-        DeviceTerminalControl.FileDropProtocolPrompt = files => FileTransferProtocolWindow.Ask(WindowOwnership.ActiveWindow(), files);
-        DeviceTerminalControl.GzipBase64DropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file);
-        DeviceTerminalControl.GzipCatRequestPrompt = sending => sending
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.FileDropProtocolPrompt = files => FileTransferProtocolWindow.Ask(WindowOwnership.ActiveWindow(), files);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.GzipBase64DropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.GzipCatRequestPrompt = sending => sending
             ? GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), raw: true)
             : GzipBase64TransferWindow.ShowReceive(WindowOwnership.ActiveWindow(), raw: true);
-        DeviceTerminalControl.GzipCatDropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file, raw: true);
-        DeviceTerminalControl.CommandListEditor = (title, description, commands) =>
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.GzipCatDropPrompt = file => GzipBase64TransferWindow.ShowSend(WindowOwnership.ActiveWindow(), file, raw: true);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.CommandListEditor = (title, description, commands) =>
             DeviceCommandListWindow.Edit(WindowOwnership.ActiveWindow(), title, description, commands);
         // "Command history..." of the terminal menus (SSH tabs and COM/TCP terminals).
         SmarTTY.Terminal.CommandHistorySource.ShowWindow = source => CommandHistoryWindow.Open(WindowOwnership.ActiveWindow(), source);
-        DeviceTerminalControl.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal.TftpFirmwareWindowFactory = (terminal, title) => new TftpFirmwareWindow(terminal, title);
         RemoteFileEditor.SudoConfirmationPrompt = (channel, promptText) =>
             SudoConfirmationWindow.Show(WindowOwnership.ActiveWindow(), channel, promptText);
 

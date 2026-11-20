@@ -78,7 +78,7 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
         new Preset("Custom commands", null)
     };
 
-    private readonly DeviceTerminalControl _terminal;
+    private readonly IDeviceConsole _terminal;
     private readonly ConsoleOutputWatcher _watcher = new ConsoleOutputWatcher();
     private readonly List<ServedFile> _files = new List<ServedFile>();
     private TftpTransfer _currentTransfer; // the transfer the progress bar shows: the latest one that started
@@ -93,7 +93,7 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
     private bool _closingWithTerminal;
     private bool _closed;
 
-    public TftpFirmwareWindow(DeviceTerminalControl terminal, string terminalTitle)
+    public TftpFirmwareWindow(IDeviceConsole terminal, string terminalTitle)
     {
         _terminal = terminal;
         InitializeComponent();

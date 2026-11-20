@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The keyboard of the WPF terminal view (Terminal/Input/): what each key-down and text input event sends, with the real key layout
+       of the application (VisualTTY/XTermKeys.xml, copied next to the test). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/Input/*.cs" />
+    <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../Terminal/AnsiEscapeUtils.cs" Link="AnsiEscapeUtils.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <None Include="../../VisualTTY/XTermKeys.xml" Link="XTermKeys.xml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

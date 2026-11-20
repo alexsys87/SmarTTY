@@ -24,7 +24,7 @@ public partial class PasteProgressWindow : Window, IPasteProgress
 
     private const uint GaRoot = 2;
 
-    private System.Windows.Forms.Control _anchor;
+    private PasteAnchor _anchor;
 
     private bool _closed;
 
@@ -46,7 +46,7 @@ public partial class PasteProgressWindow : Window, IPasteProgress
     }
 
     /// <summary>Opens the window over the bottom edge of <paramref name="anchor"/> without taking the focus from it.</summary>
-    public void ShowNear(System.Windows.Forms.Control anchor)
+    public void ShowNear(PasteAnchor anchor)
     {
         _anchor = anchor;
         Window owner = OwnerOf(anchor);
@@ -93,11 +93,11 @@ public partial class PasteProgressWindow : Window, IPasteProgress
     /// The WPF window that hosts <paramref name="anchor"/>, so the progress window is owned by it. The terminal control
     /// is hosted in a WinForms host inside a WPF window, so the root of its Win32 handle is that WPF window.
     /// </summary>
-    private static Window OwnerOf(System.Windows.Forms.Control anchor)
+    private static Window OwnerOf(PasteAnchor anchor)
     {
         try
         {
-            if (anchor != null && anchor.IsHandleCreated)
+            if (anchor != null && anchor.IsAlive)
             {
                 return HwndSource.FromHwnd(GetAncestor(anchor.Handle, GaRoot))?.RootVisual as Window;
             }
@@ -110,8 +110,8 @@ public partial class PasteProgressWindow : Window, IPasteProgress
 
     private void PositionNearAnchor()
     {
-        System.Windows.Forms.Control anchor = _anchor;
-        if (anchor == null || !anchor.IsHandleCreated)
+        PasteAnchor anchor = _anchor;
+        if (anchor == null || !anchor.IsAlive)
         {
             return;
         }
@@ -120,7 +120,7 @@ public partial class PasteProgressWindow : Window, IPasteProgress
         Matrix fromDevice = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         try
         {
-            Rectangle bounds = anchor.RectangleToScreen(anchor.ClientRectangle);
+            Rectangle bounds = anchor.ScreenBounds;
             double widthPx = ActualWidth * toDevice.M11;
             double heightPx = ActualHeight * toDevice.M22;
             double leftPx = PasteProgressRules.NearLeft(bounds.Left, bounds.Width, widthPx);

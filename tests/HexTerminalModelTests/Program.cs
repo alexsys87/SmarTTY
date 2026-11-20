@@ -1,3 +1,5 @@
+using SmarTTY.Terminal.Emulation;
+using SmarTTY.Terminal.Rendering;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -237,6 +239,7 @@ internal static class Program
             LayoutChecks();
             MatchChecks();
             ColumnChecks();
+            HexPaneChecks();
         }
         catch (Exception ex)
         {
@@ -244,6 +247,48 @@ internal static class Program
             return 1;
         }
         return 0;
+    }
+
+    // The two panes of the HEX view of a device (GUI/TerminalView/WpfHexTerminal) are display models written row by row, as the view does it.
+    private static void HexPaneChecks()
+    {
+        TerminalDisplayModel hex = new TerminalDisplayModel(12, 4);
+        TerminalDisplayModel text = new TerminalDisplayModel(4, 4);
+        hex.AutoWrap = false;
+        text.AutoWrap = false;
+        HexTerminalModel model = new HexTerminalModel { BytesPerLine = 4 };
+        byte[] data = { 0x41, 0x42, 0x0a, 0x43, 0x44, 0x7f };
+        int count = model.AddData(data, data.Length, false, DateTime.Now);
+        model.BeginLayout();
+        foreach (HexRow row in HexTerminalModel.FormatRows(data, count, (hex.CursorPosition.X + 1) / 3, model.BytesPerLine))
+        {
+            model.Stream.MapBytes(hex.CursorDocumentLine, row.ByteCount);
+            hex.WriteText(row.Hex);
+            text.WriteText(row.Text);
+            if (row.EndsRow)
+            {
+                hex.MoveCursorBy(-hex.CursorPosition.X, 1, scroll: true);
+                text.MoveCursorBy(-text.CursorPosition.X, 1, scroll: true);
+            }
+        }
+        Equal(hex.Document.GetLineText(0).TrimEnd() + "|" + hex.Document.GetLineText(1).TrimEnd(), "41 42 0a 43|44 7f", "the hex rows, four bytes in a row");
+        Equal(text.Document.GetLineText(0) + "|" + text.Document.GetLineText(1).TrimEnd(), "AB.C|D.", "the characters, a dot for a byte that is not shown");
+        Check(model.Stream.TryLocate(4, out int line, out int index) && line == 1 && index == 0, "the stream knows the row of a byte");
+        hex.CurrentStyle = new CellStyle { Override = new CellStyle.ForegroundOverride { Color = new RgbColor(0xFF00FF00) } };
+        hex.WriteText("00");
+        hex.CurrentStyle = CellStyle.Default;
+        Check(hex.Lines.GetLine(1).Cells[5].Override.Color.HasValue, "the echo is written in a colour of its own");
+        int selections = 0;
+        hex.SelectionChanged += () => selections++;
+        hex.Select(new TextDocument.TextPosition(5, 0), new TextDocument.TextPosition(0, 0));
+        Equal(hex.SelectionAnchor.Column + ":" + hex.SelectionEnd.Column, "5:0", "the anchor and the end of a selection made backward");
+        TextDocument.TextPosition start = hex.SelectionAnchor;
+        TextDocument.TextPosition end = hex.SelectionEnd;
+        HexTerminalModel.HexSelectionToText(ref start, ref end);
+        Check(start.Line == 0 && end.Line == 0, "the selection of the hex pane is mirrored in the row of the text pane");
+        hex.ClearSelection();
+        hex.ClearSelection();
+        Equal(selections, 2, "a selection and its removal are told, a removal of nothing is not");
     }
 }
 

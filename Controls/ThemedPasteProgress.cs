@@ -18,7 +18,7 @@ internal interface IPasteProgress : IDisposable
     void SetProgress(long done, long total, string text);
 
     /// <summary>Opens the window over the bottom edge of <paramref name="anchor"/> without taking the focus from it.</summary>
-    void ShowNear(Control anchor);
+    void ShowNear(PasteAnchor anchor);
 
     /// <summary>Closes the window.</summary>
     void Close();
@@ -65,7 +65,7 @@ internal sealed class NativePasteProgress : IPasteProgress
         _form.SetProgress(done, total, text);
     }
 
-    public void ShowNear(Control anchor)
+    public void ShowNear(PasteAnchor anchor)
     {
         _form.ShowNear(anchor);
     }

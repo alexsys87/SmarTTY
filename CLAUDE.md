@@ -13,16 +13,17 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 132 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 130 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
-- Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
-  `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
-  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+- Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
+  remote editor on OpenSSH and Dropbear), `HexEditorControlTests` (the real hex editor control against a golden file) and
+  `ModelInteropTests` (`VirtualKey` against the real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see
+  "Done in 2E"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
-- `SshNetIntegrationTests`, `SmartTerminalIntegrationTests` and `RemoteFileEditorIntegrationTests` need a real sshd and Dropbear
+- `SshNetIntegrationTests` and `RemoteFileEditorIntegrationTests` need a real sshd and Dropbear
   (`tests/SshNetIntegrationTests/setup-*.sh`; apt `openssh-server dropbear-bin busybox`; as root they also run in a sandbox:
   `set -a; source <(setup-sshd.sh); source <(setup-dropbear.sh); set +a`). Mono cannot open its sockets on a kernel without
   IPv6: build `tests/RemoteFileEditorIntegrationTests/mono-ipv4-shim.c` (command in its csproj) and run mono with `LD_PRELOAD`.
@@ -37,8 +38,9 @@ PR that changes them.
 - Pattern for UI-free logic: model class in a logic folder + thin partial in `Controls/` that wires it to the control
   (example: `CodeEditing/MultiCursor.cs` + `Controls/CodeEditorPP.MultiCursor.cs` via `IMultiCursorText`).
 - Settings types in `VisualTTY/` are serialized to XML: do not change their member types or names.
-- `CsiRepeatLimitTests` and `PrivateModeTableTests` read the source text of `Controls/TerminalEmulatorControl.cs`
-  (`AssemblyMetadata EmulatorSource`): update the path if that code moves.
+- `CsiRepeatLimitTests` and `PrivateModeTableTests` read the source text of `Terminal/Emulation/TerminalEmulator.cs`,
+  `TerminalModes.cs` and `Terminal/Rendering/TerminalDisplayModel.cs` (`AssemblyMetadata`); `FileDialogTests`, `FolderBrowserTests` and
+  `PasteProgressTests` read files of `GUI/DevicePanel/` and `GUI/TerminalView/`: update the paths if that code moves.
 
 ## Folder map
 
@@ -46,8 +48,10 @@ PR that changes them.
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
-| `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
+| `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` hosts the WinForms editor through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
+| `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
+| `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar and menus are still WinForms, hosted) | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
@@ -72,20 +76,16 @@ DpiAwareControl (WinForms UserControl)
          └─ TextEditorControl
             ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl
-            └─ TerminalEmulatorBase   the view of a TerminalScreen (Terminal/Emulation): forwards the cursor, the buffers, tab stops, scroll region, writing
-               └─ TerminalEmulatorControl (+ .Suggestion): VT parser (ProcessOutput), keys (ProcessCmdKey), mouse, paste
-                  ├─ SshTerminalControl      Smart Terminal command line, completion, links
-                  └─ SerialTerminalControl   line input, local echo
-DeviceTerminalControl : DpiAwareControl   COM/TCP/telnet panel (+ 13 partials: ZModem, YModem, Kermit, Tftp, GzipBase64,
-                                          Netconsole, FileSend, FileDrop, QuickScript, SerialLines, DeviceListing, LineInput);
-                                          contains a SerialTerminalControl and a HexTerminalControl
+            └─ (the WinForms terminals TerminalEmulatorBase, TerminalEmulatorControl, SshTerminalControl, SerialTerminalControl:
+                removed in stage 2, see "Done in 2E")
 HexEditorControl : Control                hex editing inside RemoteFileEditor
-HexTerminalControl : DpiAwareControl      hex view of a device stream (data and search in TextEditing/HexTerminalModel + HexStreamMap)
 ```
 
-Key coupling: the terminal is a subclass of the text editor. A terminal screen is an `EditableTextDocument` plus a
-`LineInfoStore` (one `CellStyle[]` per line) plus a `Point Cursor` (`TerminalEmulatorBase.ScreenBuffer`). Bytes typed
-or sent back to the host leave through the `DataEntered` event via `TerminalEventDispatcher.PostInput`.
+The terminals are WPF (`GUI/TerminalView/`): `WpfTerminal` (a `Border` with `TerminalPanel`: `TerminalRenderView` and a scroll bar) shows
+a `Terminal/Rendering/TerminalDisplayModel`, which holds the emulator and the screen of `Terminal/Emulation/` (a screen is an
+`EditableTextDocument` plus a `LineInfoStore`, one `CellStyle[]` per line, plus a `GridPoint` cursor); `WpfSmartTerminal`,
+`WpfSerialTerminal` and the panes of `WpfHexTerminal` are `WpfTerminal`s, and `GUI/DevicePanel/WpfDeviceTerminal` is the device tab around
+the last two. Bytes typed or sent back to the host leave through `WpfTerminal.DataEntered` via `TerminalEventDispatcher.PostInput`.
 
 ## Migration status (WinForms → WPF)
 
@@ -97,7 +97,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1A | Editor logic out of WinForms | Done in alexsys87/SmarTTY#508–#526 (A1–A7, see the "Done in A…" notes below); what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here" |
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
-| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
+| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: the device panel's tool bar and menus are WinForms (hosted, they go with stage 4) |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
@@ -155,7 +155,7 @@ Size of the controls (lines, all partials, without the designer files), before s
 
 `DeviceTerminalControl` did not shrink: its protocol partials (ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript, SerialLines) are threads, timers, dialogs and progress windows around the protocols of `IO/`, which have their own tests, and the spec says to leave a group of functions that is almost all UI as it is (the model classes of the other groups added the explicit interface members). `SshTerminalControl` keeps the command channel, the key handling and the completion popup; `SerialTerminalControl` keeps the input line, the echo, the byte mode and the keys; `TerminalEmulatorControl` the byte mode, the keys, the paste, the mouse events and the output queue; `RemoteFileEditor` the threads of a save, the questions with their icons, the hex view switching and what `FinishLoading` does to the document, the caret and the folds.
 
-Mono checks and where their logic is tested now. They drive the real controls (key and mouse events, focus, the popup, the window, a real sshd or Dropbear) and stay on Mono until stage 2; none was deleted, and the projects stay. What they check about the model is also checked on plain net8.0: `DeviceLineEditorTests` (92 steps) by `LineHistoryTests` (Up/Down, Ctrl+R), `HistorySuggestionStateTests`, `LocalCompletionItemsTests` and `LocalCompletionSessionTests` (Tab: commands, paths, directories), `DeviceListingSessionTests` and `DeviceDirectoryListingTests` (the listing), `DeviceCommandListsTests` and `DeviceLineInputTests` (saved history, command lists, secret prompts), `LocalLinkScannerTests` (links); `NetconsoleTerminalTests` (38) by `NetconsoleLineInputTests` and `NetconsoleTests` (decoder, settings, transport); `SmartTerminalIntegrationTests` (253 checks on two servers) by `HistoryWalkTests`, `SessionEnvironmentTests`, `InputRegionMapTests`, `LinePasteRunTests`, `HistorySuggestionStateTests`, `SuggestionLookupTests`, `SmartTerminalCommandLineTests`, `OutputLinkTests`; `RemoteFileEditorIntegrationTests` by `RemoteFileSessionTests`, `RemoteFileLoaderTests`, `RemoteFileSaverTests`, `RemoteFileServerTests`, `RemoteFileDraftsTests`, `SyntaxChoiceTests`; `HexEditorControlTests` (golden, 3608 steps) by `HexEditingModelTests`; `HexTerminalControlTests` (golden) by `HexTerminalModelTests`; `TerminalSnapshots` (three goldens, never re-recorded) by `TerminalEmulatorTests`, `TerminalScreenTests`, `TerminalHelpersTests`, `LineInfoStoreTests`; `ModelInteropTests` stays because it needs the real `Keys`. What only the real control can show stays there: the keys and the popup of the input lines, focus, the selection with the mouse and its survival of a resize, the status of a tab, the painting and everything about a real server.
+Mono checks and where their logic is tested now. They drive the real controls (key and mouse events, focus, the popup, the window, a real sshd or Dropbear) and stay on Mono until stage 2; none was deleted, and the projects stay (the stands of the terminals were removed with them in 2E, see there). What they check about the model is also checked on plain net8.0: `DeviceLineEditorTests` (92 steps) by `LineHistoryTests` (Up/Down, Ctrl+R), `HistorySuggestionStateTests`, `LocalCompletionItemsTests` and `LocalCompletionSessionTests` (Tab: commands, paths, directories), `DeviceListingSessionTests` and `DeviceDirectoryListingTests` (the listing), `DeviceCommandListsTests` and `DeviceLineInputTests` (saved history, command lists, secret prompts), `LocalLinkScannerTests` (links); `NetconsoleTerminalTests` (38) by `NetconsoleLineInputTests` and `NetconsoleTests` (decoder, settings, transport); `SmartTerminalIntegrationTests` (253 checks on two servers) by `HistoryWalkTests`, `SessionEnvironmentTests`, `InputRegionMapTests`, `LinePasteRunTests`, `HistorySuggestionStateTests`, `SuggestionLookupTests`, `SmartTerminalCommandLineTests`, `OutputLinkTests`; `RemoteFileEditorIntegrationTests` by `RemoteFileSessionTests`, `RemoteFileLoaderTests`, `RemoteFileSaverTests`, `RemoteFileServerTests`, `RemoteFileDraftsTests`, `SyntaxChoiceTests`; `HexEditorControlTests` (golden, 3608 steps) by `HexEditingModelTests`; `HexTerminalControlTests` (golden) by `HexTerminalModelTests`; `TerminalSnapshots` (three goldens, never re-recorded) by `TerminalEmulatorTests`, `TerminalScreenTests`, `TerminalHelpersTests`, `LineInfoStoreTests`; `ModelInteropTests` stays because it needs the real `Keys`. What only the real control can show stays there: the keys and the popup of the input lines, focus, the selection with the mouse and its survival of a resize, the status of a tab, the painting and everything about a real server.
 
 Bugs found during stage 1, kept as they were while the stage only moved code, and fixed after it (the pull request after #553): `ESC [ ; ; ; ; H` threw `IndexOutOfRangeException` in `CsiParameters.Parse` (an item past the defaults that is empty or not a number is 0 now; the state and spans goldens of `TerminalSnapshots` changed in the one case that had it); the `ToArray()` copy of `SessionEnvironment` could throw while another thread changed the list (the list is replaced as a whole now), and a variable that referred to one that was set again was worked out before it and saw nothing (the settings are replayed in the order they were made and an earlier one is dropped only when nothing between it and the next setting of the same variable refers to it, so `export B=$A-two` keeps the value `A` had then, as in a shell); Tab after the start of a built-in command offered nothing (the built-in commands and the programs are put in the list for any word of the command position now, and the popup filters them); Right and Left across the end of a wrapped row of the Smart Terminal command line cost a press that changed no index (they move by one index of the text now, and so do they in the input line of the serial terminal, which had the same fault); an escape sequence typed as text in netconsole line mode was cut, the ESC to the device and the rest into the box (a sequence goes whole now: `ESC [ ...` with its final character, `ESC O` and a character, `ESC` and a printable character; an ESC before Enter stays alone); after `Clear` the views of the hex terminal kept the positions of the old selection, and the next search started from them (both are reset, with the mirroring of the selection off; the hex terminal golden changed in the selection positions after `Clear`). Not a defect, no change: the blank typed after a word of the serial terminal starts a completion that asks for a listing of its own and takes the place of a waiting request; that request belongs to a completion session that `ShowCompletions` has closed already (its answers are dropped), and the newest request winning is the rule of the one-command-at-a-time listing. End in the serial terminal put the caret at a column of the whole line on its first row (past the right edge when the line takes several rows), so Backspaces after it did not clear the line; it goes to the index of the end of the text now (`GetCaretPositionFromInputIndex`), and `DeviceLineEditorTests` has a step for it.
 
@@ -383,6 +383,145 @@ Done in C14: first a net for the path completion of the serial terminal, which t
 
 Done in C15: first a net for the hex view of a device terminal, which no test drove: `tests/HexTerminalControlTests` (net48, Mono + xvfb) drives the real `HexTerminalControl` with scripted bytes and writes down after every step (183 lines, then 226 with the bytes) the rows of the HEX view and of the text view, the number of bytes in a row and the layout state, the match that the search selected, what both views select, the marks of the matches and `AllBytes`: the rows at 1, 4, 8 and 16 bytes in a row, bytes that come in pieces, a byte above 0x7e shown as a dot, no text view, a null buffer and counts that are 0, negative or too big, the breaks around the echo and by a pause, a layout that changes (with echo and breaks, the same number again, bytes added at another layout), the search (across rows, with and without wrap, backward, one byte on from the match, a match that does not go across a break, a match that stays selected when the layout changes) and the marks (another pattern, an empty one, more bytes, Clear). The layout is set through the maximum number of bytes in a row in a window that is wide enough, so that it does not depend on the fonts. The golden `HexTerminalControlGolden.txt` was written by the code before the move (twice, the second time with `AllBytes`, by the same code; never after the move) and gives the same lines over several runs; of 15 mutations of the old code 12 make it fail (one of them, the pause, only after the stand was changed for it: the row was full already); the other three cannot be seen from the stand (the layout made again with the same number gives the same rows, and the columns of a selection made with the mouse and the columns of the marks are not reachable through the public API) and are covered by the net8.0 tests of the model. Then the model is `TextEditing/HexTerminalModel.cs` (public): the stream (`HexStreamMap`), the chunks and the breaks (`ShouldBreak`, `AddBreak`, `AddData` with the count brought between 0 and the length of the buffer, a chunk that goes on while the kind of data is the same), `BytesPerLine`, the layout state (`BeginLayout`, `LayoutMixed`, `NeedsRelayout`, `BeginRelayout`), `FormatRows` (the rows of hex digits and of characters, the bytes in each and whether the row is full; the code of the loop of `RenderData`), the match (`SetMatch`, `ClearMatch`, `IsMatchSelected`, `GetSearchStart`) and where a byte is in the two views (`HexStartColumn`, `HexEndColumn`, `HexSelectionToText`, `TextSelectionToHex`); the control keeps the two views, the cursors, the styles, the selection, the marks, the timer of the resize and the painting, and writes the rows `FormatRows` made (the map of the bytes is made before each write, as before). The stand's accessors read `_model` now instead of the fields. `tests/HexTerminalModelTests` (net8.0, compiled like `ModelBuildTests` because `TextDocument` needs the logic folders, 82 checks) drives the model; of 45 mutations of it 41 made a check fail at once and the other four led to the cases of a non-echo chunk after a break, an invalid end of the selection in a backward search, columns that are not a multiple of three in both directions and column 0. `HexTerminalControl.cs` is 714 lines before and 580 after. The number of test projects in the first section is 132 now.
 
+### Stage 2 (WPF terminal view)
+
+Done in 2A (nothing in the tabs changed yet; the view is reached through Tools > WPF terminal lab):
+- Model, no WPF (checked by the boundary script and `ModelBuildTests`): `Terminal/Rendering/TerminalColorScheme` is the colour rule of a cell (palette, bold,
+  256/24-bit, inverse, override, severity, active link); `TerminalEmulatorBase.GetLineColorSpans` uses it too, so both views paint the same colours, and the
+  spans golden of `TerminalSnapshots` passes unchanged (a mutation of the inverse rule makes it fail). `RowRunBuilder` turns a row into background
+  rectangles and text runs (cells of one colour make one run, a blank never splits one) with a 64-bit signature; `FrameOutputQueue` is the output that
+  waits for the next frame (any thread appends, the view takes pieces without copying the backlog again); `TerminalDisplayModel` is the emulator, the
+  screen, the scroll position, the caret and the selection for a view that draws itself (it implements `ITerminalScreenView` and `ITerminalHost`; byte
+  mode and the link scanners are not there yet); `TerminalBenchmarkScripts` are the generated outputs of the lab. `Terminal/Input/XtermKeyTable` reads
+  `VisualTTY/XTermKeys.xml` with `VirtualKey` names, `TerminalKeyEncoder` decides KeyDown and TextInput: a dead key and a key of the IME are never
+  handled on key down; Ctrl+letter by the virtual key (any layout); AltGr (Ctrl with the right Alt) is left to the layout, the left Ctrl with the left Alt
+  is ESC + control character; Alt with digits of the keypad is an Alt code (its character is typed without ESC); Alt with a character is ESC + the
+  system text; Ctrl+Space/2/3..8, [ \ ] - / as in xterm; Ctrl+Backspace is BS; Shift+Insert, Ctrl+Insert, Ctrl+Shift+C/V, Shift+PageUp/Down are
+  actions of the view. A key the encoder sends for must be marked handled: WPF then does not translate it, so no TextInput follows.
+- View (`GUI/TerminalView/`): one `DrawingVisual` per row that keeps its drawing; each frame finds, by signature and text, the visuals of the last frame
+  that show the same row and moves them (scrolling moves rows, it draws none), draws only the rest and keeps at most one screen of spare visuals;
+  `GlyphRun` with the advances of the grid (a fallback font for a character the font lacks); cell size and baseline in whole device pixels (DPI from
+  the visual, again on `OnDpiChanged` and on load); output parsed in `CompositionTarget.Rendering` with a 12 ms budget, the handler attached only while
+  there is work, a 100 ms timer parsing while the window is minimized (no frames then); the caret blinks by opacity. IME: `Native/ImeCompositionWindow`
+  puts the composition and candidate windows at the caret (IMM32 calls; WPF does it only for its text boxes). The extended flag of a key is read from
+  the thread's messages before WPF raises KeyDown (`KeyScanFlags`, `ComponentDispatcher.ThreadFilterMessage`).
+- `TerminalLabWindow`: the scripts with frames/s, parse and build time, rows drawn and kept, budget hits and throughput; a mirror of a classic terminal
+  tab (its `OutputReceived` feeds the view, what is typed goes to `TerminalEmulatorControl.SendInput`; the seed is the visible text and the cursor,
+  Ctrl+L makes the program draw again); the key log; the rendering tier, `SystemParameters.IsRemoteSession`, the render mode of the process and of the
+  window and a switch to `RenderMode.SoftwareOnly` for this window.
+- Tests: `TerminalRenderModelTests` (112 checks), `TerminalKeyEncoderTests` (139, with the real key layout). Only the model runs in CI; the view is
+  compile-checked on Linux and has to be tried on Windows.
+
+Done in 2B: the classic terminal tab (a shell, or a command in a PTY of its own: Run, tail, the package manager) and the sudo prompt
+(`GUI/SudoConfirmationWindow`) are `GUI/TerminalView/WpfTerminal` (a WPF `Border` with the panel); `CreateNewTerminal` makes it for every tab that is
+not a Smart Terminal. What `TerminalEmulatorControl` did for such a tab is there or in the model: byte mode (`TerminalDisplayModel`, the code of the
+control with the screen in place of the control: the stray bytes put together, the half-crossed cell, the key counts with the prediction; the view
+repeats Left/Right/Delete/Backspace by `ByteKeyCount` and parses the waiting output before counting), the links (`OutputLinkScanner` with the same
+options, Ctrl+click and the hand cursor in the view), the colours of a log (`HighlightLogLevels`), Clear, a new session after a reconnect, the paste
+(`PasteGuard`, the upload offer, `PasteJob` in pieces with its progress window, the paste menu of Ctrl+Shift+Insert / Ctrl+Shift+V, the files of the
+clipboard, the middle button and the right button as the settings say, Esc cancels), the log file, the bell, the settings of the window (font, text
+colour, palette, copy on select, Alt+letter, Shift+PageUp, the wheel as arrows, the scroll bar mode, the minimalistic mode at the edges), the window
+shortcuts (Ctrl+W, Ctrl+Shift+T/N, the Ctrl+C/X/V interception, Alt+Enter, Ctrl+Tab), the size freeze while the window is resized
+(`SuppressTerminalResizeEvents`), the search bar (`WpfTerminal` is the `ISearchTarget`: `Terminal/Rendering/DocumentSearch`, highlights drawn by the
+view) and the context menu (the same WinForms `ContextMenuStrip`, shown at the mouse; `MainWindowController.MenuTerminal` is the terminal it was
+opened on). The window, the session and the menus see a tab's terminal as `Controls/ITerminalSurface` (the members they called; the WinForms
+`TerminalEmulatorControl` implements it in `TerminalEmulatorControl.Surface.cs` for the Smart Terminal); `NormalTabContext.Terminal` is that interface
+and `EditorControl` is null for a WPF tab. `Controls/PasteAnchor` is what a paste needs of its terminal (handle, thread, place on the screen) so that
+`PasteJob`, `PasteMenu` and the progress windows work for both. The lab lost its mirror of a classic tab (the tabs are the WPF terminal now).
+`TerminalRenderModelTests` has 148 checks (byte mode, log colours, links, Clear, new session, search, and a check of the source of
+`WpfTerminal` for the fault below). A fault found on the first run on Windows: the session reads the `Tag` of a tab's terminal on the thread of the
+channel and the window on the thread of the input dispatcher; the `Tag` of a WPF element is a dependency property that throws off the UI thread, so
+no output was shown and no key reached the shell (only the caret blinked). `WpfTerminal` hides it with `public new object Tag` on a field, the
+members of `ITerminalSurface` that other threads call are listed on the interface, the retry of a shell on a key press is posted to the UI thread,
+and a frame of the view that throws no longer stops the next ones (`TerminalFrameStats.FrameErrors`, shown in the lab). A second one: the font was not that of
+the WinForms terminal: a tab took `Settings.ConfiguredFont`, which is null when nothing is set (the WinForms terminal kept Courier New 12 points of
+its designer then, the WPF one used Consolas), and bold and italic of the settings were dropped; a tab takes `Settings.EffectiveFont` now (the
+setting or Courier New 12), `TerminalRenderView.SetFont` takes the weight and the style, and the default of the view is Courier New 16 pixels. Not ported, on purpose: the warning of
+Ctrl+Insert (it copies and sends nothing now), the timestamps margin (never shown in a classic tab).
+
+Done in 2C: the Smart Terminal tab is `GUI/TerminalView/WpfSmartTerminal` (a `WpfTerminal`); `SshTerminalControl` is no longer made by the
+application (it stays, with `SmartTerminalIntegrationTests` on Mono, until the WinForms terminals are removed). The logic of the control is moved as it
+was where it did not touch the editor: the prompt, the commands in channels of their own with the output through one queue with a 25 ms budget (now
+at the background priority of the dispatcher), cd/export/unset/exit/clear/history, the history (Up/Down with `HistoryWalk`, Ctrl+R with
+`HistorySearch`, Ctrl+Shift+R as a list, the window of the history), the grey suggestion (`HistorySuggestionState`, `SuggestionLookup`; drawn by the
+view as ghost text after the end of the line), the completion (`CompletionSession` and the WPF popup of the window, at the caret in device pixels),
+Ctrl+L/C/D/U/K/A/V/X, the paste into the command line and line by line, links by a plain click (`CommandRun.CreateScanner` through
+`TerminalDisplayModel.LinkScannerFactory`), the file list (`IFileListHost`). What the editor did is `Terminal/Rendering/PromptLine` (UI-free, in
+`TerminalRenderModelTests`): the prompt and the text at the end of the document, wrapped at the width of the screen and written again on every
+change (`TerminalDisplayModel.ReplaceDocumentTail`), the caret (`SetPromptCaret`) and the selection, Left/Right by one index and Ctrl+Left/Right by
+the words of `IsWordChar`, Home/End, Backspace/Delete with Ctrl by words, surrogate pairs whole; `BeginOutputAtEnd` starts the screen of a command
+on a new line after it. `WpfTerminal` got the hooks: `OnTerminalKey` (after the window's shortcuts), `OnTerminalText`, `OnDocumentClicked`,
+`OnGridResized`, `CancelActivePaste`, `EditsLocally` (the window leaves Ctrl+C/X/V to the prompt, as `CanEdit` did). The WinForms branches of
+`NormalTabContext` and `MainWindowController` for SSH tabs are gone (`NormalTabContext` takes a `WpfTerminal`). Not as before: Ctrl+Z (the undo of
+the editor) does nothing in the command line, a selection made with the mouse inside the command line is not replaced by typing (it is dropped and
+the text goes in at the caret), Alt+letter does nothing at the prompt (it did nothing useful before: there was no channel).
+
+Done in 2D: the device tab (COM, TCP, telnet, netconsole) is `GUI/DevicePanel/WpfDeviceTerminal` (a WPF `DockPanel`), the port of
+`DeviceTerminalControl` and its 13 partials: the partial files are copies of the old ones with the terminals replaced and the control's own
+calls (`BeginInvoke`, `Handle`, the owner of a dialog, `IsHandleCreated`) answered by `WpfDeviceTerminal.View.cs`; the static helpers
+(`GetConnectionTitle`, `CreateTransportCallback`, `TestConnection`) and the hooks that `App` sets stay those of `DeviceTerminalControl`.
+The tool bar, the netconsole bar and the context menu are the WinForms ones of the old designer (`WpfDeviceTerminal.Toolbar.cs`), the bars
+hosted in a `WindowsFormsHost` strip above and below the terminals and the menu shown as a popup: they go to WPF in stage 4 with the other
+menus. The "connection closed" prompt is the WPF `ConnectionClosedPopup` over the terminals (no `ElementHost` now). The text view is
+`GUI/TerminalView/WpfSerialTerminal` (the port of `SerialTerminalControl`: the input line, which continues the device's own prompt on its
+row through `PromptLine` with the prompt on the screen, keeping the device's colours, or follows a local prompt; the history, Ctrl+R, the
+grey suggestion, the local completion, the links of a device's text with a plain click, the raw echo, the terminal size command, the text
+the device prints while a line is typed, ESC c through `TerminalDisplayModel.StreamReset`); the HEX view is `GUI/TerminalView/WpfHexTerminal`
+(two WPF terminal panes written row by row from `HexTerminalModel`, scrolled together and mirroring their selections through
+`TerminalDisplayModel.SelectionChanged`, with the byte search, its marks, the echo colour and the layout made again after a resize). The
+TFTP window and the log replay take `Controls/IDeviceConsole` and `IDeviceReplayTarget`, which both panels implement. The old
+`DeviceTerminalControl`, `SerialTerminalControl` and `HexTerminalControl` stay, with `DeviceLineEditorTests`, `NetconsoleTerminalTests`
+and `HexTerminalControlTests` on Mono (all passing), until they are removed. `TerminalRenderModelTests` has 204 checks (the device
+prompt), `HexTerminalModelTests` 89 (the panes). Fixed in the port: the caret after a completion was put the length of the prompt too far
+to the left (`OnCompletionApplied` took it off an index of the text). Not as before: the input line has the editing keys of the Smart
+Terminal (Delete, Ctrl+Backspace, Ctrl+Left/Right, Shift selection); a selection made with the mouse inside it is not replaced by typing.
+Manual check on Windows: a COM port or a TCP device with a shell (the prompt continued, colours kept, Tab, Up/Down, Ctrl+R, the grey
+suggestion, Ctrl+C, Ctrl+L, a line longer than the screen, text printed while typing, `mc`/`vi` taking the keys, "Return to input line"),
+telnet with and without the server's echo, netconsole in line and character mode, the HEX and Text + HEX views (typing into the send box,
+a search for bytes, the marks, a resize), a file dropped on the terminal, XMODEM/ZMODEM, the log and its replay, the TFTP window, the
+paste menu, a reconnect and the prompt over the terminal.
+
+Done in 2E: the WinForms terminals are gone: `TerminalEmulatorBase`, `TerminalEmulatorControl` (with `.Screen`, `.Suggestion`, `.Surface`),
+`SshTerminalControl`, `SerialTerminalControl`, `HexTerminalControl` and `DeviceTerminalControl` with its 13 partials, and the Mono stands that
+drove them: `TerminalSnapshots`, `SmartTerminalIntegrationTests`, `DeviceLineEditorTests`, `NetconsoleTerminalTests`, `HexTerminalControlTests`.
+Before the removal the stand of `TerminalSnapshots` wrote two more goldens on the WinForms control (its `--record-model` option, twice,
+the same both times): `TerminalModelGolden.txt`, the screen state of every case without the probes of the keys and the pastes (the lines of the
+hand-written cases are exactly those of the state golden without the probe lines, checked), and `TerminalCellColorsGolden.txt`, the colour of
+every painted cell (background, and text colour and underline where they show) made from the colour spans the control painted with.
+`tests/TerminalModelSnapshots` (net8.0, in CI) runs the same cases (`Cases.cs`, copied as they were, with the same seeds) on
+`TerminalDisplayModel` and compares the state, the cells as `RowRunBuilder` paints them, and the mouse golden of B4d through
+`TerminalInputEncoder` as `TerminalRenderView` calls it; all three pass, and a mutation of the colour rule and one of erase-in-line each make
+it fail. Two things are written down instead of compared: the case "always track lines" (the display model keeps no line info for a
+line without style; the WinForms view kept one for its margins), and the mouse steps at "cell 0,0", which the old stand clicked two pixels
+into the padding left of the text, where the control reported nothing; they are given as no report. It found one difference, fixed: the
+WPF view took a wheel step of 0 as up, the WinForms terminal as down (`Delta <= 0`). The keys and the pastes the old stand probed were the
+WinForms input; the keys of the WPF view are `TerminalKeyEncoderTests`. What only the removed Mono stands checked (the keys, the popups and
+the focus of the real controls, the Smart Terminal on a real sshd and Dropbear, the input line of a device over TCP and UDP) has no stand
+now; the model logic under it is in the net8.0 tests listed in "Stage 1 result", and the WPF terminals are checked by hand (the lists above).
+Moved out of the deleted files: `BeepMode` (`VisualTTY/BeepMode.cs`; it was the nested `TerminalEmulatorControl.BeepMode`, the settings file
+holds the names of its values, which did not change), `Colorize`/`ForegroundCode`/`ResetSequence` (`Terminal/AnsiEscapeUtils`),
+`GetConnectionTitle`/`CreateTransportCallback`/`TestConnection` (`Transport/DeviceConnections`), the hooks `App` sets for the device
+windows (`WpfDeviceTerminal`; the WinForms `ConnectionPromptHostFactory` is gone), `DeviceFileDropProtocol` (`GUI/DevicePanel`), the rule of a
+relative linked path (`Terminal/Rendering/LinkedPath`, used by `WpfTerminal`). `VisualTTY/XTermKeyMap` (the key map of the WinForms terminal)
+is gone; `XtermKeyTable` reads the same `XTermKeys.xml`. `CsiRepeatLimitTests`, `PrivateModeTableTests`, `FileDialogTests`,
+`FolderBrowserTests` and `PasteProgressTests` read the WPF files now.
+
+Not in 2A–2E: the view in the other tabs (`ITabContext.EditorControl` is a `TextEditorControl` for the editor tabs), wide (East Asian) characters taking two cells (the
+screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
+slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
+
+Manual check on Windows, for every change of the view (record the numbers of the lab in the pull request): local with a GPU; the same with
+"Software rendering (this window)"; over Remote Desktop (tier 0, remote session yes); a virtual machine without 3D (Hyper-V or VirtualBox
+without acceleration); 100 %, 150 % and 200 % scaling and a window moved between monitors of different DPI. On each: the five scripts (no frame
+over about 30 ms of build time, rows kept above 90 % in the scrolling log, the window responsive during the colour flood); a classic tab with `htop`, `mc` (mouse), `vim` (application keys), `less`, a paste of 100 KB (progress window, Esc), Ctrl+click on a file
+name and an address, the search bar, Clear, a reconnect (the old screen dimmed), BusyBox `ash` without Unicode (Cyrillic letters and Backspace); a Smart Terminal tab: the prompt and typing, a line longer than the screen,
+Home/End/Ctrl+Left/Right/Shift selection, Up/Down, Ctrl+R, the grey suggestion (Right takes it, Esc hides it), Tab and the completion list (Esc,
+Enter, a directory), `cd`/`export`/`clear`/`history`/`exit`, a command that runs (`top`, `vim`, Ctrl+C), the exit code note, Ctrl+L, a paste and a
+paste line by line, the history window, a click on a file name in the output; the keys Ctrl+C, Ctrl+Left, Alt+F, Alt+Backspace, F1-F12, the keypad in
+`vim` with `:set` in application mode, Ctrl+Space; the German layout (AltGr+Q gives @, AltGr+7 gives {, ^ then e gives the e with a circumflex,
+the left Ctrl+Alt+A sends ESC ^A), the Russian layout (letters, Ctrl+C, Alt+letter), Alt+0233 on the keypad (e acute), Japanese and Chinese IME
+(the composition window at the caret, Enter that ends a composition is not sent); minimise during the colour flood and restore.
+
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20
 of the specification plus `Completion/ShellCompletionAnalyzer`, `Terminal/CommandRun`, `Terminal/OutputLinkScanner`, which
@@ -393,4 +532,5 @@ is compiled there as well, and add to the dependency list there when the model s
 
 Safety nets that stage 1 adds before moving code: terminal golden snapshots captured from the old code before any
 terminal move (`tests/TerminalSnapshots/`, never re-recorded); `tests/check-model-boundary.sh` with an allowlist that
-only shrinks. Mono tests stay until each of their checks is ported to net8.0 tests on the model.
+only shrinks. Mono tests stay until each of their checks is ported to net8.0 tests on the model (or, for the terminals, until
+the controls they drove are gone: 2E).

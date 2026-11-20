@@ -173,7 +173,7 @@ public class GlobalSettings : INotifyPropertyChanged
 
     /// <summary>
     /// Whether SSH terminal tabs work in byte mode, for a shell that edits its command line in UTF-8 bytes rather than
-    /// characters (see TerminalEmulatorControl.ByteOrientedLineEditing and SessionWrapper.UsesByteOrientedLineEditing).
+    /// characters (see TerminalDisplayModel.ByteOrientedLineEditing and SessionWrapper.UsesByteOrientedLineEditing).
     /// Used for classic tabs (<see cref="ByteOrientedLineEditing"/>) and Smart Terminal tabs
     /// (VirtualTerminalSettings.ByteOrientedLineEditing); decided when a tab opens, as its PTY depends on it.
     /// </summary>
@@ -301,7 +301,7 @@ public class GlobalSettings : INotifyPropertyChanged
 
     public string XServerArguments { get; set; } = DefaultXServerArguments;
 
-    public TerminalEmulatorControl.BeepMode BeepMode { get; set; } = TerminalEmulatorControl.BeepMode.SystemBeep;
+    public BeepMode BeepMode { get; set; } = BeepMode.SystemBeep;
 
     public string BeepFileName
     {
@@ -545,7 +545,8 @@ public class GlobalSettings : INotifyPropertyChanged
         Paste.Snippets ??= new System.Collections.Generic.List<PasteSnippet>();
         if (DefaultTextColor.Alpha == 0)
         {
-            DefaultTextColor = TerminalEmulatorControl.DefaultTextColor;
+            // The colour of text without a colour of its own, as the WinForms terminal had it.
+            DefaultTextColor = Color.LightGray;
         }
         if (Editor.LightColors == null)
         {

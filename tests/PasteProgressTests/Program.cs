@@ -98,7 +98,7 @@ internal static class Program
         Check(!Regex.IsMatch(pasteJob, @"\bPasteProgressForm\b"), "the paste job no longer builds the WinForms form");
         Check(!Regex.IsMatch(pasteJob, @"using SmarTTY\.Forms"), "the paste job no longer imports the Forms namespace");
 
-        string terminal = File.ReadAllText(Path.Combine(root, "Controls", "SshTerminalControl.cs"));
+        string terminal = File.ReadAllText(Path.Combine(root, "GUI", "TerminalView", "WpfSmartTerminal.cs"));
         Check(terminal.Contains("ThemedPasteProgress.Create"), "the line-by-line paste creates the window through the facade");
         Check(!Regex.IsMatch(terminal, @"\bPasteProgressForm\b"), "the line-by-line paste no longer builds the WinForms form");
         Check(!Regex.IsMatch(terminal, @"using SmarTTY\.Forms"), "the line-by-line paste no longer imports the Forms namespace");

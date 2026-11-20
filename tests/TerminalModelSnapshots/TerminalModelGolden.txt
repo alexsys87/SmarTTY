@@ -1,0 +1,2103 @@
+=== plain text
+size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|Hello, world|no info
+001|second line|no info
+002||no info
+clicks 
+by character: same
+=== long line wraps
+size 80x24 buffer 0 cursor 1,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+001|aaaaaaaaaaaaaaaaaaaa|no info
+002|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|wrap no cells
+003|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|wrap no cells
+004|X|no info
+clicks 
+by character: same
+=== exactly the width
+size 80x24 buffer 0 cursor 4,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc|no info
+001|next|no info
+clicks 
+by character: same
+=== auto wrap off
+size 80x24 buffer 0 cursor 15,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd|wrap no cells
+001|dddddddddddddddddddd|no info
+002|aftereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee|wrap no cells
+003|eeeeeeeeeeeeeee|no info
+clicks 
+by character: same
+=== lf without cr
+size 80x24 buffer 0 cursor 9,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abc|no info
+001|   def|no info
+002|      ghi|no info
+clicks 
+by character: same
+=== cr overwrite
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|Jello|no info
+clicks 
+by character: same
+=== backspace
+size 80x24 buffer 0 cursor 79,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|aXc                                                                           Y|no info
+clicks 
+by character: same
+=== tabs
+size 80x24 buffer 0 cursor 1,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a       b               c|no info
+001|        dxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx |wrap no cells
+002|!|no info
+clicks 
+by character: same
+=== bell
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 3 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|ab|no info
+clicks 
+by character: same
+=== control characters
+size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abc\u007fdefg|no info
+clicks 
+by character: same
+=== unicode text
+size 80x24 buffer 0 cursor 27,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|caf\u00e9 \u00fc\u00f1\u00ee \u4e2d\u6587\u5b57 \u0416\u0443\u043a \u0301e\u0301 \ud83d\ude00 end|no info
+clicks 
+by character: same
+=== wide characters wrap
+size 80x24 buffer 0 cursor 4,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u4e2d|wrap no cells
+001|\u6587|no info
+002|next|no info
+clicks 
+by character: same
+=== combining marks
+size 80x24 buffer 0 cursor 9,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|e\u0301a\u0300 o\u0302\u0323x|no info
+clicks 
+by character: same
+=== scrollback
+size 80x24 buffer 0 cursor 0,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010|line 11|no info
+011|line 12|no info
+012|line 13|no info
+013|line 14|no info
+014|line 15|no info
+015|line 16|no info
+016|line 17|no info
+017|line 18|no info
+018|line 19|no info
+019|line 20|no info
+020|line 21|no info
+021|line 22|no info
+022|line 23|no info
+023|line 24|no info
+024|line 25|no info
+025|line 26|no info
+026|line 27|no info
+027|line 28|no info
+028|line 29|no info
+029|line 30|no info
+030|line 31|no info
+031|line 32|no info
+032|line 33|no info
+033|line 34|no info
+034|line 35|no info
+035|line 36|no info
+036|line 37|no info
+037|line 38|no info
+038|line 39|no info
+039|line 40|no info
+040|line 41|no info
+041|line 42|no info
+042|line 43|no info
+043|line 44|no info
+044|line 45|no info
+045|line 46|no info
+046|line 47|no info
+047|line 48|no info
+048|line 49|no info
+049|line 50|no info
+050|line 51|no info
+051|line 52|no info
+052|line 53|no info
+053|line 54|no info
+054|line 55|no info
+055|line 56|no info
+056|line 57|no info
+057|line 58|no info
+058|line 59|no info
+059|line 60|no info
+060||no info
+clicks 
+by character: same
+=== scroll with full line
+size 80x24 buffer 0 cursor 80,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010|line 11|no info
+011|line 12|no info
+012|line 13|no info
+013|line 14|no info
+014|line 15|no info
+015|line 16|no info
+016|line 17|no info
+017|line 18|no info
+018|line 19|no info
+019|line 20|no info
+020|line 21|no info
+021|line 22|no info
+022|line 23|no info
+023|line 24|no info
+024|line 25|no info
+025|line 26|no info
+026|line 27|no info
+027|line 28|no info
+028|line 29|no info
+029|line 30|no info
+030|zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz|wrap no cells
+031|yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|no info
+032||no info
+clicks 
+by character: same
+=== cursor up down
+size 80x24 buffer 0 cursor 4,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|liTe 1|no info
+001|line 2|no info
+002|line 3|no info
+003|Uine 4|no info
+004|line 5|no info
+005||no info
+006| D|no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019||no info
+020||no info
+021||no info
+022||no info
+023|   B|no info
+clicks 
+by character: same
+=== cursor forward back
+size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|01234<67>9                                                                      |wrap no cells
+001|S|no info
+clicks 
+by character: same
+=== cursor position
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|B                  C|no info
+001|F|no info
+002||no info
+003|   E|no info
+004|         A|no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019||no info
+020||no info
+021||no info
+022||no info
+023||wrap no cells
+024|D|no info
+clicks 
+by character: same
+=== cursor column and row
+size 80x24 buffer 0 cursor 12,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1     W|no info
+001|line 2|no info
+002|line 3|no info
+003|         H                             G|no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011|          V|no info
+clicks 
+by character: same
+=== next and previous line
+size 80x24 buffer 0 cursor 1,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|Rine 3|no info
+003|Q|no info
+004||no info
+005|N|no info
+clicks 
+by character: same
+=== save and restore cursor
+size 80x24 buffer 0 cursor 8,7 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004|    Y|no info
+005||no info
+006||no info
+007|       Z|no info
+008||no info
+009|                   X|no info
+clicks 
+by character: same
+=== save restore keeps the style
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0 bold
+sent 
+threw 
+000|redin|0+3[fg2 bg0 bold] of 80
+clicks 
+by character: same
+=== tab stops
+size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a        b         c    d|no info
+001|h        e g        f|no info
+clicks 
+by character: same
+=== clear one tab stop
+size 80x24 buffer 0 cursor 17,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a       b       c|no info
+clicks 
+by character: same
+=== index and reverse index
+size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|T|no info
+001|Nine 1|no info
+002|line 2|no info
+003|line 3|no info
+004|line 4|no info
+005|line 5|no info
+006| R|no info
+007|I|no info
+clicks 
+by character: same
+=== index at bottom scrolls
+size 80x24 buffer 0 cursor 4,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019||no info
+020||no info
+021||no info
+022||no info
+023|last|no info
+024|    next|no info
+025|more|no info
+clicks 
+by character: same
+=== erase in line
+size 80x24 buffer 0 cursor 9,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xxxxxxxxxxxxxx|no info
+001|          yyyyyyyyyyyyyyyyyyyy|no info
+002|         |no info
+clicks 
+by character: same
+=== erase in display
+size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|aine 2|no info
+002|line 3|no info
+003|line 4|no info
+004|li|no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+clicks 
+by character: same
+=== erase in display to start
+size 80x24 buffer 0 cursor 2,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004|   e 5|no info
+005|line 6|no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010||no info
+clicks 
+by character: same
+=== erase whole display
+size 80x24 buffer 0 cursor 1,10 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010|x|no info
+clicks 
+by character: same
+=== erase scrollback
+size 80x24 buffer 0 cursor 1,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010|line 11|no info
+011|line 12|no info
+012|line 13|no info
+013|line 14|no info
+014|line 15|no info
+015|line 16|no info
+016|line 17|no info
+017|line 18|no info
+018|line 19|no info
+019|line 20|no info
+020|line 21|no info
+021|line 22|no info
+022|line 23|no info
+023|line 24|no info
+024|line 25|no info
+025|line 26|no info
+026|line 27|no info
+027|line 28|no info
+028|line 29|no info
+029|line 30|no info
+030|line 31|no info
+031|line 32|no info
+032|line 33|no info
+033|line 34|no info
+034|line 35|no info
+035|line 36|no info
+036|line 37|no info
+037|line 38|no info
+038|line 39|no info
+039|line 40|no info
+040|x|no info
+clicks 
+by character: same
+=== erase display styled
+size 80x24 buffer 0 cursor 2,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|0+6[fg0 bg5] of 80
+001|line 2|0+6[fg0 bg5] of 80
+002|li                                                                              |0+80[fg0 bg5] of 80
+003|                                                                                |0+80[fg0 bg5] of 80
+004|                                                                                |0+80[fg0 bg5] of 80
+005|                                                                                |0+80[fg0 bg5] of 80
+clicks 
+by character: same
+=== erase characters
+size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abcZ   hij|no info
+clicks 
+by character: same
+=== delete characters
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abfghij|no info
+clicks 
+by character: same
+=== insert characters
+size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abXY cdefghij|no info
+clicks 
+by character: same
+=== insert lines
+size 80x24 buffer 0 cursor 3,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|new|no info
+003||no info
+004|line 3|no info
+005|line 4|no info
+006|line 5|no info
+007|line 6|no info
+008|line 7|no info
+009|line 8|no info
+010||no info
+clicks 
+by character: same
+=== delete lines
+size 80x24 buffer 0 cursor 3,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|newe 5|no info
+003|line 6|no info
+004|line 7|no info
+005|line 8|no info
+006||no info
+007||no info
+008||no info
+009||no info
+clicks 
+by character: same
+=== repeat character
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|wrap no cells
+001|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|wrap no cells
+002|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|no info
+clicks 
+by character: same
+=== insert mode
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|XYZbcdef|no info
+clicks 
+by character: same
+=== delete more than the line
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019||no info
+020||no info
+021||no info
+022||no info
+023||no info
+024||no info
+clicks 
+by character: same
+=== scroll region
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|end|no info
+001||no info
+002||no info
+003||no info
+004|line 8|no info
+005|line 9|no info
+006|line 10|no info
+007|line 11|no info
+008|line 12|no info
+009||no info
+010||no info
+clicks 
+by character: same
+=== scroll region cursor home
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== scroll up and down
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000| B|no info
+001||no info
+002||no info
+003|Aine 3|no info
+004|line 4|no info
+005|line 5|no info
+006|line 6|no info
+007|line 7|no info
+008|line 8|no info
+009|line 9|no info
+010|line 10|no info
+011||no info
+012||no info
+013||no info
+014||no info
+clicks 
+by character: same
+=== scroll up in region
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 5|no info
+003|line 6|no info
+004||no info
+005||no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010||no info
+clicks 
+by character: same
+=== index in region
+size 80x24 buffer 0 cursor 2,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002| e|no info
+003|d|no info
+004|a|no info
+005||no info
+clicks 
+by character: same
+=== invalid region
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|cd|no info
+clicks 
+by character: same
+=== insert lines in region
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004||no info
+005||no info
+006|line 5|no info
+007|line 6|no info
+008|line 9|no info
+009|line 10|no info
+010|line 11|no info
+011|line 12|no info
+012||no info
+clicks 
+by character: same
+=== delete lines outside the region
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 4|no info
+002|line 5|no info
+003|line 6|no info
+004|line 7|no info
+005|line 8|no info
+006||no info
+007||no info
+008|line 9|no info
+009|line 10|no info
+010|line 11|no info
+011|line 12|no info
+012||no info
+clicks 
+by character: same
+=== sgr basic
+size 80x24 buffer 0 cursor 20,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|bold under inv plain|0+4[fg0 bg0 bold] 5+5[fg0 bg0 underline] 11+3[fg0 bg0 inverse] of 80
+clicks 
+by character: same
+=== sgr colours
+size 80x24 buffer 0 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg7 bg6
+sent 
+threw 
+000|redongreenxycyan|0+3[fg2 bg0] 3+7[fg2 bg3] 10+1[fg0 bg3] 12+4[fg7 bg6] of 80
+clicks 
+by character: same
+=== sgr bright colours
+size 80x24 buffer 0 cursor 12,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|brbgmixwhite|0+2[fg0 bg0 efgA] 2+2[fg0 bg0 efgB] 4+3[fg0 bg0 efgD ebgC] 7+5[fg0 bg0 efgD ebg10] of 80
+clicks 
+by character: same
+=== sgr 256 colours
+size 80x24 buffer 0 cursor 20,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0 efg100
+sent 
+threw 
+000|redblueblackgreyover|0+3[fg0 bg0 efgC5] 3+4[fg0 bg0 efgC5 ebg16] 7+5[fg0 bg0 efg1 ebg16] 12+4[fg0 bg0 efg100 ebgE9] 16+4[fg0 bg0 efg100] of 80
+clicks 
+by character: same
+=== sgr true colours
+size 80x24 buffer 0 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0 efg1FF0000
+sent 
+threw 
+000|orangebgshortbig|0+6[fg0 bg0 efg1FF8000] 6+7[fg0 bg0 efg1FF8000 ebg1004080] 13+3[fg0 bg0 efg1FF0000] of 80
+clicks 
+by character: same
+=== sgr colon forms
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xyz|0+1[fg0 bg0 efg64] 1+1[fg0 bg0 efg10A141E] 2+1[fg0 bg0 efg10A141E ebg1010203] of 80
+clicks 
+by character: same
+=== sgr reset forms
+size 80x24 buffer 0 cursor 14,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xplainallreset|0+1[fg2 bg0 bold] 6+3[fg2 bg3 bold inverse underline] of 80
+clicks 
+by character: same
+=== sgr unknown
+size 80x24 buffer 0 cursor 22,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|strikeblinkhiddenoverx|no info
+clicks 
+by character: same
+=== sgr bold bright
+size 80x24 buffer 0 cursor 34,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0
+sent 
+threw 
+000|bold rednormal redafter 21after 22|0+8[fg2 bg0 bold] 8+26[fg2 bg0] of 80
+clicks 
+by character: same
+=== styles survive wrapping and scrolling
+size 80x24 buffer 0 cursor 0,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 1|0+72[fg0 bg2] of 80
+001|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 2|0+72[fg0 bg2] of 80
+002|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 3|0+72[fg0 bg2] of 80
+003|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 4|0+72[fg0 bg2] of 80
+004|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 5|0+72[fg0 bg2] of 80
+005|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 6|0+72[fg0 bg2] of 80
+006|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 7|0+72[fg0 bg2] of 80
+007|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 8|0+72[fg0 bg2] of 80
+008|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 9|0+72[fg0 bg2] of 80
+009|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 10|0+73[fg0 bg2] of 80
+010|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 11|0+73[fg0 bg2] of 80
+011|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 12|0+73[fg0 bg2] of 80
+012|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 13|0+73[fg0 bg2] of 80
+013|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 14|0+73[fg0 bg2] of 80
+014|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 15|0+73[fg0 bg2] of 80
+015|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 16|0+73[fg0 bg2] of 80
+016|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 17|0+73[fg0 bg2] of 80
+017|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 18|0+73[fg0 bg2] of 80
+018|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 19|0+73[fg0 bg2] of 80
+019|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 20|0+73[fg0 bg2] of 80
+020|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 21|0+73[fg0 bg2] of 80
+021|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 22|0+73[fg0 bg2] of 80
+022|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 23|0+73[fg0 bg2] of 80
+023|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 24|0+73[fg0 bg2] of 80
+024|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 25|0+73[fg0 bg2] of 80
+025|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 26|0+73[fg0 bg2] of 80
+026|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 27|0+73[fg0 bg2] of 80
+027|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 28|0+73[fg0 bg2] of 80
+028|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 29|0+73[fg0 bg2] of 80
+029|rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr 30|0+73[fg0 bg2] of 80
+030||no info
+clicks 
+by character: same
+=== styled blank cells
+size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|                                                                                |9+71[fg0 bg5] of 80
+001|x    |no info
+clicks 
+by character: same
+=== alternate screen 1049
+size 80x24 buffer 0 cursor 4,10 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|line 7|no info
+007|line 8|no info
+008|line 9|no info
+009|line 10|no info
+010|back|no info
+clicks 
+by character: same
+=== alternate screen 47
+size 80x24 buffer 0 cursor 4,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|back|no info
+clicks 
+by character: same
+=== alternate screen 1047
+size 80x24 buffer 0 cursor 4,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|back|no info
+clicks 
+by character: same
+=== alternate screen stays on
+size 80x24 buffer 1 cursor 3,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001||no info
+002|  x|no info
+003||no info
+004||no info
+005||no info
+006|alt text|no info
+007|more|no info
+clicks 
+by character: same
+=== alternate screen twice
+size 80x24 buffer 0 cursor 1,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|line 1|no info
+001|line 2|no info
+002|line 3|no info
+003|line 4|no info
+004|line 5|no info
+005|line 6|no info
+006|c|no info
+clicks 
+by character: same
+=== alternate screen scroll
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== cursor save 1048
+size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abcy|no info
+001||no info
+002||no info
+003||no info
+004|    x|no info
+clicks 
+by character: same
+=== osc title
+size 80x24 buffer 0 cursor 4,0 title "my title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|text|no info
+clicks 
+by character: same
+=== osc title with st
+size 80x24 buffer 0 cursor 4,0 title "other" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|text|no info
+clicks 
+by character: same
+=== osc icon name
+size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|text|no info
+clicks 
+by character: same
+=== osc title with control characters
+size 80x24 buffer 0 cursor 1,0 title "abcd" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc title with semicolons
+size 80x24 buffer 0 cursor 1,0 title "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc without a command
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xyz|no info
+clicks 
+by character: same
+=== osc empty
+size 80x24 buffer 0 cursor 1,0 title "" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc unknown
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xy|no info
+clicks 
+by character: same
+=== osc directory
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/home/user/dir name"
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc directory variants
+size 80x24 buffer 0 cursor 6,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/\u00e9\u00e9"
+style fg0 bg0
+sent 
+threw 
+000|123456|no info
+clicks 
+by character: same
+=== osc directory plain
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc colours
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc clipboard
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== osc hyperlink
+size 80x24 buffer 0 cursor 10,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|link after|no info
+clicks 
+by character: same
+=== osc 133 marks
+size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|$ ls|no info
+001|out|no info
+002||no info
+clicks 
+by character: same
+=== dcs ignored
+size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|shownend|no info
+clicks 
+by character: same
+=== osc cancelled
+size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|textmore|no info
+clicks 
+by character: same
+=== osc aborted by esc
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0
+sent 
+threw 
+000|red|0+3[fg2 bg0] of 80
+clicks 
+by character: same
+=== device status report
+size 80x24 buffer 0 cursor 4,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent KeySequence:\u001b[0n KeySequence:\u001b[5;5R 
+threw 
+000||no info
+001||no info
+002||no info
+003||no info
+004|    |no info
+clicks 
+by character: same
+=== cursor position report in region
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent KeySequence:\u001b[1;1R 
+threw 
+000||no info
+clicks 
+by character: same
+=== device attributes
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent KeySequence:\u001b[?1;2c KeySequence:\u001b[?1;2c 
+threw 
+000||no info
+clicks 
+by character: same
+=== soft reset
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xy|0+1[fg2 bg0 bold] of 80
+clicks 
+by character: same
+=== full reset
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|y|no info
+clicks 
+by character: same
+=== private modes saved and restored
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== private modes restored without a save
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== private modes saved twice
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== application cursor keys
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== application keypad
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== numeric keypad
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== bracketed paste
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== bracketed paste off
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== focus reporting
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse mode 9
+size 80x24 buffer 0 cursor 0,0 title <null> mouse X10 bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse mode 1000
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse mode 1002
+size 80x24 buffer 0 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse mode 1003
+size 80x24 buffer 0 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse mode off again
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== mouse encodings
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== cursor visibility
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== origin mode
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|c|no info
+001||no info
+002||no info
+003||no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019|b|no info
+clicks 
+by character: same
+=== line feed mode
+size 80x24 buffer 0 cursor 4,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a|no info
+001| bc|no info
+002|   d|no info
+clicks 
+by character: same
+=== reverse video mode
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+by character: same
+=== unknown modes
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== multiple modes in one
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== line drawing g0
+size 80x24 buffer 0 cursor 3,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|\u250c\u2500\u2500\u2500\u2500\u2510|no info
+001|\u2502    \u2502|no info
+002|\u2514\u2500\u2500\u2500\u2500\u2518|no info
+003|lqk|no info
+clicks 
+by character: same
+=== line drawing g1 shift
+size 80x24 buffer 0 cursor 6,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|\u250c\u2500\u2510lqk|no info
+clicks 
+by character: same
+=== charset designations
+size 80x24 buffer 0 cursor 7,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abcdefg|no info
+clicks 
+by character: same
+=== charset cut short
+size 80x24 buffer 0 cursor 2,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0
+sent 
+threw 
+000||no info
+001|xy|1+1[fg2 bg0] of 80
+clicks 
+by character: same
+=== split csi
+size 80x24 buffer 0 cursor 5,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0
+sent 
+threw 
+000|    z                                                                           |0+80[fg2 bg0] of 80
+clicks 
+by character: same
+=== split osc
+size 80x24 buffer 0 cursor 2,0 title "a" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|xy|no info
+clicks 
+by character: same
+=== split charset
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|\u250c\u2500\u2510|no info
+clicks 
+by character: same
+=== esc at the end
+size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abc|no info
+clicks 
+by character: same
+=== csi cancelled by control
+size 80x24 buffer 0 cursor 9,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg3 bg0
+sent 
+threw 
+000||no info
+001|textgreex|4+5[fg3 bg0] of 80
+clicks 
+by character: same
+=== csi with intermediates
+size 80x24 buffer 0 cursor 5,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|abcde|no info
+clicks 
+by character: same
+=== csi parameter limits
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg1 bg0
+sent 
+threw 
+000|cb|0+2[fg1 bg0] of 80
+clicks 
+by character: same
+=== csi huge repeat
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+001|abaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|of 80
+002|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+003|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+004|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+005|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+006|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+007|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+008|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+009|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+010|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+011|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+012|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+013|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+014|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+015|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+016|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+017|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+018|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+019|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+020|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+021|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+022|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+023|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap no cells
+024|a|no info
+clicks 
+by character: same
+=== unterminated csi
+size 80x24 buffer 0 cursor 5,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|after|no info
+clicks 
+by character: same
+=== unterminated osc
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== lone escapes
+size 80x24 buffer 0 cursor 5,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null>
+style fg2 bg0
+sent 
+threw 
+000|after|0+5[fg2 bg0] of 80
+clicks 
+by character: same
+=== esc then letters
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+by character: same
+=== many small chunks
+size 80x24 buffer 0 cursor 5,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|hello|no info
+001|world|no info
+clicks 
+by character: same
+=== chunk longer than the limit
+size 80x24 buffer 0 cursor 0,14 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+001|--- skipped 251 bytes ---|no info
+002||no info
+003|line 30|no info
+004|line 31|no info
+005|line 32|no info
+006|line 33|no info
+007|line 34|no info
+008|line 35|no info
+009|line 36|no info
+010|line 37|no info
+011|line 38|no info
+012|line 39|no info
+013|line 40|no info
+014||no info
+clicks 
+=== unrecognised as hex
+size 80x24 buffer 0 cursor 13,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a\u005c1b\u005c2c\u005c3d\u005c4e|no info
+clicks 
+=== replies suppressed
+size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000||no info
+clicks 
+=== enter sequence
+size 80x24 buffer 0 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|x|no info
+clicks 
+=== tab width
+size 80x24 buffer 0 cursor 9,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|a   b   c|no info
+clicks 
+=== log levels
+size 80x24 buffer 0 cursor 0,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|INFO ok|of 80
+001|WARNING careful|0+15[fg0 bg0 severity2] of 80
+002|ERROR broken|0+12[fg0 bg0 severity3] of 80
+003|[ERROR] again|1+12[fg0 bg0 severity3] of 80
+004|plain|of 80
+005||no info
+clicks 
+=== links
+size 80x24 buffer 0 cursor 0,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|see https://example.com/path?x=1 and /etc/passwd:12 and C:\u005cWindows\u005cnotepad.exe(3|wrap 4+28[fg0 bg0 link:UrlLink(active)=https://example.com/path?x=1] 37+15[fg0 bg0 link:LinkCandidate(active)=/etc/passwd] 79+1[fg0 bg0 link:LinkCandidate(inactive)=3] of 80
+001|) or file.txt:4:5|16+1[fg0 bg0 link:LinkCandidate(inactive)=5] of 80
+002|https://very.long.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|wrap 0+80[fg0 bg0 link:UrlLink(active)=https://very.long.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] of 80
+003|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|0+40[fg0 bg0 link:UrlLink(active)=https://very.long.example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa] of 80
+004||no info
+clicks /etc/passwd:11::Characters
+=== links relative to the reported directory
+size 80x24 buffer 0 cursor 0,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/home/user/project"
+style fg0 bg0
+sent 
+threw 
+000|src/main.c:10:5: error: x|24+1[fg0 bg0 link:LinkCandidate(inactive)=x] of 80
+001|./run.sh:3|of 80
+002|README.md and Makefile and lib/util.h(7,2)|14+8[fg0 bg0 link:LinkCandidate(active)=Makefile] of 80
+003||no info
+clicks /home/user/project/Makefile:::Characters
+=== links relative to the fallback directory
+size 80x24 buffer 0 cursor 0,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|src/main.c:10:5: error: x|24+1[fg0 bg0 link:LinkCandidate(inactive)=x] of 80
+001|Makefile|0+8[fg0 bg0 link:LinkCandidate(active)=Makefile] of 80
+002|run.sh:3|of 80
+003|./a.out|0+7[fg0 bg0 link:LinkCandidate(inactive)=./a.out] of 80
+004|../lib/b.c:4|of 80
+005||no info
+clicks /fallback/dir/Makefile:::Characters
+=== no links on the alternate screen
+size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|https://back.example.com/ /etc/hosts:1|0+25[fg0 bg0 link:UrlLink(active)=https://back.example.com/] 26+12[fg0 bg0 link:LinkCandidate(active)=/etc/hosts] of 80
+001||no info
+clicks /etc/hosts:0::Characters
+=== no links while the mouse is taken
+size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|https://example.com/path /etc/passwd:12|no info
+001|https://back.example.com/|0+25[fg0 bg0 link:UrlLink(active)=https://back.example.com/] of 80
+002||no info
+clicks 
+=== urls only
+size 80x24 buffer 0 cursor 18,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|(https://example.com/a_(b)) <http://x.y/z>, ftp://f.g/h. s3://bucket/key git+ssh|wrap 1+26[fg0 bg0 link:UrlLink(active)=https://example.com/a_(b)] 29+12[fg0 bg0 link:UrlLink(active)=http://x.y/z] 44+12[fg0 bg0 link:UrlLink(active)=ftp://f.g/h] 57+15[fg0 bg0 link:UrlLink(inactive)=s3://bucket/key] of 80
+001|://host/x https://|0+9[fg0 bg0 link:UrlLink(inactive)=git+ssh://host/x] 10+8[fg0 bg0 link:UrlLink(inactive)=https://] of 80
+clicks 
+=== files only
+size 80x24 buffer 0 cursor 0,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|/usr/bin/env: bad|14+3[fg0 bg0 link:LinkCandidate(inactive)=bad] of 80
+001|bash: /tmp: Is a directory|17+9[fg0 bg0 link:LinkCandidate(inactive)=directory] of 80
+002|/etc/passwd:3 a.cpp:12:3 b.py:1 c.txt(4) d.rs:5:6|0+14[fg0 bg0 link:LinkCandidate(active)=/etc/passwd] 48+1[fg0 bg0 link:LinkCandidate(inactive)=6] of 80
+003||no info
+clicks /etc/passwd:2::Characters
+=== links off
+size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|see https://example.com/path and /etc/passwd:12|no info
+001||no info
+clicks 
+=== always track lines
+size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|plain|of 80
+001|red|0+3[fg2 bg0] of 80
+002||no info
+clicks 
+=== typed text goes to the host
+size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|$ |no info
+clicks 
+=== full screen program
+size 80x24 buffer 1 cursor 13,23 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|  Title bar                                                                    |0+79[fg0 bg0 inverse] of 80
+001|~|no info
+002|~|no info
+003||no info
+004||no info
+005||no info
+006||no info
+007||no info
+008||no info
+009||no info
+010||no info
+011||no info
+012||no info
+013||no info
+014||no info
+015||no info
+016||no info
+017||no info
+018||no info
+019||no info
+020||no info
+021||no info
+022||no info
+023|-- INSERT -- |0+12[fg8 bg2 bold] of 80
+clicks 
+=== colourful ls and prompt
+size 80x24 buffer 0 cursor 17,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|user@host:~/dir$ ls --color|0+9[fg3 bg0 bold] 10+5[fg5 bg0 bold] of 80
+001|dir  run.sh  file.tar.gz  plain.txt|0+3[fg5 bg0 bold] 5+6[fg3 bg0 bold] 13+11[fg2 bg0] of 80
+002|user@host:~/dir$ |0+9[fg3 bg0 bold] 10+5[fg5 bg0 bold] of 80
+clicks 
+=== progress bar redraw
+size 80x24 buffer 0 cursor 6,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null>
+style fg0 bg0
+sent 
+threw 
+000|[======] 100%|no info
+001|    up|no info
+002|next|no info
+clicks 
+random 1/0 size 80x24 buffer 0 cursor 0,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 c4f1e14839c91d87481e12337d5bd7da0b05270d
+random 1/1 size 80x24 buffer 0 cursor 23,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 6 45d4633339862b8a8ccf4cb198a15e91d17083ad
+random 1/2 size 80x24 buffer 0 cursor 17,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 732693669e7a83524b72f782d06b1e3b1bc46674
+random 1/3 size 80x24 buffer 0 cursor 18,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 79fbfa847e346421442512e70dcb01292a00365b
+random 1/4 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 7bec11308a6175300d8a4dee00c4cb3d00514ff7
+random 1/5 size 80x24 buffer 0 cursor 8,4 title "other title" mouse Off bells 0 titleEvents 4 sizeEvents 0 directory <null> lines 6 267241f054e0feae2c372e8a5f4c7d458c12f1c7
+random 1/6 size 80x24 buffer 0 cursor 25,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 fb87875e030cc5c0c9a6cf805b20a43cc05028e3
+random 1/7 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 70e66867321d61004c465e9009438f467be0cdc7
+random 1/8 size 80x24 buffer 1 cursor 19,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 3 99401f2b3934a457180fa76746f2f1256cb58cb4
+random 1/9 size 80x24 buffer 0 cursor 35,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 9 a034f710e882c433f9369a65b335025201212cde
+random 1/10 size 80x24 buffer 1 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 fa0e86286d093e86ed108379968929a12fd0d30b
+random 1/11 size 80x24 buffer 1 cursor 80,23 title <null> mouse Normal bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 25 3e3dd08220733b769e2e7f651e8dae4f1ae8453f
+random 1/12 size 80x24 buffer 0 cursor 0,0 title "ab" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 12 c76ceae5e686d5bf4c70f88355016436a6e4efeb
+random 1/13 size 80x24 buffer 1 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 6cef5ca03a4b30aa66da77395851eb7d94673ba3
+random 1/14 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 1 2c21c9644ca1a827545d0e4088f511b8607fd13d
+random 1/15 size 80x24 buffer 1 cursor 0,11 title "other title" mouse Normal bells 1 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 12 3e9266a638002914c3ab16e2526a36bca3ee96a0
+random 1/16 size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 d50734a17e59a71ce01ca681f45a1bdc520ff996
+random 1/17 size 80x24 buffer 1 cursor 55,11 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 13 09129c8db1dabab4ee3fec624ef6b1721c1558d8
+random 1/18 size 80x24 buffer 0 cursor 39,11 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 12 c09ac833367180df16a0e536468fad732e14e726
+random 1/19 size 80x24 buffer 1 cursor 11,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 e2c352f152d0e56a2aa248cb874acc14db3aec11
+random 1/20 size 80x24 buffer 1 cursor 20,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 f48ea6cd035092aa4a27cbb0f136c5b7dbc8636d
+random 1/21 size 80x24 buffer 0 cursor 0,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 4 973330aef71b6c820eb68dc5335400da94713ad0
+random 1/22 size 80x24 buffer 0 cursor 30,0 title "other title" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 1caca19989c5dc6a1239045c168e77c38d27c5ad
+random 1/23 size 80x24 buffer 0 cursor 5,4 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 6 53686a7871fda47ca834ab63e66d946d8c2dbf25
+random 1/24 size 80x24 buffer 0 cursor 0,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 24 36478ca197b782ed926d3c528b58070188603ebf
+random 1/25 size 80x24 buffer 0 cursor 27,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 173bd141c9e48e5f49d5f1fb325c62546acb8787
+random 1/26 size 80x24 buffer 0 cursor 39,11 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 641533b791a91500f97f92f603d14350dd3683eb
+random 1/27 size 80x24 buffer 1 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 6 09c873b346e5eef3af43cf82a255819f3ba2f691
+random 1/28 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 66d94f671da8df9999d9ab5c2a677a064423760c
+random 1/29 size 80x24 buffer 0 cursor 2,2 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 12 8a7bb83d58a56917b2f639db9475d536d4c35ade
+random 1/30 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 7 ec69b9c54dd45f49fad1718afb012f89c41f4b70
+random 1/31 size 80x24 buffer 1 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 aa6980b18f6259bc1ae75583bf7f6aa4c6644d19
+random 1/32 size 80x24 buffer 0 cursor 10,6 title "other title" mouse ButtonEvent bells 1 titleEvents 1 sizeEvents 0 directory "/p q" lines 8 ce8f38b5c28dabd7ac43ad0bf1ec7acb7f661112
+random 1/33 size 80x24 buffer 1 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 2 26188d728dc8d40c81c4f4bf01796de1abe058a4
+random 1/34 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 8e122f8558fe9749bb36838ad91bbe4d1049816a
+random 1/35 size 80x24 buffer 1 cursor 40,11 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 12 7344ba1ab91f23b987353e30164e579007d40e2d
+random 1/36 size 80x24 buffer 1 cursor 40,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 6 1cfa4d3ccd1dd8aea305693bcfc408a67c8bebaa
+random 1/37 size 80x24 buffer 0 cursor 34,0 title "other title" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 17 b1c970b2a1f4fd000c438f2106daf70f69886559
+random 1/38 size 80x24 buffer 0 cursor 7,3 title "ab" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 15 d8097b81d9f905b12dd01e5a3997775a6b8b2693
+random 1/39 size 80x24 buffer 1 cursor 0,6 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 468ad17f98bfeb987171c84a6ad91a4e8bd724e1
+random 1/40 size 80x24 buffer 0 cursor 25,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 ff359003027baccd974d7d2818c9578c9d781b3d
+random 1/41 size 80x24 buffer 1 cursor 0,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 b11f4d0b02ad71b2a57f6b1c9e1e27fed0dacc26
+random 1/42 size 80x24 buffer 0 cursor 40,11 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 12 b90a85954b00dd61a9ec44071ed18cfeb0c2ce57
+random 1/43 size 80x24 buffer 0 cursor 17,1 title "title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 2 021dd6bba277650660ad2d6e8d50e20ae3b44945
+random 1/44 size 80x24 buffer 0 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 958303dd86a47320f6dd052ae6da9ee8bc64146a
+random 1/45 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 55fd98b7d1c00f3e3c02775331eee6df0789bb82
+random 1/46 size 80x24 buffer 0 cursor 17,4 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 cc4037af125b8cb6327454ffcdc50964555843b0
+random 1/47 size 80x24 buffer 1 cursor 5,4 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 8 ecef1111a8260febabc2c1348ea73cd53992eab9
+random 1/48 size 80x24 buffer 0 cursor 1,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 15 fd4c8036085f6e06cc1c96491d46b5b16b0278cc
+random 1/49 size 80x24 buffer 1 cursor 9,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 2 530e47d66e5d03b217fc261d9fd2c410a28dc999
+random 1/50 size 80x24 buffer 0 cursor 80,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 25 7292cb221794d8a0013327e67b14c2d4aad3f4fd
+random 1/51 size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 60c3669a26cab515887da03c7bcddcfb6b4212a1
+random 1/52 size 80x24 buffer 1 cursor 24,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 5b81e22b89db1f43c738d15b93b3453f48c57cac
+random 1/53 size 80x24 buffer 0 cursor 0,4 title "other title" mouse Normal bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 5 13109358f408330359625846c071efd3f1852abd
+random 1/54 size 80x24 buffer 0 cursor 19,9 title "title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 24 a714915e0d9a54280a5c5bca063c70ebfa5fc8ee
+random 1/55 size 80x24 buffer 0 cursor 19,1 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 2 163b7a6a89b92e83af62a0e1b390c6288819cfd1
+random 1/56 size 80x24 buffer 1 cursor 29,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 2 5a36ac4010885efd6fad7f2b637ec03c937cb3f8
+random 1/57 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 3d1f8e93e1e20a9c4ce8a956ad1427febaf8a7c4
+random 1/58 size 80x24 buffer 0 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 6db82515ab08b9c577db94e95acb486980f8127b
+random 1/59 size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 2 8c4224b314358294305cc06de038fc45b07c6ab2
+random 2/0 size 80x24 buffer 0 cursor 4,3 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 14 a138ee519dc94693c1c13f5ed0f4d4951f1bf8c9
+random 2/1 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 ee12607d3823fa3af3262913d0de3c751be9882f
+random 2/2 size 80x24 buffer 1 cursor 19,0 title "ab" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory "/p q" lines 1 03ecfa9464073d42c804022c8b772edeedbc7e93
+random 2/3 size 80x24 buffer 0 cursor 0,5 title "other title" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 8 8a45ac5bc5a6194ba074edbe27a096091d2cd147
+random 2/4 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 1b177ac896d935d67c6b2b7cbdb1b0d159674046
+random 2/5 size 80x24 buffer 0 cursor 5,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 d060d309c402785fa172f3f7c2861d53322fff88
+random 2/6 size 80x24 buffer 1 cursor 1,1 title "title" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory "/p q" lines 12 af2c0e01a58bce11d8d209631057d32c59205bd0
+random 2/7 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 e9d029746dc4ea7207b787571244a8b7a3669f91
+random 2/8 size 80x24 buffer 1 cursor 5,5 title "other title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 6 d61fac307291fa96d54fac2e70182909c37da99c
+random 2/9 size 80x24 buffer 0 cursor 78,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 1 4c436b4f8de08a240d05c1df8105b9c991517bd4
+random 2/10 size 80x24 buffer 1 cursor 5,4 title "ab" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 25 ca16f17078049dbfaf7136d3261665613ff2104f
+random 2/11 size 80x24 buffer 0 cursor 26,7 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 8 7203193ffbc41b24113e0e076b896d4a9881a0c0
+random 2/12 size 80x24 buffer 0 cursor 0,1 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 7 1f20f101fca6829e205e4dd75572eb3015e2ac77
+random 2/13 size 80x24 buffer 0 cursor 2,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 4 022b9de68a6aac1c01342697d9d205942aa3ea4b
+random 2/14 size 80x24 buffer 0 cursor 18,23 title "title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 26 484c2f137ae80ab6f072fb8273cf82b343b576d5
+random 2/15 size 80x24 buffer 0 cursor 8,0 title <null> mouse AnyEvent bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 24 1e767ee30c026e286e94d06a699980b768cb183e
+random 2/16 size 80x24 buffer 1 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 1 4f3665e80d2e2e8c4bb643ce3f647cbcf2461a4d
+random 2/17 size 80x24 buffer 1 cursor 0,12 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 13 3123e69bebb0b7b35a0e30e1a688df0f6c534711
+random 2/18 size 80x24 buffer 1 cursor 0,0 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 2 915e287f0426d3380b8b68332dff246c3feb90e8
+random 2/19 size 80x24 buffer 0 cursor 8,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 1cd071cf80e4963b13c7286836e5b1e334938757
+random 2/20 size 80x24 buffer 1 cursor 39,11 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 13 582a277423201e55875fbb99effa26d898aef39b
+random 2/21 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 a99650c5902e7f675639ff04d3986b8eb959815f
+random 2/22 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 1 c95272842b8b377bc548a55b74b1e622ca06d4b6
+random 2/23 size 80x24 buffer 1 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 0670403cd3a89eb3184684c4b248bbf7c457dd3f
+random 2/24 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 e5ae47517e1b38a03c2180dcc205d0b6e5729246
+random 2/25 size 80x24 buffer 0 cursor 39,11 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 12 aa8dd03ee711301cb81490fb583ee7f2a78b7225
+random 2/26 size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 9d759ca00d00abafed76678e6ccd3cc194f44b33
+random 2/27 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 5 df33f568b14729687eb9e52b645483f837b4dbbe
+random 2/28 size 80x24 buffer 1 cursor 18,5 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 6 699b557d586cae5b947d16e72e0bf10951fecb99
+random 2/29 size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 1 fc99d0003a31c663c4cf962f376cb791467b461d
+random 2/30 size 80x24 buffer 1 cursor 0,2 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 14 1ebeeab29aea8af11ec9f43ee92852ab22b8f28c
+random 2/31 size 80x24 buffer 0 cursor 54,0 title "ab" mouse Off bells 0 titleEvents 4 sizeEvents 0 directory <null> lines 8 43edab8d165262502fe17b839bacf1acabdff0d4
+random 2/32 size 80x24 buffer 1 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 9401ff48668a4ae87fedf640d1501d2c4025bc09
+random 2/33 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 14 b0998b42a8639faab4e415c5274e64ec471e258c
+random 2/34 size 80x24 buffer 1 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 2 2505cb87eccd004ec633833ddab004261f266ddb
+random 2/35 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 31cce7a23c090ddb89d5ff6d61dc19a41eaba4b0
+random 2/36 size 80x24 buffer 1 cursor 80,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 13 00caee2314af511764021af34c1dde9099267506
+random 2/37 size 80x24 buffer 1 cursor 21,4 title "ab" mouse AnyEvent bells 1 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 5 b7702c04aa10962d3d93e98b70c0b18de31562c3
+random 2/38 size 80x24 buffer 0 cursor 0,3 title "ab" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 4 83bb7c57a56a5b65edf62592e10f4d64d96eb60a
+random 2/39 size 80x24 buffer 1 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 1 9ada75e259bf1740d717415b4906f59240806385
+random 2/40 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 8da09c2264acac9f184d4c73fc63bcd0e81958fe
+random 2/41 size 80x24 buffer 1 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 24 dfcc1a85a64c4c41df90d531889f87f659266ae1
+random 2/42 size 80x24 buffer 0 cursor 38,11 title "ab" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 15 cb644bfa503629ec25725f5068edbe287412eee1
+random 2/43 size 80x24 buffer 0 cursor 0,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 2 eb19fe37580635866bfebf9a1029ca3f31fb8a6a
+random 2/44 size 80x24 buffer 0 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 3e70f4d310f76679fb9eddaec7be23f45b7037a7
+random 2/45 size 80x24 buffer 0 cursor 0,0 title "other title" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 1 70725b510b4e9cdcd81a90fcd3426f0b38c64216
+random 2/46 size 80x24 buffer 0 cursor 0,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 4 cc3e56fb7afd41359b408b803d30074b1265d332
+random 2/47 size 80x24 buffer 0 cursor 22,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 1 6e84855b6e0ceb4fc7ce98e18d6d44d83957d413
+random 2/48 size 80x24 buffer 0 cursor 19,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 11 033b6b2036c313afa17824a6a099c102bb9ea0bf
+random 2/49 size 80x24 buffer 0 cursor 22,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 6 3324b621a93c2183b57bd25b2a289ab90de3edfe
+random 2/50 size 80x24 buffer 1 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 6fae67babd2e052fe7319d92fb97d239e2c63b3b
+random 2/51 size 80x24 buffer 0 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 14 9f731329e0cd159e02624a7e1c3888a82ab3e391
+random 2/52 size 80x24 buffer 0 cursor 8,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 6 869387f4988506a1d118caac9adc5527742a6bed
+random 2/53 size 80x24 buffer 1 cursor 7,2 title "title" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory <null> lines 3 1de9bf9cba660235e6aa3a7c3dee20630bc1960c
+random 2/54 size 80x24 buffer 0 cursor 24,2 title "title" mouse AnyEvent bells 0 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 3 731fc49d1a4bdc543eab2a7da739bef0b5c0398e
+random 2/55 size 80x24 buffer 0 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 25 ecab90f98c777d827b5f2425f86b9e9ef81192c9
+random 2/56 size 80x24 buffer 0 cursor 7,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 4 a1b395ac7582f9db9bb7e19a60cb5e808f02ef46
+random 2/57 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 a2f11ceb066a0873a5329ab214ce59f4799bc4ce
+random 2/58 size 80x24 buffer 0 cursor 30,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 8f3ee873d199c9d423966ac5f8c519a2909ec69b
+random 2/59 size 80x24 buffer 1 cursor 1,1 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 03843b8115d9248d91b9fbfc2664a10cf1eb8b55
+random 3/0 size 80x24 buffer 0 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 7db1cb33cd616b6fde46894dcb3e68f974cac2bd
+random 3/1 size 80x24 buffer 0 cursor 26,1 title <null> mouse ButtonEvent bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 3 c099ce2618232bae94f0b750df3545796b53920f
+random 3/2 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 442cccf1b89cde14fac52074e8cc2d64742e0f28
+random 3/3 size 80x24 buffer 0 cursor 0,1 title "title" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 5ab63c21b59a6580c9bf1346a896761a20c72171
+random 3/4 size 80x24 buffer 0 cursor 2,4 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 8 7bfb9038dd385d7230116e067d4ed878308afd89
+random 3/5 size 80x24 buffer 0 cursor 0,0 title "title" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 7 dfbd66050ede60b81ebd7b2592d07f232bacfdb9
+random 3/6 size 80x24 buffer 0 cursor 8,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 e146f6d96794c2a3de7ced6be6445478af0f3dfd
+random 3/7 size 80x24 buffer 0 cursor 7,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 24 982a420ab8e24209e4424651f8aa368123ca9a8a
+random 3/8 size 80x24 buffer 0 cursor 16,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 b176a62c5f2bcc5fa1af3474c718a42355490c84
+random 3/9 size 80x24 buffer 0 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 1 b8d387db553b2e26d72c5919896bc61d82f120b8
+random 3/10 size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 6 bf2db66a6de0ac38f0f34c5334e0632475c5b316
+random 3/11 size 80x24 buffer 1 cursor 0,6 title "title" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory "/p q" lines 25 5207dc5ca870e12a70c3a5d46075d63adf9de494
+random 3/12 size 80x24 buffer 0 cursor 7,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 10 bde185cd6c20610eb14f53066d839a5fc5a452e8
+random 3/13 size 80x24 buffer 1 cursor 19,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 5d1c5de919a75586a75d9073aeddd858aa61bd0b
+random 3/14 size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 3 16bcfb238fe38953f759d83a42fc4f39b5c77ba6
+random 3/15 size 80x24 buffer 0 cursor 39,11 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 12 44fc3ad2e2a42d0840fd2eb3c53e4899d1e7e2f6
+random 3/16 size 80x24 buffer 0 cursor 39,11 title <null> mouse Normal bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 12 1f516ade9af4a14a4e2ba27964e0ade7241c2a16
+random 3/17 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 5 38a090b8ef71325da6c659f1075846dedeb06860
+random 3/18 size 80x24 buffer 0 cursor 39,12 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 13 e1ac268a70a5676f8bdb5791f515423b037e2f00
+random 3/19 size 80x24 buffer 0 cursor 53,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 807e914926147c991a297b7caa70330e5e6e9e31
+random 3/20 size 80x24 buffer 1 cursor 2,1 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 24af3f51ec89cc9fd4275a4e3ffd7de6f61cfc2c
+random 3/21 size 80x24 buffer 0 cursor 19,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 5a4f22dcc659871cab9364c656bfd1f386d81c79
+random 3/22 size 80x24 buffer 0 cursor 42,0 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 39f628b48af2c8729dcfacfb36971fa6bc780d42
+random 3/23 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 691a284a159286540e03d54811e0fa9b9c4713ea
+random 3/24 size 80x24 buffer 0 cursor 5,4 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 25 fbeebdc6abf3861eeec2ae2f5bedaf26a701c75d
+random 3/25 size 80x24 buffer 0 cursor 0,5 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 7 d90bb00e074944deeeee2bbba09c77255f7c1c99
+random 3/26 size 80x24 buffer 0 cursor 34,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 8 0eaf4adcb2c357ee4672cde45a6385e53bf3cb93
+random 3/27 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 9d835dc6d4494efa4e93ae9049b1372e8b83f114
+random 3/28 size 80x24 buffer 0 cursor 41,11 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 62391112094b7ff564c937795b921572bce649e8
+random 3/29 size 80x24 buffer 1 cursor 26,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 006a72db6b30a194d966a600a6c33eb29a83615b
+random 3/30 size 80x24 buffer 0 cursor 79,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 392fd09727d0141f412a36293170b28634a16a33
+random 3/31 size 80x24 buffer 1 cursor 20,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 fbfad85b62585ff6efd166035c28867ba12106f3
+random 3/32 size 80x24 buffer 0 cursor 0,5 title "other title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 6 d22494f0dfd85c3f6cb5ecb10b65b98fa7287852
+random 3/33 size 80x24 buffer 1 cursor 80,23 title "ab" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 25 db079cd1280b08b162ab5b6b33e5aea54ba0fecf
+random 3/34 size 80x24 buffer 0 cursor 17,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 28b9c7bcaaf1659f453d900ea96874cae293c203
+random 3/35 size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 d280659ec567b8d0fb27f899c639f4e36494b1f1
+random 3/36 size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 b5ed2251f51172f71fe1b87dbc9e347a1f95b527
+random 3/37 size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 39611da308ce0be903e3612b667b35e1dcfd3267
+random 3/38 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 2 3fb3a1ee44a165106e2c9f571f4a561f8e4bb624
+random 3/39 size 80x24 buffer 0 cursor 0,8 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 9 290c3ee2b8ed3ed308f6cd0899c6e20b8e0ec483
+random 3/40 size 80x24 buffer 1 cursor 24,3 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 c2972d6a5f369d3f6e8561c31b6d13214d0d16c1
+random 3/41 size 80x24 buffer 0 cursor 0,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 321f8a5f3bd4a3cf375d779fd964f48109356eac
+random 3/42 size 80x24 buffer 1 cursor 2,0 title "title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 5 486673c0d1eb0a0f6ee4bc779c6764f85bd9e2c2
+random 3/43 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 ee12607d3823fa3af3262913d0de3c751be9882f
+random 3/44 size 80x24 buffer 1 cursor 2,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 0f2b90ec6850987cb4c8b2afc352b629cc50977f
+random 3/45 size 80x24 buffer 1 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 d11348211135fda0ffc1652cf97b29e41635cd9b
+random 3/46 size 80x24 buffer 0 cursor 5,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 19 fd10c2e693514d9b5490d2507cd87c6c37977713
+random 3/47 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 1 29dc1dd7cc9a79140e450ef250a5e43e333ae985
+random 3/48 size 80x24 buffer 1 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 508cb99b79b469ee20412186c2568e9518cc10aa
+random 3/49 size 80x24 buffer 0 cursor 56,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 2 1241d18f6ee76c1813949291752646ab95be3eef
+random 3/50 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 dffec5ba2cd40d577f152f1ea3dbeff1ccd60a75
+random 3/51 size 80x24 buffer 1 cursor 0,3 title "ab" mouse Normal bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 13 a0d538a294b394b10cccbe375219f2085369b03f
+random 3/52 size 80x24 buffer 1 cursor 31,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 e3371c7d3a61e8e09891716d09284b048dae9eb3
+random 3/53 size 80x24 buffer 1 cursor 0,0 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 1 941c47c111ccdfd7102a2ce664fb51a67f4ae368
+random 3/54 size 80x24 buffer 0 cursor 0,1 title "other title" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 356dfb0bbddd17096d090a905adbb34f107f91a4
+random 3/55 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 fa77e654f4a6a9a612dbad52800f5f554a66dd3e
+random 3/56 size 80x24 buffer 0 cursor 40,1 title <null> mouse ButtonEvent bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 2 024151a55718821b25ca2c819076972fcf62deb2
+random 3/57 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 9 bafe7f0bf0584374b603d5a8ee401ffe0135a82b
+random 3/58 size 80x24 buffer 0 cursor 7,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 c1f5d2cf6eaa33dcf1630037522c36bb1dcf2bf0
+random 3/59 size 80x24 buffer 1 cursor 0,0 title "other title" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 1 f831bc3afe5aefac5216a2896265edaaa0cacd52
+random 4/0 size 80x24 buffer 0 cursor 3,2 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 8 22aaa30c7db15dc7baf2c964cf192b0a5e35e939
+random 4/1 size 80x24 buffer 0 cursor 17,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 7 f1dadd6fb23a8d916a7b04249e4e98a327336e1e
+random 4/2 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 1 71a373e1a094246be9dc9d632ce77dc761fd5a65
+random 4/3 size 80x24 buffer 1 cursor 79,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 4 a88ee3060ea4846129b4cb155afbb57353e6987a
+random 4/4 size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 ce0cfd89e2f0925fc375eb34b4b423677d39102d
+random 4/5 size 80x24 buffer 0 cursor 0,3 title <null> mouse Normal bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 7 501fb46791c1c83852f4840969477f4f60fe819a
+random 4/6 size 80x24 buffer 0 cursor 8,0 title "ab" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 11 7636cb6ab9d85e55a144cc92cf854466e5ca6b44
+random 4/7 size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 83bbc73e20a244c3e783a592a92d3337c56ae5a0
+random 4/8 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 7 d142b0f2aba3a95dea848f111039f01125e87c61
+random 4/9 size 80x24 buffer 0 cursor 0,12 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 14 71d71b4c177b648d4ebd90ba741419bd0626da60
+random 4/10 size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 5 9c07e66ed4514b68d5306fb020e9c7a3c218b6c6
+random 4/11 size 80x24 buffer 0 cursor 5,4 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 25 3a562de2dc57b3945911fe419e71164190076e8d
+random 4/12 size 80x24 buffer 1 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 3 6a2740bb2f4c6250b79ff4a7d2c91f23eb6b1d96
+random 4/13 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 4 4de862edfb91f0f2b37fbb877a087289990e2f7b
+random 4/14 size 80x24 buffer 1 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 0d253bea87d0e591ea1225c3796ce8c6e2f18907
+random 4/15 size 80x24 buffer 0 cursor 19,3 title <null> mouse AnyEvent bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 5 2f26323afb32a6f78be77c7d4233f7e4e6a9d6d0
+random 4/16 size 80x24 buffer 0 cursor 30,4 title "title" mouse Normal bells 1 titleEvents 2 sizeEvents 0 directory "/p q" lines 5 4935587a080de1cb282b0efee41fbc6a4f47ead5
+random 4/17 size 80x24 buffer 0 cursor 0,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 3 e0b98b7c619b26e02bb87be8f7f6a9d658d7c960
+random 4/18 size 80x24 buffer 0 cursor 6,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 6c1d0519c6ee9a041d860a142b1b9c0ee01147f5
+random 4/19 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 01fc63d07e05a312e51d38291530251b65e133fd
+random 4/20 size 80x24 buffer 0 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 5a6271883b2bffe08b2374b266febe439de6c583
+random 4/21 size 80x24 buffer 1 cursor 49,0 title "ab" mouse Normal bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 25 0e74854f82eaa97835b8582b2823d680465e214e
+random 4/22 size 80x24 buffer 0 cursor 0,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 8 b179e448ace49a1bbd4f1928f7c88f8427c7ad03
+random 4/23 size 80x24 buffer 0 cursor 0,2 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 c02a310ea38778517a306736595a55a527ccceb9
+random 4/24 size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 8 e0afd161c185f01395d4ff133eec325c5208659d
+random 4/25 size 80x24 buffer 1 cursor 0,5 title <null> mouse AnyEvent bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 6 5896be12983b91426d6e04ff63ab4a00b6214cd2
+random 4/26 size 80x24 buffer 0 cursor 22,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 300a7da41bde4dfbe887168b485ae8552f73b505
+random 4/27 size 80x24 buffer 0 cursor 80,23 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 25 f56225bdc1ba775bb27abda95a013fdc1c920e61
+random 4/28 size 80x24 buffer 0 cursor 22,23 title "ab" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 25 c98c222dc088fa14e6d701f92d8283399855f549
+random 4/29 size 80x24 buffer 1 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 1 d1a54c519af7c971f0a32885f87e3cbc3e075b02
+random 4/30 size 80x24 buffer 0 cursor 22,0 title "other title" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 2 4651cfcbc772618f4a9259306b2eac7648445b29
+random 4/31 size 80x24 buffer 0 cursor 22,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 1 ff599844ecd4cc3161ce5d5526c492510ba2988d
+random 4/32 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 a7aaf881ff7f73d7200bf67f73114c2e032092b6
+random 4/33 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Normal bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 2 10d4156e8b0d47005735201e2fa5254bb981ec5c
+random 4/34 size 80x24 buffer 0 cursor 0,2 title <null> mouse ButtonEvent bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 25 6adffcdb249903d68ac3effe6c08a958b39cfb24
+random 4/35 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 3 titleEvents 0 sizeEvents 0 directory <null> lines 2 008f084f18477c62b65319bf682605f708948224
+random 4/36 size 80x24 buffer 0 cursor 80,23 title "title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 25 2cf4a9f525e60a50b2e04accd4e3c9cd1acebebc
+random 4/37 size 80x24 buffer 0 cursor 33,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 861fd21198471e3d79ed30ae9b84faa9227a19fb
+random 4/38 size 80x24 buffer 1 cursor 39,11 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 12 0a90f4a36b803828a0e59f6cbfe3a7ccc383064c
+random 4/39 size 80x24 buffer 0 cursor 1,1 title <null> mouse Normal bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 2 3c5ac8451b914037393cea4375798517fc2dc945
+random 4/40 size 80x24 buffer 1 cursor 0,0 title "title" mouse AnyEvent bells 2 titleEvents 2 sizeEvents 0 directory <null> lines 1 8daba6c3209b588ac05706ff16e30ed43af906b5
+random 4/41 size 80x24 buffer 0 cursor 57,11 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 12 6bbf2fc9954d77db366525003d63183b67f00952
+random 4/42 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 83f015fd87b8eeb7d00f8e2b18e78618628d44be
+random 4/43 size 80x24 buffer 1 cursor 80,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 f4f18cc900ab9af4b90e966d3ea8d0efc3e52ce2
+random 4/44 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 4 7af16c7bc6f3cdf8352ef43acb33dd6006766b0e
+random 4/45 size 80x24 buffer 0 cursor 35,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 1 f907618be5d320782415ecbf2c5966c7fb0fcfab
+random 4/46 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 0ce139911c91884f71c08623bf1f205cbc615558
+random 4/47 size 80x24 buffer 0 cursor 5,4 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 b3a9ec3014a8295b49bdbb541293b48360b038af
+random 4/48 size 80x24 buffer 0 cursor 0,13 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 14 5454e3769c0f33d32a138cd3de098e12ed0f98c2
+random 4/49 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 b714d03ecfc91e4ed8ac6d2bb5e986804c690159
+random 4/50 size 80x24 buffer 1 cursor 18,7 title "title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 9 20d0f6c9bb4abc50316e1fefa85c80400e2edacf
+random 4/51 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 16 3eb15e865ed735a231f3a5a86437f9da11fe4582
+random 4/52 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 1 950539a7bfdd31b4936f8494b9842f8512a6fe35
+random 4/53 size 80x24 buffer 0 cursor 0,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 d5e64b0a5be7cc1045d05e59109dde856ad88ce2
+random 4/54 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 1 050725a2b32699b38863791fa2f6da8588a2e067
+random 4/55 size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 ee236dbf7b7c5fcc240afdab5df6dc3cb32f7abf
+random 4/56 size 80x24 buffer 1 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 57f02771a685a1aad484d03c48e00725490b289b
+random 4/57 size 80x24 buffer 0 cursor 0,0 title "ab" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 3820fb5e9d9ffbaa2ebeb8ccf55ee6e773ba951f
+random 4/58 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 e2fda819dc51cf8f778b5704585ef1ff9973d96f
+random 4/59 size 80x24 buffer 1 cursor 25,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 b673600fb9255f9ec38e664e9a6274ae01ed5b92
+random 5/0 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 2 titleEvents 0 sizeEvents 0 directory <null> lines 1 763bd28a2dad31517584b80292c154329ec622a9
+random 5/1 size 80x24 buffer 0 cursor 2,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 4 9305bb2d03a6a66f4ad4efc0cf5cce128de92d2c
+random 5/2 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 5c1c83ce9907095afb7fa03a42554e19f9c2be61
+random 5/3 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory "/p q" lines 24 61a2583cac20e3db068cecc26923e4a1955de480
+random 5/4 size 80x24 buffer 0 cursor 39,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 49d5744b9f94c0dc8f0a43af26ce2899af00cfdd
+random 5/5 size 80x24 buffer 1 cursor 1,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 326e7457cb469603b0f67f3879d7f30a0d6f3903
+random 5/6 size 80x24 buffer 0 cursor 19,4 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 25 8fd6f2b5eff9fc5144916a22bf70d1aeda623b2e
+random 5/7 size 80x24 buffer 1 cursor 0,6 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 7 ad945b4c6ca4890342f604d26a6fcc1dea835b76
+random 5/8 size 80x24 buffer 0 cursor 12,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 5 914310091b48fcebae4e52e52ba123226e85eb4b
+random 5/9 size 80x24 buffer 0 cursor 22,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 8 5e93799de5429347179aff66032539c0be07aa3c
+random 5/10 size 80x24 buffer 0 cursor 3,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 7 2dd68c03532bcae11ba72b76d245436e49da599b
+random 5/11 size 80x24 buffer 0 cursor 48,1 title "other title" mouse AnyEvent bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 13 73d974e17d3bdcf512f016cab6b47a982a2014d2
+random 5/12 size 80x24 buffer 1 cursor 3,0 title "title" mouse ButtonEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 0e7e1535962bdcc7021ccbe6aa7795a66098cbdb
+random 5/13 size 80x24 buffer 0 cursor 48,16 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 17 b4ca26709d18b8ae03b409b0c17e2595669346d8
+random 5/14 size 80x24 buffer 0 cursor 19,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 e11fa97f32d83ca19f50b95d51d8952e3ef2c010
+random 5/15 size 80x24 buffer 0 cursor 0,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 8 6dda9fbef3b70f180abb2bc8e9da48d88cb82003
+random 5/16 size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 3 titleEvents 0 sizeEvents 0 directory "/p q" lines 24 101c7cdce01dc3920244112ab2c6671d20d88b45
+random 5/17 size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 97b0fd291fe24ad4a192fd0c5eccdb46fd719c2a
+random 5/18 size 80x24 buffer 0 cursor 0,6 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 7 567c0e7570d9cdb667e68dec2d9a8408a1ae3980
+random 5/19 size 80x24 buffer 1 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 4683c6b981620d9f54781c8b4d85179172a62d7d
+random 5/20 size 80x24 buffer 0 cursor 26,1 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 9 9f1eba6f703c6bd3c97dfe835f6ee69b779f3982
+random 5/21 size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 654b46a7e8dd48bc55fab9e57d3e3c81b96925d9
+random 5/22 size 80x24 buffer 0 cursor 0,2 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 272b7387c1d3269975ab1c75dfe692ae864d0ab6
+random 5/23 size 80x24 buffer 0 cursor 16,0 title "ab" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 1 960f3b2910408de8be45166ec288f7c65f121297
+random 5/24 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 5 fd4934a0ada0dfad7458109a9d2a09aed1271a65
+random 5/25 size 80x24 buffer 0 cursor 5,4 title "ab" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 7 68f9e234a949c39ba3652bd08b87d19618a9b5d5
+random 5/26 size 80x24 buffer 0 cursor 0,0 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 5 3e7fa06e2267aa448c7f37dfc2985ab6fc983edb
+random 5/27 size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 4 b76165efcfa3dd5e2d09ed2c59165e827eb27943
+random 5/28 size 80x24 buffer 0 cursor 4,4 title "title" mouse Off bells 1 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 6 8d9147f1ab3723078c1f856a633133a7b2a1af80
+random 5/29 size 80x24 buffer 1 cursor 0,12 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 13 d471cdb3c022072a9550246460b5fc6a40dce9d7
+random 5/30 size 80x24 buffer 0 cursor 15,4 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 009eeca8e5a8025fa1ed95691c8037e86d318699
+random 5/31 size 80x24 buffer 0 cursor 0,0 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 23 5ba34c204f08af64f859b3aee7bc88da749d7057
+random 5/32 size 80x24 buffer 0 cursor 2,1 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 d4f9831f5cadbdfd19973453b64da3b1714eaaae
+random 5/33 size 80x24 buffer 0 cursor 7,0 title "other title" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 5 137094b8951f2431f7d10d14ff1701369e3607f5
+random 5/34 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 5 a970bf2d66e4c9f56652c20773ad63324c4b9b8b
+random 5/35 size 80x24 buffer 0 cursor 0,8 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 9 154437081a17494e275f3ee5097dc92687415b92
+random 5/36 size 80x24 buffer 0 cursor 26,1 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 5 963770e40dc1d25ac2c23dfa65f266e35b4dca3d
+random 5/37 size 80x24 buffer 0 cursor 17,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 5e4c1a86eac27b4206c2c562de30735569f6a413
+random 5/38 size 80x24 buffer 0 cursor 8,0 title "title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 4 806cfd743eecb422e7573b9b1adff82756b9745e
+random 5/39 size 80x24 buffer 0 cursor 1,1 title "title" mouse Normal bells 1 titleEvents 2 sizeEvents 0 directory "/tmp/x" lines 18 834cf825a281ae5eb4b19910764f9540afaf0c7d
+random 5/40 size 80x24 buffer 0 cursor 0,1 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 6 ed239650a19f379fa004dc0c6c76cb56333c51bd
+random 5/41 size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 e81555202e501b1bae24f50b0f54af979516d339
+random 5/42 size 80x24 buffer 0 cursor 4,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 497bb8b69f9a922d87d8278a78424d1f3fbe3fed
+random 5/43 size 80x24 buffer 0 cursor 0,11 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 9b12b0b3965f02dd14aec02c5b6dc94e1754e0bb
+random 5/44 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 26 b01dc1e7771ae6b84f5c8074e29699c27022d336
+random 5/45 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 2 72ba171aaf41d3ae641a3e1f1ca2b5d1c12a7eec
+random 5/46 size 80x24 buffer 1 cursor 0,1 title "ab" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 8de783fa6940230ad73f1abbc2f95bf6454b311a
+random 5/47 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 3 474499158f15240fa407891cf41f418ab0e25179
+random 5/48 size 80x24 buffer 0 cursor 23,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 ce23b3b79d90a87d6943ffe6c30a4e1e05537c59
+random 5/49 size 80x24 buffer 0 cursor 2,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 2 467cede4977759a073c49a6303c37e203b50f549
+random 5/50 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 2ea69cbbe59d7052cd4bfb660b61b09fd02a5f55
+random 5/51 size 80x24 buffer 0 cursor 39,11 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 12 0755e615797c2f8baae8ea9bf1538038c15fc32b
+random 5/52 size 80x24 buffer 0 cursor 1,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 39feed4e73af161328e2af4f363f7b62e1baccef
+random 5/53 size 80x24 buffer 1 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 14 5f4b270592993495ef17d29a6311525fd8144c69
+random 5/54 size 80x24 buffer 1 cursor 0,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 34f88be250581056dd99bd7ed3f9728b7547c973
+random 5/55 size 80x24 buffer 1 cursor 16,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 c54a778e7755be1debb8b1bb6c6acc3edade4151
+random 5/56 size 80x24 buffer 0 cursor 23,8 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 9 3f2393a228105d2bd34fc53e60b62d178210e223
+random 5/57 size 80x24 buffer 1 cursor 1,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 1 ceff52163258bfb9736700b8adaebc418c06fcfb
+random 5/58 size 80x24 buffer 0 cursor 0,0 title <null> mouse Normal bells 1 titleEvents 0 sizeEvents 0 directory <null> lines 1 50697c3c537e0aab821b4849921a8363901bb037
+random 5/59 size 80x24 buffer 0 cursor 7,0 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 4 db8c7ef0a272e4122747f18649267ea97b8ec2b7
+random 6/0 size 80x24 buffer 0 cursor 30,2 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/p q" lines 3 1b59bb736fc3696e87b6c6e84513ebed86f1a019
+random 6/1 size 80x24 buffer 0 cursor 16,0 title "other title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 12 aa87fb5646231bdcc33b9980ed498d69cbe3aaad
+random 6/2 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 25 249f0fa7e3d54130c659e4f872ae5605b48f2540
+random 6/3 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 3 37b0be919118c601739ac290e14849696a78bb28
+random 6/4 size 80x24 buffer 0 cursor 18,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 6 b25b85c9892ff0664a8f7bc795f1ab7ff0eaf79f
+random 6/5 size 80x24 buffer 0 cursor 8,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 415b26361a2adf1292b83f7f3f04e19107c0ea3e
+random 6/6 size 80x24 buffer 0 cursor 39,11 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 12 6ee9cc9fd22ebcdea036e622c7b790c4362940e0
+random 6/7 size 80x24 buffer 1 cursor 3,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 7 3616ab7338dcdbb1a5d4837977394d74006c66c6
+random 6/8 size 80x24 buffer 0 cursor 0,1 title <null> mouse AnyEvent bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 4 31ad12ad2ed4a36c030f402dcb8d1399ef01c09a
+random 6/9 size 80x24 buffer 0 cursor 18,1 title "title" mouse Normal bells 0 titleEvents 3 sizeEvents 0 directory "/p q" lines 7 3b1d78f2f78eb5df380b3da9fd1904607a2c0ce5
+random 6/10 size 80x24 buffer 0 cursor 24,0 title "ab" mouse Normal bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 1 beea789580aaaf857ee299def87b4d886ee401bd
+random 6/11 size 80x24 buffer 0 cursor 27,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 1934e6011b5f4ca98c8f6902b4bf70df7eab3cb1
+random 6/12 size 80x24 buffer 1 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 24 cfc92557f27e0f06d9db46ba5e0e098262a39945
+random 6/13 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 bf8bface61d3f5c42cb1215aaf47bb576556bf7c
+random 6/14 size 80x24 buffer 0 cursor 1,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 aebc86fcfa0606db72fb3cbb4ae6123aa312b729
+random 6/15 size 80x24 buffer 0 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 6 b16fa169df0c9e4527ea85e8c365dfab4eb58a24
+random 6/16 size 80x24 buffer 0 cursor 13,1 title "other title" mouse ButtonEvent bells 3 titleEvents 2 sizeEvents 0 directory "/p q" lines 6 9f04723be0cca90eebbc8232e9c7f7dec03df001
+random 6/17 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 4 1ed034a66b199db3d1fa92eaacd6764a6e87da3f
+random 6/18 size 80x24 buffer 0 cursor 80,23 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 42ff4763eea49059698eacb97a9d6a4e029725a9
+random 6/19 size 80x24 buffer 0 cursor 39,11 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 12 61aaf4b59bac86c63709dc2d049b5093ef7284fd
+random 6/20 size 80x24 buffer 1 cursor 0,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 6 4d936b9d8c548f68f919e701a2bb5b0214cfe950
+random 6/21 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 5 b1534651a45397a8518f466cd504928cf35abde9
+random 6/22 size 80x24 buffer 1 cursor 7,0 title "other title" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory <null> lines 11 907c2e8cabcd6d5f81652d6c8320b196d523debc
+random 6/23 size 80x24 buffer 1 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 49e06d669338d5084ffce3ab9b92c4096d2bb9a9
+random 6/24 size 80x24 buffer 0 cursor 0,5 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 10 c909beda381047a24c35e69cd2676e52d60fac01
+random 6/25 size 80x24 buffer 0 cursor 0,0 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 1 3862b2389fdc92c14d60fa84424ebb45b9da0fa8
+random 6/26 size 80x24 buffer 1 cursor 4,6 title "title" mouse ButtonEvent bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 8 0aea0959575b6805c4bd7d20d4982129637fec3f
+random 6/27 size 80x24 buffer 0 cursor 16,2 title "title" mouse Off bells 1 titleEvents 2 sizeEvents 0 directory "/p q" lines 6 786c73b7b1f2ee4e1e1c6f5fa2aff2c55277baac
+random 6/28 size 80x24 buffer 1 cursor 0,6 title "ab" mouse AnyEvent bells 1 titleEvents 1 sizeEvents 0 directory "/p q" lines 27 e6dfb69c317b7576242a0c4a1e18a30999cd8538
+random 6/29 size 80x24 buffer 0 cursor 0,0 title "ab" mouse AnyEvent bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 3 376aae8e1f40cbde20f6341c32cfd5161d2d3274
+random 6/30 size 80x24 buffer 0 cursor 35,0 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 12 4cfaca9a9cae4aec18db3c693ffe7a9fa34c88c0
+random 6/31 size 80x24 buffer 0 cursor 34,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 cf8b2a7ed692ae51b6a57f097ab6418058d32668
+random 6/32 size 80x24 buffer 1 cursor 0,0 title "other title" mouse Off bells 1 titleEvents 3 sizeEvents 0 directory <null> lines 1 968e24b7025d66ed14f24b1bfa259f4108acac11
+random 6/33 size 80x24 buffer 0 cursor 15,7 title <null> mouse Normal bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 8 66ec72a354c8ac7986b0fd85d24fe9ec9a0dd15d
+random 6/34 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 93e6693fa317cdfb44f1a8b77bd1b44dff4987bf
+random 6/35 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 3a0a1b246a4ba940773ac26f67d9aaa53245715d
+random 6/36 size 80x24 buffer 1 cursor 1,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 16e2c5e1b8d3c7ca955b04322b642dbc5901cd4b
+random 6/37 size 80x24 buffer 0 cursor 0,4 title "ab" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory "/p q" lines 5 9e8fd92b7f8b859cdcd263ea8d22f7f2a5115812
+random 6/38 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 1 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 3 ef105d057f335ad9a9118061b201fa655c77fcf1
+random 6/39 size 80x24 buffer 0 cursor 0,20 title "title" mouse AnyEvent bells 1 titleEvents 2 sizeEvents 0 directory <null> lines 25 6822ecbc8bb9a567b59f4608c1b68689306bd700
+random 6/40 size 80x24 buffer 0 cursor 0,0 title <null> mouse ButtonEvent bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 26 dfbd777f95c3670958ea506b826f6a55a3166d46
+random 6/41 size 80x24 buffer 0 cursor 16,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 567c3f132c8b1b6d6257ca011251641df3fd4a07
+random 6/42 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 a0057e292ddcd16cb18b0fcd442cc21d696a7fe6
+random 6/43 size 80x24 buffer 0 cursor 0,7 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 8 582e0ea8d6c7265d3098cdcdabab74e1d57dcfb1
+random 6/44 size 80x24 buffer 1 cursor 5,4 title "title" mouse Off bells 0 titleEvents 3 sizeEvents 0 directory "/tmp/x" lines 14 de845fa7e30e517268d56500ac4189a84bc1d61b
+random 6/45 size 80x24 buffer 0 cursor 0,1 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 e3e6183a16f7514f54a8ff27fbc2021200858c66
+random 6/46 size 80x24 buffer 1 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 574961d4a1ebfd98a8c67ada19709c62a1d1de52
+random 6/47 size 80x24 buffer 0 cursor 0,6 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/tmp/x" lines 7 e2ffd0276f36f4b99b8e56d3bd18ecad546342ca
+random 6/48 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 1 57687b4baa81bcaa3e797794ee9f5c29d89dc7bf
+random 6/49 size 80x24 buffer 0 cursor 16,1 title "title" mouse AnyEvent bells 1 titleEvents 1 sizeEvents 0 directory <null> lines 2 433dca7f45f07ec944c37b29be8b05fb03d57849
+random 6/50 size 80x24 buffer 0 cursor 4,0 title "ab" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory "/p q" lines 3 71be582f756f858c2adf1fd70239cc6e5c588945
+random 6/51 size 80x24 buffer 1 cursor 12,0 title "title" mouse Off bells 0 titleEvents 2 sizeEvents 0 directory <null> lines 4 4b728a7b4116c44c4877f16ce093e3c849f6132c
+random 6/52 size 80x24 buffer 0 cursor 22,1 title "other title" mouse AnyEvent bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 2 7f3e69d7b974047cdd0772ccede3d11c7c02b63d
+random 6/53 size 80x24 buffer 0 cursor 0,2 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory "/p q" lines 3 cfdf5a5af3ac13a4e73d735917255b9b740128e1
+random 6/54 size 80x24 buffer 0 cursor 21,4 title "other title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory <null> lines 6 807e09266b234a7cd6c9eee96c093c65a5342c1b
+random 6/55 size 80x24 buffer 1 cursor 0,0 title "title" mouse Off bells 0 titleEvents 1 sizeEvents 0 directory "/tmp/x" lines 1 8f099bacd9671287177a9bbb59cb8f72e952d930
+random 6/56 size 80x24 buffer 0 cursor 20,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 2 be6959f199c9360115143a46efdb9cd3f4f344e6
+random 6/57 size 80x24 buffer 0 cursor 0,19 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 25 0d1217ca3a543a1feb48ef72ae88e2de63fc952b
+random 6/58 size 80x24 buffer 0 cursor 0,0 title <null> mouse Off bells 0 titleEvents 0 sizeEvents 0 directory <null> lines 3 2ca4d4dfc65824fa0c42f314c33db27a44497f78
+random 6/59 size 80x24 buffer 1 cursor 8,0 title "title" mouse ButtonEvent bells 1 titleEvents 2 sizeEvents 0 directory "/p q" lines 1 fff43b7815c5b40e1aed3141910c03a6e4e6744b

@@ -1,0 +1,113 @@
+using SmarTTY.Terminal.Input;
+using SmarTTY.Controls;
+using SmarTTY.GUI.TerminalView;
+using SmarTTY.IO;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows.Forms;
+using VisualTTY.DeviceTerminal;
+
+namespace SmarTTY.GUI.DevicePanel;
+
+// Kermit over the COM/TCP connection (IO/KermitTransfer.cs holds the protocol). A transfer owns the line exactly like an
+// XMODEM or ZMODEM one: everything received goes to the protocol (through the same queue) and typing is refused until it
+// ends. Started from the menu only: the user starts the Kermit program on the device first.
+public partial class WpfDeviceTerminal
+{
+    private void InitializeKermitMenu()
+    {
+        sendFilesViaKermitToolStripMenuItem.Click -= sendFilesViaKermitToolStripMenuItem_Click;
+        sendFilesViaKermitToolStripMenuItem.Click += sendFilesViaKermitToolStripMenuItem_Click;
+        receiveFilesViaKermitToolStripMenuItem.Click -= receiveFilesViaKermitToolStripMenuItem_Click;
+        receiveFilesViaKermitToolStripMenuItem.Click += receiveFilesViaKermitToolStripMenuItem_Click;
+    }
+
+    private void sendFilesViaKermitToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        if (IsLineBusy())
+        {
+            return;
+        }
+        if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
+        {
+            ThemedMessageBox.Show("Please connect first before sending files via Kermit.", "Kermit Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        string[] fileNames = ThemedFileDialog.OpenFiles(Owner, "Select files to send via Kermit (start the Kermit receiver on the device first, e.g. \"kermit -r\")", "All files (*.*)|*.*");
+        if (fileNames == null)
+        {
+            return;
+        }
+
+        StartKermitSend(fileNames);
+    }
+
+    /// <summary>Must be called on the UI thread, with the line free and the connection open.</summary>
+    private void StartKermitSend(string[] fileNames)
+    {
+        List<KermitTransfer.Source> sources = new List<KermitTransfer.Source>();
+        foreach (string path in fileNames)
+        {
+            string fileName = path;
+            FileInfo info = new FileInfo(fileName);
+            sources.Add(new KermitTransfer.Source(info.Name, info.Length, () => File.OpenRead(fileName), info.LastWriteTimeUtc));
+        }
+        StartLineTransfer("Kermit Send", "Kermit", "send", (sendData, progress, token) =>
+            KermitTransfer.SendFiles(sources, sendData.Invoke, ReadXModemByte, token, progress.Invoke));
+    }
+
+    private void receiveFilesViaKermitToolStripMenuItem_Click(object sender, EventArgs e)
+    {
+        if (IsLineBusy())
+        {
+            return;
+        }
+        if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
+        {
+            ThemedMessageBox.Show("Please connect first before receiving files via Kermit.", "Kermit Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        string folder = ThemedFolderBrowser.Browse(Owner,
+            "Select the folder for the files received via Kermit (then start the sender on the device, e.g. \"kermit -s file\")");
+        if (string.IsNullOrEmpty(folder))
+        {
+            return;
+        }
+        Dictionary<string, string> created = new Dictionary<string, string>();
+        StartLineTransfer("Kermit Receive", "Kermit", "receive", (sendData, progress, token) =>
+            KermitTransfer.ReceiveFiles(
+                name =>
+                {
+                    // An existing file is never overwritten: the new one gets " (1)", " (2)"... before the extension.
+                    string path = UniqueFilePathIn(folder, name);
+                    FileStream stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                    created[name] = path;
+                    return stream;
+                },
+                name =>
+                {
+                    if (created.TryGetValue(name, out string path))
+                    {
+                        File.Delete(path);
+                    }
+                },
+                sendData.Invoke, ReadXModemByte, token, progress.Invoke,
+                (name, modifiedUtc) =>
+                {
+                    // The sender's modification time, when it gave one; the time is a courtesy, the file itself is fine.
+                    if (modifiedUtc.HasValue && created.TryGetValue(name, out string path))
+                    {
+                        try
+                        {
+                            File.SetLastWriteTimeUtc(path, modifiedUtc.Value);
+                        }
+                        catch (Exception)
+                        {
+                        }
+                    }
+                }));
+    }
+}

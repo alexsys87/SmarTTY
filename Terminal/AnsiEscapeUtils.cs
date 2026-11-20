@@ -15,6 +15,21 @@ public enum CsiScanResult
 
 public static class AnsiEscapeUtils
 {
+    /// <summary>Resets the colours and the attributes (SGR 0).</summary>
+    public const string ResetSequence = "\u001b[0m";
+
+    /// <summary>The SGR sequence of a foreground colour of the palette (0 black ... 7 white).</summary>
+    public static string ForegroundCode(int colorIndex)
+    {
+        return "\u001b[" + (30 + colorIndex) + "m";
+    }
+
+    /// <summary>Text in a colour of the palette, with the colours reset after it (a message the terminal prints itself).</summary>
+    public static string Colorize(string text, int colorIndex)
+    {
+        return ForegroundCode(colorIndex) + text + ResetSequence;
+    }
+
     /// <summary>
     /// True for ESC and the other C0 control characters (CR, LF, BEL, ...): none of them can be a part of an escape sequence.
     /// When one comes in the middle of a sequence the stream is damaged (a serial line that lost characters, an output that

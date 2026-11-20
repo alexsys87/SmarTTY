@@ -28,9 +28,22 @@ internal static class PasteMenu
         {
             return;
         }
+        Point where = owner.PointToScreen(location ?? DefaultLocation(owner));
+        Show(PasteAnchor.For(owner), owner.ContextMenuStrip, settings, where, pasteClipboard, pasteText);
+    }
+
+    /// <summary>
+    /// Shows the menu at a point of the screen for a terminal that is not a WinForms control (the WPF terminal); <paramref name="reference"/>
+    /// is a menu whose look it takes (the terminal's context menu), or null.
+    /// </summary>
+    public static void Show(PasteAnchor owner, ContextMenuStrip reference, GlobalSettings settings, Point screenLocation, Action pasteClipboard, Action<string> pasteText)
+    {
+        if (owner == null || !owner.IsAlive)
+        {
+            return;
+        }
         PasteSettings options = PasteGuard.OptionsOf(settings);
         ContextMenuStrip menu = new ContextMenuStrip { ShowItemToolTips = true };
-        ContextMenuStrip reference = owner.ContextMenuStrip;
         if (reference != null)
         {
             menu.Renderer = reference.Renderer;
@@ -40,7 +53,7 @@ internal static class PasteMenu
         menu.Closed += (sender, e) =>
         {
             // Disposing inside the click handler would take the item away while it runs.
-            owner.BeginInvoke((Action)menu.Dispose);
+            owner.Post(menu.Dispose);
         };
 
         AddClipboardItem(menu, owner, pasteClipboard);
@@ -103,11 +116,10 @@ internal static class PasteMenu
         clear.Click += (sender, e) => PasteHistory.Clear();
         menu.Items.Add(clear);
 
-        Point where = location ?? DefaultLocation(owner);
-        menu.Show(owner, where);
+        menu.Show(screenLocation);
     }
 
-    private static void AddClipboardItem(ContextMenuStrip menu, Control owner, Action pasteClipboard)
+    private static void AddClipboardItem(ContextMenuStrip menu, IWin32Window owner, Action pasteClipboard)
     {
         string label;
         bool enabled = true;
@@ -145,7 +157,7 @@ internal static class PasteMenu
         return item;
     }
 
-    private static void AddSnippet(Control owner, GlobalSettings settings, PasteSettings options)
+    private static void AddSnippet(IWin32Window owner, GlobalSettings settings, PasteSettings options)
     {
         string text = null;
         try
@@ -165,7 +177,7 @@ internal static class PasteMenu
         settings?.Save();
     }
 
-    private static void EditSnippet(Control owner, GlobalSettings settings, PasteSettings options, PasteSnippet snippet)
+    private static void EditSnippet(IWin32Window owner, GlobalSettings settings, PasteSettings options, PasteSnippet snippet)
     {
         ThemedSnippetEditorResult edited = ThemedSnippetEditor.Edit(owner, snippet.Name, snippet.Text, canDelete: true);
         if (edited == null)

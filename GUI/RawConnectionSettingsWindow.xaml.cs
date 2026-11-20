@@ -1,3 +1,4 @@
+using SmarTTY.Transport;
 using SmarTTY.Controls;
 using System;
 using System.ComponentModel;
@@ -682,7 +683,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public Visibility TCPSettingsVisibility { get; }
 
-        // Auto-reconnect options, forwarded to the root settings so that DeviceTerminalControl can read them back
+        // Auto-reconnect options, forwarded to the root settings so that the device terminal can read them back
         // when the connection is opened. Raised through the controller so the WPF bindings update.
         public bool ReconnectAutomatically
         {
@@ -892,7 +893,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         {
             ApplyTCPEndpoint();
             DeviceTerminalSettings.ConnectionSettings connection = EffectiveConnectionSettings;
-            return Task.Run(() => DeviceTerminalControl.TestConnection(connection));
+            return Task.Run(() => DeviceConnections.TestConnection(connection));
         }
 
         public void EditColor(Border border)
