@@ -9,6 +9,10 @@ using System.Threading;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // File transfer through the device's shell: the file is packed with gzip and typed into the shell as base64 (or uuencode)
@@ -31,35 +35,35 @@ public partial class WpfDeviceTerminal
 
     private void InitializeGzipBase64Menu()
     {
-        ToolStripMenuItem send = new ToolStripMenuItem("Send file via gzip + base64 (shell)...")
+        MenuItem send = new DeviceMenuItem("Send file via gzip + base64 (shell)...")
         {
-            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip, typed as base64 text in blocks that the device checks one by one (a damaged block is typed again), unpacked there and checked with a checksum. Nothing is needed on the device but busybox tools."
+            ToolTip = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip, typed as base64 text in blocks that the device checks one by one (a damaged block is typed again), unpacked there and checked with a checksum. Nothing is needed on the device but busybox tools."
         };
-        ToolStripMenuItem receive = new ToolStripMenuItem("Receive file via gzip + base64 (shell)...")
+        MenuItem receive = new DeviceMenuItem("Receive file via gzip + base64 (shell)...")
         {
-            ToolTipText = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip, sent as base64 text in blocks that are checked one by one (a damaged block is sent again), unpacked here and checked with a checksum."
+            ToolTip = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip, sent as base64 text in blocks that are checked one by one (a damaged block is sent again), unpacked here and checked with a checksum."
         };
-        Icons.Apply(send, "upload");
-        Icons.Apply(receive, "download");
+        send.Icon = WpfMenus.Icon("upload");
+        receive.Icon = WpfMenus.Icon("download");
         send.Click += (sender, e) => StartGzipBase64Transfer(sending: true);
         receive.Click += (sender, e) => StartGzipBase64Transfer(sending: false);
-        toolStripButton3.DropDownItems.Add(send);
-        toolStripButton3.DropDownItems.Add(receive);
+        toolStripButton3.Items.Add(send);
+        toolStripButton3.Items.Add(receive);
 
-        ToolStripMenuItem sendRaw = new ToolStripMenuItem("Send file via gzip + cat (raw, shell)...")
+        MenuItem sendRaw = new DeviceMenuItem("Send file via gzip + cat (raw, shell)...")
         {
-            ToolTipText = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip and sent as it is, without base64 (a quarter less on the line), read there from the terminal in raw mode, unpacked and checked with a checksum at the end. The archive goes in blocks that the device checks one by one, and a damaged block is sent again; still keep the speed under what the device can take."
+            ToolTip = "Sends a file through the shell of a Linux device (OpenWrt too): packed with gzip and sent as it is, without base64 (a quarter less on the line), read there from the terminal in raw mode, unpacked and checked with a checksum at the end. The archive goes in blocks that the device checks one by one, and a damaged block is sent again; still keep the speed under what the device can take."
         };
-        ToolStripMenuItem receiveRaw = new ToolStripMenuItem("Receive file via gzip + cat (raw, shell)...")
+        MenuItem receiveRaw = new DeviceMenuItem("Receive file via gzip + cat (raw, shell)...")
         {
-            ToolTipText = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip and sent as it is, without base64, unpacked here and checked with a checksum at the end."
+            ToolTip = "Fetches a file through the shell of a Linux device (OpenWrt too): packed there with gzip and sent as it is, without base64, unpacked here and checked with a checksum at the end."
         };
-        Icons.Apply(sendRaw, "upload");
-        Icons.Apply(receiveRaw, "download");
+        sendRaw.Icon = WpfMenus.Icon("upload");
+        receiveRaw.Icon = WpfMenus.Icon("download");
         sendRaw.Click += (sender, e) => StartGzipBase64Transfer(sending: true, raw: true);
         receiveRaw.Click += (sender, e) => StartGzipBase64Transfer(sending: false, raw: true);
-        toolStripButton3.DropDownItems.Add(sendRaw);
-        toolStripButton3.DropDownItems.Add(receiveRaw);
+        toolStripButton3.Items.Add(sendRaw);
+        toolStripButton3.Items.Add(receiveRaw);
     }
 
     /// <summary>Asks what to transfer and runs the transfer over the shared line runner. Must be called on the UI thread.</summary>

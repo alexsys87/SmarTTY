@@ -100,8 +100,9 @@ internal static class Program
             return;
         }
 
-        string pasteMenu = File.ReadAllText(Path.Combine(root, "Controls", "PasteMenu.cs"));
-        Check(pasteMenu.Contains("ThemedSnippetEditor.Edit"), "the paste menu edits snippets through the facade");
+        // The paste menu is WPF since stage 4A and opens the WPF window itself, without the facade of the WinForms code.
+        string pasteMenu = File.ReadAllText(Path.Combine(root, "GUI", "PasteMenu.cs"));
+        Check(pasteMenu.Contains("SnippetEditWindow.Edit"), "the paste menu edits snippets in the WPF window");
         Check(!Regex.IsMatch(pasteMenu, @"\bSnippetEditForm\b"), "the paste menu no longer builds the WinForms form");
         Check(!Regex.IsMatch(pasteMenu, @"using SmarTTY\.Forms"), "the paste menu no longer imports the Forms namespace");
     }

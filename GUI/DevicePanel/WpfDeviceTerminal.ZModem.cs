@@ -12,6 +12,10 @@ using System.Threading;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // ZMODEM over the COM/TCP connection (IO/ZModemTransfer.cs holds the protocol). A transfer owns the line exactly like
@@ -46,14 +50,14 @@ public partial class WpfDeviceTerminal
         sendFilesViaZModemToolStripMenuItem.Click += sendFilesViaZModemToolStripMenuItem_Click;
         receiveFilesViaZModemToolStripMenuItem.Click -= receiveFilesViaZModemToolStripMenuItem_Click;
         receiveFilesViaZModemToolStripMenuItem.Click += receiveFilesViaZModemToolStripMenuItem_Click;
-        autoReceiveZModemToolStripMenuItem.CheckedChanged -= autoReceiveZModemToolStripMenuItem_CheckedChanged;
-        autoReceiveZModemToolStripMenuItem.CheckedChanged += autoReceiveZModemToolStripMenuItem_CheckedChanged;
-        _autoStartZModem = autoReceiveZModemToolStripMenuItem.Checked;
+        autoReceiveZModemToolStripMenuItem.Click -= autoReceiveZModemToolStripMenuItem_CheckedChanged;
+        autoReceiveZModemToolStripMenuItem.Click += autoReceiveZModemToolStripMenuItem_CheckedChanged;
+        _autoStartZModem = autoReceiveZModemToolStripMenuItem.IsChecked;
     }
 
     private void autoReceiveZModemToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
     {
-        _autoStartZModem = autoReceiveZModemToolStripMenuItem.Checked;
+        _autoStartZModem = autoReceiveZModemToolStripMenuItem.IsChecked;
         _zmodemTail = new byte[0];
     }
 
@@ -272,7 +276,7 @@ public partial class WpfDeviceTerminal
         }
         _cancelLineTransfer = transferForm.Cancel;
 
-        ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.Checked };
+        ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.IsChecked };
         Dictionary<ZModemFileInfo, string> paths = new Dictionary<ZModemFileInfo, string>();
         List<string> saved = new List<string>();
 
@@ -454,7 +458,7 @@ public partial class WpfDeviceTerminal
         _lineOwner = _asyncTransportConnection;
         _cancelLineTransfer = transferForm.Cancel;
         _isXModemActive = true;
-        ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.Checked };
+        ZModemOptions options = new ZModemOptions { EscapeControlCharacters = escapeZModemControlToolStripMenuItem.IsChecked };
 
         ThreadPool.QueueUserWorkItem(state =>
         {

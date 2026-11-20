@@ -7,6 +7,10 @@ using SmarTTY.Transport;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // Path completion of the COM/TCP terminal: the names come from the device (VisualTTY/DeviceTerminal/DeviceListingSession.cs runs the listing and holds

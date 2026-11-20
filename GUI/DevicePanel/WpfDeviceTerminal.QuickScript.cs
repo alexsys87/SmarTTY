@@ -10,6 +10,10 @@ using System.Windows.Forms;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // Tools > Quick commands: a script in the menu of a COM-port or Telnet terminal. An SSH tab uploads a script over its own channel;

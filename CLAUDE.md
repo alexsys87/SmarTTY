@@ -47,11 +47,11 @@ PR that changes them.
 | Folder | What is there | UI? |
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
-| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
+| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists); `WpfMenus` (icons and items of the WPF menus), `PasteMenu` | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` hosts the WinForms editor through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
-| `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar and menus are still WinForms, hosted) | WPF |
+| `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar, netconsole bar and menus are WPF since 4A) | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
@@ -97,9 +97,9 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1A | Editor logic out of WinForms | Done in alexsys87/SmarTTY#508–#526 (A1–A7, see the "Done in A…" notes below); what is left in `RemoteFileEditor` is view orchestration, see "A4 ends here" |
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
-| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: the device panel's tool bar and menus are WinForms (hosted, they go with stage 4) |
+| 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: nothing (the tool bar and menus of the device panel, which stayed WinForms, went to WPF in 4A) |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Planned (after 1A) |
-| 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
+| 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | In progress: 4A (the menus and bars of the terminal tabs and the device tab) done, see "Stage 4"; 4B (the popups and menus of the editor, `Themed*Adapter`, `Forms/`) after stage 3, which changes the editor |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
 ### Stage 1 rules
@@ -521,6 +521,27 @@ paste line by line, the history window, a click on a file name in the output; th
 `vim` with `:set` in application mode, Ctrl+Space; the German layout (AltGr+Q gives @, AltGr+7 gives {, ^ then e gives the e with a circumflex,
 the left Ctrl+Alt+A sends ESC ^A), the Russian layout (letters, Ctrl+C, Alt+letter), Alt+0233 on the keypad (e acute), Japanese and Chinese IME
 (the composition window at the caret, Enter that ends a composition is not sent); minimise during the colour flood and restore.
+
+### Stage 4 (popups and menus)
+
+Done in 4A (the terminal side; the editor's menus and popups wait for stage 3, which changes the editor): the menus and bars of the terminal
+tabs are WPF. `GUI/WpfMenus` loads the icons of the items from the same embedded files as `Controls/Icons` (`SmarTTY.Icons.<name>.png`,
+frozen and shared), makes items and opens a menu at the mouse or below a button; a text from the user (a command, a snippet, a file name)
+goes through `WpfMenus.PlainText`, which doubles the underscore (the access key mark of WPF; the WinForms menus doubled the ampersand). The
+look is the theme's implicit styles of `GUI/Styles/Controls.xaml`, so `ThemedMenu.Apply` is not called for them. The context menu of the
+classic and Smart Terminal tabs is a WPF `ContextMenu` of `MainWindowController` (`ShowTerminalContextMenu`, the quick commands added each
+time it opens; `MenuTerminal` is the terminal it was opened on); the paste menu of the WPF terminals is `GUI/PasteMenu` (it replaces
+`Controls/PasteMenu`; the snippet editor is called directly). The device tab (`GUI/DevicePanel/WpfDeviceTerminal.Toolbar.cs`) keeps the
+names of the old designer's fields for WPF elements: two `ToolBar`s in a row (the "Send values" box at the right end), the split and
+drop-down buttons are `ToolBarMenuButton` (a main button and an arrow that open a `ContextMenu` below it), the menu items are `MenuItem`s
+(`DeviceMenuItem` is the one-expression form the partials used with `ToolStripMenuItem`); the netconsole bar is a WPF `Border` below the
+terminals; the context menu opens at the mouse. Items that their handlers check and uncheck themselves are not `IsCheckable` (WPF would
+toggle them a second time). No `WindowsFormsHost` is left in the device tab. Not as before: the tool bar does not move items into an
+overflow menu by the WinForms rules (WPF's `ToolBar` has its own overflow). Tests: `SnippetEditorTests` reads `GUI/PasteMenu.cs`; the menus themselves are checked by hand on Windows: the terminal
+context menu (Copy, Paste, Paste special, quick commands, Clear, New/Close Tab), the paste menu (recent pastes, snippets, save and edit a
+snippet), the device tool bar in each connection type (COM with the baud rate and the Lines button, TCP, telnet with its menu, netconsole
+with its bar), "Send values" in HEX and text mode, the file transfer menu, the settings menu, the log button while recording, light and dark
+themes.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20

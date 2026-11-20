@@ -1,550 +1,333 @@
-using SmarTTY.Terminal.Input;
-using SmarTTY.Controls;
-using SmarTTY.GUI.TerminalView;
+using System;
 using System.ComponentModel;
-using System.Drawing;
-using System.Windows.Forms;
-using System.Windows.Threading;
-using SmarTTY.TextEditing;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace SmarTTY.GUI.DevicePanel;
 
-// The tool bar and the context menu of the device panel: the WinForms items of the old panel's designer, as they were (stage 4 makes them
-// WPF); the panel hosts the tool bar in a WindowsFormsHost and shows the menu as a popup.
+// The tool bar and the context menu of the device panel, WPF since stage 4A (they were the WinForms items of the old designer). The items
+// keep the names the designer gave them, so that the code of the partial files reads as before; the look is the theme's (ToolBar, its
+// button styles, ContextMenu and MenuItem in GUI/Styles/Controls.xaml).
 public partial class WpfDeviceTerminal
 {
-	private IContainer components = null;
+    // The WinForms timers of the partial files (the line status, the quick script, the listing) are made in it.
+    private IContainer components = new Container();
 
-	private ToolStrip toolStrip1;
+    private Grid _toolBarRow;
 
-	private ToolStripButton btnDisconnect;
+    private ToolBar toolStrip1;
 
-	private ToolStripLabel lblConnection;
+    private ToolBar _toolBarRight;
 
-	private ToolStripButton btnReconnect;
+    private TextBlock lblConnection;
 
-	private ToolStripSplitButton btnSend;
+    private Button btnDisconnect;
 
-	private ToolStripTextBox txtHexInput;
+    private Button btnReconnect;
 
-	private ToolStripLabel lblSend;
+    private ToolBarMenuButton btnSend;
 
-	private ToolStripMenuItem sendAsHEXToolStripMenuItem;
+    private TextBox txtHexInput;
 
-	private ToolStripMenuItem sendImmediatelyToolStripMenuItem;
+    private TextBlock lblSend;
 
-	private ToolStripButton toolStripButton1;
+    private MenuItem sendAsHEXToolStripMenuItem;
 
-	private ToolStripSplitButton toolStripButton3;
+    private MenuItem sendImmediatelyToolStripMenuItem;
 
-	private ToolStripMenuItem sendBinaryFileToolStripMenuItem;
+    private Button toolStripButton1;
 
-	private ToolStripMenuItem sendFileViaXMODEMToolStripMenuItem;
+    private ToolBarMenuButton toolStripButton3;
 
-	private ToolStripMenuItem sendFileViaXMODEM1KToolStripMenuItem;
+    private MenuItem sendBinaryFileToolStripMenuItem;
 
-	private ToolStripMenuItem receiveFileViaXMODEMToolStripMenuItem;
+    private MenuItem sendFileViaXMODEMToolStripMenuItem;
 
-	private ToolStripMenuItem sendFilesViaYMODEMToolStripMenuItem;
+    private MenuItem sendFileViaXMODEM1KToolStripMenuItem;
 
-	private ToolStripMenuItem receiveFilesViaYMODEMToolStripMenuItem;
+    private MenuItem receiveFileViaXMODEMToolStripMenuItem;
 
-	private ToolStripMenuItem receiveFilesViaYMODEMGToolStripMenuItem;
+    private MenuItem sendFilesViaYMODEMToolStripMenuItem;
 
-	private ToolStripMenuItem sendFilesViaZModemToolStripMenuItem;
+    private MenuItem receiveFilesViaYMODEMToolStripMenuItem;
 
-	private ToolStripMenuItem receiveFilesViaZModemToolStripMenuItem;
+    private MenuItem receiveFilesViaYMODEMGToolStripMenuItem;
 
-	private ToolStripMenuItem autoReceiveZModemToolStripMenuItem;
+    private MenuItem sendFilesViaZModemToolStripMenuItem;
 
-	private ToolStripMenuItem escapeZModemControlToolStripMenuItem;
-	private ToolStripMenuItem sendFilesViaKermitToolStripMenuItem;
+    private MenuItem receiveFilesViaZModemToolStripMenuItem;
 
-	private ToolStripMenuItem receiveFilesViaKermitToolStripMenuItem;
+    private MenuItem autoReceiveZModemToolStripMenuItem;
 
-	private ToolStripButton toolStripButton2;
+    private MenuItem escapeZModemControlToolStripMenuItem;
 
-	private ContextMenuStrip contextMenuStrip1;
+    private MenuItem sendFilesViaKermitToolStripMenuItem;
 
-	private ToolStripMenuItem copyToolStripMenuItem;
+    private MenuItem receiveFilesViaKermitToolStripMenuItem;
 
-	private ToolStripMenuItem copyAllToolStripMenuItem;
+    private Button toolStripButton2;
 
-	private ToolStripMenuItem pasteToolStripMenuItem;
+    private ContextMenu contextMenuStrip1;
 
-	private ToolStripDropDownButton toolStripDropDownButton1;
+    private MenuItem copyToolStripMenuItem;
 
-	private ToolStripMenuItem terminalTypeToolStripMenuItem;
+    private MenuItem copyAllToolStripMenuItem;
 
-	private ToolStripMenuItem cbASCII;
+    private MenuItem pasteToolStripMenuItem;
 
-	private ToolStripMenuItem cbHEX;
+    private ToolBarMenuButton toolStripDropDownButton1;
 
-	private ToolStripMenuItem cbBoth;
+    private MenuItem terminalTypeToolStripMenuItem;
 
-	private ToolStripMenuItem echoTypedCharactersToolStripMenuItem;
+    private MenuItem cbASCII;
 
-	private ToolStripMenuItem changeSettingsToolStripMenuItem;
+    private MenuItem cbHEX;
 
-	private ToolStripLabel lblBaudRate;
+    private MenuItem cbBoth;
 
-	private ToolStripComboBox cbBaudRate;
+    private MenuItem echoTypedCharactersToolStripMenuItem;
 
-	private ToolStripLabel lblEncoding;
+    private MenuItem changeSettingsToolStripMenuItem;
 
-	private ToolStripComboBox cbEncoding;
+    private TextBlock lblBaudRate;
 
-	private ToolStripButton btnLog;
+    private ComboBox cbBaudRate;
 
-	private ToolStripButton btnReplay;
+    private TextBlock lblEncoding;
 
-	private void DisposeComponents(bool disposing)
-	{
-		if (disposing && components != null)
-		{
-			components.Dispose();
-		}
-	}
+    private ComboBox cbEncoding;
 
-	private void InitializeComponent()
-	{
-            this.components = new System.ComponentModel.Container();
-            this.toolStrip1 = new System.Windows.Forms.ToolStrip();
-            this.lblConnection = new System.Windows.Forms.ToolStripLabel();
-            this.btnDisconnect = new System.Windows.Forms.ToolStripButton();
-            this.btnReconnect = new System.Windows.Forms.ToolStripButton();
-            this.btnSend = new System.Windows.Forms.ToolStripSplitButton();
-            this.sendAsHEXToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendImmediatelyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.txtHexInput = new System.Windows.Forms.ToolStripTextBox();
-            this.lblSend = new System.Windows.Forms.ToolStripLabel();
-            this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButton3 = new System.Windows.Forms.ToolStripSplitButton();
-            this.sendBinaryFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendFileViaXMODEM1KToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.receiveFileViaXMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.receiveFilesViaYMODEMToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.receiveFilesViaYMODEMGToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.receiveFilesViaZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.autoReceiveZModemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.escapeZModemControlToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.sendFilesViaKermitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.receiveFilesViaKermitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
-            this.btnLog = new System.Windows.Forms.ToolStripButton();
-            this.btnReplay = new System.Windows.Forms.ToolStripButton();
-            this.toolStripDropDownButton1 = new System.Windows.Forms.ToolStripDropDownButton();
-            this.terminalTypeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.cbASCII = new System.Windows.Forms.ToolStripMenuItem();
-            this.cbHEX = new System.Windows.Forms.ToolStripMenuItem();
-            this.cbBoth = new System.Windows.Forms.ToolStripMenuItem();
-            this.echoTypedCharactersToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.changeSettingsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.lblBaudRate = new System.Windows.Forms.ToolStripLabel();
-            this.cbBaudRate = new System.Windows.Forms.ToolStripComboBox();
-            this.lblEncoding = new System.Windows.Forms.ToolStripLabel();
-            this.cbEncoding = new System.Windows.Forms.ToolStripComboBox();
-            this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.copyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.copyAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pasteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStrip1.SuspendLayout();
-            this.contextMenuStrip1.SuspendLayout();
-            this.toolStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.lblConnection,
-            this.btnDisconnect,
-            this.btnReconnect,
-            this.btnSend,
-            this.txtHexInput,
-            this.lblSend,
-            this.toolStripButton1,
-            this.toolStripButton3,
-            this.toolStripButton2,
-            this.btnLog,
-            this.btnReplay,
-            this.toolStripDropDownButton1,
-            this.lblBaudRate,
-            this.cbBaudRate,
-            this.lblEncoding,
-            this.cbEncoding});
-            this.toolStrip1.Location = new System.Drawing.Point(0, 0);
-            this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(634, 27);
-            this.toolStrip1.TabIndex = 3;
-            this.toolStrip1.Text = "Paste binary file";
-            // 
-            // lblConnection
-            // 
-            this.lblConnection.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.lblConnection.ImageScaling = System.Windows.Forms.ToolStripItemImageScaling.None;
-            this.lblConnection.Name = "lblConnection";
-            this.lblConnection.Size = new System.Drawing.Size(65, 24);
-            this.lblConnection.Text = "Connected";
-            // 
-            // btnDisconnect
-            // 
-            this.btnDisconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            Icons.Apply(this.btnDisconnect, "terminal-disconnect");
-            this.btnDisconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.btnDisconnect.Name = "btnDisconnect";
-            this.btnDisconnect.Size = new System.Drawing.Size(23, 24);
-            this.btnDisconnect.Text = "Disconnect";
-            // 
-            // btnReconnect
-            // 
-            this.btnReconnect.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            Icons.Apply(this.btnReconnect, "terminal-reconnect");
-            this.btnReconnect.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.btnReconnect.Name = "btnReconnect";
-            this.btnReconnect.Size = new System.Drawing.Size(23, 24);
-            this.btnReconnect.Text = "Reconnect";
-            // 
-            // btnSend
-            // 
-            this.btnSend.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
-            this.btnSend.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.btnSend.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.sendAsHEXToolStripMenuItem,
-            this.sendImmediatelyToolStripMenuItem});
-            Icons.Apply(this.btnSend, "terminal-send");
-            this.btnSend.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.btnSend.Name = "btnSend";
-            this.btnSend.Size = new System.Drawing.Size(32, 24);
-            this.btnSend.Text = "Send";
-            // 
-            // sendAsHEXToolStripMenuItem
-            // 
-            this.sendAsHEXToolStripMenuItem.Checked = true;
-            this.sendAsHEXToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.sendAsHEXToolStripMenuItem.Name = "sendAsHEXToolStripMenuItem";
-            this.sendAsHEXToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
-            this.sendAsHEXToolStripMenuItem.Text = "Send as HEX";
-            // 
-            // sendImmediatelyToolStripMenuItem
-            // 
-            this.sendImmediatelyToolStripMenuItem.Checked = true;
-            this.sendImmediatelyToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.sendImmediatelyToolStripMenuItem.Name = "sendImmediatelyToolStripMenuItem";
-            this.sendImmediatelyToolStripMenuItem.Size = new System.Drawing.Size(163, 22);
-            this.sendImmediatelyToolStripMenuItem.Text = "Send as you type";
-            // 
-            // txtHexInput
-            // 
-            this.txtHexInput.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
-            this.txtHexInput.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.txtHexInput.Name = "txtHexInput";
-            this.txtHexInput.Size = new System.Drawing.Size(100, 27);
-            // 
-            // lblSend
-            // 
-            this.lblSend.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
-            this.lblSend.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.lblSend.Name = "lblSend";
-            this.lblSend.Size = new System.Drawing.Size(72, 24);
-            this.lblSend.Text = "Send values:";
-            // 
-            // toolStripButton1
-            // 
-            this.toolStripButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            Icons.Apply(this.toolStripButton1, "terminal-clear");
-            this.toolStripButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton1.Name = "toolStripButton1";
-            this.toolStripButton1.Size = new System.Drawing.Size(23, 24);
-            this.toolStripButton1.Text = "Clear contents";
-            // 
-            // toolStripButton3
-            // 
-            this.toolStripButton3.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton3.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.sendBinaryFileToolStripMenuItem,
-            this.sendFileViaXMODEMToolStripMenuItem,
-            this.sendFileViaXMODEM1KToolStripMenuItem,
-            this.receiveFileViaXMODEMToolStripMenuItem,
-            this.sendFilesViaYMODEMToolStripMenuItem,
-            this.receiveFilesViaYMODEMToolStripMenuItem,
-            this.receiveFilesViaYMODEMGToolStripMenuItem,
-            this.sendFilesViaZModemToolStripMenuItem,
-            this.receiveFilesViaZModemToolStripMenuItem,
-            this.autoReceiveZModemToolStripMenuItem,
-            this.escapeZModemControlToolStripMenuItem,
-            this.sendFilesViaKermitToolStripMenuItem,
-            this.receiveFilesViaKermitToolStripMenuItem});
-            Icons.Apply(this.toolStripButton3, "terminal-transfer");
-            this.toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton3.Name = "toolStripButton3";
-            this.toolStripButton3.Size = new System.Drawing.Size(32, 24);
-            this.toolStripButton3.Text = "File transfer";
-            // 
-            // sendBinaryFileToolStripMenuItem
-            // 
-            this.sendBinaryFileToolStripMenuItem.Name = "sendBinaryFileToolStripMenuItem";
-            this.sendBinaryFileToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendBinaryFileToolStripMenuItem.Text = "Send binary file";
-            // 
-            // sendFileViaXMODEMToolStripMenuItem
-            // 
-            this.sendFileViaXMODEMToolStripMenuItem.Name = "sendFileViaXMODEMToolStripMenuItem";
-            this.sendFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendFileViaXMODEMToolStripMenuItem.Text = "Send file via XMODEM...";
-            // 
-            // sendFileViaXMODEM1KToolStripMenuItem
-            // 
-            this.sendFileViaXMODEM1KToolStripMenuItem.Name = "sendFileViaXMODEM1KToolStripMenuItem";
-            this.sendFileViaXMODEM1KToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendFileViaXMODEM1KToolStripMenuItem.Text = "Send file via XMODEM-1K...";
-            // 
-            // receiveFileViaXMODEMToolStripMenuItem
-            // 
-            this.receiveFileViaXMODEMToolStripMenuItem.Name = "receiveFileViaXMODEMToolStripMenuItem";
-            this.receiveFileViaXMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.receiveFileViaXMODEMToolStripMenuItem.Text = "Receive file via XMODEM...";
-            // 
-            // sendFilesViaYMODEMToolStripMenuItem
-            // 
-            this.sendFilesViaYMODEMToolStripMenuItem.Name = "sendFilesViaYMODEMToolStripMenuItem";
-            this.sendFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendFilesViaYMODEMToolStripMenuItem.Text = "Send file(s) via YMODEM...";
-            this.sendFilesViaYMODEMToolStripMenuItem.ToolTipText = "The receiver chooses the variant: YMODEM (CRC-16), the checksum variant or YMODEM-G (streaming).";
-            // 
-            // receiveFilesViaYMODEMToolStripMenuItem
-            // 
-            this.receiveFilesViaYMODEMToolStripMenuItem.Name = "receiveFilesViaYMODEMToolStripMenuItem";
-            this.receiveFilesViaYMODEMToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.receiveFilesViaYMODEMToolStripMenuItem.Text = "Receive file(s) via YMODEM...";
-            this.receiveFilesViaYMODEMToolStripMenuItem.ToolTipText = "Asks for CRC-16 and falls back to the checksum variant when the sender does not answer.";
-            // 
-            // receiveFilesViaYMODEMGToolStripMenuItem
-            // 
-            this.receiveFilesViaYMODEMGToolStripMenuItem.Name = "receiveFilesViaYMODEMGToolStripMenuItem";
-            this.receiveFilesViaYMODEMGToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.receiveFilesViaYMODEMGToolStripMenuItem.Text = "Receive file(s) via YMODEM-G...";
-            this.receiveFilesViaYMODEMGToolStripMenuItem.ToolTipText = "Streaming without acknowledgements: for error-free links only; a damaged block cancels the transfer.";
-            // 
-            // sendFilesViaZModemToolStripMenuItem
-            // 
-            this.sendFilesViaZModemToolStripMenuItem.Name = "sendFilesViaZModemToolStripMenuItem";
-            this.sendFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendFilesViaZModemToolStripMenuItem.Text = "Send files via ZMODEM...";
-            // 
-            // receiveFilesViaZModemToolStripMenuItem
-            // 
-            this.receiveFilesViaZModemToolStripMenuItem.Name = "receiveFilesViaZModemToolStripMenuItem";
-            this.receiveFilesViaZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.receiveFilesViaZModemToolStripMenuItem.Text = "Receive files via ZMODEM...";
-            // 
-            // autoReceiveZModemToolStripMenuItem
-            // 
-            this.autoReceiveZModemToolStripMenuItem.Checked = true;
-            this.autoReceiveZModemToolStripMenuItem.CheckOnClick = true;
-            this.autoReceiveZModemToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.autoReceiveZModemToolStripMenuItem.Name = "autoReceiveZModemToolStripMenuItem";
-            this.autoReceiveZModemToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.autoReceiveZModemToolStripMenuItem.Text = "Start ZMODEM receive automatically";
-            // 
-            // escapeZModemControlToolStripMenuItem
-            // 
-            this.escapeZModemControlToolStripMenuItem.CheckOnClick = true;
-            this.escapeZModemControlToolStripMenuItem.Name = "escapeZModemControlToolStripMenuItem";
-            this.escapeZModemControlToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.escapeZModemControlToolStripMenuItem.Text = "ZMODEM: escape control characters";
-            // sendFilesViaKermitToolStripMenuItem
-            // 
-            this.sendFilesViaKermitToolStripMenuItem.Name = "sendFilesViaKermitToolStripMenuItem";
-            this.sendFilesViaKermitToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.sendFilesViaKermitToolStripMenuItem.Text = "Send files via Kermit...";
-            // 
-            // receiveFilesViaKermitToolStripMenuItem
-            // 
-            this.receiveFilesViaKermitToolStripMenuItem.Name = "receiveFilesViaKermitToolStripMenuItem";
-            this.receiveFilesViaKermitToolStripMenuItem.Size = new System.Drawing.Size(219, 22);
-            this.receiveFilesViaKermitToolStripMenuItem.Text = "Receive files via Kermit...";
-            // 
-            // toolStripButton2
-            // 
-            this.toolStripButton2.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            Icons.Apply(this.toolStripButton2, "terminal-save");
-            this.toolStripButton2.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton2.Name = "toolStripButton2";
-            this.toolStripButton2.Size = new System.Drawing.Size(23, 24);
-            this.toolStripButton2.Text = "Save output to file";
-            // 
-            // btnLog
-            // 
-            this.btnLog.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.btnLog.Name = "btnLog";
-            this.btnLog.Size = new System.Drawing.Size(55, 24);
-            this.btnLog.Text = "Start log";
-            this.btnLog.ToolTipText = "Continuously record received data to a file";
-            // 
-            // btnReplay
-            // 
-            this.btnReplay.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.btnReplay.Name = "btnReplay";
-            this.btnReplay.Size = new System.Drawing.Size(46, 24);
-            this.btnReplay.Text = "Replay";
-            this.btnReplay.ToolTipText = "Play a recorded log of received data back into this terminal";
-            // 
-            // toolStripDropDownButton1
-            // 
-            this.toolStripDropDownButton1.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripDropDownButton1.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.terminalTypeToolStripMenuItem,
-            this.echoTypedCharactersToolStripMenuItem,
-            this.changeSettingsToolStripMenuItem});
-            Icons.Apply(this.toolStripDropDownButton1, "terminal-settings");
-            this.toolStripDropDownButton1.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripDropDownButton1.Name = "toolStripDropDownButton1";
-            this.toolStripDropDownButton1.Size = new System.Drawing.Size(29, 24);
-            this.toolStripDropDownButton1.Text = "Settings";
-            // 
-            // terminalTypeToolStripMenuItem
-            // 
-            this.terminalTypeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.cbASCII,
-            this.cbHEX,
-            this.cbBoth});
-            this.terminalTypeToolStripMenuItem.Name = "terminalTypeToolStripMenuItem";
-            this.terminalTypeToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
-            this.terminalTypeToolStripMenuItem.Text = "Terminal type";
-            // 
-            // cbASCII
-            // 
-            this.cbASCII.Name = "cbASCII";
-            this.cbASCII.Size = new System.Drawing.Size(131, 22);
-            this.cbASCII.Text = "ASCII";
-            // 
-            // cbHEX
-            // 
-            this.cbHEX.Name = "cbHEX";
-            this.cbHEX.Size = new System.Drawing.Size(131, 22);
-            this.cbHEX.Text = "HEX";
-            // 
-            // cbBoth
-            // 
-            this.cbBoth.Name = "cbBoth";
-            this.cbBoth.Size = new System.Drawing.Size(131, 22);
-            this.cbBoth.Text = "Text + HEX";
-            // 
-            // echoTypedCharactersToolStripMenuItem
-            // 
-            this.echoTypedCharactersToolStripMenuItem.Name = "echoTypedCharactersToolStripMenuItem";
-            this.echoTypedCharactersToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
-            this.echoTypedCharactersToolStripMenuItem.Text = "Echo typed characters";
-            // 
-            // changeSettingsToolStripMenuItem
-            // 
-            this.changeSettingsToolStripMenuItem.Name = "changeSettingsToolStripMenuItem";
-            this.changeSettingsToolStripMenuItem.Size = new System.Drawing.Size(190, 22);
-            this.changeSettingsToolStripMenuItem.Text = "Connection settings...";
-            // 
-            // lblBaudRate
-            // 
-            this.lblBaudRate.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
-            this.lblBaudRate.Name = "lblBaudRate";
-            this.lblBaudRate.Size = new System.Drawing.Size(60, 24);
-            this.lblBaudRate.Text = "Baud rate:";
-            // 
-            // cbBaudRate
-            // 
-            this.cbBaudRate.Items.AddRange(new object[] {
-            "1200",
-            "2400",
-            "4800",
-            "9600",
-            "19200",
-            "38400",
-            "57600",
-            "74880",
-            "115200",
-            "230400",
-            "460800",
-            "921600",
-            "1000000",
-            "2000000"});
-            this.cbBaudRate.Name = "cbBaudRate";
-            this.cbBaudRate.Size = new System.Drawing.Size(121, 23);
-            // 
-            // lblEncoding
-            // 
-            this.lblEncoding.Name = "lblEncoding";
-            this.lblEncoding.Size = new System.Drawing.Size(60, 15);
-            this.lblEncoding.Text = "Encoding:";
-            // 
-            // cbEncoding
-            // 
-            this.cbEncoding.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cbEncoding.Name = "cbEncoding";
-            this.cbEncoding.Size = new System.Drawing.Size(170, 23);
-            this.cbEncoding.ToolTipText = "Text encoding used to decode received data and to encode typed and pasted text";
-            // 
-            // contextMenuStrip1
-            // 
-            this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.copyToolStripMenuItem,
-            this.copyAllToolStripMenuItem,
-            this.pasteToolStripMenuItem});
-            this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(177, 70);
-            // 
-            // copyToolStripMenuItem
-            // 
-            Icons.Apply(this.copyToolStripMenuItem, "copy");
-            this.copyToolStripMenuItem.Name = "copyToolStripMenuItem";
-            this.copyToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
-            this.copyToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
-            this.copyToolStripMenuItem.Text = "Copy";
-            // 
-            // copyAllToolStripMenuItem
-            // 
-            Icons.Apply(this.copyAllToolStripMenuItem, "copy");
-            this.copyAllToolStripMenuItem.Name = "copyAllToolStripMenuItem";
-            this.copyAllToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
-            this.copyAllToolStripMenuItem.Text = "Copy all";
-            // 
-            // pasteToolStripMenuItem
-            // 
-            Icons.Apply(this.pasteToolStripMenuItem, "paste");
-            this.pasteToolStripMenuItem.Name = "pasteToolStripMenuItem";
-            this.pasteToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+V";
-            this.pasteToolStripMenuItem.Size = new System.Drawing.Size(176, 22);
-            this.pasteToolStripMenuItem.Text = "Paste";
-            this.btnDisconnect.Click += new System.EventHandler(this.btnDisconnect_Click);
-            this.btnReconnect.Click += new System.EventHandler(this.btnReconnect_Click);
-            this.btnSend.ButtonClick += new System.EventHandler(this.btnSend_ButtonClick);
-            this.sendAsHEXToolStripMenuItem.Click += new System.EventHandler(this.sendAsHEXToolStripMenuItem_Click);
-            this.sendImmediatelyToolStripMenuItem.Click += new System.EventHandler(this.sendImmediatelyToolStripMenuItem_Click);
-            this.txtHexInput.KeyDown += new System.Windows.Forms.KeyEventHandler(this.txtHexInput_KeyDown);
-            this.txtHexInput.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtHexInput_KeyPress);
-            this.txtHexInput.TextChanged += new System.EventHandler(this.txtHexInput_TextChanged);
-            this.toolStripButton1.Click += new System.EventHandler(this.toolStripButton1_Click);
-            this.toolStripButton3.ButtonClick += new System.EventHandler(this.toolStripButton3_Click);
-            this.sendBinaryFileToolStripMenuItem.Click += new System.EventHandler(this.toolStripButton3_Click);
-            this.sendFileViaXMODEMToolStripMenuItem.Click += new System.EventHandler(this.sendFileViaXMODEMToolStripMenuItem_Click);
-            this.sendFileViaXMODEM1KToolStripMenuItem.Click += new System.EventHandler(this.sendFileViaXMODEM1KToolStripMenuItem_Click);
-            this.receiveFileViaXMODEMToolStripMenuItem.Click += new System.EventHandler(this.receiveFileViaXMODEMToolStripMenuItem_Click);
-            this.toolStripButton2.Click += new System.EventHandler(this.toolStripButton2_Click);
-            this.btnLog.Click += new System.EventHandler(this.btnLog_Click);
-            this.btnReplay.Click += new System.EventHandler(this.btnReplay_Click);
-            this.cbASCII.Click += new System.EventHandler(this.cbASCII_Click);
-            this.cbHEX.Click += new System.EventHandler(this.cbHEX_Click);
-            this.cbBoth.Click += new System.EventHandler(this.cbBoth_Click);
-            this.echoTypedCharactersToolStripMenuItem.Click += new System.EventHandler(this.echoTypedCharactersToolStripMenuItem_Click);
-            this.changeSettingsToolStripMenuItem.Click += new System.EventHandler(this.changeSettingsToolStripMenuItem_Click);
-            this.cbBaudRate.SelectedIndexChanged += new System.EventHandler(this.cbBaudRate_SelectedIndexChanged);
-            this.cbBaudRate.Leave += new System.EventHandler(this.cbBaudRate_Leave);
-            this.cbBaudRate.KeyDown += new System.Windows.Forms.KeyEventHandler(this.cbBaudRate_KeyDown);
-            this.cbEncoding.SelectedIndexChanged += new System.EventHandler(this.cbEncoding_SelectedIndexChanged);
-            this.contextMenuStrip1.Opening += new System.ComponentModel.CancelEventHandler(this.contextMenuStrip1_Opening);
-            this.copyToolStripMenuItem.Click += new System.EventHandler(this.copyToolStripMenuItem_Click);
-            this.copyAllToolStripMenuItem.Click += new System.EventHandler(this.copyAllToolStripMenuItem_Click);
-            this.pasteToolStripMenuItem.Click += new System.EventHandler(this.pasteToolStripMenuItem_Click);
-            this.toolStrip1.ResumeLayout(false);
-            this.toolStrip1.PerformLayout();
-            this.contextMenuStrip1.ResumeLayout(false);
+    private Button btnLog;
 
-	}
+    private Button btnReplay;
 
+    private void DisposeComponents(bool disposing)
+    {
+        if (disposing && components != null)
+        {
+            components.Dispose();
+        }
+    }
+
+    private void InitializeComponent()
+    {
+        lblConnection = new TextBlock { Text = "Connected", Margin = new Thickness(2, 0, 4, 0) };
+        btnDisconnect = ImageButton("terminal-disconnect", "Disconnect", btnDisconnect_Click);
+        btnReconnect = ImageButton("terminal-reconnect", "Reconnect", btnReconnect_Click);
+
+        sendAsHEXToolStripMenuItem = new MenuItem { Header = "Send as HEX", IsChecked = true };
+        sendAsHEXToolStripMenuItem.Click += sendAsHEXToolStripMenuItem_Click;
+        sendImmediatelyToolStripMenuItem = new MenuItem { Header = "Send as you type", IsChecked = true };
+        sendImmediatelyToolStripMenuItem.Click += sendImmediatelyToolStripMenuItem_Click;
+        btnSend = new ToolBarMenuButton(WpfMenus.Icon("terminal-send"), "Send", split: true);
+        btnSend.Items.Add(sendAsHEXToolStripMenuItem);
+        btnSend.Items.Add(sendImmediatelyToolStripMenuItem);
+        btnSend.ButtonClick += btnSend_ButtonClick;
+        txtHexInput = new TextBox { Width = 100, VerticalContentAlignment = VerticalAlignment.Center };
+        txtHexInput.PreviewKeyDown += txtHexInput_KeyDown;
+        txtHexInput.PreviewTextInput += txtHexInput_KeyPress;
+        txtHexInput.TextChanged += txtHexInput_TextChanged;
+        lblSend = new TextBlock { Text = "Send values:", Margin = new Thickness(4, 0, 2, 0) };
+
+        toolStripButton1 = ImageButton("terminal-clear", "Clear contents", toolStripButton1_Click);
+
+        sendBinaryFileToolStripMenuItem = MenuText("Send binary file", toolStripButton3_Click);
+        sendFileViaXMODEMToolStripMenuItem = MenuText("Send file via XMODEM...", sendFileViaXMODEMToolStripMenuItem_Click);
+        sendFileViaXMODEM1KToolStripMenuItem = MenuText("Send file via XMODEM-1K...", sendFileViaXMODEM1KToolStripMenuItem_Click);
+        receiveFileViaXMODEMToolStripMenuItem = MenuText("Receive file via XMODEM...", receiveFileViaXMODEMToolStripMenuItem_Click);
+        sendFilesViaYMODEMToolStripMenuItem = MenuText("Send file(s) via YMODEM...", null,
+            "The receiver chooses the variant: YMODEM (CRC-16), the checksum variant or YMODEM-G (streaming).");
+        receiveFilesViaYMODEMToolStripMenuItem = MenuText("Receive file(s) via YMODEM...", null,
+            "Asks for CRC-16 and falls back to the checksum variant when the sender does not answer.");
+        receiveFilesViaYMODEMGToolStripMenuItem = MenuText("Receive file(s) via YMODEM-G...", null,
+            "Streaming without acknowledgements: for error-free links only; a damaged block cancels the transfer.");
+        sendFilesViaZModemToolStripMenuItem = MenuText("Send files via ZMODEM...", null);
+        receiveFilesViaZModemToolStripMenuItem = MenuText("Receive files via ZMODEM...", null);
+        autoReceiveZModemToolStripMenuItem = new MenuItem { Header = "Start ZMODEM receive automatically", IsCheckable = true, IsChecked = true };
+        escapeZModemControlToolStripMenuItem = new MenuItem { Header = "ZMODEM: escape control characters", IsCheckable = true };
+        sendFilesViaKermitToolStripMenuItem = MenuText("Send files via Kermit...", null);
+        receiveFilesViaKermitToolStripMenuItem = MenuText("Receive files via Kermit...", null);
+        toolStripButton3 = new ToolBarMenuButton(WpfMenus.Icon("terminal-transfer"), "File transfer", split: true);
+        foreach (MenuItem item in new[]
+        {
+            sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, sendFileViaXMODEM1KToolStripMenuItem, receiveFileViaXMODEMToolStripMenuItem,
+            sendFilesViaYMODEMToolStripMenuItem, receiveFilesViaYMODEMToolStripMenuItem, receiveFilesViaYMODEMGToolStripMenuItem, sendFilesViaZModemToolStripMenuItem,
+            receiveFilesViaZModemToolStripMenuItem, autoReceiveZModemToolStripMenuItem, escapeZModemControlToolStripMenuItem, sendFilesViaKermitToolStripMenuItem,
+            receiveFilesViaKermitToolStripMenuItem
+        })
+        {
+            toolStripButton3.Items.Add(item);
+        }
+        toolStripButton3.ButtonClick += toolStripButton3_Click;
+
+        toolStripButton2 = ImageButton("terminal-save", "Save output to file", toolStripButton2_Click);
+        btnLog = TextButton("Start log", "Continuously record received data to a file", btnLog_Click);
+        btnReplay = TextButton("Replay", "Play a recorded log of received data back into this terminal", btnReplay_Click);
+
+        cbASCII = MenuText("ASCII", cbASCII_Click);
+        cbHEX = MenuText("HEX", cbHEX_Click);
+        cbBoth = MenuText("Text + HEX", cbBoth_Click);
+        terminalTypeToolStripMenuItem = MenuText("Terminal type", null);
+        terminalTypeToolStripMenuItem.Items.Add(cbASCII);
+        terminalTypeToolStripMenuItem.Items.Add(cbHEX);
+        terminalTypeToolStripMenuItem.Items.Add(cbBoth);
+        echoTypedCharactersToolStripMenuItem = MenuText("Echo typed characters", echoTypedCharactersToolStripMenuItem_Click);
+        changeSettingsToolStripMenuItem = MenuText("Connection settings...", changeSettingsToolStripMenuItem_Click);
+        toolStripDropDownButton1 = new ToolBarMenuButton(WpfMenus.Icon("terminal-settings"), "Settings", split: false);
+        toolStripDropDownButton1.Items.Add(terminalTypeToolStripMenuItem);
+        toolStripDropDownButton1.Items.Add(echoTypedCharactersToolStripMenuItem);
+        toolStripDropDownButton1.Items.Add(changeSettingsToolStripMenuItem);
+
+        lblBaudRate = new TextBlock { Text = "Baud rate:", Margin = new Thickness(6, 0, 2, 0) };
+        cbBaudRate = new ComboBox { IsEditable = true, Width = 100 };
+        foreach (string rate in new[] { "1200", "2400", "4800", "9600", "19200", "38400", "57600", "74880", "115200", "230400", "460800", "921600", "1000000", "2000000" })
+        {
+            cbBaudRate.Items.Add(rate);
+        }
+        cbBaudRate.SelectionChanged += cbBaudRate_SelectedIndexChanged;
+        cbBaudRate.LostKeyboardFocus += cbBaudRate_Leave;
+        cbBaudRate.PreviewKeyDown += cbBaudRate_KeyDown;
+        lblEncoding = new TextBlock { Text = "Encoding:", Margin = new Thickness(6, 0, 2, 0) };
+        cbEncoding = new ComboBox { Width = 170, ToolTip = "Text encoding used to decode received data and to encode typed and pasted text" };
+        cbEncoding.SelectionChanged += cbEncoding_SelectedIndexChanged;
+
+        toolStrip1 = new ToolBar();
+        foreach (UIElement item in new UIElement[]
+        {
+            lblConnection, btnDisconnect, btnReconnect, toolStripButton1, toolStripButton3, toolStripButton2, btnLog, btnReplay, toolStripDropDownButton1,
+            lblBaudRate, cbBaudRate, lblEncoding, cbEncoding
+        })
+        {
+            toolStrip1.Items.Add(item);
+        }
+        // The "Send values" box and its button are at the right end, as the WinForms items aligned to the right were.
+        _toolBarRight = new ToolBar();
+        _toolBarRight.Items.Add(lblSend);
+        _toolBarRight.Items.Add(txtHexInput);
+        _toolBarRight.Items.Add(btnSend);
+        _toolBarRow = new Grid();
+        _toolBarRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        _toolBarRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(_toolBarRight, 1);
+        _toolBarRow.Children.Add(toolStrip1);
+        _toolBarRow.Children.Add(_toolBarRight);
+
+        copyToolStripMenuItem = new MenuItem { Header = "Copy", Icon = WpfMenus.Icon("copy"), InputGestureText = "Ctrl+Shift+C" };
+        copyToolStripMenuItem.Click += copyToolStripMenuItem_Click;
+        copyAllToolStripMenuItem = new MenuItem { Header = "Copy all", Icon = WpfMenus.Icon("copy") };
+        copyAllToolStripMenuItem.Click += copyAllToolStripMenuItem_Click;
+        pasteToolStripMenuItem = new MenuItem { Header = "Paste", Icon = WpfMenus.Icon("paste"), InputGestureText = "Ctrl+Shift+V" };
+        pasteToolStripMenuItem.Click += pasteToolStripMenuItem_Click;
+        contextMenuStrip1 = new ContextMenu();
+        contextMenuStrip1.Items.Add(copyToolStripMenuItem);
+        contextMenuStrip1.Items.Add(copyAllToolStripMenuItem);
+        contextMenuStrip1.Items.Add(pasteToolStripMenuItem);
+    }
+
+    private static Button ImageButton(string icon, string toolTip, RoutedEventHandler click)
+    {
+        Button button = new Button { Content = WpfMenus.Icon(icon), ToolTip = toolTip };
+        button.Click += click;
+        return button;
+    }
+
+    private static Button TextButton(string text, string toolTip, RoutedEventHandler click)
+    {
+        Button button = new Button { Content = text, ToolTip = toolTip };
+        button.Click += click;
+        return button;
+    }
+
+    private static MenuItem MenuText(string text, RoutedEventHandler click, string toolTip = null)
+    {
+        MenuItem item = new MenuItem { Header = text };
+        if (toolTip != null)
+        {
+            item.ToolTip = toolTip;
+        }
+        if (click != null)
+        {
+            item.Click += click;
+        }
+        return item;
+    }
+}
+
+/// <summary>
+/// A button of a WPF tool bar that opens a menu below it: split (its main part runs <see cref="ButtonClick"/>, the arrow opens the menu), or
+/// a drop-down whose whole face opens the menu. What the WinForms <c>ToolStripSplitButton</c> and <c>ToolStripDropDownButton</c> were.
+/// </summary>
+internal sealed class ToolBarMenuButton : StackPanel
+{
+    private readonly Button _main;
+
+    private readonly Button _arrow;
+
+    public ToolBarMenuButton(object content, string toolTip, bool split)
+    {
+        Orientation = Orientation.Horizontal;
+        ToolTip = toolTip;
+        Menu = new ContextMenu();
+        _main = new Button { Content = split ? content : DropDownFace(content) };
+        _main.SetResourceReference(StyleProperty, ToolBar.ButtonStyleKey);
+        Children.Add(_main);
+        if (split)
+        {
+            _arrow = new Button { Content = Arrow(), Padding = new Thickness(1, 3, 1, 3) };
+            _arrow.SetResourceReference(StyleProperty, ToolBar.ButtonStyleKey);
+            _arrow.Click += (sender, e) => OpenMenu();
+            Children.Add(_arrow);
+            _main.Click += (sender, e) => ButtonClick?.Invoke(this, e);
+        }
+        else
+        {
+            _main.Click += (sender, e) => OpenMenu();
+        }
+    }
+
+    /// <summary>The menu that opens below the button.</summary>
+    public ContextMenu Menu { get; }
+
+    public ItemCollection Items => Menu.Items;
+
+    /// <summary>The main part of a split button was clicked.</summary>
+    public event RoutedEventHandler ButtonClick;
+
+    /// <summary>The menu is about to open (its items can be brought up to date).</summary>
+    public event EventHandler Opening;
+
+    private void OpenMenu()
+    {
+        Opening?.Invoke(this, EventArgs.Empty);
+        WpfMenus.OpenBelow(Menu, this);
+    }
+
+    private static object DropDownFace(object content)
+    {
+        StackPanel face = new StackPanel { Orientation = Orientation.Horizontal };
+        if (content is UIElement element)
+        {
+            face.Children.Add(element);
+        }
+        else
+        {
+            face.Children.Add(new TextBlock { Text = Convert.ToString(content), VerticalAlignment = VerticalAlignment.Center });
+        }
+        UIElement arrow = Arrow();
+        ((FrameworkElement)arrow).Margin = new Thickness(3, 0, 0, 0);
+        face.Children.Add(arrow);
+        return face;
+    }
+
+    private static UIElement Arrow()
+    {
+        System.Windows.Shapes.Path path = new System.Windows.Shapes.Path
+        {
+            Data = System.Windows.Media.Geometry.Parse("M 0,0 L 6,0 L 3,3 Z"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        path.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Theme.TextSecondary");
+        return path;
+    }
 }
