@@ -1332,3 +1332,26 @@ scoped in one line: 2 end 1:5
 edit the end of the range in the same line: text=x123y\n123 end caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,4,5;line:1,0,6,7;mod:T
 shorter: 3
 edit the caret brought into the shorter line: text=\nz caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,6,0;mod:T
+== syntax
+syntax C: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-13:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax a line break at the start of a line inside the comment: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[] 3[0-13:3] 4[0-6:3 7-10:1] 5[0-4:1 10-16:2] 6[0-7:7 10-11:4] 7[2-8:1 9-10:4]
+syntax the empty line taken out: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-13:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax the comment no longer opened: 0[0-3:1 8-9:4 11-17:3] 1[] 2[] 3[7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax opened again: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-13:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax closed and opened in a line inside it: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-7:3 12-13:4 15-25:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax lines inserted that open a comment: 0[0-3:1 8-9:4 11-17:3] 1[0-3:1 7-13:3] 2[0-4:3] 3[0-8:3] 4[0-7:3 12-13:4 15-25:3] 5[0-6:3 7-10:1] 6[0-4:1 10-16:2] 7[0-7:7 10-11:4] 8[2-8:1 9-10:4]
+syntax lines removed: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-7:3 12-13:4 15-25:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax a line break at the start of the first line: 0[] 1[0-3:1 8-9:4 11-17:3] 2[0-8:3] 3[0-7:3 12-13:4 15-25:3] 4[0-6:3 7-10:1] 5[0-4:1 10-16:2] 6[0-7:7 10-11:4] 7[2-8:1 9-10:4]
+syntax the first line taken out: 0[0-3:1 8-9:4 11-17:3] 1[0-8:3] 2[0-7:3 12-13:4 15-25:3] 3[0-6:3 7-10:1] 4[0-4:1 10-16:2] 5[0-7:7 10-11:4] 6[2-8:1 9-10:4]
+syntax two brushes: the other types take the first: 0[0-3:1 8-9:0 11-17:0] 1[0-8:0] 2[0-7:0 12-13:0 15-25:0] 3[0-6:0 7-10:1] 4[0-4:1 10-16:0] 5[0-7:0 10-11:0] 6[2-8:1 9-10:0]
+syntax no brushes: the colour of the text: 0[0-3:d 8-9:d 11-17:d] 1[0-8:d] 2[0-7:d 12-13:d 15-25:d] 3[0-6:d 7-10:d] 4[0-4:d 10-16:d] 5[0-7:d 10-11:d] 6[2-8:d 9-10:d]
+syntax an empty list of brushes: the colour of the text: 0[0-3:d 8-9:d 11-17:d] 1[0-8:d] 2[0-7:d 12-13:d 15-25:d] 3[0-6:d 7-10:d] 4[0-4:d 10-16:d] 5[0-7:d 10-11:d] 6[2-8:d 9-10:d]
+syntax no tokenizer: 0[0-17:0] 1[0-8:0] 2[0-25:0] 3[0-13:0] 4[0-17:0] 5[0-11:0] 6[0-11:0]
+lines a document with messages and a fold: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=2:on a,3:on the brace,7:on x folds=3:  {
+lines a line break at the start of the line of a message and a fold: text=int f()\n{\n  int a;\n\n  {\n    b();\n  }\n}\nx messages=2:on a,4:on the brace,8:on x folds=4:  {
+lines the empty line taken out: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=2:on a,3:on the brace,7:on x folds=3:  {
+lines a line break at the start of the line before the fold: text=int f()\n{\n\n  int a;\n  {\n    b();\n  }\n}\nx messages=3:on a,4:on the brace,8:on x folds=4:  {
+lines taken out again: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=2:on a,3:on the brace,7:on x folds=3:  {
+lines a line break at the start of the first line: text=\nint f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=3:on a,4:on the brace,8:on x folds=4:  {
+lines the first line taken out: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx messages=2:on a,3:on the brace,7:on x folds=3:  {
+lines a line added after the last one: text=int f()\n{\n  int a;\n  {\n    b();\n  }\n}\nx\ny messages=2:on a,3:on the brace,7:on x folds=3:  {

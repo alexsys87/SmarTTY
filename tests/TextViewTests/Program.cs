@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
@@ -282,6 +283,7 @@ internal static class Program
         EditRuns();
         TypingRuns();
         ReplaceRuns();
+        SyntaxRuns();
         _form.Dispose();
     }
 
@@ -980,5 +982,126 @@ internal static class Program
         _editor.SetCaret(At(0, 6));
         Lines.Add("shorter: " + _editor.ReplaceAll("aa", "", false));
         Edit("the caret brought into the shorter line");
+    }
+
+    // ---- 3D-3: the colours of the syntax of CodeEditorPP, written by the code before what it decides about them moved to the model: the spans a
+    // line is drawn with (start, end and which of the token brushes, d for the colour of the text) after edits that change a line, insert and remove
+    // lines (a line break put in at the start of a line and an empty line taken out, the two edits for which the tokens are worked out again from
+    // the line before), open and close a block comment over several lines, and with fewer brushes than token types, none, and no tokenizer.
+
+    private static readonly MethodInfo ColorSpansMethod = typeof(CodeEditorPP).GetMethod("GetLineColorSpans", Private);
+
+    private static void Spans(CodeEditorPP code, string what)
+    {
+        System.Drawing.Brush[] brushes = code.TokenBrushes;
+        List<string> lines = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            ReadonlyTextBrowser.ColorSpan[] spans = (ReadonlyTextBrowser.ColorSpan[])ColorSpansMethod.Invoke(code, new object[] { line });
+            List<string> parts = new List<string>();
+            if (spans != null)
+            {
+                foreach (ReadonlyTextBrowser.ColorSpan span in spans)
+                {
+                    int index = brushes == null ? -1 : Array.IndexOf(brushes, span.Foreground);
+                    parts.Add(span.Start + "-" + span.End + ":" + (index < 0 ? "d" : index.ToString(CultureInfo.InvariantCulture)));
+                }
+            }
+            lines.Add(line + "[" + string.Join(" ", parts) + "]");
+        }
+        Lines.Add("syntax " + what + ": " + string.Join(" ", lines));
+    }
+
+    private static void MessagesAndFolds(CodeEditorPP code, string what)
+    {
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        List<string> messages = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            if (provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+            {
+                messages.Add(line + ":" + message.Text);
+            }
+        }
+        List<string> folds = new List<string>();
+        foreach (FoldedLineInfo fold in code.GetFoldState())
+        {
+            folds.Add(fold.Line + ":" + fold.Text);
+        }
+        Lines.Add("lines " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " messages=" + string.Join(",", messages) + " folds=" + string.Join(",", folds));
+    }
+
+    private static void SyntaxRuns()
+    {
+        Lines.Add("== syntax");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 100) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int a = 1; // one", "/* start", "still comment", "end */ int b;", "char *s = \"text\";", "#define X 2", "  return 0;" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        System.Drawing.Brush[] brushes = new System.Drawing.Brush[8];
+        for (int i = 0; i < brushes.Length; i++)
+        {
+            brushes[i] = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(255, i, i, i));
+        }
+        code.TokenBrushes = brushes;
+        Spans(code, "C");
+        code.ReplaceText(At(2, 0), At(2, 0), false, "\n");
+        Spans(code, "a line break at the start of a line inside the comment");
+        code.ReplaceText(At(2, 0), At(3, 0), false, "");
+        Spans(code, "the empty line taken out");
+        code.ReplaceText(At(1, 0), At(1, 2), false, "");
+        Spans(code, "the comment no longer opened");
+        code.ReplaceText(At(1, 0), At(1, 0), false, "/*");
+        Spans(code, "opened again");
+        code.ReplaceText(At(2, 5), At(2, 5), false, "*/ x = 3; /*");
+        Spans(code, "closed and opened in a line inside it");
+        code.ReplaceText(At(0, 17), At(0, 17), false, "\nint c; /* new\nline");
+        Spans(code, "lines inserted that open a comment");
+        code.ReplaceText(At(1, 0), At(3, 0), false, "");
+        Spans(code, "lines removed");
+        code.ReplaceText(At(0, 0), At(0, 0), false, "\n");
+        Spans(code, "a line break at the start of the first line");
+        code.ReplaceText(At(0, 0), At(1, 0), false, "");
+        Spans(code, "the first line taken out");
+        code.TokenBrushes = new System.Drawing.Brush[] { brushes[0], brushes[1] };
+        Spans(code, "two brushes: the other types take the first");
+        code.TokenBrushes = null;
+        Spans(code, "no brushes: the colour of the text");
+        code.TokenBrushes = new System.Drawing.Brush[0];
+        Spans(code, "an empty list of brushes: the colour of the text");
+        code.TokenBrushes = brushes;
+        code.SetTokenizer(null);
+        Spans(code, "no tokenizer");
+
+        // The lines an edit changed are also what the inline messages and the folds are told: a message under a line goes with the line when a
+        // line break is put in at its start, and a fold that starts at the line before is looked at again.
+        code.TokenBrushes = brushes;
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        code.SetDocument(new EditableTextDocument(new[] { "int f()", "{", "  int a;", "  {", "    b();", "  }", "}", "x" }, TextDocument.LineEnding.Lf));
+        code.AddMessages(new[]
+        {
+            new InlineMessageProvider.MessageRequest { Line = 3, Severity = InlineMessageProvider.MessageSeverity.Error, Text = "on a", Column = 0 },
+            new InlineMessageProvider.MessageRequest { Line = 4, Severity = InlineMessageProvider.MessageSeverity.Warning, Text = "on the brace", Column = 0 },
+            new InlineMessageProvider.MessageRequest { Line = 8, Severity = InlineMessageProvider.MessageSeverity.Error, Text = "on x", Column = 0 }
+        });
+        code.SetCaret(At(3, 3));
+        code.CollapseCurrentFold();
+        MessagesAndFolds(code, "a document with messages and a fold");
+        code.ReplaceText(At(3, 0), At(3, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the line of a message and a fold");
+        code.ReplaceText(At(3, 0), At(4, 0), false, "");
+        MessagesAndFolds(code, "the empty line taken out");
+        code.ReplaceText(At(2, 0), At(2, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the line before the fold");
+        code.ReplaceText(At(2, 0), At(3, 0), false, "");
+        MessagesAndFolds(code, "taken out again");
+        code.ReplaceText(At(0, 0), At(0, 0), false, "\n");
+        MessagesAndFolds(code, "a line break at the start of the first line");
+        code.ReplaceText(At(0, 0), At(1, 0), false, "");
+        MessagesAndFolds(code, "the first line taken out");
+        code.ReplaceText(At(7, 1), At(7, 1), false, "\ny");
+        MessagesAndFolds(code, "a line added after the last one");
+        _form.Controls.Remove(code);
+        code.Dispose();
     }
 }
