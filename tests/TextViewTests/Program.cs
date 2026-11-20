@@ -281,6 +281,7 @@ internal static class Program
         WrapMap2(3);
         EditRuns();
         TypingRuns();
+        ReplaceRuns();
         _form.Dispose();
     }
 
@@ -927,5 +928,57 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("All text view checks passed.");
         return 0;
+    }
+
+    // ---- 3D-2: what ReplaceText and Replace All decide that the edits run did not reach, written by the code before it moved to the model:
+    // a single-line view (line breaks dropped), a lone CR in an edit within a line, the line endings of an insertion with and without the
+    // existing ones, Replace All limited to the end of a range, a replacement with line breaks whose new lines would match again (LF and a lone
+    // CR), the end of the range after it, and the caret brought into a line that became shorter. A fault it found, kept as it is: when a line of the
+    // range before the last one gets line breaks, the last line of the range is looked for at its old index, so its limit and the new end of the
+    // range are worked out for another line.
+
+    private static void ReplaceRuns()
+    {
+        Lines.Add("== replace");
+        Start("one two", "three");
+        _editor.SingleLine = true;
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "+a\nb\r\nc+");
+        Edit("single line: the line breaks of the text are dropped");
+        _editor.SingleLine = false;
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "x\ry");
+        Edit("a lone CR in an edit within a line breaks the line");
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 4), false, "A\r\nB");
+        Edit("an insertion with CRLF into an LF text takes the existing line ending");
+        FieldInfo existing = typeof(EditableTextBrowser).GetField("_useExistingLineEnding", Private);
+        existing.SetValue(_editor, false);
+        Start("one two", "three");
+        _editor.ReplaceText(At(0, 3), At(0, 4), false, "A\r\nB");
+        Edit("and without the existing line ending its own");
+        existing.SetValue(_editor, true);
+        TextDocument.TextPosition newEnd;
+        Start("aXa aXa", "aXa");
+        Lines.Add("scoped to a column: " + _editor.ReplaceAll(TextMatcher.Literal("a", false), "b", At(0, 1), At(1, 2), out newEnd) + " end " + P(newEnd));
+        Edit("Replace All up to the end of the range only");
+        Start("aaaa", "z");
+        Lines.Add("lines that would match again: " + _editor.ReplaceAll("aa", "a\na", false));
+        Edit("the inserted lines are not searched again");
+        Start("aaaa", "z");
+        Lines.Add("with a lone CR: " + _editor.ReplaceAll("aa", "a\ra", false));
+        Edit("nor after a lone CR");
+        Start("xaay", "aa end");
+        Lines.Add("scoped with breaks: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 4), out newEnd) + " end " + P(newEnd));
+        Edit("line breaks in a line before the last: the last line is taken for another one (recorded as it is)");
+        Start("xy", "aa bb");
+        Lines.Add("breaks in the last line: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 5), out newEnd) + " end " + P(newEnd));
+        Edit("the end of the range after line breaks in the last line");
+        Start("xaay", "aa end");
+        Lines.Add("scoped in one line: " + _editor.ReplaceAll(TextMatcher.Literal("aa", false), "123", At(0, 0), At(1, 4), out newEnd) + " end " + P(newEnd));
+        Edit("the end of the range in the same line");
+        Start("aaaaaa", "z");
+        _editor.SetCaret(At(0, 6));
+        Lines.Add("shorter: " + _editor.ReplaceAll("aa", "", false));
+        Edit("the caret brought into the shorter line");
     }
 }

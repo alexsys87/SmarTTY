@@ -1313,3 +1313,22 @@ edit the last line removed (the line break before it goes): text=l0 caret=0:2 se
 edit the only line removed: text= caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,2,0
 edit DeleteSelection without a selection: text=abc def caret=0:0 sel=- mod=F undo=F redo=F events=
 edit DeleteSelection: text=abc  caret=0:4 sel=- mod=T undo=T redo=F events=line:0,4,3,0;mod:T
+== replace
+edit single line: the line breaks of the text are dropped: text=one+abc+ two\nthree caret=0:8 sel=- mod=T undo=T redo=F events=line:0,3,0,5;mod:T
+edit a lone CR in an edit within a line breaks the line: text=onex\ny two\nthree caret=1:1 sel=- mod=T undo=T redo=F events=range:0:3,0:3,1:1;mod:T
+edit an insertion with CRLF into an LF text takes the existing line ending: text=oneA\nBtwo\nthree caret=1:1 sel=- mod=T undo=T redo=F events=range:0:3,0:4,1:1;mod:T
+edit and without the existing line ending its own: text=oneA\r\nBtwo\nthree caret=1:1 sel=- mod=T undo=T redo=F events=range:0:3,0:4,1:1;mod:T
+scoped to a column: 4 end 1:2
+edit Replace All up to the end of the range only: text=aXb bXb\nbXa caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,7,7;line:1,0,3,3;mod:T
+lines that would match again: 2
+edit the inserted lines are not searched again: text=a\naa\na\nz caret=0:0 sel=- mod=T undo=T redo=F events=range:0:0,0:4,2:1;mod:T
+with a lone CR: 2
+edit nor after a lone CR: text=a\naa\na\nz caret=0:0 sel=- mod=T undo=T redo=F events=range:0:0,0:4,2:1;mod:T
+scoped with breaks: 2 end 1:4
+edit line breaks in a line before the last: the last line is taken for another one (recorded as it is): text=x1\n22y\n1\n22 end caret=0:0 sel=- mod=T undo=T redo=F events=range:0:0,0:4,1:3;range:2:0,2:6,3:6;mod:T
+breaks in the last line: 1 end 2:5
+edit the end of the range after line breaks in the last line: text=xy\n1\n22 bb caret=0:0 sel=- mod=T undo=T redo=F events=range:1:0,1:5,2:5;mod:T
+scoped in one line: 2 end 1:5
+edit the end of the range in the same line: text=x123y\n123 end caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,4,5;line:1,0,6,7;mod:T
+shorter: 3
+edit the caret brought into the shorter line: text=\nz caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,6,0;mod:T
