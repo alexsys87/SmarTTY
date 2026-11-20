@@ -515,6 +515,112 @@ internal static class Program
         Equal(editor.Take(), "hint1 dismiss", "no caret: the hint closes");
     }
 
+    private static readonly string[] ListNames = { "Value", "ValueType", "get_value", "getValue", "int", "MAX_VALUE", "max", "sum", "valid", "value", "values",
+        "xvalue", "my_get_value", "smallest", "MaxAllowed", "ReadAllText", "ReadAllLines", "SunRa", "Vector3d", "ReadAll", "GetAllItems", "OmeGa", "RunApp" };
+
+    private static string Describe(SuggestionMatch match, IList<string> names)
+    {
+        if (match.Kind != SuggestionMatchKind.Filtered)
+        {
+            return match.Kind + " " + names[match.Index];
+        }
+        List<string> top = new List<string>();
+        foreach (int index in match.Matches)
+        {
+            top.Add(names[index]);
+        }
+        return "Filtered " + string.Join(" ", top);
+    }
+
+    private static void Match(string prefix, bool substrings, string expected, string name)
+    {
+        Equal(Describe(SuggestionListMatch.Find(ListNames, prefix, substrings, StringComparer.CurrentCultureIgnoreCase), ListNames), expected, name);
+    }
+
+    private static void ListMatchChecks()
+    {
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        Match("", false, "Item Value", "an empty word selects the first item");
+        Match("value", false, "Item Value", "the same name in other letters: the first one");
+        Match("values", true, "Item values", "the same name");
+        Match("va", true, "Item Value", "the first name the word starts");
+        Match("GetV", true, "Item getValue", "a start in other letters");
+        Match("get", false, "Item get_value", "the first of two names it starts");
+        Match("max", true, "Item max", "the same name before an earlier name it starts");
+        Match("vx", false, "Nearest RunApp", "no match without substrings: the last item before the word");
+        Match("zz", true, "Nearest RunApp", "no match with substrings either: the last item before it");
+        Match("_", false, "Nearest Value", "nothing before the word: the first item");
+        Match("gv", true, "Nearest GetAllItems", "an abbreviation is compared in the same letters: none, so the nearest item");
+        Match("GV", true, "Filtered getValue", "an abbreviation of the capital letters");
+        Match("VT", true, "Filtered ValueType", "another");
+        Match("V3", true, "Filtered Vector3d", "a digit starts a word of the abbreviation");
+        Match("RA", true, "Filtered ReadAll RunApp ReadAllText ReadAllLines SunRa", "the exact abbreviations first, then those it starts, then the names with a word that is the typed one");
+        Match("RAT", true, "Filtered ReadAllText", "an exact abbreviation that is the only match");
+        Match("GA", true, "Filtered OmeGa GetAllItems", "a word that is the typed one goes first when no abbreviation is exact");
+        Match("all", true, "Filtered ReadAllText ReadAllLines ReadAll GetAllItems MaxAllowed smallest", "the names with the word, then those with a word it starts, then those it is a part of");
+        Match("type", true, "Filtered ValueType", "a word it starts");
+        Match("alu", true, "Filtered Value ValueType get_value getValue value values xvalue my_get_value MAX_VALUE", "a part of the name, the same letters first");
+        Match("ALU", true, "Filtered MAX_VALUE Value ValueType get_value getValue value values xvalue my_get_value", "a part in the same letters first, then in others");
+        Match("_", true, "Filtered get_value MAX_VALUE my_get_value", "an underscore is a part too");
+        Match("alu", false, "Nearest Value", "without substrings no part counts");
+        Match("RA", false, "Nearest OmeGa", "nor an abbreviation");
+
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("getValue")), "get|Value", "a capital letter starts a word");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("Vector3d")), "Vector|3d", "so does a digit");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("get_value")), "get", "an underscore ends one and the rest up to the next one is skipped");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("a_b_cD")), "a|D", "a second underscore skips on to the end; a capital letter starts a word again");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("MAX_VALUE")), "M|A|X|V|A|L|U|E", "capital letters each start a word, after an underscore too");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("")), "", "no words in nothing");
+        Equal(string.Join("|", SuggestionListMatch.SplitWords("_x")), "_x", "the first character starts a word, an underscore too");
+
+        ISuggestion item = new CatalogItem("getValue");
+        int asked = 0;
+        Func<string> text(string value) => () => { asked++; return value; };
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Escape, item, text("")), SuggestionListKeyAction.Hide, "Escape hides");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Menu, null, text("")), SuggestionListKeyAction.Hide, "Alt hides, with no item too");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Return, item, text("x")), SuggestionListKeyAction.Accept, "Enter accepts");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Tab, item, text("x")), SuggestionListKeyAction.Accept, "Tab accepts");
+        Equal(asked, 0, "the typed word is not asked for Enter or Tab");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("getV")), SuggestionListKeyAction.Accept, "a blank accepts an item that continues the word");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("")), SuggestionListKeyAction.Accept, "and after no word");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("getValue")), SuggestionListKeyAction.Accept, "and after the whole name");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("GETV")), SuggestionListKeyAction.HideAndTypeBlank, "a blank after the word in other letters is typed");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("gv")), SuggestionListKeyAction.HideAndTypeBlank, "and after a word it does not continue");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, item, text("getValues")), SuggestionListKeyAction.HideAndTypeBlank, "and after a longer word");
+        Equal(asked, 6, "the typed word is asked once for each blank");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Return, null, text("")), SuggestionListKeyAction.None, "Enter with no item is not taken");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Space, null, text("")), SuggestionListKeyAction.None, "a blank with no item is not taken");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Tab, null, text("")), SuggestionListKeyAction.Forward, "Tab with no item goes to the editor");
+        Equal(asked, 6, "the typed word is not asked without an item");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.Home, item, text("")), SuggestionListKeyAction.ForwardAndSelectFirst, "Home");
+        Equal(SuggestionListMatch.MapKey(VirtualKey.End, null, text("")), SuggestionListKeyAction.ForwardAndSelectLast, "End");
+        foreach (VirtualKey key in new[] { VirtualKey.Left, VirtualKey.Right, VirtualKey.Delete })
+        {
+            Equal(SuggestionListMatch.MapKey(key, item, text("")), SuggestionListKeyAction.Forward, key + " goes to the editor");
+        }
+        foreach (VirtualKey key in new[] { VirtualKey.Up, VirtualKey.Down, VirtualKey.PageUp, VirtualKey.PageDown, VirtualKey.Back, VirtualKey.Q })
+        {
+            Equal(SuggestionListMatch.MapKey(key, item, text("")), SuggestionListKeyAction.None, key + " stays in the list");
+        }
+    }
+
+    private sealed class CatalogItem : ISuggestion
+    {
+        public CatalogItem(string name) { DisplayName = name; }
+
+        public int ImageIndex => -1;
+
+        public string DisplayName { get; }
+
+        public string DetailText => "";
+
+        public string HintText => "";
+
+        public bool IsBold => false;
+
+        public string HintDescription => null;
+    }
+
     private static bool Contains(IEnumerable<ISuggestion> items, string name)
     {
         foreach (ISuggestion item in items)
@@ -532,6 +638,7 @@ internal static class Program
         ListChecks();
         SwitchChecks();
         HintChecks();
+        ListMatchChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " editor completion checks passed.");
     }
