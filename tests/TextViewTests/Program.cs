@@ -1453,8 +1453,8 @@ internal static class Program
 
     private static void Completion(CodeEditorPP code, string what)
     {
-        string hint = (string)typeof(CodeEditorPP).GetField("_signatureHintName", Private).GetValue(code);
-        object controller = typeof(CodeEditorPP).GetField("_signatureHintController", Private).GetValue(code);
+        string hint = code.Completion.SignatureHintName;
+        object controller = typeof(EditorCompletion).GetField("_signatureHintController", Private).GetValue(code.Completion);
         object view = controller == null ? null : typeof(SignatureHintController).GetField("_view", Private).GetValue(controller);
         if (view != null)
         {
@@ -1478,7 +1478,7 @@ internal static class Program
         code.CompletionLanguage = SyntaxHighlighting.Language.CLike;
         code.CompletionEnabled = true;
         code.CompletionOnTyping = true;
-        typeof(CodeEditorPP).GetField("_suggestionController", Private).SetValue(code, new SuggestionController(new LoggingPopupFactory { Host = code }));
+        typeof(EditorCompletion).GetField("_suggestionController", Private).SetValue(code.Completion, new SuggestionController(new LoggingPopupFactory { Host = code }));
         Application.DoEvents();
         void TypeInto(string text)
         {
