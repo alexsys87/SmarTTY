@@ -7,7 +7,7 @@ using System.Text;
 
 namespace SmarTTY.Controls;
 
-public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget, ITextEditView
+public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget, ITextReplaceHost
 {
     public delegate void ModifiedChangedHandler(EditableTextBrowser editableTextBrowser, bool modified);
 
@@ -102,11 +102,6 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         return EditableDocument.GetRangeText(start, end);
     }
 
-    private void ExecuteCommand(TextEditCommand editCommand)
-    {
-        History.Execute(editCommand);
-    }
-
     /// <summary>Runs several edits (ReplaceText calls) so that a single Undo reverts all of them.</summary>
     public void ExecuteAsSingleUndoStep(Action edits)
     {
@@ -143,65 +138,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         {
             return 0;
         }
-        replacement = replacement ?? "";
-        bool scoped = scopeStart.IsValid && scopeEnd.IsValid;
-        TextDocument.TextPosition caret = CaretPosition;
-        int count = 0;
-        int firstLine = scoped ? Math.Max(0, scopeStart.Line) : 0;
-        int lastLine = scoped ? scopeEnd.Line : (Doc.LineCount - 1);
-        int endLine = scopeEnd.Line;
-        int endColumn = scopeEnd.Column;
-        ExecuteAsSingleUndoStep(() =>
-        {
-            for (int line = firstLine; line <= lastLine && line < Doc.LineCount; line++)
-            {
-                string text = Doc.GetLineText(line);
-                int from = (scoped && line == scopeStart.Line) ? scopeStart.Column : 0;
-                int to = (scoped && line == scopeEnd.Line) ? Math.Min(scopeEnd.Column, text.Length) : text.Length;
-                string replaced = matcher.ReplaceAll(text, from, to, replacement, out int lineCount, out int newTo);
-                if (lineCount == 0)
-                {
-                    continue;
-                }
-                count += lineCount;
-                ReplaceText(new TextDocument.TextPosition(0, line), new TextDocument.TextPosition(text.Length, line), select: false, replaced);
-                // A replacement with line breaks adds lines: do not search the inserted text again.
-                int added = CountLineBreaks(replaced);
-                if (scoped && line == scopeEnd.Line)
-                {
-                    int lastBreak = replaced.LastIndexOfAny(new[] { '\r', '\n' });
-                    endLine = scopeEnd.Line + added;
-                    endColumn = (added == 0) ? newTo : Math.Max(0, newTo - (lastBreak + 1));
-                }
-                line += added;
-                lastLine += added;
-            }
-        });
-        if (scoped)
-        {
-            newScopeEnd = new TextDocument.TextPosition(endColumn, endLine);
-        }
-        if (count > 0)
-        {
-            int caretLine = Math.Min(caret.Line, Math.Max(0, Doc.LineCount - 1));
-            SetSelection(false, CaretPosition);
-            SetCaret(new TextDocument.TextPosition(Math.Min(caret.Column, Doc.GetLineText(caretLine).Length), caretLine));
-            Redraw();
-        }
-        return count;
-    }
-
-    private static int CountLineBreaks(string text)
-    {
-        int count = 0;
-        for (int i = 0; i < text.Length; i++)
-        {
-            if (text[i] == '\n' || (text[i] == '\r' && (i + 1 == text.Length || text[i + 1] != '\n')))
-            {
-                count++;
-            }
-        }
-        return count;
+        return Replacing.ReplaceAll(matcher, replacement, scopeStart, scopeEnd, out newScopeEnd);
     }
 
     /// <summary>There is an edit that <see cref="Undo"/> would revert.</summary>
@@ -242,54 +179,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
 
     protected void ReplaceTextCore(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string replacement)
     {
-        if (select)
-        {
-            end = start;
-        }
-        if (SingleLine)
-        {
-            replacement = replacement.Replace("\r\n", "").Replace("\n", "");
-        }
-        if (start.Column == -1)
-        {
-            start.Column = GetLineOrNull(start.Line).Length;
-        }
-        if (end.Column == -1)
-        {
-            end.Column = GetLineOrNull(end.Line).Length;
-        }
-        if (start == end && string.IsNullOrEmpty(replacement))
-        {
-            // Nothing to change (e.g. Backspace at the start of the document): do not mark the
-            // file as modified and do not record an empty undo step.
-            return;
-        }
-        if (replacement == "" && end.Column == 0 && end.Line == start.Line + 1 && start.Column == EditableDocument.GetLineText(start.Line).Length)
-        {
-            end.Column = IndentEdits.SharedIndentLength(GetIndentation(start.Line), EditableDocument.GetLineText(end.Line));
-        }
-        if (start.Line == end.Line && replacement.IndexOfAny(new char[2] { '\r', '\n' }) == -1)
-        {
-            ExecuteCommand(new ReplaceInLineCommand(this, start.Line, Math.Min(start.Column, end.Column), Math.Abs(start.Column - end.Column), replacement));
-            return;
-        }
-        TextDocument.TextPosition rangeStart;
-        TextDocument.TextPosition rangeEnd;
-        if (select)
-        {
-            rangeStart = (rangeEnd = start);
-        }
-        else if (start < end)
-        {
-            rangeStart = start;
-            rangeEnd = end;
-        }
-        else
-        {
-            rangeStart = end;
-            rangeEnd = start;
-        }
-        ExecuteCommand(new ReplaceRangeCommand(this, rangeStart, rangeEnd, replacement, _useExistingLineEnding));
+        Replacing.Replace(start, end, select, replacement);
     }
 
     public void Indent(int levels)
@@ -298,7 +188,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         {
             return;
         }
-        ExecuteCommand(new IndentCommand(this, levels));
+        History.Execute(new IndentCommand(this, levels));
     }
 
     protected virtual void OnLineChanged(int line, int column, int addedLength, int removedLength)

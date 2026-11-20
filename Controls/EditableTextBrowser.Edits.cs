@@ -3,9 +3,18 @@ using SmarTTY.TextEditing;
 
 namespace SmarTTY.Controls;
 
-// The edit commands are CodeEditing/TextEditCommands (stage 3D); this partial gives them what they use of the view.
+// The edit commands are CodeEditing/TextEditCommands and what an edit becomes is CodeEditing/TextReplace (stage 3D); this partial gives them what
+// they use of the view.
 public partial class EditableTextBrowser
 {
+    // Made when it is first used: the base classes may ask before the constructor has run.
+    private TextReplace _replace;
+
+    /// <summary>What an edit becomes, and Replace All.</summary>
+    internal TextReplace Replacing => _replace ?? (_replace = new TextReplace(this, History));
+
+    bool ITextReplaceHost.UseExistingLineEnding => _useExistingLineEnding;
+
     EditableTextDocument ITextEditView.Document => EditableDocument;
 
     bool ITextEditView.HasSelection
