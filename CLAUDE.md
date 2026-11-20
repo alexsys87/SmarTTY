@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -48,7 +48,7 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
-| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds and the inline messages (`WpfTextEditor`), and Tools > WPF text editor lab (`TextLabWindow`); not in the editor tab yet | WPF |
+| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), and Tools > WPF text editor lab (`TextLabWindow`); not in the editor tab yet | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
@@ -72,7 +72,7 @@ DpiAwareControl (WinForms UserControl)
    └─ ReadonlySmartScrollBrowser
       └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
          └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
-            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring
+            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor, .Completion): folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring, the rules of the word list and the parameter hint CodeEditing/EditorCompletion
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
             │                                   shows a hex view it is given (the tab gives it the WPF one) through IHexViewPlace
             └─ TerminalEmulatorBase   the view of a TerminalScreen (Terminal/Emulation): forwards the cursor, the buffers, tab stops, scroll region, writing
@@ -101,7 +101,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) done; next 3D-6, the completion of `CodeEditorPP` on the WPF view, then the view in the editor tab |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; next the view in the editor tab |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -784,3 +784,47 @@ Manual check on Windows (the lab): a message under a column, in the middle, unde
 header and inside a folded block; lines put in and taken out above a message (it moves with its line), a line break at the start of its line;
 the icons and the colours in the light and the dark theme; word wrap on drops them; Up and Down over a message row; a click on a message row puts the
 caret on its line; 100 %, 150 % and 200 % scaling.
+
+Done in 3D-6 (the completion): first a net: `tests/TextViewTests` has a completion run on a real `CodeEditorPP` (its list replaced by a stand-in
+that logs what it is asked, set into the controller by reflection; the hint is the real one), written by the code before the move (the 1399 lines
+of before did not change; 1433 in all, the same on every run): two letters of a word open the list by themselves and not one, the word it is told
+to select, Backspace, a blank that accepts the selected word when it continues the typed one and a mark that closes the list when it does not, a
+word that starts with a digit, Ctrl+Space with and without a word, Escape, the language and the switches; the hint opened by the parenthesis of a
+call, the active parameter after a comma, closed after the call, opened again by Left (a new window) or kept (the same window), hidden while the
+list is open, Escape, the lost focus, completion switched off. Of 27 mutations of the old code 25 make it fail; two are equivalent changes
+(`ShowCompletion` tests the switch itself; a character that is not a letter or a digit leaves no word before the caret). Then
+`CodeEditing/EditorCompletion.cs` (internal) holds what `CodeEditorPP` decided about the list and the hint, as it was: `ShowCompletion`,
+`HideCompletion`, `OnCharTyping`, `OnCharTyped`, `AfterKeyPress`, `OnEscape`, `AfterKeyDown`, `ShowSuggestions`, `ShowSignatureHint`,
+`UpdateSignatureHint`, `HideSignatureHint`, `SetActiveParameter`, `OnLostFocus` (the hint window that takes the focus while it is shown does not
+close it), `RepositionHint`, `Language`, `Enabled`, `OnTyping`, `ApiSymbols`; through `IEditorCompletionHost` (the document, the caret, the typed
+word, the back colour, the windows of the list and of the hint, the focus, the word separators), implemented in
+`Controls/CodeEditorPP.Completion.cs`; Ctrl is a flag. Every golden and stand passes unchanged; the accessors of the run read the model's fields.
+
+Then the list: first a net: `tests/TextViewTests` has a list run on the real `SuggestionListForm` and `SuggestionListView` (1515 lines in all, the
+1433 of before did not change): the item a typed word selects with and without substrings (the same name, a name it starts, the nearest item
+before it), the items put on top and their order (the abbreviations of the capital letters, digits and words, exact first; a word that is the
+typed one or that it starts; the parts in the same letters, then in others; the rest grey), and the keys (Escape and Alt hide; Enter, Tab and a
+blank accept; a blank after a word the item does not continue, in other letters or longer, is typed instead; Home and End; the keys and the
+characters handed to the editor; a double click). Mono keeps the focused item when the selection is cleared, so a list with nothing focused
+cannot be shown there. Of 35 mutations of the old code 34 make it fail; the 35th is an equivalent change. A fault it found, kept as it is: after
+a filtered list the nearest item is counted in the filtered order and selected after the order is put back, so another item is selected. Then
+`Completion/SuggestionListMatch.cs` (public static): `Find` (the old `SelectMatch` on the names of the list: the index to select, or the indexes
+that go on top), `SplitWords`, `MapKey` (the old `HandleKey` and the keys the view handed on, as a `SuggestionListKeyAction`); the form keeps the
+items, their colours and the order, the view the window and the messages. Not word for word: the typed word is read once for a blank, not twice.
+`tests/EditorCompletionModelTests` (net8.0, compiled like `ModelBuildTests`, a fake editor over a real document and fake windows under the real
+controllers, 166 checks) drives both models; of 63 mutations of `EditorCompletion` 59 make a check fail (some after checks were added: a list
+of another language, a word that starts with 0, a hint window that closed by itself), four are equivalent changes; of 32 of `SuggestionListMatch`
+31 (one is equivalent).
+
+For the WPF view: `WpfTextEditor` keeps an `EditorCompletion` as `CodeEditorPP` does (the typing hooks, `AfterKeyPress` after a typed character,
+`AfterKeyDown` after a key, Escape, Ctrl+Space, the lost focus, the scroll) and `CompletionEnabled`, `CompletionOnTyping`, `CompletionLanguage`,
+`ApiSymbols`, `ShowCompletion`. `GUI/TextView/WpfSuggestionList` is the list on `SuggestionListMatch`: a popup under the caret that never takes
+the keyboard; the editor hands it its keys first (Up, Down and the pages move the selection, the rest as `MapKey`), a click selects and a double
+click accepts, the signature of the selected item is shown beside it; a click in the text and the lost focus close it.
+`GUI/TextView/WpfHintView` is the hint (the active parameter in bold, one per line for a vertical signature, the description, above the caret
+when the controller asks). The lab has switches for the completion and for completion on typing and takes the API symbols of the settings. Manual
+check on Windows (the lab): two letters of a word open the list (with completion on typing), Ctrl+Space; Up, Down, PageUp, PageDown, Home, End;
+Enter, Tab and a blank accept, a blank after a word the item does not continue is typed; a mark closes the list; Escape; a click on an item and a
+double click; the list near the bottom and the right edge of the screen; the hint of a function of the file and of a C library function (API
+symbols on): the parameter after a comma, closed after the call, Left and Right back into it, scrolled; the light and the dark theme; 100 %,
+150 % and 200 % scaling.
