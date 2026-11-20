@@ -288,6 +288,7 @@ internal static class Program
         FoldRuns();
         MessageRuns();
         CompletionRuns();
+        ListRuns();
         _form.Dispose();
     }
 
@@ -1576,5 +1577,170 @@ internal static class Program
         Completion(code, "no hint with completion off");
         _form.Controls.Remove(code);
         code.Dispose();
+    }
+
+    // ---- 3D-6: the list of the completion (Forms/SuggestionListForm with its Controls/SuggestionListView), written by the code before what it decides
+    // moved to the model: the item a typed word selects (the same name, a name it starts, the nearest one before it), the items it puts on top when
+    // substrings are allowed (an abbreviation of the capital letters and the words, a word of the name, a part of it; the rest grey) and the order
+    // they come back in, and the keys of the list (Escape and Alt hide it, Enter, Tab and a blank accept the selected item, a blank that does not
+    // continue the typed word is typed instead, Home and End select the first and the last item and move the caret too, the other keys and the
+    // characters go to the editor).
+
+    private sealed class ListItem : ISuggestion
+    {
+        public ListItem(string name) { DisplayName = name; }
+
+        public int ImageIndex => -1;
+
+        public string DisplayName { get; }
+
+        public string DetailText => "";
+
+        public string HintText => "";
+
+        public bool IsBold => false;
+
+        public string HintDescription => null;
+    }
+
+    private sealed class ListSource : ISuggestionSource
+    {
+        public List<ISuggestion> List = new List<ISuggestion>();
+
+        public System.Collections.IEnumerable Images => new object[0];
+
+        public IEnumerable<ISuggestion> Items => List;
+    }
+
+    private sealed class ListHost : ICompletionHost
+    {
+        public readonly List<string> Log = new List<string>();
+
+        public Control Control;
+
+        public string Text = "";
+
+        public Control HostControl => Control;
+
+        public string CurrentText => Text;
+
+        public System.Drawing.Rectangle CaretScreenBounds => new System.Drawing.Rectangle(10, 10, 100, 16);
+
+        public void AcceptSuggestion(ISuggestion suggestion, Keys keys) { Log.Add("accept " + suggestion.DisplayName + " " + keys); }
+
+        public void ForwardMessage(Message message) { Log.Add("forward " + message.Msg + " " + message.WParam.ToInt64()); }
+
+        public void SetPopupActive(bool changed) { Log.Add("active " + changed); }
+    }
+
+    private static string ListState(SmarTTY.Forms.SuggestionListForm form, ListView view)
+    {
+        StringBuilder text = new StringBuilder();
+        foreach (ListViewItem item in view.Items)
+        {
+            text.Append(item.Text);
+            if (item.ForeColor == System.Drawing.Color.DarkGray)
+            {
+                text.Append("~");
+            }
+            else if (item.ForeColor == System.Drawing.Color.Black)
+            {
+                text.Append("!");
+            }
+            else if (item.ForeColor != view.ForeColor)
+            {
+                text.Append("?");
+            }
+            text.Append(' ');
+        }
+        string selected = "";
+        foreach (int index in view.SelectedIndices)
+        {
+            selected += index + " ";
+        }
+        return "items=" + text.ToString().TrimEnd() + " selected=" + selected.TrimEnd() + " focused=" + (view.FocusedItem == null ? "-" : view.FocusedItem.Text)
+            + " filtered=" + typeof(SmarTTY.Forms.SuggestionListForm).GetField("_isFiltered", Private).GetValue(form) + " visible=" + form.Visible;
+    }
+
+    private static void ListRuns()
+    {
+        Lines.Add("== list");
+        ListSource source = new ListSource();
+        foreach (string name in new[] { "Value", "ValueType", "get_value", "getValue", "int", "MAX_VALUE", "max", "sum", "valid", "value", "values", "xvalue", "my_get_value", "MaxAllowed", "ReadAllText", "ReadAllLines", "SunRa", "Vector3d", "ReadAll", "GetAllItems", "OmeGa" })
+        {
+            source.List.Add(new ListItem(name));
+        }
+        ListHost host = new ListHost { Control = _form };
+        SmarTTY.Forms.SuggestionListForm form = new SmarTTY.Forms.SuggestionListForm(host, false);
+        ListView view = (ListView)typeof(SmarTTY.Forms.SuggestionListForm).GetField("listView1", Private).GetValue(form);
+        // The list keeps its selection only once its window exists.
+        form.CreateControl();
+        GC.KeepAlive(view.Handle);
+        form.SetSource(source);
+        Lines.Add("list source: " + ListState(form, view));
+        foreach (bool substrings in new[] { false, true })
+        {
+            foreach (string prefix in new[] { "", "va", "VAL", "value", "Value", "values", "vx", "gv", "GV", "GetV", "type", "max", "MV", "alu", "ALU", "zz", "_", "my", "VT", "get", "value", "a", "RA", "RAT", "all", "V3", "ra", "GA" })
+            {
+                form.SelectMatch(prefix, substrings);
+                Lines.Add("list " + (substrings ? "substrings" : "prefix") + " '" + prefix + "': " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+                host.Log.Clear();
+            }
+        }
+        // After a filtered list the nearest item is counted in the filtered order and selected in the order put back (recorded as it is).
+        form.SelectMatch("gv", true);
+        Lines.Add("list substrings 'gv' after a filtered list: " + ListState(form, view));
+        form.SelectMatch("getV", false);
+        form.Show();
+        Application.DoEvents();
+        host.Log.Clear();
+        void Press(string what, int msg, long key, string currentText)
+        {
+            host.Text = currentText;
+            if (!form.Visible)
+            {
+                form.Show();
+                Application.DoEvents();
+            }
+            host.Log.Clear();
+            Message message = Message.Create(view.Handle, msg, (IntPtr)key, IntPtr.Zero);
+            bool handled = view.PreProcessMessage(ref message);
+            Lines.Add("list key " + what + ": handled=" + handled + " " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        }
+        Press("Escape", 256, (long)Keys.Escape, "gv");
+        Press("Alt", 260, (long)Keys.Menu, "gv");
+        Press("Enter", 256, (long)Keys.Return, "gv");
+        Press("Tab", 256, (long)Keys.Tab, "gv");
+        Press("a blank after a word the item does not continue", 256, (long)Keys.Space, "gv");
+        Press("a blank after a word the item continues", 256, (long)Keys.Space, "getV");
+        Press("a blank after the word in other letters", 256, (long)Keys.Space, "GETV");
+        Press("a blank after a longer word", 256, (long)Keys.Space, "getValues");
+        Press("a blank after no word", 256, (long)Keys.Space, "");
+        Press("Home", 256, (long)Keys.Home, "gv");
+        Press("End", 256, (long)Keys.End, "gv");
+        Press("Left", 256, (long)Keys.Left, "gv");
+        Press("Right", 256, (long)Keys.Right, "gv");
+        Press("Delete", 256, (long)Keys.Delete, "gv");
+        Press("a system key Left", 260, (long)Keys.Left, "gv");
+        Press("a character", 258, 'q', "gv");
+        Press("Down", 256, (long)Keys.Down, "gv");
+        Press("a letter key", 256, (long)Keys.Q, "gv");
+        // Mono keeps the focused item when the selection is cleared and does not take a null one.
+        view.SelectedIndices.Clear();
+        view.FocusedItem = null;
+        Press("Enter with nothing selected", 256, (long)Keys.Return, "gv");
+        Press("Tab with nothing selected", 256, (long)Keys.Tab, "gv");
+        Press("a blank with nothing selected", 256, (long)Keys.Space, "gv");
+        form.SelectMatch("sum", false);
+        host.Log.Clear();
+        typeof(SmarTTY.Controls.SuggestionListView).GetMethod("OnDoubleClick", Private).Invoke(view, new object[] { EventArgs.Empty });
+        Lines.Add("list double click: " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        form.Show();
+        Application.DoEvents();
+        view.SelectedIndices.Clear();
+        host.Log.Clear();
+        form.AcceptSelected();
+        Lines.Add("list accept with nothing selected: " + ListState(form, view) + " log=" + string.Join(";", host.Log));
+        form.Dispose();
     }
 }
