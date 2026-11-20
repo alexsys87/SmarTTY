@@ -254,6 +254,26 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         CancelHover();
     }
 
+    // The style of the highlight of a pair of brackets of a kind.
+    private HighlightStyle PairHighlightStyle(BracketPairKind kind)
+    {
+        switch (kind)
+        {
+            case BracketPairKind.Paren:
+                return this.ParenHighlightStyle;
+            case BracketPairKind.Bracket:
+                return BracketHighlightStyle;
+            case BracketPairKind.Brace:
+                return BraceHighlightStyle;
+            case BracketPairKind.Angle:
+                return AngleHighlightStyle;
+            case BracketPairKind.Unpaired:
+                return UnpairedHighlightStyle;
+            default:
+                return DefaultPairHighlightStyle;
+        }
+    }
+
     protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
         if (!_applyingMultiCursor)
@@ -264,70 +284,15 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         CancelHover();
         if (!hasSelection)
         {
-            TokenCache.Token token = _tokenCache.FindNearestToken(currentCaret.Line, currentCaret.Column);
-            if (token == null || token.Kind != TokenCache.Token.TokenKind.Paired || CaretPosition.Line != token.LineNumber || CaretPosition.Column != token.End)
+            BracketPairKind kind = BracketPair.Find(_tokenCache, base.EditableDocument, currentCaret, CaretPosition, out TextDocument.TextPosition pairStart, out TextDocument.TextPosition pairEnd);
+            if (kind == BracketPairKind.None)
             {
                 RemoveHighlight(_pairHighlightId);
                 _pairHighlightId = -1;
             }
-            else
+            else if (kind != BracketPairKind.Keep)
             {
-                string text = base.EditableDocument.GetLineText(token.LineNumber);
-                string tokenText = "";
-                if (token.End <= text.Length)
-                {
-                    tokenText = text.Substring(token.Start, token.End - token.Start);
-                }
-                if (tokenText.Length >= 1)
-                {
-                    HighlightStyle highlightStyle;
-                    switch (tokenText[0])
-                    {
-                        case '(':
-                        case ')':
-                            highlightStyle = this.ParenHighlightStyle;
-                            break;
-                        case '[':
-                        case ']':
-                            highlightStyle = BracketHighlightStyle;
-                            break;
-                        case '{':
-                        case '}':
-                            highlightStyle = BraceHighlightStyle;
-                            break;
-                        case '<':
-                        case '>':
-                            highlightStyle = AngleHighlightStyle;
-                            break;
-                        default:
-                            highlightStyle = DefaultPairHighlightStyle;
-                            break;
-                    }
-                    TextDocument.TextPosition pairStart;
-                    TextDocument.TextPosition pairEnd;
-                    if (token.Partner == null)
-                    {
-                        highlightStyle = UnpairedHighlightStyle;
-                        pairStart = token.StartPosition;
-                        pairEnd = token.EndPosition;
-                        if (pairStart < pairEnd)
-                        {
-                            pairEnd = token.StartPosition;
-                            pairStart = token.EndPosition;
-                        }
-                    }
-                    else if (token.StartPosition < token.Partner.StartPosition)
-                    {
-                        pairStart = token.StartPosition;
-                        pairEnd = token.Partner.EndPosition;
-                    }
-                    else
-                    {
-                        pairStart = token.Partner.StartPosition;
-                        pairEnd = token.EndPosition;
-                    }
-                    _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, highlightStyle);
-                }
+                _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, PairHighlightStyle(kind));
             }
         }
         base.OnSelectionChanged(previousCaret, currentCaret, hasSelection, selectionChangeSource);

@@ -3786,7 +3786,9 @@ internal static class Program
         string browser = File.ReadAllText(Path.Combine(root, "Controls", "ReadonlyTextBrowser.cs"));
         Check(browser.Contains("public bool ShowAllCharacters") && browser.Contains("_showAllCharacters = value"),
             "the editor draws the invisible-character marks through a ShowAllCharacters property");
-        Check(browser.Contains("PaintInvisibleCharacters") && browser.Contains("\"¶\"") && browser.Contains("0x2400 + ch"),
+        // The marks are CodeEditing/BlankMarks since stage 3E; the view draws them.
+        string marks = File.ReadAllText(Path.Combine(root, "CodeEditing", "BlankMarks.cs"));
+        Check(browser.Contains("PaintInvisibleCharacters") && browser.Contains("BlankMarks.LineMarks") && marks.Contains("\"¶\"") && marks.Contains("0x2400 + ch"),
             "the overlay marks spaces, tabs, line ends and control characters");
         string commands = File.ReadAllText(Path.Combine(root, "Controls", "EditorCommandState.cs"));
         Check(commands.Contains("ShowAllCharacters") && commands.Contains("public bool IsChecked"),

@@ -2530,41 +2530,17 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
     }
 
+    private readonly List<BlankMark> _blankMarks = new List<BlankMark>();
+
     private void PaintInvisibleCharacters(Graphics graphics, int line, string text, int firstColumn, int top)
     {
         int lastColumn = _rowLastColumn >= 0 ? _rowLastColumn : firstColumn + _visibleColumns - 1;
-        int column = 0;
-        for (int i = 0; i < text.Length; i++)
-        {
-            char ch = text[i];
-            int nextColumn = (ch == '\t') ? (column + TabSize - column % TabSize) : (column + 1);
-            if (column >= firstColumn && column <= lastColumn)
-            {
-                if (ch == '\t')
-                {
-                    DrawInvisibleCharacter(graphics, "→", column, top);
-                }
-                else
-                {
-                    string marker = GetInvisibleCharacterMarker(ch);
-                    if (marker != null)
-                    {
-                        DrawInvisibleCharacter(graphics, marker, column, top);
-                    }
-                }
-            }
-            column = nextColumn;
-            if (column > lastColumn)
-            {
-                // The rest of the line, including its line break, is off screen.
-                return;
-            }
-        }
         // The line break itself is not a part of the line text. The last line of the document has none, even when the
         // model gives it the ending of the line above (see TextDocument.SplitLines).
-        if (column >= firstColumn && column <= lastColumn && line < _document.LineCount - 1)
+        BlankMarks.LineMarks(text, TabSize, firstColumn, lastColumn, line < _document.LineCount - 1, _blankMarks);
+        foreach (BlankMark mark in _blankMarks)
         {
-            DrawInvisibleCharacter(graphics, "¶", column, top);
+            DrawInvisibleCharacter(graphics, mark.Marker, mark.Column, top);
         }
     }
 
@@ -2575,38 +2551,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private static string GetInvisibleCharacterMarker(char ch)
     {
-        if (ch == ' ')
-        {
-            return "·";
-        }
-        if (ch == '\u00A0')
-        {
-            // A no-break space looks like a space but is another character; show it as a ring.
-            return "°";
-        }
-        if (char.IsControl(ch))
-        {
-            if (ch == '\u007F')
-            {
-                return "\u2421";
-            }
-            if (ch < '\u0020')
-            {
-                return ((char)(0x2400 + ch)).ToString();
-            }
-            // C1 control characters have no control picture: a replacement mark still shows them.
-            return "\uFFFD";
-        }
-        if (char.IsWhiteSpace(ch))
-        {
-            return "·";
-        }
-        if (char.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.Format)
-        {
-            // Zero-width joiner, BOM, soft hyphen and the bidirectional marks: invisible but present.
-            return "\uFFFD";
-        }
-        return null;
+        return BlankMarks.Marker(ch);
     }
 
     public int AddHighlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
@@ -3086,108 +3031,41 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     /// </summary>
     public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, TextMatcher matcher, bool searchBackward, bool wrapAround, FindSelectMode findSelectMode, TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd)
     {
-        if (_document == null || _document.LineCount == 0 || matcher == null)
+        if (TextSearch.TryFind(_document, textPosition, matcher, searchBackward, wrapAround, scopeStart, scopeEnd, out int line, out int matchIndex, out int matchLength))
         {
-            return new TextDocument.TextPosition(-1, -1);
-        }
-        bool scoped = scopeStart.IsValid && scopeEnd.IsValid;
-        int firstLine = scoped ? Math.Max(0, scopeStart.Line) : 0;
-        int lastLine = scoped ? Math.Min(scopeEnd.Line, _document.LineCount - 1) : (_document.LineCount - 1);
-        int direction = ((!searchBackward) ? 1 : (-1));
-        int startColumn = textPosition.Column;
-        // A caret that is outside the lines to search (after a failed search it stands behind the last line): the search goes on from
-        // the edge of the range, in its direction, instead of finding nothing without a wrap-around.
-        if (textPosition.Line > lastLine && searchBackward)
-        {
-            textPosition.Line = lastLine;
-            startColumn = -1;
-        }
-        else if (textPosition.Line < firstLine && !searchBackward)
-        {
-            textPosition.Line = firstLine;
-            startColumn = -1;
-        }
-        for (int pass = 0; pass < 2; pass++)
-        {
-            for (int line = textPosition.Line; line >= firstLine && line <= lastLine; line += direction)
+            TextDocument.TextPosition position = new TextDocument.TextPosition
             {
-                string text = _document.GetLineText(line);
-                if (text == null)
+                Column = matchIndex,
+                Line = line
+            };
+            if (findSelectMode != FindSelectMode.None)
+            {
+                if (TerminalMode)
                 {
-                    continue;
-                }
-                // The part of the line that may hold a match: the whole line, or what the scope leaves of it.
-                int lower = (scoped && line == firstLine) ? scopeStart.Column : 0;
-                int upper = (scoped && line == lastLine) ? Math.Min(scopeEnd.Column, text.Length) : text.Length;
-                int from;
-                int to;
-                if (searchBackward)
-                {
-                    from = lower;
-                    to = (startColumn == -1) ? upper : Math.Min(startColumn, upper);
+                    SetSelectionEnd(position);
+                    SetSelectionCore(select: true, new TextDocument.TextPosition
+                    {
+                        Line = line,
+                        Column = matchIndex + matchLength
+                    }, SelectionChangeSource.FindResult);
+                    EnsureCaretVisible(position);
                 }
                 else
                 {
-                    from = (startColumn == -1) ? lower : Math.Max(startColumn, lower);
-                    to = upper;
-                }
-                if (matcher.Match(text, from, to, searchBackward, allowEmpty: false, out int matchIndex, out int matchLength))
-                {
-                    TextDocument.TextPosition position = new TextDocument.TextPosition
+                    SetCaretCore(position, SelectionChangeSource.FindResult);
+                    SetSelectionCore(select: true, new TextDocument.TextPosition
                     {
-                        Column = matchIndex,
-                        Line = line
-                    };
-                    if (findSelectMode != FindSelectMode.None)
-                    {
-                        if (TerminalMode)
-                        {
-                            SetSelectionEnd(position);
-                            SetSelectionCore(select: true, new TextDocument.TextPosition
-                            {
-                                Line = line,
-                                Column = matchIndex + matchLength
-                            }, SelectionChangeSource.FindResult);
-                            EnsureCaretVisible(position);
-                        }
-                        else
-                        {
-                            SetCaretCore(position, SelectionChangeSource.FindResult);
-                            SetSelectionCore(select: true, new TextDocument.TextPosition
-                            {
-                                Line = line,
-                                Column = matchIndex + matchLength
-                            }, SelectionChangeSource.FindResult);
-                        }
-                        int matchEnd = matchIndex + matchLength;
-                        if (matchEnd <= _visibleColumns)
-                        {
-                            ScrollColumn = 0;
-                        }
-                        else if (text.Length - matchIndex < _visibleColumns && text.Length > _visibleColumns)
-                        {
-                            ScrollColumn = text.Length - _visibleColumns;
-                        }
-                        else if (matchLength < _visibleColumns)
-                        {
-                            int centerColumn = (matchIndex + matchEnd) / 2;
-                            ScrollColumn = centerColumn - _visibleColumns / 2;
-                        }
-                        else
-                        {
-                            ScrollColumn = matchIndex;
-                        }
-                    }
-                    return position;
+                        Line = line,
+                        Column = matchIndex + matchLength
+                    }, SelectionChangeSource.FindResult);
                 }
-                startColumn = -1;
+                ScrollColumn = TextSearch.ScrollColumnFor(matchIndex, matchLength, _document.GetLineText(line).Length, _visibleColumns);
             }
-            if (!((pass == 0) & wrapAround))
-            {
-                break;
-            }
-            textPosition.Line = (searchBackward ? lastLine : firstLine);
-            startColumn = -1;
+            return position;
+        }
+        if (_document == null || _document.LineCount == 0 || matcher == null)
+        {
+            return new TextDocument.TextPosition(-1, -1);
         }
         if (findSelectMode == FindSelectMode.SelectOrClear)
         {
@@ -3220,21 +3098,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         Redraw();
     }
 
-    // A line longer than this is searched for matches only where it is on the screen, with this margin on each side.
-    private const int LongLineChars = 4096;
-
-    private const int LongLineMargin = 2048;
-
-    /// <summary>The column of <paramref name="target"/>, going on from <paramref name="index"/> and <paramref name="column"/> (as IndexToColumn counts: a tab goes to the next tab stop).</summary>
-    private int AdvanceColumn(string text, ref int index, ref int column, int target)
-    {
-        while (index < target && index < text.Length)
-        {
-            column = (text[index] != '\t') ? (column + 1) : (column + (TabSize - column % TabSize));
-            index++;
-        }
-        return column;
-    }
+    private readonly List<MatchSpan> _matchSpans = new List<MatchSpan>();
 
     private void PaintMatches(Graphics graphics)
     {
@@ -3256,45 +3120,18 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 {
                     continue;
                 }
-                string text = _document.GetLineText(line);
-                if (string.IsNullOrEmpty(text))
-                {
-                    continue;
-                }
                 int y = Round(RowToY(row));
                 int rowFirst = IsWrapping ? _displayRows[row].SegStart : ScrollColumn;
                 int rowEnd = IsWrapping ? _displayRows[row].SegEnd : int.MaxValue;
-                // The part of the line to look at: all of it, or, in a long line (a minified file), what is on the screen with a margin.
-                // Looking at the whole of a line of megabytes on every paint, and counting its columns from its start for every match,
-                // took seconds.
-                int from = 0;
-                int scanEnd = text.Length;
-                if (text.Length > LongLineChars)
+                TextSearch.RowMatches(_document, line, matcher, TabSize, rowFirst, rowEnd, IsWrapping ? rowEnd : rowFirst + _visibleColumns + 1, _matchSpans);
+                foreach (MatchSpan span in _matchSpans)
                 {
-                    int firstIndex = _document.ColumnToIndex(line, rowFirst, TabSize);
-                    int lastIndex = _document.ColumnToIndex(line, IsWrapping ? rowEnd : rowFirst + _visibleColumns + 1, TabSize);
-                    from = Math.Max(0, firstIndex - LongLineMargin);
-                    scanEnd = Math.Min(text.Length, lastIndex + LongLineMargin);
-                }
-                // The column of an index, counted on from the last one asked for (the matches come in order).
-                int countedIndex = from;
-                int countedColumn = (from == 0) ? 0 : _document.IndexToColumn(line, from, TabSize);
-                // A line of a minified file may hold thousands of matches; the first ones are enough to show.
-                for (int shown = 0; shown < 500 && from <= scanEnd && matcher.Match(text, from, scanEnd, backward: false, allowEmpty: false, out int index, out int length); shown++)
-                {
-                    int matchStart = AdvanceColumn(text, ref countedIndex, ref countedColumn, index);
-                    int matchEnd = AdvanceColumn(text, ref countedIndex, ref countedColumn, index + length);
-                    int startX = Round(ColumnToXFrom(matchStart, rowFirst));
-                    int endX = Round(ColumnToXFrom(Math.Min(matchEnd, rowEnd), rowFirst));
-                    if (matchStart >= rowEnd || matchEnd <= rowFirst)
-                    {
-                        endX = startX;
-                    }
+                    int startX = Round(ColumnToXFrom(span.StartColumn, rowFirst));
+                    int endX = Round(ColumnToXFrom(span.EndColumn, rowFirst));
                     if (endX > startX)
                     {
                         graphics.FillRectangle(_matchHighlightBrush, startX, y, endX - startX, _charSize.Height);
                     }
-                    from = index + length;
                 }
             }
         }
