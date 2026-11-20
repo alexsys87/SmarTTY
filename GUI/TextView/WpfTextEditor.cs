@@ -49,6 +49,23 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     // The folded blocks, on the tokens (as CodeEditorPP keeps them); they hide lines only while the lines are not wrapped.
     private readonly FoldingManager _folding;
 
+    // The messages shown in rows of their own under their lines (the problems a check found), as CodeEditorPP keeps them.
+    private readonly InlineMessageProvider _messages = new InlineMessageProvider();
+
+    private RgbColor _messageBackColor = RgbColor.FromArgb(255, 211, 211, 211);
+
+    private RgbColor _messageErrorColor = RgbColor.FromArgb(255, 255, 0, 0);
+
+    private RgbColor _messageWarningColor = RgbColor.FromArgb(255, 184, 134, 11);
+
+    private RgbColor _messageBorderColor = RgbColor.FromArgb(255, 0, 0, 0);
+
+    private ImageSource _errorIcon;
+
+    private ImageSource _warningIcon;
+
+    private bool _iconsLoaded;
+
     private TokenCache.LineTokenizer _tokenizer;
 
     private RgbColor[] _tokenColors = new RgbColor[0];
@@ -268,6 +285,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             // The first line in view stays in view: the rows count differently.
             int firstLine = _layout.RowCount > 0 ? _layout.RowToLine(_layout.FirstRow, out _, out _) : 0;
             _wordWrap = value;
+            // A message is a row of its own under a line, which the wrapped rows do not have: the messages are dropped (as CodeEditorPP does).
+            _messages.Clear();
             _layout.Wrap.Invalidate();
             _layout.InvalidateRows();
             _layout.ScrollX = 0;
@@ -307,6 +326,57 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         // The folds refer to the tokens of the old tokenizer (as CodeEditorPP.Retokenize).
         _folding.Clear();
         _tokens.SetDocument(_document, tokenizer);
+        _layout.InvalidateRows();
+        UpdateScrollBars();
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Adds messages under their lines, as a check reports them: the line and the column counted from 1 (a column of 0: the message goes in the
+    /// middle of its row), a line past the text on the last line.
+    /// </summary>
+    public void AddMessages(IEnumerable<InlineMessageProvider.MessageRequest> messages)
+    {
+        foreach (InlineMessageProvider.MessageRequest message in messages)
+        {
+            _messages.AddReported(message.Line, message.Severity, message.Text, message.Column, _document.LineCount);
+        }
+        AfterMessageChange();
+    }
+
+    /// <summary>Adds a message under a line (the line and the column counted from 1).</summary>
+    public void AddMessage(int line, InlineMessageProvider.MessageSeverity severity, string text, int column)
+    {
+        _messages.AddReported(line, severity, text, column, _document.LineCount);
+        AfterMessageChange();
+    }
+
+    /// <summary>Removes the messages.</summary>
+    public void ClearMessages()
+    {
+        if (_messages.Count == 0)
+        {
+            return;
+        }
+        _messages.Clear();
+        AfterMessageChange();
+    }
+
+    /// <summary>How many messages are shown.</summary>
+    public int MessageCount => _messages.Count;
+
+    /// <summary>The colours of the messages: the band, the text of an error and of a warning, the frame of the band.</summary>
+    public void SetMessageColors(RgbColor background, RgbColor error, RgbColor warning, RgbColor border)
+    {
+        _messageBackColor = background;
+        _messageErrorColor = error;
+        _messageWarningColor = warning;
+        _messageBorderColor = border;
+        InvalidateVisual();
+    }
+
+    private void AfterMessageChange()
+    {
         _layout.InvalidateRows();
         UpdateScrollBars();
         InvalidateVisual();
@@ -950,6 +1020,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     ITextFolds ITextLayoutView.Folds => _folding;
 
+    ILineMessages ITextLayoutView.Messages => _messages;
+
     void ICaretNavigationHost.OnMoveBeyondDocument(ref TextDocument.TextPosition textPosition, int direction)
     {
     }
@@ -992,6 +1064,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     void ITextEditView.OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
         SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int firstLine, out int removedLines, out int addedLines);
+        _messages.ShiftLines(firstLine, removedLines, addedLines);
         _tokens.OnLinesChanged(firstLine, removedLines, addedLines, _tokenizer);
         _folding.RemoveStaleRegions(firstLine, removedLines, addedLines, out _);
         _layout.InvalidateRows();
@@ -1382,6 +1455,89 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         }
     }
 
+    // The row of a message as InlineMessageView draws it: the band under the column of the message (or in the middle of the row), the icon of an
+    // error or a warning, the text in the colour of its kind in a serif font of five eighths of the row, and the frame of the band.
+    private void DrawMessageRow(DrawingContext context, int line, int y, int width)
+    {
+        if (!_messages.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+        {
+            return;
+        }
+        int rowHeight = _layout.RowHeight;
+        int left = _layout.TextLeft;
+        int charWidth = _layout.CharWidth;
+        int scrollColumn = _wordWrap ? 0 : _layout.ScrollX / charWidth;
+        int indentColumn = InlineMessageBand.IndentColumn(message.Column, _document.IndexToColumn(line, message.Column, _tabSize), scrollColumn);
+        // The size of the WinForms font: rowHeight * 5 / 8 points, at the DPI of the device.
+        double emSize = (rowHeight * 5 / 8) * 96.0 / 72.0;
+        bool error = message.Severity == InlineMessageProvider.MessageSeverity.Error;
+        FormattedText text = new FormattedText(message.Text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Times New Roman"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), emSize,
+            Brush(error ? _messageErrorColor : _messageWarningColor), _scale);
+        InlineMessageBand band = InlineMessageBand.Place(left, Math.Max(1, width - left), rowHeight, (float)text.WidthIncludingTrailingWhitespace, indentColumn, charWidth);
+        context.DrawRectangle(Brush(_messageBackColor), null, new Rect(band.BandLeft, y, band.BandWidth, rowHeight));
+        LoadIcons();
+        ImageSource icon = error ? _errorIcon : _warningIcon;
+        if (icon != null)
+        {
+            context.DrawImage(icon, new Rect(band.IconLeft, y, rowHeight, rowHeight));
+        }
+        text.MaxTextWidth = Math.Max(1, band.TextWidth);
+        text.MaxLineCount = 1;
+        context.PushClip(new RectangleGeometry(new Rect(band.TextLeft, y, Math.Max(0, band.TextWidth), rowHeight)));
+        context.DrawText(text, new Point(band.TextLeft, y));
+        context.Pop();
+        Pen border = new Pen(Brush(_messageBorderColor), 1);
+        border.Freeze();
+        context.DrawRectangle(null, border, new Rect(band.BandLeft + 0.5, y + 0.5, band.BandWidth, rowHeight - 1));
+    }
+
+    // The icons of the WinForms view (its resources), with their magenta made transparent as its colour key does.
+    private void LoadIcons()
+    {
+        if (_iconsLoaded)
+        {
+            return;
+        }
+        _iconsLoaded = true;
+        _errorIcon = LoadIcon("message-error");
+        _warningIcon = LoadIcon("message-warning");
+    }
+
+    private static ImageSource LoadIcon(string name)
+    {
+        try
+        {
+            using (System.IO.Stream stream = typeof(WpfTextEditor).Assembly.GetManifestResourceStream("SmarTTY.Icons." + name + ".png"))
+            {
+                if (stream == null)
+                {
+                    return null;
+                }
+                System.Windows.Media.Imaging.BitmapSource source = System.Windows.Media.Imaging.BitmapFrame.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+                System.Windows.Media.Imaging.FormatConvertedBitmap bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+                int stride = bgra.PixelWidth * 4;
+                byte[] pixels = new byte[stride * bgra.PixelHeight];
+                bgra.CopyPixels(pixels, stride, 0);
+                for (int i = 0; i < pixels.Length; i += 4)
+                {
+                    if (pixels[i] == 255 && pixels[i + 1] == 0 && pixels[i + 2] == 255)
+                    {
+                        pixels[i + 3] = 0;
+                    }
+                }
+                System.Windows.Media.Imaging.BitmapSource image = System.Windows.Media.Imaging.BitmapSource.Create(bgra.PixelWidth, bgra.PixelHeight, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+                image.Freeze();
+                return image;
+            }
+        }
+        catch (Exception)
+        {
+            // No icon: the message is drawn without it.
+            return null;
+        }
+    }
+
     protected override void OnRender(DrawingContext context)
     {
         base.OnRender(context);
@@ -1421,6 +1577,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 if (y >= height)
                 {
                     break;
+                }
+                if (_layout.IsMessageRow(row))
+                {
+                    DrawMessageRow(context, _layout.RowToLine(row, out _, out _), y, width);
+                    continue;
                 }
                 string text = _layout.RowText(row);
                 int selectedFrom = 0;

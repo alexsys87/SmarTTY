@@ -51,6 +51,9 @@ internal sealed class TextLabWindow : Window
         float zoom = settings.Editor.FontZoom > 0f ? settings.Editor.FontZoom : 1f;
         // The font of the editor tab: Courier New of 12 points, with the zoom of the editor.
         _editor.SetFont("Courier New", 12 * zoom);
+        // As RemoteFileEditor.RefreshMessageColors: the band in the colour of the margin, its frame in the colour of the line numbers.
+        _editor.SetMessageColors(((DrawingColor)colors.LineNumberBackground).ToRgb(), ((DrawingColor)colors.ErrorColor).ToRgb(),
+            ((DrawingColor)colors.WarningColor).ToRgb(), ((DrawingColor)colors.LineNumberForeground).ToRgb());
         _editor.TabSize = settings.Editor.TabSize > 0 ? settings.Editor.TabSize : 4;
         _editor.InsertSpaces = settings.Editor.InsertSpaces;
         _editor.WordWrap = settings.Editor.WordWrap;
@@ -106,6 +109,14 @@ internal sealed class TextLabWindow : Window
         };
         tools.Children.Add(new TextBlock { Text = "Syntax:", Margin = new Thickness(10, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
         tools.Children.Add(_syntax);
+        // A check of the editor tab puts its problems under the lines; here they are put at the caret by hand.
+        tools.Children.Add(MessageButton("Error here", () => AddMessageAtCaret(InlineMessageProvider.MessageSeverity.Error)));
+        tools.Children.Add(MessageButton("Warning here", () => AddMessageAtCaret(InlineMessageProvider.MessageSeverity.Warning)));
+        tools.Children.Add(MessageButton("Clear messages", () =>
+        {
+            _editor.ClearMessages();
+            _editor.Focus();
+        }));
 
         DockPanel panel = new DockPanel();
         DockPanel.SetDock(tools, Dock.Top);
@@ -119,6 +130,24 @@ internal sealed class TextLabWindow : Window
         _editor.StateChanged += (sender, e) => UpdateStatus();
         _editor.SaveRequested += (sender, e) => Note("The lab does not save: the text stays in memory.");
         Loaded += (sender, e) => _editor.Focus();
+        UpdateStatus();
+    }
+
+    private static Button MessageButton(string text, Action click)
+    {
+        Button button = new Button { Content = text, Padding = new Thickness(6, 2, 6, 2), Margin = new Thickness(10, 0, 0, 0) };
+        button.Click += (sender, e) => click();
+        return button;
+    }
+
+    private void AddMessageAtCaret(InlineMessageProvider.MessageSeverity severity)
+    {
+        TextDocument.TextPosition caret = _editor.CaretPosition;
+        string kind = severity == InlineMessageProvider.MessageSeverity.Error ? "An error" : "A warning";
+        // A message without a column goes in the middle of its row: every other one is put under the caret.
+        int column = (_editor.MessageCount % 2 == 0) ? caret.Column + 1 : 0;
+        _editor.AddMessage(caret.Line + 1, severity, kind + " under line " + (caret.Line + 1).ToString(CultureInfo.InvariantCulture) + (column == 0 ? ", without a column" : ", column " + column.ToString(CultureInfo.InvariantCulture)), column);
+        _editor.Focus();
         UpdateStatus();
     }
 
@@ -207,6 +236,7 @@ internal sealed class TextLabWindow : Window
         string selection = _editor.HasSelection ? "selection " + _editor.SelectedText.Length.ToString(CultureInfo.InvariantCulture) + " characters" : "no selection";
         _status.Text = _fileName + "   |   Ln " + (caret.Line + 1).ToString(CultureInfo.InvariantCulture) + ", Col " + (column + 1).ToString(CultureInfo.InvariantCulture)
             + "   |   " + selection + "   |   " + _editor.Document.LineCount.ToString(CultureInfo.InvariantCulture) + " lines   |   " + (_editor.OverwriteMode ? "OVR" : "INS")
+            + (_editor.MessageCount > 0 ? "   |   " + _editor.MessageCount.ToString(CultureInfo.InvariantCulture) + " message(s)" : "")
             + (_editor.ReadOnly ? "   |   read-only" : "") + (_editor.IsModified ? "   |   modified (not saved)" : "");
     }
 
