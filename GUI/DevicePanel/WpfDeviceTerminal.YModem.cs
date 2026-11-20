@@ -8,6 +8,10 @@ using System.Linq;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // YMODEM: a batch of files with their names and sizes, over the same line-claiming transfer runner as XMODEM

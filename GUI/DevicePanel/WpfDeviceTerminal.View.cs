@@ -7,19 +7,22 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Forms.Integration;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using VisualTTY.DeviceTerminal;
+
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace SmarTTY.GUI.DevicePanel;
 
 /// <summary>
 /// The COM/TCP/telnet/netconsole tab on WPF (stage 2D): what <c>DeviceTerminalControl</c> did, with the WPF serial terminal
 /// (<see cref="WpfSerialTerminal"/>) and HEX view (<see cref="WpfHexTerminal"/>), and the "connection closed" prompt of the SSH sessions
-/// shown over them. The tool bar, the netconsole bar and the menus are still the WinForms ones of the old panel (hosted in a
-/// <see cref="WindowsFormsHost"/> strip and shown as popups): they go to WPF with the other menus in stage 4. The logic of the partial
+/// shown over them. The tool bar, the netconsole bar and the menus are WPF too since stage 4A (they were the WinForms ones of the old panel,
+/// hosted in a <c>WindowsFormsHost</c> strip). The logic of the partial
 /// files is that of the WinForms panel, moved as it was; this file is what was the control: the layout, the thread of the window, the
 /// owner of the dialogs and the keys.
 /// </summary>
@@ -60,11 +63,7 @@ public partial class WpfDeviceTerminal
     /// <summary>Creates the TFTP/U-Boot window of a terminal (the terminal, its title); null when the window is unavailable.</summary>
     public static Func<IDeviceConsole, string, ITftpFirmwareWindow> TftpFirmwareWindowFactory;
 
-    // The tool bar row (WinForms), the area of the terminals with the prompt over them, and the netconsole bar below them.
-    private WindowsFormsHost _toolStripHost;
-
-    private WindowsFormsHost _netconsoleBarHost;
-
+    // The area of the terminals with the prompt over them (the tool bar row is above it, the netconsole bar below it).
     private Grid _terminalArea;
 
     private ConnectionClosedPopup _connectionPromptView;
@@ -114,9 +113,8 @@ public partial class WpfDeviceTerminal
     {
         LastChildFill = true;
         Focusable = false;
-        _toolStripHost = new WindowsFormsHost { Child = toolStrip1 };
-        SetDock(_toolStripHost, Dock.Top);
-        Children.Add(_toolStripHost);
+        SetDock(_toolBarRow, Dock.Top);
+        Children.Add(_toolBarRow);
         _terminalArea = new Grid();
         _connectionPromptView = new ConnectionClosedPopup
         {
@@ -136,28 +134,21 @@ public partial class WpfDeviceTerminal
         _terminalArea.Children.Insert(0, view);
     }
 
-    /// <summary>Puts the netconsole bar (WinForms) below the terminals.</summary>
-    private void AddNetconsoleBar(System.Windows.Forms.Control bar)
+    /// <summary>Puts the netconsole bar below the terminals.</summary>
+    private void AddNetconsoleBar(FrameworkElement bar)
     {
-        _netconsoleBarHost = new WindowsFormsHost { Child = bar, Height = Math.Max(24, bar.Height) };
-        SetDock(_netconsoleBarHost, Dock.Bottom);
+        SetDock(bar, Dock.Bottom);
         // Before the last child, which fills the rest.
-        Children.Insert(Children.Count - 1, _netconsoleBarHost);
-        bar.SizeChanged += (sender, e) => _netconsoleBarHost.Height = Math.Max(24, bar.Height);
+        Children.Insert(Children.Count - 1, bar);
         SetNetconsoleBarVisible(false);
     }
 
-    // Whether the netconsole bar is shown (a hosted WinForms control reports itself hidden while its tab is not shown).
     private bool _netconsoleBarShown;
 
     private void SetNetconsoleBarVisible(bool visible)
     {
         _netconsoleBarShown = visible;
-        _netconsoleBar.Visible = visible;
-        if (_netconsoleBarHost != null)
-        {
-            _netconsoleBarHost.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        }
+        _netconsoleBar.SetVisible(visible);
     }
 
     private void SetConnectionPromptVisible(bool visible)
@@ -167,14 +158,14 @@ public partial class WpfDeviceTerminal
 
     private void SetToolbarVisible(bool visible)
     {
-        toolStrip1.Visible = visible;
-        _toolStripHost.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        _toolBarRow.SetVisible(visible);
     }
 
-    /// <summary>The context menu of the terminals (WinForms) at a point of the screen.</summary>
-    private void ShowContextMenu(System.Drawing.Point screen)
+    /// <summary>The context menu of the terminals, at the mouse over the one that asked for it.</summary>
+    private void ShowContextMenu(UIElement terminal)
     {
-        contextMenuStrip1.Show(screen);
+        RefreshContextMenu();
+        WpfMenus.OpenAtMouse(contextMenuStrip1, terminal);
     }
 
     // The keys of the terminals that the panel takes (OnTerminalKeyDown of the WinForms panel).
@@ -232,7 +223,5 @@ public partial class WpfDeviceTerminal
         _serialTerminalControl.Dispose();
         hexTerminalControl1.Dispose();
         DisposeComponents(true);
-        _toolStripHost.Dispose();
-        _netconsoleBarHost?.Dispose();
     }
 }

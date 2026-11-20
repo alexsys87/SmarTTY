@@ -7,6 +7,10 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // "Send file": the file goes to the device as a stream of small writes from a worker thread, with a progress window

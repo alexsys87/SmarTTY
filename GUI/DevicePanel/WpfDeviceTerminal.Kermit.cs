@@ -8,6 +8,10 @@ using System.IO;
 using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // Kermit over the COM/TCP connection (IO/KermitTransfer.cs holds the protocol). A transfer owns the line exactly like an

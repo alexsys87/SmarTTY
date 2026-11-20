@@ -112,3 +112,35 @@ internal static class WpfMenus
         menu.IsOpen = true;
     }
 }
+
+/// <summary>A menu item made in one expression, with an object initializer after it (the way the WinForms menu items of the device panel were made).</summary>
+internal class DeviceMenuItem : MenuItem
+{
+    public DeviceMenuItem(string text, string icon = null, RoutedEventHandler click = null)
+    {
+        Header = text;
+        Icon = WpfMenus.Icon(icon);
+        if (click != null)
+        {
+            Click += click;
+        }
+    }
+
+    public DeviceMenuItem()
+    {
+    }
+}
+
+/// <summary>What the WinForms <c>Visible</c> of a control was, for a WPF element.</summary>
+internal static class VisibilityExtensions
+{
+    public static void SetVisible(this UIElement element, bool visible)
+    {
+        element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public static bool IsShown(this UIElement element)
+    {
+        return element.Visibility == Visibility.Visible;
+    }
+}

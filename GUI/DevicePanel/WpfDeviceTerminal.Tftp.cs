@@ -6,6 +6,10 @@ using System;
 using System.Text;
 using VisualTTY.DeviceTerminal;
 
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+
 namespace SmarTTY.GUI.DevicePanel;
 
 // The TFTP server window (Tools menu): it serves a firmware file to a board that waits at the U-Boot prompt on this COM/TCP
