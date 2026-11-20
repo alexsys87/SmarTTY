@@ -282,6 +282,9 @@ jobs:
       - name: Run text search checks (the search of a text view, the highlight of the matches, the pair of a bracket, the marks of the blanks)
         run: dotnet run --project tests/TextSearchTests -c Release
 
+      - name: Run cursor session checks (what a code editor does with several cursors - the commands, typing, the keys, copy, cut, paste, Alt+click)
+        run: dotnet run --project tests/MultiCursorSessionTests -c Release
+
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
