@@ -379,17 +379,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     /// </summary>
     public void AddMessage(int line, InlineMessageProvider.MessageSeverity messageSeverity, string text, int column)
     {
-        _inlineMessageProvider.AddMessage(MessageLine(line), messageSeverity, text, column - 1);
+        // A line past the end, which is what a check reports for "unexpected end of file", goes on the last line.
+        _inlineMessageProvider.AddReported(line, messageSeverity, text, column, LineCount);
         RefreshMessages();
-    }
-
-    /// <summary>
-    /// The row index of the line a message is for (the line from 1): a line past the end, which is what a check reports for
-    /// "unexpected end of file", goes on the last line, where there is a row to show it.
-    /// </summary>
-    private int MessageLine(int line)
-    {
-        return Math.Max(0, Math.Min(line - 1, LineCount - 1));
     }
 
     /// <summary>
@@ -400,9 +392,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
     {
         foreach (InlineMessageProvider.MessageRequest message in messages)
         {
-            // A message is drawn as a row under its line: the line is 1-based here, the provider counts from 0.
-            // The column is 1-based too, and 0 means "not known": -1 makes the message centre in the row.
-            _inlineMessageProvider.AddMessage(MessageLine(message.Line), message.Severity, message.Text, message.Column - 1);
+            // A message is drawn as a row under its line: the line and the column are 1-based here, and a column of 0 means
+            // "not known" (the message is centred in the row).
+            _inlineMessageProvider.AddReported(message.Line, message.Severity, message.Text, message.Column, LineCount);
         }
         RefreshMessages();
     }
