@@ -391,23 +391,23 @@ public class MainWindowController : INotifyPropertyChanged
             EditorTabContext newTab = session.AddNewFileEditorOrThrow(editor, fn);
             view.Tag = newTab;
             // The tool bar and the context menu of the editor.
-            newTab.EditorPanel.SaveRequested += (object sender, EventArgs e) => SaveFile();
-            newTab.EditorPanel.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
-            newTab.EditorPanel.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
-            newTab.EditorPanel.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
-            newTab.EditorPanel.FollowLogRequested += (object sender, EventArgs e) => FollowLog(editor.RemotePath);
-            newTab.EditorPanel.ShowAllCharactersChanged += (object sender, EventArgs e) =>
+            newTab.Commands.SaveRequested += (object sender, EventArgs e) => SaveFile();
+            newTab.Commands.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
+            newTab.Commands.ShowChangesRequested += (object sender, EventArgs e) => ShowChanges(editor);
+            newTab.Commands.RunRequested += (object sender, EventArgs e) => RunInTerminal(editor, session);
+            newTab.Commands.FollowLogRequested += (object sender, EventArgs e) => FollowLog(editor.RemotePath);
+            newTab.Commands.ShowAllCharactersChanged += (object sender, EventArgs e) =>
             {
                 // The switch on the tool bar and in the context menu is the same setting as in the settings window.
                 _Controller.Settings.Editor.ShowAllCharacters = view.ShowAllCharacters;
                 _Controller.Settings.Save();
             };
-            newTab.EditorPanel.WordWrapChanged += (object sender, EventArgs e) =>
+            newTab.Commands.WordWrapChanged += (object sender, EventArgs e) =>
             {
                 _Controller.Settings.Editor.WordWrap = view.WordWrap;
                 _Controller.Settings.Save();
             };
-            newTab.EditorPanel.HexViewOptionsChanged += (object sender, EventArgs e) =>
+            newTab.Commands.HexViewOptionsChanged += (object sender, EventArgs e) =>
             {
                 // The next hex view opens with the byte order, the groups and the row width chosen last.
                 IHexEditorView hex = editor.HexEditor;
@@ -596,7 +596,7 @@ public class MainWindowController : INotifyPropertyChanged
                 if ((sender as RemoteTextView)?.Owner is RemoteFileEditor runnable && runnable.CanRunInTerminal && runnable.TextControl.Tag is EditorTabContext runnableTab)
                 {
                     e.SuppressKeyPress = true;
-                    runnableTab.EditorPanel.RunCommand(EditorToolbarCommand.RunFile);
+                    runnableTab.Commands.RunCommand(EditorToolbarCommand.RunFile);
                 }
             }
             else if (!e.Control && !e.Alt && e.KeyCode == Keys.F3)

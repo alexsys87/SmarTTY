@@ -44,7 +44,27 @@ public interface IRemoteTextView
     /// <summary>Puts the keyboard focus on the text.</summary>
     void FocusText();
 
-    bool WordWrap { get; }
+    bool WordWrap { get; set; }
+
+    /// <summary>The marks of the blanks are shown.</summary>
+    bool ShowAllCharacters { get; set; }
+
+    int LineCount { get; }
+
+    // What the commands of the tab (RemoteFileEditorCommands) do with the text and read of it.
+    bool CanUndo { get; }
+
+    bool CanRedo { get; }
+
+    void Undo();
+
+    void Redo();
+
+    /// <summary>More than one line is selected (the Text menu sorts and removes duplicates only then).</summary>
+    bool HasLineSelection { get; }
+
+    /// <summary>Runs a command of the Text menu on the selected lines (or all of them); false when nothing changed.</summary>
+    bool ApplyLineTransform(LineTransformKind kind);
 
     /// <summary>Moves the caret to a line and a column counted from 0 and shows it.</summary>
     void GoToPosition(int line, int column);

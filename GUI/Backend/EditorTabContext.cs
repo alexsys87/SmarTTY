@@ -49,6 +49,9 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     /// <summary>The editor together with its context menu (the WinForms part of the tab).</summary>
     internal RemoteFileEditorPanel EditorPanel { get; }
 
+    /// <summary>The commands of the editor and their state (the tool bar, the context menus and the keys run them).</summary>
+    internal RemoteFileEditorCommands Commands => EditorPanel.Commands;
+
     public string Title
     {
         get
@@ -95,7 +98,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             // The WPF hex view lies over the place of the editor: one of the two is shown (a WPF element cannot be drawn over a WinForms one).
             _wpfHexView.Visibility = Visibility.Collapsed;
-            _wpfHexView.ContextMenu = new HexView.HexViewContextMenu(EditorPanel, _wpfHexView, ShowHexDialog, () =>
+            _wpfHexView.ContextMenu = new HexView.HexViewContextMenu(Commands, _wpfHexView, ShowHexDialog, () =>
             {
                 Editor.FocusActiveView();
                 EditorPanel.RefreshState();
@@ -110,13 +113,13 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             Control = (FrameworkElement)winFormsHostWrapper;
         }
-        ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
-        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, EditorPanel));
+        ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(Commands);
+        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, Commands));
         Searcher = new TextSearcher(editor.TextControl)
         {
             CanReplace = true
         };
-        EditorPanel.FindRequested += (object sender, EventArgs e) =>
+        Commands.FindRequested += (object sender, EventArgs e) =>
         {
             if (Editor.IsHexMode)
             {
@@ -126,8 +129,8 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             Searcher.IsReplaceVisible = false;
             Searcher.Activate();
         };
-        EditorPanel.HexDialogRequested += (object sender, HexDialogRequestedEventArgs e) => ShowHexDialog(e.Kind);
-        EditorPanel.ReplaceRequested += (object sender, EventArgs e) =>
+        Commands.HexDialogRequested += (object sender, HexDialogRequestedEventArgs e) => ShowHexDialog(e.Kind);
+        Commands.ReplaceRequested += (object sender, EventArgs e) =>
         {
             if (!Editor.IsHexMode)
             {

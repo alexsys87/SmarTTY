@@ -17,12 +17,12 @@ namespace SmarTTY.GUI.HexView;
 /// <summary>
 /// The context menu of the WPF hex view in the editor tab (stage 3B-3): what the WinForms context menu of <see cref="RemoteFileEditorPanel"/> shows
 /// in the hex view, on WPF. The commands of the editor are the panel's (<see cref="EditorCommandCatalog.ContextMenuLayout"/>, run through
-/// <see cref="RemoteFileEditorPanel.RunCommand"/>, enabled, checked and shown by <see cref="RemoteFileEditorPanel.CommandState"/>); the Text submenu
+/// <see cref="RemoteFileEditorCommands.RunCommand"/>, enabled, checked and shown by <see cref="RemoteFileEditorCommands.CommandState"/>); the Text submenu
 /// is there and off, as it is in the hex view; the submenus of the hex view are <see cref="HexMenuModel"/>, after Hex Editor.
 /// </summary>
 internal sealed class HexViewContextMenu : ContextMenu
 {
-    private readonly RemoteFileEditorPanel _panel;
+    private readonly RemoteFileEditorCommands _panel;
 
     private readonly Dictionary<EditorToolbarCommand, MenuItem> _commands = new Dictionary<EditorToolbarCommand, MenuItem>();
 
@@ -31,7 +31,7 @@ internal sealed class HexViewContextMenu : ContextMenu
     private readonly List<KeyValuePair<HexMenuItem, MenuItem>> _items = new List<KeyValuePair<HexMenuItem, MenuItem>>();
 
     /// <param name="afterCommand">What follows a command of a hex submenu (the focus back to the view, the state of the commands).</param>
-    public HexViewContextMenu(RemoteFileEditorPanel panel, IHexEditorView view, Action<HexDialogKind> requestDialog, Action afterCommand)
+    public HexViewContextMenu(RemoteFileEditorCommands panel, IHexEditorView view, Action<HexDialogKind> requestDialog, Action afterCommand)
     {
         _panel = panel ?? throw new ArgumentNullException(nameof(panel));
         if (view == null)

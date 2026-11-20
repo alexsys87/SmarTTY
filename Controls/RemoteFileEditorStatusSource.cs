@@ -5,8 +5,8 @@ using System;
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// <see cref="IEditorStatusSource"/> of a <see cref="RemoteFileEditor"/> inside its <see cref="RemoteFileEditorPanel"/>: every member is the member of the editor
-/// (or of its hex view) that the status bar read directly before. The panel tells when to read again.
+/// <see cref="IEditorStatusSource"/> of a <see cref="RemoteFileEditor"/> with its <see cref="RemoteFileEditorCommands"/>: every member is the member of the editor
+/// (or of its hex view) that the status bar read directly before. The commands tell when to read again.
 /// </summary>
 internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 {
@@ -16,8 +16,8 @@ internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 
     private readonly Action<EventHandler> _removeStateChanged;
 
-    public RemoteFileEditorStatusSource(RemoteFileEditor editor, RemoteFileEditorPanel panel)
-        : this(editor, (panel ?? throw new ArgumentNullException(nameof(panel))).AddStateChanged, panel.RemoveStateChanged)
+    public RemoteFileEditorStatusSource(RemoteFileEditor editor, RemoteFileEditorCommands commands)
+        : this(editor, (commands ?? throw new ArgumentNullException(nameof(commands))).AddStateChanged, commands.RemoveStateChanged)
     {
     }
 
