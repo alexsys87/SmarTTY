@@ -9,6 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using TextSearch = SmarTTY.CodeEditing.TextSearch;
 
 namespace SmarTTY.GUI.TextView;
 
@@ -25,7 +26,7 @@ namespace SmarTTY.GUI.TextView;
 /// characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
 /// </summary>
 internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost, IEditorCompletionHost,
-    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget
+    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget, ISearchTarget
 {
     // What a word is for Ctrl+Left/Right, a double click and Ctrl+Backspace (as ReadonlyTextBrowser.IsWordChar).
     private const string WordCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -131,6 +132,39 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     private readonly KeyBindingMap _keyBindingMap = new KeyBindingMap(EditorCommands.All);
 
     private readonly LineCommands _lineCommands;
+
+    // The highlighted ranges (the range a search is limited to, the pair of the bracket at the caret) by their numbers, as ReadonlyTextBrowser keeps them.
+    private readonly Dictionary<int, TextHighlight> _highlights = new Dictionary<int, TextHighlight>();
+
+    private int _lastHighlightId;
+
+    // The highlight of the pair of the bracket at the caret (-1: none), as CodeEditorPP keeps it.
+    private int _pairHighlightId = -1;
+
+    // The query of the search bar whose matches are highlighted (null: none).
+    private TextMatcher _matchHighlighter;
+
+    private readonly List<MatchSpan> _matchSpans = new List<MatchSpan>();
+
+    private readonly List<BlankMark> _blankMarks = new List<BlankMark>();
+
+    private bool _showAllCharacters;
+
+    private bool _showTabs;
+
+    // The colour of the highlight of the matches (as ReadonlyTextBrowser paints it) and of the marks of the blanks (DarkGray).
+    private static readonly RgbColor MatchHighlightColor = RgbColor.FromArgb(95, 255, 190, 0);
+
+    private static readonly RgbColor BlankMarkColor = RgbColor.FromArgb(255, 169, 169, 169);
+
+    private sealed class TextHighlight
+    {
+        public TextDocument.TextPosition Start;
+
+        public TextDocument.TextPosition End;
+
+        public HighlightStyle Style;
+    }
 
     private GlyphTypeface _glyphTypeface;
 
@@ -431,6 +465,173 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     }
 
     /// <summary>The font: a monospaced family and its size in points (before the scale of the monitor).</summary>
+    // ---- the search, the highlights and the marks (the search target of the search bar, as EditableTextBrowser is)
+
+    /// <summary>The styles of the highlight of a pair of brackets at the caret, by kind (those of CodeEditorPP).</summary>
+    public HighlightStyle ParenHighlightStyle = new HighlightStyle(RgbColor.FromArgb(100, 255, 255, 224), RgbColor.FromArgb(50, 0, 0, 255), RgbColor.Empty);
+
+    public HighlightStyle BraceHighlightStyle = new HighlightStyle(RgbColor.FromArgb(50, 144, 238, 144), RgbColor.FromArgb(50, 0, 0, 255), RgbColor.Empty);
+
+    public HighlightStyle BracketHighlightStyle = new HighlightStyle(RgbColor.FromArgb(50, 173, 216, 230), RgbColor.FromArgb(50, 0, 0, 255), RgbColor.Empty);
+
+    public HighlightStyle AngleHighlightStyle = new HighlightStyle(RgbColor.FromArgb(50, 211, 211, 211), RgbColor.FromArgb(50, 0, 0, 255), RgbColor.Empty);
+
+    public HighlightStyle UnpairedHighlightStyle = new HighlightStyle(RgbColor.FromArgb(100, 255, 0, 0), RgbColor.FromArgb(50, 0, 0, 0), RgbColor.Empty);
+
+    public HighlightStyle DefaultPairHighlightStyle = new HighlightStyle(RgbColor.Empty, RgbColor.Empty, RgbColor.Empty);
+
+    /// <summary>The text was edited (the range an edit changed), for the search bar.</summary>
+    public event TextRangeChangedHandler RangeChanged;
+
+    /// <summary>Draws spaces, tabs, line ends and the characters that leave no ink as marks (those of <see cref="BlankMarks"/>).</summary>
+    public bool ShowAllCharacters
+    {
+        get => _showAllCharacters;
+        set
+        {
+            _showAllCharacters = value;
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>Draws a grey line under each tab, so that tab-indented lines are easy to tell from space-indented ones.</summary>
+    public bool ShowTabs
+    {
+        get => _showTabs;
+        set
+        {
+            _showTabs = value;
+            InvalidateVisual();
+        }
+    }
+
+    public string GetLineText(int line)
+    {
+        return _document.GetLineText(line);
+    }
+
+    public string GetRangeText(TextDocument.TextPosition start, TextDocument.TextPosition end)
+    {
+        return _document.GetRangeText(start, end);
+    }
+
+    /// <summary>
+    /// Finds the next match from <paramref name="textPosition"/> (<see cref="TextSearch.TryFind"/>) and selects it as the search mode says: the
+    /// caret at its start, the selection to its end, the view scrolled to it (as ReadonlyTextBrowser.Find). A failed search that clears the
+    /// selection puts the caret at the end of the text (the WinForms view put it below the last line, which this view does not have).
+    /// </summary>
+    public TextDocument.TextPosition Find(TextDocument.TextPosition textPosition, TextMatcher matcher, bool searchBackward, bool wrapAround, FindSelectMode findSelectMode,
+        TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd)
+    {
+        if (TextSearch.TryFind(_document, textPosition, matcher, searchBackward, wrapAround, scopeStart, scopeEnd, out int line, out int matchIndex, out int matchLength))
+        {
+            TextDocument.TextPosition position = new TextDocument.TextPosition(matchIndex, line);
+            if (findSelectMode != FindSelectMode.None)
+            {
+                SetCaret(position);
+                ((ITextEditView)this).SetSelection(true, new TextDocument.TextPosition(matchIndex + matchLength, line));
+                if (!_wordWrap)
+                {
+                    int column = TextSearch.ScrollColumnFor(matchIndex, matchLength, _document.GetLineText(line).Length, Math.Max(1, (_layout.VisibleWidth - _layout.TextLeft) / _layout.CharWidth));
+                    _layout.ScrollX = _layout.ClampScrollX(column * _layout.CharWidth);
+                    UpdateScrollBarValues();
+                }
+                AfterEdit();
+            }
+            return position;
+        }
+        if (matcher != null && findSelectMode == FindSelectMode.SelectOrClear)
+        {
+            int last = _document.LineCount - 1;
+            SetCaret(new TextDocument.TextPosition(_document.GetLineText(last).Length, last));
+            ((ITextEditView)this).SetSelection(false, _caret);
+            AfterEdit();
+        }
+        return new TextDocument.TextPosition(-1, -1);
+    }
+
+    /// <summary>Replaces every match (in the range when one is given) in one undo step; returns how many there were.</summary>
+    public int ReplaceAll(TextMatcher matcher, string replacement, TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd, out TextDocument.TextPosition newScopeEnd)
+    {
+        newScopeEnd = scopeEnd;
+        if (_readOnly)
+        {
+            return 0;
+        }
+        int count = _replace.ReplaceAll(matcher, replacement, scopeStart, scopeEnd, out newScopeEnd);
+        AfterEdit();
+        return count;
+    }
+
+    /// <summary>Highlights every match of <paramref name="matcher"/> in the rows in view; null removes the highlight.</summary>
+    public void SetMatchHighlight(TextMatcher matcher)
+    {
+        _matchHighlighter = matcher;
+        InvalidateVisual();
+    }
+
+    public int AddHighlight(TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
+    {
+        return SetHighlight(-1, start, end, highlightStyle);
+    }
+
+    public int SetHighlight(int highlightIndex, TextDocument.TextPosition start, TextDocument.TextPosition end, HighlightStyle highlightStyle)
+    {
+        if (highlightIndex == -1)
+        {
+            highlightIndex = ++_lastHighlightId;
+        }
+        _highlights[highlightIndex] = new TextHighlight { Start = start, End = end, Style = highlightStyle };
+        InvalidateVisual();
+        return highlightIndex;
+    }
+
+    public void RemoveHighlight(int highlightIndex)
+    {
+        if (highlightIndex != -1 && _highlights.Remove(highlightIndex))
+        {
+            InvalidateVisual();
+        }
+    }
+
+    // The highlight of the pair of the bracket at the caret, as CodeEditorPP.OnSelectionChanged keeps it (nothing changes while a selection is made).
+    private void UpdatePairHighlight()
+    {
+        if (HasSelection && SelectionStart != _caret)
+        {
+            return;
+        }
+        BracketPairKind kind = BracketPair.Find(_tokens, _document, _caret, _caret, out TextDocument.TextPosition pairStart, out TextDocument.TextPosition pairEnd);
+        if (kind == BracketPairKind.None)
+        {
+            RemoveHighlight(_pairHighlightId);
+            _pairHighlightId = -1;
+        }
+        else if (kind != BracketPairKind.Keep)
+        {
+            _pairHighlightId = SetHighlight(_pairHighlightId, pairStart, pairEnd, PairHighlightStyle(kind));
+        }
+    }
+
+    private HighlightStyle PairHighlightStyle(BracketPairKind kind)
+    {
+        switch (kind)
+        {
+            case BracketPairKind.Paren:
+                return ParenHighlightStyle;
+            case BracketPairKind.Bracket:
+                return BracketHighlightStyle;
+            case BracketPairKind.Brace:
+                return BraceHighlightStyle;
+            case BracketPairKind.Angle:
+                return AngleHighlightStyle;
+            case BracketPairKind.Unpaired:
+                return UnpairedHighlightStyle;
+            default:
+                return DefaultPairHighlightStyle;
+        }
+    }
+
     /// <summary>Enables the word list (Ctrl+Space and, with <see cref="CompletionOnTyping"/>, typing) and the parameter hint.</summary>
     public bool CompletionEnabled
     {
@@ -1340,6 +1541,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _layout.InvalidateRows();
         _layout.Wrap.Invalidate();
         _layout.UpdateMaxColumns(-1);
+        RangeChanged?.Invoke(start, oldEnd, newEnd);
         OnTextChangedOutsideEdit();
     }
 
@@ -1687,6 +1889,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     private void OnStateChanged()
     {
+        UpdatePairHighlight();
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1723,6 +1926,92 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     }
 
     // Draws the characters from..to of a row text from x on the grid of the characters, the top of the row at y; only the ones in view.
+    // The matches of the query of the search bar in a row, as ReadonlyTextBrowser.PaintMatches (a matcher that throws stops the highlight).
+    private void DrawMatches(DrawingContext context, int line, int rowStart, int rowEndColumn, int firstColumn, int visibleColumns, int origin, int textLeft, int y)
+    {
+        TextMatcher matcher = _matchHighlighter;
+        if (matcher == null)
+        {
+            return;
+        }
+        try
+        {
+            int rowEnd = _wordWrap ? rowEndColumn : int.MaxValue;
+            TextSearch.RowMatches(_document, line, matcher, _tabSize, firstColumn, rowEnd, _wordWrap ? rowEnd : firstColumn + visibleColumns + 1, _matchSpans);
+        }
+        catch (Exception)
+        {
+            _matchHighlighter = null;
+            return;
+        }
+        int charWidth = _layout.CharWidth;
+        foreach (MatchSpan span in _matchSpans)
+        {
+            if (span.EndColumn > span.StartColumn)
+            {
+                context.DrawRectangle(Brush(MatchHighlightColor), null, new Rect(textLeft + (span.StartColumn - origin) * charWidth, y, (span.EndColumn - span.StartColumn) * charWidth, _layout.RowHeight));
+            }
+        }
+    }
+
+    // The highlighted ranges in a row: the fill and a frame of a pixel, in the colours of their styles (an empty colour draws nothing).
+    private void DrawHighlights(DrawingContext context, int row, int textLeft, int y)
+    {
+        int charWidth = _layout.CharWidth;
+        foreach (TextHighlight highlight in _highlights.Values)
+        {
+            TextDocument.TextPosition start = highlight.Start < highlight.End ? highlight.Start : highlight.End;
+            TextDocument.TextPosition end = highlight.Start < highlight.End ? highlight.End : highlight.Start;
+            if (!_layout.SelectedColumns(row, start, end, out int from, out int to, out _) || to <= from)
+            {
+                continue;
+            }
+            Rect rect = new Rect(textLeft + from * charWidth, y, (to - from) * charWidth, _layout.RowHeight);
+            if (!highlight.Style.FillColor.IsEmpty)
+            {
+                context.DrawRectangle(Brush(highlight.Style.FillColor), null, rect);
+            }
+            if (!highlight.Style.BorderColor.IsEmpty)
+            {
+                Pen pen = new Pen(Brush(highlight.Style.BorderColor), 1);
+                context.DrawRectangle(null, pen, new Rect(rect.X + 0.5, rect.Y + 0.5, Math.Max(0, rect.Width - 1), Math.Max(0, rect.Height - 1)));
+            }
+        }
+    }
+
+    // The grey line under the tabs of a row (ShowTabs), at the middle of the row, one line for each run of tabs, as the WinForms view draws it.
+    private void DrawTabLines(DrawingContext context, int line, int rowStart, int rowEndColumn, int origin, int textLeft, int y)
+    {
+        string text = _document.GetLineText(line);
+        int charWidth = _layout.CharWidth;
+        double lineY = y + _layout.RowHeight / 2 + 0.5;
+        Pen pen = new Pen(Brush(BlankMarkColor), 1);
+        int column = 0;
+        int runStart = -1;
+        for (int i = 0; i <= text.Length; i++)
+        {
+            bool tab = i < text.Length && text[i] == '\t';
+            if (tab && runStart == -1)
+            {
+                runStart = column;
+            }
+            else if (!tab && runStart != -1)
+            {
+                int from = Math.Max(runStart, rowStart);
+                int to = Math.Min(column, rowEndColumn);
+                if (to > from)
+                {
+                    context.DrawLine(pen, new Point(textLeft + (from - origin) * charWidth, lineY), new Point(textLeft + (to - origin) * charWidth, lineY));
+                }
+                runStart = -1;
+            }
+            if (i < text.Length)
+            {
+                column = tab ? column + _tabSize - column % _tabSize : column + 1;
+            }
+        }
+    }
+
     private void DrawText(DrawingContext context, string text, int from, int to, int x, int y, int left, int right, RgbColor color)
     {
         int charWidth = _layout.CharWidth;
@@ -1944,6 +2233,13 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                     continue;
                 }
                 string text = _layout.RowText(row);
+                int line = _layout.RowToLine(row, out int rowStart, out int rowEndColumn);
+                // The x of a column of the line in this row is textLeft + (column - origin) * charWidth.
+                int origin = _wordWrap ? rowStart : 0;
+                int firstColumn = _wordWrap ? rowStart : _layout.ScrollX / charWidth;
+                int visibleColumns = Math.Max(1, (width - _layout.TextLeft) / charWidth + 1);
+                DrawMatches(context, line, rowStart, rowEndColumn, firstColumn, visibleColumns, origin, textLeft, y);
+                DrawHighlights(context, row, textLeft, y);
                 int selectedFrom = 0;
                 int selectedTo = 0;
                 if (selected && _layout.SelectedColumns(row, SelectionStart, _caret, out selectedFrom, out selectedTo, out bool pastEnd))
@@ -1967,6 +2263,20 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                     DrawText(context, text, run.From, from, textLeft, y, gutter, width, color);
                     DrawText(context, text, from, to, textLeft, y, gutter, width, selectionText);
                     DrawText(context, text, to, run.To, textLeft, y, gutter, width, color);
+                }
+                if (_showTabs || _showAllCharacters)
+                {
+                    DrawTabLines(context, line, rowStart, rowEndColumn, origin, textLeft, y);
+                }
+                if (_showAllCharacters)
+                {
+                    // As ReadonlyTextBrowser.PaintInvisibleCharacters: the columns in view (of the row, when wrapped), the line break but the last.
+                    int lastColumn = _wordWrap ? Math.Min(rowEndColumn - 1, rowStart + visibleColumns - 1) : firstColumn + visibleColumns - 1;
+                    BlankMarks.LineMarks(_document.GetLineText(line), _tabSize, firstColumn, lastColumn, line < _document.LineCount - 1, _blankMarks);
+                    foreach (BlankMark mark in _blankMarks)
+                    {
+                        DrawText(context, mark.Marker, 0, mark.Marker.Length, textLeft + (mark.Column - origin) * charWidth, y, gutter, width, BlankMarkColor);
+                    }
                 }
             }
             if (focused && _caretVisible)

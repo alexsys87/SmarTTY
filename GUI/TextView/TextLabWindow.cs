@@ -79,6 +79,29 @@ internal sealed class TextLabWindow : Window
         CheckBox completion = Option("Completion", _editor.CompletionEnabled);
         completion.ToolTip = "The word list (Ctrl+Space) and the parameter hint";
         completion.Click += (sender, e) => _editor.CompletionEnabled = completion.IsChecked == true;
+        _editor.ShowAllCharacters = settings.Editor.ShowAllCharacters;
+        _editor.ShowTabs = settings.Editor.ShowTabs;
+        CheckBox allCharacters = Option("All characters", _editor.ShowAllCharacters);
+        allCharacters.Click += (sender, e) => _editor.ShowAllCharacters = allCharacters.IsChecked == true;
+        CheckBox tabLines = Option("Tab lines", _editor.ShowTabs);
+        tabLines.Click += (sender, e) => _editor.ShowTabs = tabLines.IsChecked == true;
+        // A search as the search bar of the editor tab asks it (the view is its ISearchTarget): Enter finds the next match from the caret,
+        // Shift+Enter the one before, with a wrap; every match is highlighted while there is a query.
+        TextBox find = new TextBox { MinWidth = 120, Margin = new Thickness(10, 0, 0, 0), ToolTip = "Find (Enter, Shift+Enter)" };
+        find.TextChanged += (sender, e) => _editor.SetMatchHighlight(string.IsNullOrEmpty(find.Text) ? null : TextMatcher.Literal(find.Text, true));
+        find.KeyDown += (sender, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter && !string.IsNullOrEmpty(find.Text))
+            {
+                bool back = (System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+                TextDocument.TextPosition from = back || !_editor.HasSelection ? _editor.CaretPosition : _editor.SelectionStart;
+                if (!_editor.Find(from, TextMatcher.Literal(find.Text, true), back, true, FindSelectMode.SelectOrClear, TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid).IsValid)
+                {
+                    Note("Not found: " + find.Text);
+                }
+                e.Handled = true;
+            }
+        };
         CheckBox onTyping = Option("On typing", _editor.CompletionOnTyping);
         onTyping.ToolTip = "The word list opens by itself after two letters of a word";
         onTyping.Click += (sender, e) => _editor.CompletionOnTyping = onTyping.IsChecked == true;
@@ -108,6 +131,9 @@ internal sealed class TextLabWindow : Window
         tools.Children.Add(spaces);
         tools.Children.Add(completion);
         tools.Children.Add(onTyping);
+        tools.Children.Add(allCharacters);
+        tools.Children.Add(tabLines);
+        tools.Children.Add(find);
         tools.Children.Add(new TextBlock { Text = "Tab size:", Margin = new Thickness(10, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
         tools.Children.Add(tabSize);
         foreach (SyntaxHighlighting.Language language in SyntaxHighlighting.SelectableLanguages)
