@@ -43,6 +43,15 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     private readonly TextPointer _pointer;
 
+    // The tokens of the syntax of the lines (as CodeEditorPP keeps them) and the colours of the token types (none: the colour of the text).
+    private readonly TokenCache _tokens = new TokenCache();
+
+    private TokenCache.LineTokenizer _tokenizer;
+
+    private RgbColor[] _tokenColors = new RgbColor[0];
+
+    private readonly List<TextRun> _lineRuns = new List<TextRun>();
+
     private readonly VisualCollection _children;
 
     private readonly ScrollBar _verticalBar = new ScrollBar { Orientation = Orientation.Vertical, Visibility = Visibility.Collapsed };
@@ -113,6 +122,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _replace = new TextReplace(this, _history);
         _typing = new TextTyping(this);
         _pointer = new TextPointer(_selection, _navigator, () => _document);
+        _tokens.SetDocument(_document, null);
         _children = new VisualCollection(this) { _verticalBar, _horizontalBar };
         Focusable = true;
         FocusVisualStyle = null;
@@ -154,6 +164,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 document.SetText("");
             }
             _document = document;
+            _tokens.SetDocument(_document, _tokenizer);
             _selection.Clear();
             _pointer.Release();
             _caret = new TextDocument.TextPosition(0, 0);
@@ -276,6 +287,18 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _foreColor = foreground;
         _gutterBackColor = marginBackground;
         _gutterForeColor = marginForeground;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// The syntax: the tokenizer of a language (null: none) and the colours of its token types, the first for the plain text (none: everything in
+    /// the colour of the text); a token type past them takes the first, as in CodeEditorPP.
+    /// </summary>
+    public void SetSyntax(TokenCache.LineTokenizer tokenizer, RgbColor[] colors)
+    {
+        _tokenizer = tokenizer;
+        _tokenColors = colors ?? new RgbColor[0];
+        _tokens.SetDocument(_document, tokenizer);
         InvalidateVisual();
     }
 
@@ -881,6 +904,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextEditView.OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
+        _tokens.RetokenizeLine(line, _tokenizer);
         _layout.Wrap.Invalidate();
         if (line == _caret.Line && _caret.Column > _document.GetLineText(line).Length)
         {
@@ -892,6 +916,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextEditView.OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
+        SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int firstLine, out int removedLines, out int addedLines);
+        _tokens.OnLinesChanged(firstLine, removedLines, addedLines, _tokenizer);
         _layout.Wrap.Invalidate();
         _layout.UpdateMaxColumns(-1);
         OnTextChangedOutsideEdit();
@@ -1170,6 +1196,20 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         return RgbColor.FromArgb(color.A, color.R, color.G, color.B);
     }
 
+    // The coloured parts of a line: its tokens with the colour of their type.
+    private List<TextRun> LineRuns(int line)
+    {
+        _lineRuns.Clear();
+        if (line < _tokens.LineCount)
+        {
+            foreach (TokenCache.Token token in _tokens.GetLineTokens(line))
+            {
+                _lineRuns.Add(new TextRun(token.Start, token.End, SyntaxColoring.ColorIndex(token.Type, _tokenColors.Length)));
+            }
+        }
+        return _lineRuns;
+    }
+
     // Draws the characters from..to of a row text from x on the grid of the characters, the top of the row at y; only the ones in view.
     private void DrawText(DrawingContext context, string text, int from, int to, int x, int y, int left, int right, RgbColor color)
     {
@@ -1237,18 +1277,23 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                     break;
                 }
                 string text = _layout.RowText(row);
-                if (selected && _layout.SelectedColumns(row, SelectionStart, _caret, out int from, out int to, out bool pastEnd))
+                int selectedFrom = 0;
+                int selectedTo = 0;
+                if (selected && _layout.SelectedColumns(row, SelectionStart, _caret, out selectedFrom, out selectedTo, out bool pastEnd))
                 {
                     // The line break is drawn as one cell after the line.
-                    int selectedWidth = (to - from + (pastEnd ? 1 : 0)) * charWidth;
-                    context.DrawRectangle(Brush(selection), null, new Rect(textLeft + from * charWidth, y, selectedWidth, rowHeight));
-                    DrawText(context, text, 0, Math.Min(from, text.Length), textLeft, y, gutter, width, _foreColor);
-                    DrawText(context, text, from, Math.Min(to, text.Length), textLeft, y, gutter, width, selectionText);
-                    DrawText(context, text, to, text.Length, textLeft, y, gutter, width, _foreColor);
+                    int selectedWidth = (selectedTo - selectedFrom + (pastEnd ? 1 : 0)) * charWidth;
+                    context.DrawRectangle(Brush(selection), null, new Rect(textLeft + selectedFrom * charWidth, y, selectedWidth, rowHeight));
                 }
-                else
+                // The colours of the syntax, and the selected part of each run in the colour of a selected text.
+                foreach (TextRun run in _layout.RowRuns(row, LineRuns(_layout.RowToLine(row, out _, out _))))
                 {
-                    DrawText(context, text, 0, text.Length, textLeft, y, gutter, width, _foreColor);
+                    RgbColor color = (run.Color < 0 || run.Color >= _tokenColors.Length) ? _foreColor : _tokenColors[run.Color];
+                    int from = Math.Min(run.To, Math.Max(run.From, selectedFrom));
+                    int to = Math.Max(from, Math.Min(run.To, selectedTo));
+                    DrawText(context, text, run.From, from, textLeft, y, gutter, width, color);
+                    DrawText(context, text, from, to, textLeft, y, gutter, width, selectionText);
+                    DrawText(context, text, to, run.To, textLeft, y, gutter, width, color);
                 }
             }
             if (focused && _caretVisible)

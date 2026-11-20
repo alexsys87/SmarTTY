@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
@@ -29,10 +30,15 @@ internal sealed class TextLabWindow : Window
 
     private readonly CheckBox _readOnly = Option("Read-only", false);
 
+    private readonly ComboBox _syntax = new ComboBox { MinWidth = 150, ToolTip = "Syntax" };
+
+    private readonly GlobalSettings _settings;
+
     private string _fileName = "(new text)";
 
     public TextLabWindow(GlobalSettings settings)
     {
+        _settings = settings;
         Title = "WPF text editor lab";
         Width = 1000;
         Height = 650;
@@ -49,7 +55,7 @@ internal sealed class TextLabWindow : Window
         _editor.InsertSpaces = settings.Editor.InsertSpaces;
         _editor.WordWrap = settings.Editor.WordWrap;
         _editor.ShowLineNumbers = settings.Editor.ShowLineNumbers;
-        _editor.Document = new EditableTextDocument(new[] { "Open a file, or type here: the text is never saved.", "", "\tA tab,", "    four spaces,", "and a long line that goes on " + string.Concat(Enumerable.Repeat("and on ", 30)) + "to the end." }, TextDocument.LineEnding.CrLf);
+        _editor.Document = new EditableTextDocument(new[] { "/* Open a file, or type here: the text is never saved. */", "#include <stdio.h>", "int main(void) { return printf(\"%d\\n\", 42) > 0; } // C", "\tA tab,", "    four spaces,", "and a long line that goes on " + string.Concat(Enumerable.Repeat("and on ", 30)) + "to the end." }, TextDocument.LineEnding.CrLf);
         _editor.IsModified = false;
 
         Button open = new Button { Content = "Open file...", Padding = new Thickness(8, 2, 8, 2) };
@@ -87,6 +93,19 @@ internal sealed class TextLabWindow : Window
         tools.Children.Add(spaces);
         tools.Children.Add(new TextBlock { Text = "Tab size:", Margin = new Thickness(10, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
         tools.Children.Add(tabSize);
+        foreach (SyntaxHighlighting.Language language in SyntaxHighlighting.SelectableLanguages)
+        {
+            _syntax.Items.Add(new ComboBoxItem { Content = SyntaxHighlighting.GetDisplayName(language), Tag = language });
+        }
+        _syntax.SelectionChanged += (sender, e) =>
+        {
+            if (_syntax.SelectedItem is ComboBoxItem item && item.Tag is SyntaxHighlighting.Language language)
+            {
+                ApplySyntax(language);
+            }
+        };
+        tools.Children.Add(new TextBlock { Text = "Syntax:", Margin = new Thickness(10, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
+        tools.Children.Add(_syntax);
 
         DockPanel panel = new DockPanel();
         DockPanel.SetDock(tools, Dock.Top);
@@ -96,6 +115,7 @@ internal sealed class TextLabWindow : Window
         panel.Children.Add(_editor);
         Content = panel;
 
+        ChooseSyntax(SyntaxHighlighting.Language.CLike);
         _editor.StateChanged += (sender, e) => UpdateStatus();
         _editor.SaveRequested += (sender, e) => Note("The lab does not save: the text stays in memory.");
         Loaded += (sender, e) => _editor.Focus();
@@ -129,6 +149,8 @@ internal sealed class TextLabWindow : Window
             _fileName = path;
             _editor.Document = document;
             _editor.IsModified = false;
+            // As the editor tab: the syntax of the name or of the first line when the highlighting is on in the settings.
+            ChooseSyntax(_settings.Editor.SyntaxHighlighting ? SyntaxHighlighting.DetectLanguage(path, document.LineCount > 0 ? document.GetLineText(0) : null) : SyntaxHighlighting.Language.Plain);
             _editor.ReadOnly = _readOnly.IsChecked == true;
             UpdateStatus();
         }
@@ -136,6 +158,46 @@ internal sealed class TextLabWindow : Window
         {
             MessageDialog.Show(exception.Message, "WPF text editor lab", MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: this);
         }
+    }
+
+    private void ChooseSyntax(SyntaxHighlighting.Language language)
+    {
+        foreach (ComboBoxItem item in _syntax.Items)
+        {
+            if (item.Tag is SyntaxHighlighting.Language itemLanguage && itemLanguage == language)
+            {
+                if (ReferenceEquals(_syntax.SelectedItem, item))
+                {
+                    ApplySyntax(language);
+                }
+                _syntax.SelectedItem = item;
+                return;
+            }
+        }
+        ApplySyntax(language);
+    }
+
+    // The tokenizer of the language and the colours of the token types of the settings, in the order MainWindowController gives them to the editor.
+    private void ApplySyntax(SyntaxHighlighting.Language language)
+    {
+        TokenCache.LineTokenizer tokenizer = SyntaxHighlighting.GetTokenizer(language);
+        if (tokenizer == null)
+        {
+            _editor.SetSyntax(null, null);
+            return;
+        }
+        GlobalSettings.EditorColors colors = _settings.Editor.GetEffectiveColors(_settings.IsLightTheme);
+        _editor.SetSyntax(tokenizer, new[]
+        {
+            ((DrawingColor)colors.TextColor).ToRgb(),
+            ((DrawingColor)colors.KeywordColor).ToRgb(),
+            ((DrawingColor)colors.StringColor).ToRgb(),
+            ((DrawingColor)colors.CommentColor).ToRgb(),
+            ((DrawingColor)colors.NumberColor).ToRgb(),
+            ((DrawingColor)colors.VariableColor).ToRgb(),
+            ((DrawingColor)colors.SectionColor).ToRgb(),
+            ((DrawingColor)colors.PreprocessorColor).ToRgb()
+        });
     }
 
     private void UpdateStatus()
