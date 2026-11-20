@@ -13,12 +13,12 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 136 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 138 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
   `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
-  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TextViewTests` (where the caret of the real text view goes, against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
@@ -67,7 +67,7 @@ PR that changes them.
 
 ```
 DpiAwareControl (WinForms UserControl)
-└─ ReadonlyTextBrowser            3600 lines (+ .Wrap, .DragScroll): document view, caret, selection, highlights, scrolling
+└─ ReadonlyTextBrowser            3370 lines (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves and the wrap map are CodeEditing/CaretNavigator and WrapMap
    └─ ReadonlySmartScrollBrowser
       └─ EditableTextBrowser      undo/redo edit commands
          └─ TextEditorControl
@@ -100,7 +100,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); next 3C, the caret, the selection, the wrap and the undo of the text view to the model |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) started: 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`) done; next 3C-2, the selection |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -557,3 +557,32 @@ Checksums, the view options, Copy As); the data inspector: Ctrl+I, the tool bar 
 a double-click or Enter on a value and its edit (Enter, Esc, a wrong value), Up/Down, Ctrl+C, a window too narrow for it; the editor zoom
 (Ctrl+wheel in the text, then the hex view) and the light/dark theme; a reload and a save in the hex view; Ctrl+W and Ctrl+Tab with the
 hex view focused; closing a tab with the hex view open.
+
+3C takes out of the text view (`ReadonlyTextBrowser`, `EditableTextBrowser`) what it decides about the caret, the selection, the wrap and the undo,
+so that a WPF text view (3D) can be put on the same model: 3C-1 the caret moves and the wrap map, 3C-2 the selection (by the keys with Shift,
+the mouse, words, lines, Select all), 3C-3 the undo and redo of the edit commands. The rules of stage 1 hold.
+
+Done in 3C-1: first a net, as nothing drove the text view itself: `tests/TextViewTests` (net48, Mono + xvfb) drives the real text view
+through a `TextEditorControl` in a form sized until it shows 8 rows (and wraps at 20 columns), so that what it writes does not depend on the
+fonts: for every position of a document of 30 lines (empty lines, tabs, words with punctuation, letters that are not ASCII, blanks, lines longer
+than the wrap width) the target of each navigation key as the key handler finds it (`TryGetNavigationTarget`), the word moves, Ctrl+Home and
+Ctrl+End (asked of `ComputeMovedPosition` with the keys: `Control.ModifierKeys` cannot be set by a test) and the word under the caret; runs of
+keys through the real `OnKeyDown` (the kept column, the scroll); the same with word wrap, and the wrap map (breaks, row indexes, segments) at two
+tab sizes and for another text. `TextViewGolden.txt` (1113 lines) was written by the code before the move and is never re-recorded; nine
+mutations of the old code each make it fail. A fault it found, kept as it is: with word wrap on, Right at the end of a wrapped line that is on the
+screen goes to the start of that line instead of the next one (`GetNextRealLine` takes the next row of the screen, a row of the same line). Then
+`CodeEditing/CaretNavigator.cs` (public): `Move` (what `ComputeMovedPosition` did, with Ctrl as a flag; `MoveWrappedRow`, `MoveWrappedRows`),
+`BeginMove` and `DesiredColumn`/`DesiredWrapOffset` (the column Up, Down and the pages keep: the part of `TryGetNavigationTarget` that took and
+dropped it), `TryGetWordBounds`; `CaretMove` is a top-level enum of `CodeEditing` now (it was protected in the view; `TextEditorControl`,
+`SshTerminalControl` and `SerialTerminalControl`, which name it, use `SmarTTY.CodeEditing`). `CodeEditing/WrapMap.cs` (public): the breaks
+and first rows, `Ensure` (built again when the text, the width or the tab size changed, or after `Invalidate`), `RowCount`, `RowIndexToLine`,
+`SegmentOf`, `SegmentStart`, `SegmentEnd`, `PositionToRowIndex`. The code is as it was. The view gives them what they read through
+`ICaretNavigationHost` (the document, the tab size, the rows in view, wrapping and the map, `IsWordChar`, `GetPreviousRealLine`/`GetNextRealLine`,
+`OnMoveBeyondDocument`) and `IWrapMapSource` (the lines, the wrap width, the tab size), implemented explicitly in
+`Controls/ReadonlyTextBrowser.Navigation.cs` and the Wrap partial; both models are made when first used (the base class constructors may ask
+before the view's own has run). `ComputeMovedPosition` stays virtual (the terminals override it) and forwards; the private wrap methods the rest
+of the view calls are one-line forwarders. The text view golden, the three goldens of `TerminalSnapshots`, `SmartTerminalIntegrationTests`
+(253), `RemoteFileEditorIntegrationTests` (486), `DeviceLineEditorTests`, `NetconsoleTerminalTests` and `HexTerminalControlTests` pass
+unchanged; the golden's accessors read `Navigator` and `WrapLayout`. `tests/CaretNavigatorTests` (net8.0, a fake view over a real document,
+106 checks) drives the models; of 17 mutations 14 made a check fail at once, one after a check of the kept place in a row was added, two are
+equivalent changes. `ReadonlyTextBrowser.cs` is 3603 lines before and 3374 after, the Wrap partial 337 and 247.
