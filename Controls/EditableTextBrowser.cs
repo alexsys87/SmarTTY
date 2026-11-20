@@ -7,251 +7,8 @@ using System.Text;
 
 namespace SmarTTY.Controls;
 
-public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget
+public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget, ITextEditView
 {
-    // The edits the undo history (CodeEditing/UndoHistory, stage 3C) records: each works on the document and on this view.
-    private abstract class EditCommand : IUndoStep
-    {
-        public class ReplaceInLineCommand : EditCommand
-        {
-            private string _removedText;
-
-            private string _newText;
-
-            private int _line;
-
-            private int _column;
-
-            private int _removedLength;
-
-            public ReplaceInLineCommand(EditableTextBrowser editableTextBrowser, int line, int column, int removedLength, string text)
-                : base(editableTextBrowser)
-            {
-                this._newText = text;
-                this._line = line;
-                this._removedLength = removedLength;
-                this._column = column;
-            }
-
-            public override void Undo(EditableTextBrowser editableTextBrowser)
-            {
-                editableTextBrowser.Doc.ReplaceInLine(_line, this._column, _newText.Length, _removedText);
-                editableTextBrowser.OnLineChanged(_line, this._column, _newText.Length, _removedText.Length);
-                RestoreSelection(editableTextBrowser);
-            }
-
-            public override void Execute(EditableTextBrowser editableTextBrowser)
-            {
-                _removedText = editableTextBrowser.Doc.ReplaceInLine(_line, this._column, _removedLength, _newText);
-                editableTextBrowser.OnLineChanged(_line, this._column, _removedText.Length, _newText.Length);
-                ((ReadonlyTextBrowser)editableTextBrowser)._hasSelection = false;
-                editableTextBrowser.SetCaretColumn(this._column + _newText.Length);
-                editableTextBrowser.InvalidateLine(_line);
-                editableTextBrowser.UpdateLayout();
-            }
-        }
-
-        public class ReplaceRangeCommand : EditCommand
-        {
-            private TextDocument.TextPosition _start;
-
-            private TextDocument.TextPosition _end;
-
-            private TextDocument.TextPosition _newEnd;
-
-            private string _removedText;
-
-            private string _newText;
-
-            private bool _useExistingLineEnding;
-
-            public ReplaceRangeCommand(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition start, TextDocument.TextPosition end, string text, bool modified)
-                : base(editableTextBrowser)
-            {
-                this._start = start;
-                this._end = end;
-                this._newText = text;
-                this._useExistingLineEnding = modified;
-            }
-
-            public override void Execute(EditableTextBrowser editableTextBrowser)
-            {
-                if (_start != _end)
-                {
-                    // Keep the real line terminators: with the default "\r\n" an undo of a multi-line
-                    // deletion would put CRLF endings into an LF file.
-                    _removedText = editableTextBrowser.Doc.GetRangeText(_start, _end, editableTextBrowser.Doc.GetEffectiveLineTerminator);
-                    editableTextBrowser.DeleteRange(_start, _end);
-                }
-                TextDocument.TextPosition textPosition = ((_newText != null && _newText != "") ? (_newEnd = editableTextBrowser.Doc.InsertText(_start, _newText, this._useExistingLineEnding)) : (_newEnd = _start));
-                editableTextBrowser.OnRangeChanged(_start, _end, _newEnd);
-                editableTextBrowser.UpdateLayout();
-                editableTextBrowser.SetCaret(textPosition);
-                editableTextBrowser.Redraw();
-                base._hadSelection = false;
-            }
-
-            public override void Undo(EditableTextBrowser editableTextBrowser)
-            {
-                if (_start != _newEnd)
-                {
-                    editableTextBrowser.DeleteRange(_start, _newEnd);
-                }
-                if (_removedText != null && _removedText != "")
-                {
-                    editableTextBrowser.Doc.InsertText(_start, _removedText);
-                }
-                editableTextBrowser.OnRangeChanged(_start, _newEnd, _end);
-                RestoreSelection(editableTextBrowser);
-            }
-        }
-
-        public class IndentCommand : EditCommand
-        {
-            private int _levels;
-
-            private LineRange _lines;
-
-            private string[] _removedIndents;
-
-            // One indentation level: a tab or TabSize spaces (InsertSpaces).
-            private readonly string _indentUnit;
-
-            // Lines that got an indent (blank lines are left alone), so that undo removes exactly that.
-            private bool[] _indentedLines;
-
-            public IndentCommand(EditableTextBrowser editableTextBrowser, int levels)
-                : base(editableTextBrowser)
-            {
-                _indentUnit = IndentEdits.IndentUnit(editableTextBrowser.InsertSpaces, editableTextBrowser.TabSize);
-                this._lines = editableTextBrowser.SelectedLines;
-                if (this._lines.Count == 0)
-                {
-                    // Without a selection (Shift+Tab) the caret line is (un)indented.
-                    int caretLine = editableTextBrowser.CaretPosition.Line;
-                    this._lines = new LineRange(caretLine, caretLine);
-                }
-                _levels = levels;
-            }
-
-            private void ApplyIndent(EditableTextBrowser editableTextBrowser, int levels)
-            {
-                if (levels > 0)
-                {
-                    string text = IndentText(levels);
-                    _indentedLines = new bool[this._lines.Count];
-                    for (int line = this._lines.First; line <= this._lines.Last; line++)
-                    {
-                        if (editableTextBrowser.Doc.GetLineText(line).Trim().Length == 0)
-                        {
-                            // Indenting a blank line would only add trailing whitespace.
-                            continue;
-                        }
-                        _indentedLines[line - this._lines.First] = true;
-                        editableTextBrowser.Doc.ReplaceInLine(line, 0, 0, text);
-                        editableTextBrowser.OnLineChanged(line, 0, 0, text.Length);
-                        editableTextBrowser.InvalidateLine(line);
-                        editableTextBrowser.UpdateLayout();
-                    }
-                }
-                else
-                {
-                    if (levels >= 0)
-                    {
-                        return;
-                    }
-                    _removedIndents = new string[this._lines.Count];
-                    for (int currentLine = this._lines.First; currentLine <= this._lines.Last; currentLine++)
-                    {
-                        int indentWidth = IndentEdits.UnindentWidth(editableTextBrowser.Doc.GetLineText(currentLine), -levels, editableTextBrowser.TabSize);
-                        _removedIndents[currentLine - this._lines.First] = editableTextBrowser.Doc.ReplaceInLine(currentLine, 0, indentWidth, "");
-                        editableTextBrowser.OnLineChanged(currentLine, 0, indentWidth, 0);
-                        editableTextBrowser.InvalidateLine(currentLine);
-                        editableTextBrowser.UpdateLayout();
-                    }
-                }
-            }
-
-            public override void Execute(EditableTextBrowser editableTextBrowser)
-            {
-                ApplyIndent(editableTextBrowser, _levels);
-            }
-
-            public override void Undo(EditableTextBrowser editableTextBrowser)
-            {
-                if (_levels < 0)
-                {
-                    for (int line = this._lines.First; line <= this._lines.Last; line++)
-                    {
-                        editableTextBrowser.Doc.ReplaceInLine(line, 0, 0, _removedIndents[line - this._lines.First]);
-                        editableTextBrowser.OnLineChanged(line, 0, 0, _removedIndents[line - this._lines.First].Length);
-                    }
-                }
-                else if (_indentedLines != null)
-                {
-                    // Remove exactly the indent that Execute inserted.
-                    int length = IndentText(_levels).Length;
-                    for (int line = this._lines.First; line <= this._lines.Last; line++)
-                    {
-                        if (_indentedLines[line - this._lines.First])
-                        {
-                            editableTextBrowser.Doc.ReplaceInLine(line, 0, length, "");
-                            editableTextBrowser.OnLineChanged(line, 0, length, 0);
-                            editableTextBrowser.InvalidateLine(line);
-                        }
-                    }
-                    editableTextBrowser.UpdateLayout();
-                }
-                RestoreSelection(editableTextBrowser);
-            }
-
-            private string IndentText(int levels)
-            {
-                return IndentEdits.IndentText(_indentUnit, levels);
-            }
-        }
-
-        protected TextDocument.TextPosition _caretBefore;
-
-        protected TextDocument.TextPosition _selectionStartBefore;
-
-        protected bool _hadSelection;
-
-        protected bool _overwriteBefore;
-
-        // The view the command works on when the history runs it.
-        private readonly EditableTextBrowser _view;
-
-        private EditCommand(EditableTextBrowser editableTextBrowser)
-        {
-            _view = editableTextBrowser;
-            _overwriteBefore = editableTextBrowser.OverwriteMode;
-            _caretBefore = editableTextBrowser.CaretPosition;
-            _hadSelection = ((ReadonlyTextBrowser)editableTextBrowser)._hasSelection;
-            _selectionStartBefore = editableTextBrowser.SelectionStart;
-        }
-
-        protected void RestoreSelection(EditableTextBrowser editableTextBrowser)
-        {
-            editableTextBrowser.SetSelection(_hadSelection, _selectionStartBefore);
-            editableTextBrowser.SetCaret(_caretBefore);
-        }
-
-        public abstract void Undo(EditableTextBrowser editableTextBrowser);
-
-        public abstract void Execute(EditableTextBrowser editableTextBrowser);
-
-        void IUndoStep.Execute()
-        {
-            Execute(_view);
-        }
-
-        void IUndoStep.Undo()
-        {
-            Undo(_view);
-        }
-    }
-
     public delegate void ModifiedChangedHandler(EditableTextBrowser editableTextBrowser, bool modified);
 
     public delegate void LineChangedHandler(EditableTextBrowser editableTextBrowser, int line, int column, int addedLength, int removedLength);
@@ -345,7 +102,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         return EditableDocument.GetRangeText(start, end);
     }
 
-    private void ExecuteCommand(EditCommand editCommand)
+    private void ExecuteCommand(TextEditCommand editCommand)
     {
         History.Execute(editCommand);
     }
@@ -475,28 +232,6 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         InitializeComponent();
     }
 
-    private void DeleteRange(TextDocument.TextPosition start, TextDocument.TextPosition end)
-    {
-        if (start.Line == end.Line)
-        {
-            Doc.ReplaceInLine(start.Line, start.Column, end.Column - start.Column, "");
-        }
-        else
-        {
-            Doc.ReplaceInLine(start.Line, start.Column, -1, "");
-            Doc.ReplaceInLine(end.Line, 0, end.Column, "");
-            int removedLineCount = end.Line - start.Line - 1;
-            if (removedLineCount != 0)
-            {
-                Doc.RemoveLines(start.Line + 1, removedLineCount);
-                end.Line -= removedLineCount;
-            }
-            Doc.JoinWithNextLine(start.Line);
-        }
-        SetCaret(start);
-        base._hasSelection = false;
-    }
-
     public virtual void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text)
     {
         if (!_readOnly)
@@ -535,7 +270,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         }
         if (start.Line == end.Line && replacement.IndexOfAny(new char[2] { '\r', '\n' }) == -1)
         {
-            ExecuteCommand(new EditCommand.ReplaceInLineCommand(this, start.Line, Math.Min(start.Column, end.Column), Math.Abs(start.Column - end.Column), replacement));
+            ExecuteCommand(new ReplaceInLineCommand(this, start.Line, Math.Min(start.Column, end.Column), Math.Abs(start.Column - end.Column), replacement));
             return;
         }
         TextDocument.TextPosition rangeStart;
@@ -554,7 +289,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
             rangeStart = end;
             rangeEnd = start;
         }
-        ExecuteCommand(new EditCommand.ReplaceRangeCommand(this, rangeStart, rangeEnd, replacement, _useExistingLineEnding));
+        ExecuteCommand(new ReplaceRangeCommand(this, rangeStart, rangeEnd, replacement, _useExistingLineEnding));
     }
 
     public void Indent(int levels)
@@ -563,7 +298,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         {
             return;
         }
-        ExecuteCommand(new EditCommand.IndentCommand(this, levels));
+        ExecuteCommand(new IndentCommand(this, levels));
     }
 
     protected virtual void OnLineChanged(int line, int column, int addedLength, int removedLength)
