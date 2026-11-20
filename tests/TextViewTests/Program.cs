@@ -21,6 +21,7 @@ using K = System.Windows.Forms.Keys;
 //   - the selection (3C-2): the clicks, the margin, a drag, the buttons, a key without Shift, Select all, a range of lines, the setters and the
 //     selected lines, also in terminal mode (SelectionRuns).
 //   - the edits and their undo (3C-3): ReplaceText, Indent, Undo, Redo, the modified state, single steps, Replace All, read-only (EditRuns).
+//   - the typing and the edit keys (3D-1): characters, Enter, Backspace, Tab, Delete, the word keys, the hook of typing (TypingRuns).
 // The view is sized until it shows exactly 8 rows (and wraps at 20 columns), so that the lines do not depend on the fonts.
 // TextViewGolden.txt is what the code wrote before the move; it is never written again. Since the move (3C-1) the accessors read the kept column
 // and the wrap map of the model (Navigator, WrapLayout) instead of the fields of the view.
@@ -279,6 +280,7 @@ internal static class Program
         Application.DoEvents();
         WrapMap2(3);
         EditRuns();
+        TypingRuns();
         _form.Dispose();
     }
 
@@ -652,6 +654,220 @@ internal static class Program
         _editor.IsModified = false;
         _editor.SetDocument(new EditableTextDocument(new[] { "newer" }, TextDocument.LineEnding.Lf));
         Edit("a new document while saved");
+    }
+
+    // ---- 3D-1: the typing and the edit keys of TextEditorControl, written by the code before they moved to the model.
+    // Characters (with and without a selection, overwrite, a control character), Enter (the indentation carried over, a caret inside the
+    // indentation, a selection, a line without a line break of its own), Backspace (a character, a selection, a level of space indentation,
+    // the start of a line, the start of the text), Tab (a tab, spaces to the next tab stop, a multi-line selection indents), Delete,
+    // Ctrl+Delete and Ctrl+Backspace (words, blanks, the ends of a line and of the text), Undo and Redo by the keys, the CharTyping hook that
+    // changes the text and the caret, InsertText, GetWordAtCaret, ReplaceWordAtCaret, RemoveLines and DeleteSelection. Shift cannot be held by a
+    // test (Shift+Tab reads Control.ModifierKeys), and the clipboard is not used. Every step writes what the edits run writes.
+
+    private static readonly MethodInfo KeyPressMethod = typeof(TextEditorControl).GetMethod("OnKeyPress", Private);
+
+    private static readonly MethodInfo EditorKeyDownMethod = typeof(TextEditorControl).GetMethod("OnKeyDown", Private);
+
+    private static void Type(string text)
+    {
+        foreach (char ch in text)
+        {
+            KeyPressMethod.Invoke(_editor, new object[] { new KeyPressEventArgs(ch) });
+        }
+    }
+
+    private static void Key(Keys keyData)
+    {
+        EditorKeyDownMethod.Invoke(_editor, new object[] { new KeyEventArgs(keyData) });
+    }
+
+    private static void Start(params string[] lines)
+    {
+        _editor.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+        _editor.ClearSelection();
+        _editor.SetCaret(At(0, 0));
+        _editor.IsModified = false;
+        EditEvents.Clear();
+    }
+
+    private static void TypingRuns()
+    {
+        Lines.Add("== typing");
+        _editor.InsertSpaces = false;
+        _editor.OverwriteMode = false;
+        Start("abc", "    indented", "\tx", "");
+        _editor.SetCaret(At(0, 3));
+        Type("de");
+        Edit("two characters typed at the end");
+        _editor.SetSelection(true, At(0, 1));
+        _editor.SetCaret(At(0, 4));
+        Type("Z");
+        Edit("a character typed over a selection");
+        Type("\u0001");
+        Edit("a control character does nothing");
+        _editor.OverwriteMode = true;
+        _editor.SetCaret(At(0, 0));
+        Type("xy");
+        Edit("overwrite");
+        _editor.SetCaret(At(0, 4));
+        Type("!");
+        Edit("overwrite at the end of a line inserts");
+        _editor.OverwriteMode = false;
+        _editor.SetCaret(At(1, 12));
+        Type("\r");
+        Edit("Enter after an indented line carries the indentation");
+        _editor.SetCaret(At(1, 2));
+        Type("\r");
+        Edit("Enter inside the indentation carries the part before the caret");
+        _editor.SetSelection(true, At(0, 1));
+        _editor.SetCaret(At(0, 3));
+        Type("\r");
+        Edit("Enter over a selection");
+        Start("one");
+        _editor.SetCaret(At(0, 3));
+        Type("\r");
+        Edit("Enter on a line without a line break of its own");
+        Start("abc", "      sp", "x");
+        _editor.SetCaret(At(0, 2));
+        Type("\b");
+        Edit("Backspace removes a character");
+        _editor.SetCaret(At(1, 0));
+        Type("\b");
+        Edit("Backspace at the start of a line joins it");
+        Type("\b\b\b");
+        _editor.SetCaret(At(0, 0));
+        Type("\b");
+        Edit("three more Backspaces, then one at the start of the text, which does nothing");
+        Start("x", "      sp");
+        _editor.InsertSpaces = true;
+        _editor.SetCaret(At(1, 6));
+        Type("\b");
+        Edit("Backspace in space indentation goes back to the tab stop");
+        Type("\b");
+        Edit("and again");
+        _editor.SetCaret(At(1, 3));
+        Type("\t");
+        Edit("Tab with spaces goes to the next tab stop");
+        _editor.InsertSpaces = false;
+        Type("\t");
+        Edit("Tab without spaces types a tab");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(1, 1));
+        Type("\t");
+        Edit("Tab over a selection of two lines indents them");
+        _editor.SetSelection(true, At(1, 0));
+        _editor.SetCaret(At(1, 2));
+        Type("\t");
+        Edit("Tab over a selection in one line replaces it");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(1, 1));
+        Type("\b");
+        Edit("Backspace over a selection removes it");
+
+        Start("foo  bar.baz", "next");
+        _editor.SetCaret(At(0, 0));
+        Key(K.Delete);
+        Edit("Delete removes a character");
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete removes a word and the blanks before the next");
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete removes the next word");
+        _editor.SetCaret(At(0, _editor.EditableDocument.GetLineText(0).Length));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete at the end of a line removes the line break");
+        _editor.SetCaret(At(0, _editor.EditableDocument.GetLineText(0).Length));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete at the end of the text does nothing");
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace removes the word in front of the caret");
+        Key(K.Back | K.Control);
+        Edit("and the one before it");
+        _editor.SetCaret(At(0, 0));
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace at the start of the text does nothing");
+        Start("a b", "c");
+        _editor.SetCaret(At(1, 0));
+        Key(K.Back | K.Control);
+        Edit("Ctrl+Backspace at the start of a line removes the line break");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(0, 2));
+        Key(K.Delete | K.Control);
+        Edit("Ctrl+Delete over a selection removes it");
+        _editor.SetSelection(true, At(0, 0));
+        _editor.SetCaret(At(0, 1));
+        Key(K.Delete);
+        Edit("Delete over a selection removes it");
+        Key(K.Z | K.Control);
+        Edit("Ctrl+Z undoes");
+        Key(K.Y | K.Control);
+        Edit("Ctrl+Y redoes");
+        Key(K.Z | K.Control);
+        Key(K.Z | K.Control | K.Shift);
+        Edit("Ctrl+Shift+Z redoes too");
+        Key(K.Z | K.Control | K.Alt);
+        Edit("Ctrl+Alt+Z (AltGr) does not undo");
+        _editor.SetCaret(At(0, 1));
+        Key(K.Back | K.Control | K.Alt);
+        Edit("Ctrl+Alt+Backspace (AltGr) does not remove a word");
+
+        Start("word here", "x");
+        TextEditorControl.CharTypingHandler hook = (TextEditorControl view, char ch, ref string text, ref TextDocument.TextPosition position) =>
+        {
+            if (ch == '(')
+            {
+                text = "()";
+                position = new TextDocument.TextPosition(view.CaretPosition.Column + 1, view.CaretPosition.Line);
+            }
+            else if (ch == '#')
+            {
+                text = null;
+            }
+        };
+        string typed = "";
+        TextEditorControl.CharTypedHandler after = (view, ch, position) => typed += ch + "@" + P(position) + " ";
+        _editor.CharTyping += hook;
+        _editor.CharTyped += after;
+        _editor.SetCaret(At(0, 4));
+        Type("(");
+        Edit("a hook that types a pair and puts the caret inside it");
+        Type("#");
+        Edit("a hook that types nothing");
+        _editor.CharTyping -= hook;
+        _editor.CharTyped -= after;
+        Lines.Add("typed: " + typed);
+
+        Start("alpha beta_2 gamma", "x");
+        foreach (int column in new[] { 0, 3, 5, 6, 12, 18 })
+        {
+            _editor.SetCaret(At(0, column));
+            string word = _editor.GetWordAtCaret(out int start, out int length);
+            Lines.Add("word at " + column + ": " + (word ?? "null") + " " + start + "+" + length);
+        }
+        _editor.SetCaret(At(0, 8));
+        _editor.ReplaceWordAtCaret("BETA");
+        Edit("the word at the caret replaced");
+        _editor.SetCaret(At(0, 5));
+        _editor.ReplaceWordAtCaret("+");
+        Edit("a replacement after a word");
+        _editor.SetCaret(At(1, 0));
+        _editor.ReplaceWordAtCaret("y");
+        Edit("no word at the caret: the text is inserted");
+        _editor.InsertText("ins");
+        Edit("InsertText");
+        Start("l0", "l1", "l2", "l3");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 1, 2 });
+        Edit("lines 1 and 2 removed");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 1, 1 });
+        Edit("the last line removed (the line break before it goes)");
+        typeof(TextEditorControl).GetMethod("RemoveLines", Private).Invoke(_editor, new object[] { 0, 0 });
+        Edit("the only line removed");
+        Start("abc def");
+        _editor.DeleteSelection();
+        Edit("DeleteSelection without a selection");
+        _editor.SetSelection(true, At(0, 4));
+        _editor.SetCaret(At(0, 7));
+        _editor.DeleteSelection();
+        Edit("DeleteSelection");
     }
 
     private static string Bool(bool value)

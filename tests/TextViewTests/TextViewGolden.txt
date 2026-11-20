@@ -1259,3 +1259,57 @@ edit read-only: no edit, no undo, no redo: text=Aaa\nBab\nCac caret=2:3 sel=- mo
 edit editable again: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=T redo=T events=
 edit a new document while modified: text=new caret=2:3 sel=- mod=T undo=F redo=F events=
 edit a new document while saved: text=newer caret=2:3 sel=- mod=F undo=F redo=F events=mod:F
+== typing
+edit two characters typed at the end: text=abcde\n    indented\n\tx\n caret=0:5 sel=- mod=T undo=T redo=F events=line:0,3,0,1;mod:T;line:0,4,0,1
+edit a character typed over a selection: text=aZe\n    indented\n\tx\n caret=0:2 sel=- mod=T undo=T redo=F events=line:0,1,3,1
+edit a control character does nothing: text=aZe\n    indented\n\tx\n caret=0:2 sel=- mod=T undo=T redo=F events=
+edit overwrite: text=xye\n    indented\n\tx\n caret=0:2 sel=- mod=T undo=T redo=F events=line:0,0,1,1;line:0,1,1,1
+edit overwrite at the end of a line inserts: text=xye!\n    indented\n\tx\n caret=0:4 sel=- mod=T undo=T redo=F events=line:0,3,0,1
+edit Enter after an indented line carries the indentation: text=xye!\n    indented\n    \n\tx\n caret=2:4 sel=- mod=T undo=T redo=F events=range:1:12,1:12,2:4
+edit Enter inside the indentation carries the part before the caret: text=xye!\n  \n    indented\n    \n\tx\n caret=2:2 sel=- mod=T undo=T redo=F events=range:1:2,1:2,2:2
+edit Enter over a selection: text=x\n!\n  \n    indented\n    \n\tx\n caret=1:0 sel=- mod=T undo=T redo=F events=range:0:1,0:3,1:0
+edit Enter on a line without a line break of its own: text=one\n caret=1:0 sel=- mod=T undo=T redo=F events=range:0:3,0:3,1:0;mod:T
+edit Backspace removes a character: text=ac\n      sp\nx caret=0:1 sel=- mod=T undo=T redo=F events=line:0,1,1,0;mod:T
+edit Backspace at the start of a line joins it: text=ac      sp\nx caret=0:2 sel=- mod=T undo=T redo=F events=range:0:2,1:0,0:2
+edit three more Backspaces, then one at the start of the text, which does nothing: text=      sp\nx caret=0:0 sel=- mod=T undo=T redo=F events=line:0,1,1,0;line:0,0,1,0
+edit Backspace in space indentation goes back to the tab stop: text=x\n    sp caret=1:4 sel=- mod=T undo=T redo=F events=line:1,4,2,0;mod:T
+edit and again: text=x\nsp caret=1:0 sel=- mod=T undo=T redo=F events=line:1,0,4,0
+edit Tab with spaces goes to the next tab stop: text=x\nsp   caret=1:4 sel=- mod=T undo=T redo=F events=line:1,2,0,2
+edit Tab without spaces types a tab: text=x\nsp  \t caret=1:5 sel=- mod=T undo=T redo=F events=line:1,4,0,1
+edit Tab over a selection of two lines indents them: text=\tx\n\tsp  \t caret=1:1 sel=0:0 mod=T undo=T redo=F events=line:0,0,0,1;line:1,0,0,1
+edit Tab over a selection in one line replaces it: text=\tx\n\tp  \t caret=1:1 sel=- mod=T undo=T redo=F events=line:1,0,2,1
+edit Backspace over a selection removes it: text=p  \t caret=0:0 sel=- mod=T undo=T redo=F events=range:0:0,1:1,0:0
+edit Delete removes a character: text=oo  bar.baz\nnext caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,1,0;mod:T
+edit Ctrl+Delete removes a word and the blanks before the next: text=  bar.baz\nnext caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,2,0
+edit Ctrl+Delete removes the next word: text=.baz\nnext caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,5,0
+edit Ctrl+Delete at the end of a line removes the line break: text=.baznext caret=0:4 sel=- mod=T undo=T redo=F events=range:0:4,1:0,0:4
+edit Ctrl+Delete at the end of the text does nothing: text=.baznext caret=0:8 sel=- mod=T undo=T redo=F events=
+edit Ctrl+Backspace removes the word in front of the caret: text=. caret=0:1 sel=- mod=T undo=T redo=F events=line:0,1,7,0
+edit and the one before it: text= caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,1,0
+edit Ctrl+Backspace at the start of the text does nothing: text= caret=0:0 sel=- mod=T undo=T redo=F events=
+edit Ctrl+Backspace at the start of a line removes the line break: text=a bc caret=0:3 sel=- mod=T undo=T redo=F events=range:0:3,1:0,0:3;mod:T
+edit Ctrl+Delete over a selection removes it: text=bc caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,2,0
+edit Delete over a selection removes it: text=c caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,1,0
+edit Ctrl+Z undoes: text=bc caret=0:1 sel=0:0 mod=T undo=T redo=T events=line:0,0,0,1
+edit Ctrl+Y redoes: text=c caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,1,0
+edit Ctrl+Shift+Z redoes too: text=c caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,0,1;line:0,0,1,0
+edit Ctrl+Alt+Z (AltGr) does not undo: text=c caret=0:0 sel=- mod=T undo=T redo=F events=
+edit Ctrl+Alt+Backspace (AltGr) does not remove a word: text=c caret=0:1 sel=- mod=T undo=T redo=F events=
+edit a hook that types a pair and puts the caret inside it: text=word() here\nx caret=0:5 sel=- mod=T undo=T redo=F events=line:0,4,0,2;mod:T
+edit a hook that types nothing: text=word() here\nx caret=0:5 sel=- mod=T undo=T redo=F events=
+typed: (@0:5 #@0:5 
+word at 0: null -1+0
+word at 3: alpha 0+5
+word at 5: alpha 0+5
+word at 6: beta_2 6+6
+word at 12: beta_2 6+6
+word at 18: gamma 13+5
+edit the word at the caret replaced: text=alpha BETA gamma\nx caret=0:10 sel=- mod=T undo=T redo=F events=line:0,6,6,4;mod:T
+edit a replacement after a word: text=+ BETA gamma\nx caret=0:1 sel=- mod=T undo=T redo=F events=line:0,0,5,1
+edit no word at the caret: the text is inserted: text=+ BETA gamma\nyx caret=1:1 sel=- mod=T undo=T redo=F events=line:1,0,0,1
+edit InsertText: text=+ BETA gamma\nyinsx caret=1:4 sel=- mod=T undo=T redo=F events=line:1,1,0,3
+edit lines 1 and 2 removed: text=l0\nl3 caret=1:0 sel=- mod=T undo=T redo=F events=range:1:0,3:0,1:0;mod:T
+edit the last line removed (the line break before it goes): text=l0 caret=0:2 sel=- mod=T undo=T redo=F events=range:0:2,1:2,0:2
+edit the only line removed: text= caret=0:0 sel=- mod=T undo=T redo=F events=line:0,0,2,0
+edit DeleteSelection without a selection: text=abc def caret=0:0 sel=- mod=F undo=F redo=F events=
+edit DeleteSelection: text=abc  caret=0:4 sel=- mod=T undo=T redo=F events=line:0,4,3,0;mod:T
