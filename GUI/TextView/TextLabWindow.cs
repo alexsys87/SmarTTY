@@ -281,6 +281,7 @@ internal sealed class TextLabWindow : Window
         string selection = _editor.HasSelection ? "selection " + _editor.SelectedText.Length.ToString(CultureInfo.InvariantCulture) + " characters" : "no selection";
         _status.Text = _fileName + "   |   Ln " + (caret.Line + 1).ToString(CultureInfo.InvariantCulture) + ", Col " + (column + 1).ToString(CultureInfo.InvariantCulture)
             + "   |   " + selection + "   |   " + _editor.Document.LineCount.ToString(CultureInfo.InvariantCulture) + " lines   |   " + (_editor.OverwriteMode ? "OVR" : "INS")
+            + (_editor.CursorCount > 1 ? "   |   " + _editor.CursorCount.ToString(CultureInfo.InvariantCulture) + " cursors" : "")
             + "   |   " + Math.Round(_editor.FontZoom * 100).ToString(CultureInfo.InvariantCulture) + " %"
             + (_editor.MessageCount > 0 ? "   |   " + _editor.MessageCount.ToString(CultureInfo.InvariantCulture) + " message(s)" : "")
             + (_editor.ReadOnly ? "   |   read-only" : "") + (_editor.IsModified ? "   |   modified (not saved)" : "");

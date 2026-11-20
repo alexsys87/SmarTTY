@@ -21,12 +21,13 @@ namespace SmarTTY.GUI.TextView;
 /// <see cref="TextViewLayout"/> and <see cref="TextPointer"/>. It draws itself in whole pixels of the device: the layout counts in device pixels,
 /// the drawing is scaled back by the DPI, and every row is one <see cref="GlyphRun"/> a colour on the grid of the characters of a monospaced font.
 /// The syntax colours, the folds and the inline messages are those of <c>CodeEditorPP</c> (3D-3 to 3D-5), the word list and the parameter hint
-/// are <see cref="EditorCompletion"/> with WPF windows (<see cref="WpfSuggestionList"/>, <see cref="WpfHintView"/>, 3D-6).
-/// Not in it yet: the marks of the blanks, the search highlights, characters that the font has no glyph for (they are drawn as "?") and
-/// characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
+/// are <see cref="EditorCompletion"/> with WPF windows (<see cref="WpfSuggestionList"/>, <see cref="WpfHintView"/>, 3D-6); the commands and their
+/// keys, the search with its highlights, the pair of a bracket, the marks of the blanks and several cursors are those of <c>CodeEditorPP</c> too
+/// (<see cref="LineCommands"/>, <see cref="TextSearch"/>, <see cref="BracketPair"/>, <see cref="BlankMarks"/>, <see cref="MultiCursorSession"/>, 3E-1 to 3E-3).
+/// Not in it yet: characters that the font has no glyph for (they are drawn as "?") and characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
 /// </summary>
 internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost, IEditorCompletionHost,
-    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget, ISearchTarget
+    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget, ISearchTarget, IMultiCursorHost
 {
     // What a word is for Ctrl+Left/Right, a double click and Ctrl+Backspace (as ReadonlyTextBrowser.IsWordChar).
     private const string WordCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -133,6 +134,9 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     private readonly LineCommands _lineCommands;
 
+    // The other cursors besides the caret (Alt+click, Ctrl+D, Ctrl+Shift+L, Ctrl+Alt+Up/Down), as in CodeEditorPP.
+    private readonly MultiCursorSession _cursorSession;
+
     // The highlighted ranges (the range a search is limited to, the pair of the bracket at the caret) by their numbers, as ReadonlyTextBrowser keeps them.
     private readonly Dictionary<int, TextHighlight> _highlights = new Dictionary<int, TextHighlight>();
 
@@ -194,6 +198,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _typing = new TextTyping(this);
         _completion = new EditorCompletion(this);
         _lineCommands = new LineCommands(this);
+        _cursorSession = new MultiCursorSession(this);
         _pointer = new TextPointer(_selection, _navigator, () => _document);
         _tokens.SetDocument(_document, null);
         _folding = new FoldingManager(_tokens);
@@ -238,6 +243,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 document.SetText("");
             }
             _document = document;
+            // The cursors were in the old text.
+            _cursorSession.ClearExtraCursors();
             _folding.Clear();
             _tokens.SetDocument(_document, _tokenizer);
             _selection.Clear();
@@ -796,21 +803,72 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         InvalidateVisual();
     }
 
-    // The commands of several cursors come with 3E-3; until then their keys do nothing here.
-    public void AddNextOccurrence()
+    // ---- several cursors (MultiCursorSession; the main cursor is the caret and the selection of the view, the others are drawn by it)
+
+    /// <summary>The view has more than one cursor.</summary>
+    public bool HasMultipleCursors => _cursorSession.HasMultipleCursors;
+
+    /// <summary>The number of cursors (1 when there is just the caret).</summary>
+    public int CursorCount => _cursorSession.CursorCount;
+
+    /// <summary>Goes back to a single cursor (the main one stays).</summary>
+    public void ClearExtraCursors()
     {
+        _cursorSession.ClearExtraCursors();
     }
 
+    /// <summary>Ctrl+D: selects the word under the caret; with a selection, adds a cursor on its next occurrence.</summary>
+    public void AddNextOccurrence()
+    {
+        _cursorSession.AddNextOccurrence();
+    }
+
+    /// <summary>Ctrl+Shift+L: a cursor on every occurrence of the selected text (or of the word under the caret).</summary>
     public void SelectAllOccurrences()
     {
+        _cursorSession.SelectAllOccurrences();
     }
 
     public void AddCursorAbove()
     {
+        _cursorSession.AddCursorAbove();
     }
 
     public void AddCursorBelow()
     {
+        _cursorSession.AddCursorBelow();
+    }
+
+    EditableTextDocument IMultiCursorHost.Document => _document;
+
+    bool IMultiCursorHost.CanUseCursors => !_readOnly;
+
+    void IMultiCursorHost.SetSelection(bool select, TextDocument.TextPosition anchor)
+    {
+        ((ITextEditView)this).SetSelection(select, anchor);
+    }
+
+    void IMultiCursorHost.ExecuteAsSingleUndoStep(Action edits)
+    {
+        if (!_readOnly)
+        {
+            _history.ExecuteAsSingleStep(edits);
+        }
+    }
+
+    void IMultiCursorHost.UpdateMaxLineWidth(int line)
+    {
+        _layout.UpdateMaxColumns(line);
+    }
+
+    void IMultiCursorHost.HideCompletion()
+    {
+        _completion.HideCompletion();
+    }
+
+    void IMultiCursorHost.Redraw()
+    {
+        InvalidateVisual();
     }
 
     EditableTextDocument ILineCommandHost.Document => _document;
@@ -871,6 +929,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     /// <summary>Puts the selection, or the caret line with its line break when nothing is selected and <paramref name="select"/>, on the clipboard.</summary>
     public void CopySelection(bool select = true)
     {
+        if (_cursorSession.TryCopyCursors(out List<string> texts))
+        {
+            TryCopyToClipboard(MultiCursorSession.ForClipboard(texts));
+            return;
+        }
         if (!HasSelection && !select)
         {
             return;
@@ -880,6 +943,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     public void Cut()
     {
+        if (_cursorSession.TryCut(TryCopyToClipboard))
+        {
+            AfterEdit();
+            return;
+        }
         // The text is removed only when the clipboard has it.
         if (!TryCopyToClipboard(GetTextToCopy()))
         {
@@ -909,6 +977,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         }
         if (string.IsNullOrEmpty(text))
         {
+            return;
+        }
+        if (_cursorSession.TryPaste(text))
+        {
+            AfterEdit();
             return;
         }
         try
@@ -962,6 +1035,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     /// <summary>Moves the caret (brought into the text) and scrolls it into view; the selection, if any, now ends there.</summary>
     public void SetCaret(TextDocument.TextPosition position)
     {
+        // The caret was moved by something that knows of one cursor only (a find, a go to line, a click); the cursors' own moves keep them.
+        _cursorSession.OnViewChanged();
         // A caret put inside a folded block unfolds it (as the WinForms view tells its folds before it moves the caret).
         if (_folding.OnCaretMoved(position.Line, position.Column))
         {
@@ -1096,8 +1171,21 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         VirtualKey keyData = virtualKey | (control ? VirtualKey.Control : 0) | (shift ? VirtualKey.Shift : 0) | (alt ? VirtualKey.Alt : 0);
         if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(new KeyStroke(keyData)), out KeyBindingMap.EditorCommand command))
         {
+            if (_cursorSession.HasMultipleCursors && !MultiCursorSession.IsMultiCursorCommand(command.Name))
+            {
+                // A command that works on lines or on the view is for one cursor.
+                _cursorSession.ClearExtraCursors();
+            }
             command.Execute(this);
             e.Handled = true;
+            return;
+        }
+        // With several cursors the arrows, Home/End, Backspace, Delete and their chords work at every cursor (Enter, Tab and Backspace
+        // type below, as the characters they are).
+        if (_cursorSession.HasMultipleCursors && _cursorSession.KeyDown(virtualKey, control, shift, alt) != CursorKeyResult.NotHandled)
+        {
+            e.Handled = true;
+            AfterEdit();
             return;
         }
         if (virtualKey == VirtualKey.Escape)
@@ -1156,8 +1244,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             char typed = virtualKey == VirtualKey.Back ? '\b' : (virtualKey == VirtualKey.Return ? '\r' : (virtualKey == VirtualKey.Tab ? '\t' : '\0'));
             if (typed != '\0')
             {
-                _typing.TypeCharacter(typed, shift);
-                _completion.AfterKeyPress(typed);
+                if (!(_cursorSession.HasMultipleCursors && _cursorSession.TypeCharacter(typed, shift)))
+                {
+                    _typing.TypeCharacter(typed, shift);
+                    _completion.AfterKeyPress(typed);
+                }
                 handled = true;
             }
         }
@@ -1172,12 +1263,22 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     }
 
     // Characters typed as the WinForms view gets them as KeyPress: the edit, then the word list follows the typed word.
+    // A typed character at every cursor, or at the caret with the completion (as CodeEditorPP.OnKeyPress).
+    private void TypeOne(char character)
+    {
+        if (_cursorSession.HasMultipleCursors && _cursorSession.TypeCharacter(character, false))
+        {
+            return;
+        }
+        _typing.TypeCharacter(character, false);
+        _completion.AfterKeyPress(character);
+    }
+
     private void TypeCharacters(string text)
     {
         foreach (char character in text)
         {
-            _typing.TypeCharacter(character, false);
-            _completion.AfterKeyPress(character);
+            TypeOne(character);
         }
         AfterEdit();
     }
@@ -1235,8 +1336,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             {
                 continue;
             }
-            _typing.TypeCharacter(character, false);
-            _completion.AfterKeyPress(character);
+            TypeOne(character);
             typed = true;
         }
         if (typed)
@@ -1312,11 +1412,22 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             e.Handled = true;
             return;
         }
+        if (e.ChangedButton == MouseButton.Left && (Keyboard.Modifiers & ModifierKeys.Alt) != 0 && !_readOnly && position.IsValid)
+        {
+            // Alt+click adds a cursor (or takes one away); Alt+Shift+click makes a cursor on every line down to the click. No selection by the mouse.
+            _cursorSession.AltClick(position, (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+            AfterEdit();
+            e.Handled = true;
+            return;
+        }
         if (e.ChangedButton == MouseButton.Left)
         {
             bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
             bool margin = x < _layout.NumbersWidth;
+            // A click puts the caret in one place.
+            _cursorSession.ClearExtraCursors();
             SetCaret(_pointer.Press(position, e.ClickCount, shift, _caret, lineUnit: margin));
+            _cursorSession.OnCaretClicked(_caret);
             CaptureMouse();
             _autoScrollTimer.Start();
             e.Handled = true;
@@ -1504,6 +1615,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextEditView.SetSelection(bool select, TextDocument.TextPosition start)
     {
+        _cursorSession.OnViewChanged();
         _selection.HasSelection = select;
         _selection.Anchor = start;
         InvalidateVisual();
@@ -1516,6 +1628,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextEditView.OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
+        // An edit that is not the cursors' own (an undo, a command for one cursor) takes the extra cursors away.
+        _cursorSession.OnViewChanged();
         _tokens.RetokenizeLine(line, _tokenizer);
         // The tokens of the line are new ones: a folded block that started or ended there refers to the old tokens (as CodeEditorPP).
         _folding.RemoveStaleRegions(line, 0, 0, out bool staleRegionsRemoved);
@@ -1534,6 +1648,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextEditView.OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
+        _cursorSession.OnViewChanged();
         SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int firstLine, out int removedLines, out int addedLines);
         _messages.ShiftLines(firstLine, removedLines, addedLines);
         _tokens.OnLinesChanged(firstLine, removedLines, addedLines, _tokenizer);
@@ -1954,6 +2069,44 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         }
     }
 
+    // The selections of the other cursors in a row (their background, as CodeEditorPP.PaintExtraSelections).
+    private void DrawExtraSelections(DrawingContext context, int row, int textLeft, int y, RgbColor selection)
+    {
+        int charWidth = _layout.CharWidth;
+        foreach (TextCursor cursor in _cursorSession.ExtraCursors)
+        {
+            if (!cursor.HasSelection)
+            {
+                continue;
+            }
+            TextDocument.TextPosition start = new TextDocument.TextPosition(cursor.Start.Column, cursor.Start.Line);
+            TextDocument.TextPosition end = new TextDocument.TextPosition(cursor.End.Column, cursor.End.Line);
+            if (_layout.SelectedColumns(row, start, end, out int from, out int to, out bool pastEnd))
+            {
+                int selectedWidth = (to - from + (pastEnd ? 1 : 0)) * charWidth;
+                context.DrawRectangle(Brush(selection), null, new Rect(textLeft + from * charWidth, y, selectedWidth, _layout.RowHeight));
+            }
+        }
+    }
+
+    // The carets of the other cursors: a bar each, not above the first row (as CodeEditorPP.PaintExtraCarets).
+    private void DrawExtraCarets(DrawingContext context, int height)
+    {
+        int caretWidth = Math.Max(1, (int)Math.Round(1.5 * _scale));
+        foreach (TextCursor cursor in _cursorSession.ExtraCursors)
+        {
+            if (cursor.Caret.Line >= _document.LineCount)
+            {
+                continue;
+            }
+            _layout.PositionToPoint(new TextDocument.TextPosition(cursor.Caret.Column, cursor.Caret.Line), out int x, out int y);
+            if (y >= 0 && y < height && x >= _layout.TextLeft)
+            {
+                context.DrawRectangle(Brush(_foreColor), null, new Rect(x, y, caretWidth, _layout.RowHeight));
+            }
+        }
+    }
+
     // The highlighted ranges in a row: the fill and a frame of a pixel, in the colours of their styles (an empty colour draws nothing).
     private void DrawHighlights(DrawingContext context, int row, int textLeft, int y)
     {
@@ -2248,6 +2401,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                     int selectedWidth = (selectedTo - selectedFrom + (pastEnd ? 1 : 0)) * charWidth;
                     context.DrawRectangle(Brush(selection), null, new Rect(textLeft + selectedFrom * charWidth, y, selectedWidth, rowHeight));
                 }
+                DrawExtraSelections(context, row, textLeft, y, selection);
                 // The colours of the syntax, and the selected part of each run in the colour of a selected text.
                 foreach (TextRun run in _layout.RowRuns(row, LineRuns(_layout.RowToLine(row, out _, out _))))
                 {
@@ -2281,6 +2435,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             }
             if (focused && _caretVisible)
             {
+                DrawExtraCarets(context, height);
                 _layout.PositionToPoint(_caret, out int caretX, out int caretY);
                 if (caretY >= 0 && caretY < height)
                 {
