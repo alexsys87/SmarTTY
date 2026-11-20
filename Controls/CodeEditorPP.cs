@@ -244,14 +244,9 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             colorSpans[listIndex].Start = list[listIndex].Start;
             colorSpans[listIndex].End = list[listIndex].End;
-            if (TokenBrushes == null || TokenBrushes.Length == 0)
-            {
-                colorSpans[listIndex].Foreground = _defaultColors[0].Foreground;
-            }
-            else
-            {
-                colorSpans[listIndex].Foreground = ((list[listIndex].Type >= TokenBrushes.Length) ? TokenBrushes[0] : TokenBrushes[list[listIndex].Type]);
-            }
+            colorSpans[listIndex].Foreground = (TokenBrushes == null || TokenBrushes.Length == 0)
+                ? _defaultColors[0].Foreground
+                : TokenBrushes[SyntaxColoring.ColorIndex(list[listIndex].Type, TokenBrushes.Length)];
         }
         return colorSpans;
     }
@@ -285,17 +280,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             ClearExtraCursors();
         }
-        int changeStartLine = start.Line;
-        int removedLineCount = oldEnd.Line - start.Line;
-        int addedLineCount = newEnd.Line - start.Line;
-        if (start.Column == 0 && oldEnd == start && newEnd.Line == start.Line + 1 && newEnd.Column == 0 && changeStartLine > 0)
-        {
-            changeStartLine--;
-        }
-        if (start.Column == 0 && newEnd == start && oldEnd.Line == start.Line + 1 && oldEnd.Column == 0 && changeStartLine > 0)
-        {
-            changeStartLine--;
-        }
+        SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int changeStartLine, out int removedLineCount, out int addedLineCount);
         _inlineMessageProvider.ShiftLines(changeStartLine, removedLineCount, addedLineCount);
         DateTime now = DateTime.Now;
         _tokenCache.OnLinesChanged(changeStartLine, removedLineCount, addedLineCount, Tokenizing);
