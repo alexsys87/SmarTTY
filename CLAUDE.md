@@ -18,7 +18,7 @@ PR that changes them.
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
   `RemoteFileEditorIntegrationTests` (the real remote editor on OpenSSH and Dropbear), `NetconsoleTerminalTests`,
-  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TextViewTests` (where the caret and the selection of the real text view go, against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+  `DeviceLineEditorTests`, `HexEditorControlTests` (the real hex editor control against a golden file), `TextViewTests` (the caret, the selection and the edits with their undo of the real text view, against a golden file), `TerminalSnapshots` (the real terminal control against a golden file). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
@@ -69,7 +69,7 @@ PR that changes them.
 DpiAwareControl (WinForms UserControl)
 └─ ReadonlyTextBrowser            3340 lines (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves, the wrap map and the selection are CodeEditing/CaretNavigator, WrapMap and TextSelection
    └─ ReadonlySmartScrollBrowser
-      └─ EditableTextBrowser      undo/redo edit commands
+      └─ EditableTextBrowser      the edit commands; their undo history is CodeEditing/UndoHistory
          └─ TextEditorControl
             ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
@@ -100,7 +100,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) started: 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`) and 3C-2 (the selection, `TextSelection`) done; next 3C-3, the undo and redo |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); next 3D, the text view on WPF (AvalonEdit or a view of our own on the model: not decided yet) |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -606,3 +606,25 @@ now (properties of the same names, as `_privateModes` in B4b), so that the view 
 and their timing, `AdjustSelectionEnd` (still called after the selection is switched on: the serial terminal's override reads `HasSelection`), the
 redraws and the events. All the stands of 3C-1 pass unchanged; `tests/CaretNavigatorTests` has 37 checks of the model (143 in all), and of 12
 mutations of it 11 made a check fail at once, the 12th after a check was added. `ReadonlyTextBrowser.cs` is 3374 lines before and 3343 after.
+
+Done in 3C-3: first a net: `tests/TextViewTests` has an edits run at its end, written by the code before the move (the 1199 lines of before did
+not change; 1261 in all, the same on every run): `ReplaceText` in a line, across lines, at the start only, an empty edit, an end before the start,
+columns of -1, a line break deleted at the end of a line and the join that drops the indentation the lines share; `Indent` and unindent with a
+selection (a tab) and without one (spaces), by more than there is, blank lines left alone; Undo and Redo at both ends and an edit after an undo;
+the modified state with `IsModified`, `CurrentVersion` and `MarkSaved`, undoing to the saved text and past it, a change outside an edit command;
+`ExecuteAsSingleUndoStep` (nested, empty); Replace All (literal, of nothing, of an empty text, in a range with a line break in the replacement);
+read-only; a new document while modified and while saved; every step writes the text, the caret, the selection, the modified state, what can be
+undone and redone, and the `ModifiedChanged`, `LineChanged` and `RangeChanged` events. Nine mutations of the undo and edit code each make it fail.
+A fault it found, kept as it is: an edit within one line puts the caret at the end of the new text in the caret's own line, which is another line
+when the edit was not on the caret's line (`ReplaceInLineCommand` calls `SetCaretColumn`). Then `CodeEditing/UndoHistory.cs` (public): the two
+stacks, the saved step and the marker of a text never saved, the depth of a running edit (`InEdit`), the steps collected as one,
+`IsModified`, `CurrentVersion`, `MarkSaved`, `HasUndo`/`HasRedo`, `Execute`, `ExecuteAsSingleStep`, `Undo`, `Redo`, `Reset`; the steps are
+`IUndoStep` (the edit commands of the view, which keep their view and their code) and `CompoundUndoStep` (the old `CompoundCommand`).
+`CodeEditing/IndentEdits.cs` (public static): `IndentUnit`, `IndentText`, `UnindentWidth`, `SharedIndentLength` (the indentation a join drops).
+The code is as it was. Not word for word: a change outside an edit still sets the view's virtual `IsModified` (the remote editor sends it to the
+hex view) when `History.InEdit` is false; the unindent no longer tests the length of a line with two sentinels added (never 0); the compound step
+no longer takes the caret and the selection at its start (never used). As before, when an edit of a single step throws, the edits made before it
+stay as one step and the modified state is not looked at again. All the stands of 3C-1 and `EditorTextTests` pass unchanged;
+`tests/CaretNavigatorTests` has 64 checks of the two models (207 in all), and all 15 mutations of them make a check fail. `EditableTextBrowser.cs`
+is 763 lines before and 623 after. This ends 3C: what is left in the text view is the view (painting, the caret drawn, scrolling, the mouse and
+the keys with their timing and modifiers, the edit commands' calls on the document and the view, the events). Next, 3D: the text view on WPF.
