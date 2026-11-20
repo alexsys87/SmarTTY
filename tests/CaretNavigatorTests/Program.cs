@@ -593,7 +593,7 @@ internal static class Program
     }
 
     // The text view as the edit commands and the typing see it: a real document, a caret and a selection, and a log of what it is told.
-    private sealed class EditView : ITextEditView, ITextTypingHost
+    private sealed class EditView : ITextReplaceHost, ITextTypingHost
     {
         public readonly List<string> Log = new List<string>();
 
@@ -711,7 +711,24 @@ internal static class Program
             return Moved;
         }
 
-        public void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text) => Log.Add("replace " + P(start) + " " + P(end) + (select ? " select" : "") + " '" + text.Replace("\n", "\\n") + "'");
+        // The edit the view routes: logged, and made by the model when the checks give one (Replace All calls the view's entry).
+        public TextReplace Replacer;
+
+        public bool Single;
+
+        public bool ExistingEnding = true;
+
+        public bool SingleLine => Single;
+
+        public bool UseExistingLineEnding => ExistingEnding;
+
+        public string GetLineOrNull(int line) => line >= Text.LineCount ? null : Text.GetLineText(line);
+
+        public void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text)
+        {
+            Log.Add("replace " + P(start) + " " + P(end) + (select ? " select" : "") + " '" + text.Replace("\n", "\\n") + "'");
+            Replacer?.Replace(start, end, select, text);
+        }
 
         public void Indent(int levels) => Log.Add("indent " + levels);
 
@@ -1044,6 +1061,145 @@ internal static class Program
         Check(thrown, "the typing needs its editor");
     }
 
+    private static UndoHistory NewHistory() => new UndoHistory(() => { });
+
+    private static void Replacing()
+    {
+        EditView view = new EditView("alpha beta", "    gamma", "delta");
+        UndoHistory history = NewHistory();
+        TextReplace replace = new TextReplace(view, history);
+        replace.Replace(At(0, 6), At(2, 1), true, "X");
+        Equal(view.All, "alpha Xbeta|    gamma|delta", "select: the text is put at the start and nothing is removed");
+        replace.Replace(At(0, 0), At(0, 5), true, "_");
+        Equal(view.All, "_alpha Xbeta|    gamma|delta", "also within a line");
+        history.Undo();
+        replace.Replace(At(0, 11), At(0, 6), false, "B");
+        Equal(view.All, "alpha B|    gamma|delta", "a range within a line in either order");
+        Check(history.HasUndo, "the edits are undo steps");
+        view.Take();
+        replace.Replace(At(0, 0), At(0, 0), false, "");
+        Check(view.Take() == "", "an empty edit does nothing");
+        replace.Replace(At(0, 0), At(0, 0), false, null);
+        Check(view.Take() == "", "nor does a null text");
+        replace.Replace(At(1, -1), At(1, -1), false, "!");
+        Equal(view.All, "alpha B|    gamma!|delta", "a column of -1 is the end of the line");
+        replace.Replace(At(0, 2), At(0, -1), false, "");
+        Equal(view.All, "al|    gamma!|delta", "also for the end of the range");
+        replace.Replace(At(2, -1), At(2, 1), false, "");
+        Equal(view.All, "al|    gamma!|d", "and for its start");
+        view.Indentation = "    ";
+        replace.Replace(At(0, 2), At(1, 0), false, "");
+        Equal(view.All, "algamma!|d", "the join after an indented line drops the indentation the next line shares");
+        view.Indentation = "  ";
+        view.Text = new EditableTextDocument(new[] { "a", "    b" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 1), At(1, 0), false, "");
+        Equal(view.All, "a  b", "only the part it shares");
+        view.Text = new EditableTextDocument(new[] { "a", "    b" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 0), At(1, 0), false, "");
+        Equal(view.All, "    b", "not when the deletion starts before the end of the line");
+        view.Text = new EditableTextDocument(new[] { "a", "    b" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 1), At(1, 0), false, "-");
+        Equal(view.All, "a-    b", "nor when something is put in");
+        view.Text = new EditableTextDocument(new[] { "a", "", "    b" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 1), At(2, 0), false, "");
+        Equal(view.All, "a    b", "nor across more than one line break");
+        view.Text = new EditableTextDocument(new[] { "one", "two", "three" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(2, 2), At(0, 1), false, "-");
+        Equal(view.All, "o-ree", "a range across lines in either order");
+        view.Text = new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf);
+        view.Take();
+        replace.Replace(At(0, 3), At(0, 3), false, "x\ry");
+        Equal(view.All, "onex|y|two", "a lone CR goes the way of a line break");
+        Check(view.Take().Contains("range"), "as a range");
+        view.Text = new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(1, 1), At(0, 1), true, "A\nB");
+        Equal(view.All, "one|tA|Bwo", "with select a text with a line break goes in at the start");
+        view.Text = new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 3), At(0, 3), false, "A\r\nB");
+        Equal(view.Text.GetText(), "oneA\nB\ntwo", "the line ending of the text it goes into");
+        view.ExistingEnding = false;
+        view.Text = new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 3), At(0, 3), false, "A\r\nB");
+        Equal(view.Text.GetText(), "oneA\r\nB\ntwo", "or its own");
+        view.ExistingEnding = true;
+        view.Single = true;
+        view.Text = new EditableTextDocument(new[] { "one" }, TextDocument.LineEnding.Lf);
+        replace.Replace(At(0, 3), At(0, 3), false, "+a\r\nb\nc+");
+        Equal(view.All, "one+abc+", "a single-line view drops LF and CR LF");
+        view.Single = false;
+
+        view = new EditView("aXa aXa", "aXa");
+        history = NewHistory();
+        replace = new TextReplace(view, history);
+        view.Replacer = replace;
+        view.Caret = At(1, 3);
+        Equal(replace.ReplaceAll(TextMatcher.Literal("a", false), "b", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out TextDocument.TextPosition end), 6, "Replace All in the whole text");
+        Equal(view.All, "bXb bXb|bXb", "every match");
+        Equal(P(end), P(TextDocument.TextPosition.Invalid), "no range: its end is what it was");
+        Equal(view.Take(), "replace 0:0 0:7 'bXb bXb'; line 0,0,7,7; selection off; caret column 7; invalidate 0; layout; replace 1:0 1:3 'bXb'; line 1,0,3,3; selection off; caret column 3; invalidate 1; layout; set selection off 1:3; caret 1:3; redraw",
+            "a line at a time through the view's entry, then the selection goes and the caret comes back");
+        history.Undo();
+        Equal(view.All, "aXa aXa|aXa", "one undo takes all of it back");
+        view.Take();
+        Equal(replace.ReplaceAll(TextMatcher.Literal("q", false), "b", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end), 0, "nothing found");
+        Equal(view.Take(), "", "nothing is touched");
+        Check(!history.HasUndo && history.HasRedo, "and no undo step is made");
+        Equal(replace.ReplaceAll(TextMatcher.Literal("a", false), null, At(0, 1), At(1, 2), out end), 4, "in a range, a null replacement is empty");
+        Equal(view.All, "aX X|Xa", "from the start column of the first line to the end column of the last");
+        Equal(P(end), "1:1", "the end of the range moves with the text");
+        view.Text = new EditableTextDocument(new[] { "a1b2" }, TextDocument.LineEnding.Lf);
+        Equal(replace.ReplaceAll(TextMatcher.Create("[0-9]", true, false, true), null, TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end), 2, "a regular expression with a null replacement");
+        Equal(view.All, "ab", "replaces by nothing");
+
+        view = new EditView("aaaa", "z");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        Equal(replace.ReplaceAll(TextMatcher.Literal("aa", false), "a\na", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end), 2, "a replacement with a line break");
+        Equal(view.All, "a|aa|a|z", "the new lines are not searched again");
+        view = new EditView("aaaa", "z");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        Equal(replace.ReplaceAll(TextMatcher.Literal("aa", false), "a\ra", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end), 2, "with a lone CR");
+        Equal(view.All, "a|aa|a|z", "not either");
+        view = new EditView("xy", "aa bb");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        replace.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 5), out end);
+        Equal(view.All, "xy|1|22 bb", "line breaks in the last line of a range");
+        Equal(P(end), "2:5", "the end of the range is in its last new line");
+        view = new EditView("xaay", "aa end");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        replace.ReplaceAll(TextMatcher.Literal("aa", false), "1\n22", At(0, 0), At(1, 4), out end);
+        Equal(P(end), "1:4", "line breaks in a line before the last: the end is worked out for another line (the fault the golden records)");
+        view = new EditView("aaaaaa", "z");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        view.Caret = At(0, 6);
+        replace.ReplaceAll(TextMatcher.Literal("aa", false), "", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end);
+        Equal(P(view.Caret), "0:0", "the caret is brought into a line that became shorter");
+        view = new EditView("aa", "b");
+        replace = new TextReplace(view, NewHistory());
+        view.Replacer = replace;
+        view.Caret = At(1, 1);
+        view.Text = new EditableTextDocument(new[] { "aa" }, TextDocument.LineEnding.Lf);
+        replace.ReplaceAll(TextMatcher.Literal("a", false), "b", TextDocument.TextPosition.Invalid, TextDocument.TextPosition.Invalid, out end);
+        Equal(P(view.Caret), "0:1", "and into the text when its line is gone");
+
+        Equal(TextReplace.CountLineBreaks("a\nb\r\nc\rd\r"), 4, "line breaks: LF, CR LF and a lone CR, also at the end");
+        Equal(TextReplace.CountLineBreaks("abc"), 0, "none");
+        bool thrown = false;
+        try
+        {
+            new TextReplace(view, null);
+        }
+        catch (ArgumentNullException)
+        {
+            thrown = true;
+        }
+        Check(thrown, "the replacement needs its undo history");
+    }
+
     private static int Main()
     {
         try
@@ -1059,6 +1215,7 @@ internal static class Program
             Indents();
             EditCommands();
             Typing();
+            Replacing();
         }
         catch (Exception exception)
         {
