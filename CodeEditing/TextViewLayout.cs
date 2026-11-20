@@ -38,24 +38,7 @@ public interface ITextLayoutView
     ILineMessages Messages { get; }
 }
 
-/// <summary>Which lines have a message shown in a row of its own under them.</summary>
-public interface ILineMessages
-{
-    bool HasMessage(int line);
-}
 
-/// <summary>The folded blocks as the layout sees them: the lines a folded header hides after it, and the text the header shows instead of its own.</summary>
-public interface ITextFolds
-{
-    /// <summary>How many lines after <paramref name="line"/> its folded block hides (0: the line is not a folded header).</summary>
-    int GetHiddenLineCount(int line);
-
-    /// <summary>
-    /// The text a folded header shows instead of <paramref name="lineText"/> and where its label is in it (an index and a length); null when the line
-    /// is not a folded header.
-    /// </summary>
-    string GetFoldedText(int line, string lineText, out int labelStart, out int labelLength);
-}
 
 /// <summary>A part of a line drawn in one colour: from <see cref="From"/> to before <see cref="To"/>, in indexes of the line or in columns of a row.</summary>
 public struct TextRun

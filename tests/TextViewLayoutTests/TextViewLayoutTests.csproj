@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../CodeEditing/TextViewLayout.cs" Link="TextViewLayout.cs" />
+    <Compile Include="../../CodeEditing/ITextFolds.cs" Link="ITextFolds.cs" />
+    <Compile Include="../../CodeEditing/ILineMessages.cs" Link="ILineMessages.cs" />
     <Compile Include="../../CodeEditing/TextPointer.cs" Link="TextPointer.cs" />
     <Compile Include="../../CodeEditing/SyntaxColoring.cs" Link="SyntaxColoring.cs" />
     <Compile Include="../../CodeEditing/InlineMessageBand.cs" Link="InlineMessageBand.cs" />
