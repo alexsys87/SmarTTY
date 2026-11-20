@@ -54,6 +54,18 @@ internal static class Program
 
     private static string LastSpans;
 
+    // The state of the case that ran last without the keys and pastes (what the model goldens hold), and its painted colours per cell.
+    private static string LastState;
+
+    private static string LastCells;
+
+    // TerminalModelGolden.txt and TerminalCellColorsGolden.txt (written with --record-model by this program on the WinForms control, before
+    // it was removed in stage 2): the state without the probes of the keys, which belonged to the WinForms input, and the colours of every
+    // painted cell. tests/TerminalModelSnapshots compares the WPF display model against them.
+    private static readonly List<string> ModelLines = new List<string>();
+
+    private static readonly List<string> CellLines = new List<string>();
+
     private sealed class Case
     {
         public string Name;
@@ -156,6 +168,13 @@ internal static class Program
         lines.AddRange(RunRandomCases(seedCount: 6, casesPerSeed: 60));
 
         List<string> mouseLines = RunMouse();
+        if (args.Length == 3 && args[0] == "--record-model")
+        {
+            File.WriteAllLines(args[1], ModelLines);
+            File.WriteAllLines(args[2], CellLines);
+            Console.WriteLine("recorded " + ModelLines.Count + " lines to " + args[1] + " and " + CellLines.Count + " lines to " + args[2]);
+            return 0;
+        }
         if (args.Length == 4 && args[0] == "--record")
         {
             File.WriteAllLines(args[1], lines);
@@ -378,12 +397,17 @@ internal static class Program
             Console.WriteLine("case " + testCase.Name);
         }
         string whole = Run(testCase, byChar: false, probe: testCase.Probe);
+        string wholeState = LastState;
         SpanLines.Add("=== " + testCase.Name);
         SpanLines.AddRange(LastSpans.Split('\n'));
+        CellLines.Add("=== " + testCase.Name);
+        CellLines.AddRange(LastCells.Split('\n'));
         if (testCase.SpansOnly)
         {
             return output;
         }
+        ModelLines.Add("=== " + testCase.Name);
+        ModelLines.AddRange(wholeState.Split('\n'));
         output.Add("=== " + testCase.Name);
         if (full)
         {
@@ -397,6 +421,7 @@ internal static class Program
         {
             string perChar = Run(testCase, byChar: true, probe: testCase.Probe);
             output.Add(perChar == whole ? "by character: same" : "by character: DIFFERENT " + Hash(perChar));
+            ModelLines.Add(LastState == wholeState ? "by character: same" : "by character: DIFFERENT " + Hash(LastState));
         }
         return output;
     }
@@ -424,7 +449,9 @@ internal static class Program
         Application.DoEvents();
         StringBuilder text = new StringBuilder();
         Dump(harness, text);
+        LastState = text.ToString().TrimEnd('\n');
         LastSpans = DumpSpans(harness);
+        LastCells = DumpCells(harness);
         Step("probe");
         if (probe)
         {
@@ -461,6 +488,70 @@ internal static class Program
             text.Append('\n');
         }
         return text.ToString().TrimEnd('\n');
+    }
+
+    // The colours of every painted cell (the cells of the text, at most the width of the screen): the background, and the text colour and
+    // the underline where they show (a blank shows only an underline). Equal cells next to each other make one run.
+    private static string DumpCells(Harness harness)
+    {
+        TerminalEmulatorControl terminal = harness.Terminal;
+        EditableTextDocument document = (EditableTextDocument)typeof(EditableTextBrowser).GetProperty("EditableDocument", AllInstance).GetValue(terminal);
+        MethodInfo getSpans = typeof(TerminalEmulatorBase).GetMethod("GetLineColorSpans", AllInstance);
+        StringBuilder text = new StringBuilder();
+        for (int line = 0; line < document.LineCount; line++)
+        {
+            ReadonlyTextBrowser.ColorSpan[] spans = (ReadonlyTextBrowser.ColorSpan[])getSpans.Invoke(terminal, new object[] { line });
+            string lineText = document.GetLineText(line);
+            int length = Math.Min(lineText.Length, Columns);
+            List<string> cells = new List<string>();
+            for (int column = 0; column < length; column++)
+            {
+                ReadonlyTextBrowser.ColorSpan? span = null;
+                if (spans != null)
+                {
+                    foreach (ReadonlyTextBrowser.ColorSpan candidate in spans)
+                    {
+                        if (candidate.Start <= column && column < candidate.End)
+                        {
+                            span = candidate;
+                            break;
+                        }
+                    }
+                }
+                string background = span?.Background == null ? "-" : DescribeBrush(span.Value.Background);
+                string foreground = span?.Foreground == null ? "default" : DescribeBrush(span.Value.Foreground);
+                bool underline = span?.Underline == true;
+                cells.Add(CellDescription(lineText[column], background, foreground, underline));
+            }
+            text.Append(line.ToString("D3")).Append('|').Append(CellRuns(cells)).Append('\n');
+        }
+        return text.ToString().TrimEnd('\n');
+    }
+
+    /// <summary>One cell as the cell colours golden writes it (the same function is in tests/TerminalModelSnapshots).</summary>
+    internal static string CellDescription(char ch, string background, string foreground, bool underline)
+    {
+        if (foreground == "#FFD3D3D3")
+        {
+            foreground = "default";
+        }
+        bool blank = ch == ' ' || ch == '\0';
+        return "bg=" + background + (blank && !underline ? "" : " fg=" + foreground) + (underline ? " u" : "");
+    }
+
+    internal static string CellRuns(List<string> cells)
+    {
+        StringBuilder text = new StringBuilder();
+        int start = 0;
+        for (int column = 1; column <= cells.Count; column++)
+        {
+            if (column == cells.Count || cells[column] != cells[start])
+            {
+                text.Append(start).Append('-').Append(column).Append(' ').Append(cells[start]).Append("; ");
+                start = column;
+            }
+        }
+        return text.ToString();
     }
 
     private static string DescribeBrush(Brush brush)
@@ -1167,8 +1258,11 @@ internal static class Program
             {
                 string dump = Run(testCase, byChar: false, probe: true);
                 SpanLines.Add(testCase.Name + " " + Hash(LastSpans));
+                CellLines.Add(testCase.Name + " " + Hash(LastCells));
                 string[] dumpLines = dump.Split('\n');
                 output.Add(testCase.Name + " " + dumpLines[0] + " lines " + dumpLines.Count(line => line.Length > 3 && char.IsDigit(line[0]) && line[3] == '|') + " " + Hash(dump));
+                string[] stateLines = LastState.Split('\n');
+                ModelLines.Add(testCase.Name + " " + stateLines[0] + " lines " + stateLines.Count(line => line.Length > 3 && char.IsDigit(line[0]) && line[3] == '|') + " " + Hash(LastState));
             }
         }
         return output;

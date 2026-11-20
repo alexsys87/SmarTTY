@@ -956,19 +956,8 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     private void OpenLinkedFile(string path, int? line, int? column, ColumnUnit unit)
     {
-        if (!path.StartsWith("/", StringComparison.Ordinal))
-        {
-            // A name relative to a directory that the shell never reported: the directory it is in now.
-            string directory = null;
-            try
-            {
-                directory = DirectoryFallback?.Invoke();
-            }
-            catch (Exception)
-            {
-            }
-            path = RemotePathUtils.Combine(directory, path);
-        }
+        // A name relative to a directory that the shell never reported: the directory it is in now.
+        path = LinkedPath.Resolve(path, DirectoryFallback);
         FileLinkClicked?.Invoke(this, new OpenFileEventArgs
         {
             Path = path,

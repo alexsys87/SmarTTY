@@ -1,0 +1,1261 @@
+=== plain text
+000|0-6 bg=- fg=default; 6-7 bg=-; 7-12 bg=- fg=default; 
+001|0-6 bg=- fg=default; 6-7 bg=-; 7-11 bg=- fg=default; 
+002|
+=== long line wraps
+000|0-80 bg=- fg=default; 
+001|0-20 bg=- fg=default; 
+002|0-80 bg=- fg=default; 
+003|0-80 bg=- fg=default; 
+004|0-1 bg=- fg=default; 
+=== exactly the width
+000|0-80 bg=- fg=default; 
+001|0-4 bg=- fg=default; 
+=== auto wrap off
+000|0-80 bg=- fg=default; 
+001|0-20 bg=- fg=default; 
+002|0-80 bg=- fg=default; 
+003|0-15 bg=- fg=default; 
+=== lf without cr
+000|0-3 bg=- fg=default; 
+001|0-3 bg=-; 3-6 bg=- fg=default; 
+002|0-6 bg=-; 6-9 bg=- fg=default; 
+=== cr overwrite
+000|0-5 bg=- fg=default; 
+=== backspace
+000|0-3 bg=- fg=default; 3-78 bg=-; 78-79 bg=- fg=default; 
+=== tabs
+000|0-1 bg=- fg=default; 1-8 bg=-; 8-9 bg=- fg=default; 9-24 bg=-; 24-25 bg=- fg=default; 
+001|0-8 bg=-; 8-79 bg=- fg=default; 79-80 bg=-; 
+002|0-1 bg=- fg=default; 
+=== bell
+000|0-2 bg=- fg=default; 
+=== control characters
+000|0-8 bg=- fg=default; 
+=== unicode text
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-8 bg=- fg=default; 8-9 bg=-; 9-12 bg=- fg=default; 12-13 bg=-; 13-16 bg=- fg=default; 16-17 bg=-; 17-20 bg=- fg=default; 20-21 bg=-; 21-23 bg=- fg=default; 23-24 bg=-; 24-27 bg=- fg=default; 
+=== wide characters wrap
+000|0-80 bg=- fg=default; 
+001|0-1 bg=- fg=default; 
+002|0-4 bg=- fg=default; 
+=== combining marks
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-9 bg=- fg=default; 
+=== scrollback
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+013|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+014|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+015|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+016|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+017|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+018|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+019|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+020|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+021|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+022|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+023|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+024|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+025|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+026|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+027|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+028|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+029|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+030|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+031|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+032|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+033|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+034|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+035|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+036|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+037|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+038|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+039|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+040|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+041|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+042|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+043|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+044|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+045|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+046|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+047|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+048|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+049|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+050|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+051|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+052|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+053|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+054|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+055|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+056|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+057|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+058|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+059|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+060|
+=== scroll with full line
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+013|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+014|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+015|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+016|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+017|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+018|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+019|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+020|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+021|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+022|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+023|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+024|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+025|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+026|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+027|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+028|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+029|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+030|0-80 bg=- fg=default; 
+031|0-80 bg=- fg=default; 
+032|
+=== cursor up down
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|
+006|0-1 bg=-; 1-2 bg=- fg=default; 
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|
+020|
+021|
+022|
+023|0-3 bg=-; 3-4 bg=- fg=default; 
+=== cursor forward back
+000|0-10 bg=- fg=default; 10-80 bg=-; 
+001|0-1 bg=- fg=default; 
+=== cursor position
+000|0-1 bg=- fg=default; 1-19 bg=-; 19-20 bg=- fg=default; 
+001|0-1 bg=- fg=default; 
+002|
+003|0-3 bg=-; 3-4 bg=- fg=default; 
+004|0-9 bg=-; 9-10 bg=- fg=default; 
+005|
+006|
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|
+020|
+021|
+022|
+023|
+024|0-1 bg=- fg=default; 
+=== cursor column and row
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 6-11 bg=-; 11-12 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-9 bg=-; 9-10 bg=- fg=default; 10-39 bg=-; 39-40 bg=- fg=default; 
+004|
+005|
+006|
+007|
+008|
+009|
+010|
+011|0-10 bg=-; 10-11 bg=- fg=default; 
+=== next and previous line
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-1 bg=- fg=default; 
+004|
+005|0-1 bg=- fg=default; 
+=== save and restore cursor
+000|
+001|
+002|
+003|
+004|0-4 bg=-; 4-5 bg=- fg=default; 
+005|
+006|
+007|0-7 bg=-; 7-8 bg=- fg=default; 
+008|
+009|0-19 bg=-; 19-20 bg=- fg=default; 
+=== save restore keeps the style
+000|0-3 bg=- fg=#FFFF5555; 3-5 bg=- fg=default; 
+=== tab stops
+000|0-1 bg=- fg=default; 1-9 bg=-; 9-10 bg=- fg=default; 10-19 bg=-; 19-20 bg=- fg=default; 20-24 bg=-; 24-25 bg=- fg=default; 
+001|0-1 bg=- fg=default; 1-9 bg=-; 9-10 bg=- fg=default; 10-11 bg=-; 11-12 bg=- fg=default; 12-20 bg=-; 20-21 bg=- fg=default; 
+=== clear one tab stop
+000|0-1 bg=- fg=default; 1-8 bg=-; 8-9 bg=- fg=default; 9-16 bg=-; 16-17 bg=- fg=default; 
+=== index and reverse index
+000|0-1 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-1 bg=-; 1-2 bg=- fg=default; 
+007|0-1 bg=- fg=default; 
+=== index at bottom scrolls
+000|
+001|
+002|
+003|
+004|
+005|
+006|
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|
+020|
+021|
+022|
+023|0-4 bg=- fg=default; 
+024|0-4 bg=-; 4-8 bg=- fg=default; 
+025|0-4 bg=- fg=default; 
+=== erase in line
+000|0-14 bg=- fg=default; 
+001|0-10 bg=-; 10-30 bg=- fg=default; 
+002|0-9 bg=-; 
+=== erase in display
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-2 bg=- fg=default; 
+005|
+006|
+007|
+008|
+009|
+010|
+=== erase in display to start
+000|
+001|
+002|
+003|
+004|0-3 bg=-; 3-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|
+=== erase whole display
+000|
+001|
+002|
+003|
+004|
+005|
+006|
+007|
+008|
+009|
+010|0-1 bg=- fg=default; 
+=== erase scrollback
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+013|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+014|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+015|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+016|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+017|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+018|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+019|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+020|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+021|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+022|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+023|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+024|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+025|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+026|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+027|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+028|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+029|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+030|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+031|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+032|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+033|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+034|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+035|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+036|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+037|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+038|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+039|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+040|0-1 bg=- fg=default; 
+=== erase display styled
+000|0-4 bg=#FF0000BB fg=default; 4-5 bg=#FF0000BB; 5-6 bg=#FF0000BB fg=default; 
+001|0-4 bg=#FF0000BB fg=default; 4-5 bg=#FF0000BB; 5-6 bg=#FF0000BB fg=default; 
+002|0-2 bg=#FF0000BB fg=default; 2-80 bg=#FF0000BB; 
+003|0-80 bg=#FF0000BB; 
+004|0-80 bg=#FF0000BB; 
+005|0-80 bg=#FF0000BB; 
+=== erase characters
+000|0-4 bg=- fg=default; 4-7 bg=-; 7-10 bg=- fg=default; 
+=== delete characters
+000|0-7 bg=- fg=default; 
+=== insert characters
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-13 bg=- fg=default; 
+=== insert lines
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-3 bg=- fg=default; 
+003|
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+010|
+=== delete lines
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|
+007|
+008|
+009|
+=== repeat character
+000|0-80 bg=- fg=default; 
+001|0-80 bg=- fg=default; 
+002|0-42 bg=- fg=default; 
+=== insert mode
+000|0-8 bg=- fg=default; 
+=== delete more than the line
+000|
+001|
+002|
+003|
+004|
+005|
+006|
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|
+020|
+021|
+022|
+023|
+024|
+=== scroll region
+000|0-3 bg=- fg=default; 
+001|
+002|
+003|
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+009|
+010|
+=== scroll region cursor home
+000|0-1 bg=- fg=default; 
+=== scroll up and down
+000|0-1 bg=-; 1-2 bg=- fg=default; 
+001|
+002|
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|
+012|
+013|
+014|
+=== scroll up in region
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|
+005|
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|
+=== index in region
+000|
+001|
+002|0-1 bg=-; 1-2 bg=- fg=default; 
+003|0-1 bg=- fg=default; 
+004|0-1 bg=- fg=default; 
+005|
+=== invalid region
+000|0-2 bg=- fg=default; 
+=== insert lines in region
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|
+005|
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|
+=== delete lines outside the region
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|
+007|
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|
+=== sgr basic
+000|0-4 bg=- fg=#FFFFFFFF; 4-5 bg=-; 5-10 bg=- fg=default u; 10-11 bg=-; 11-14 bg=#FFD3D3D3 fg=#FF000000; 14-15 bg=-; 15-20 bg=- fg=default; 
+=== sgr colours
+000|0-3 bg=- fg=#FFBB0000; 3-10 bg=#FF00BB00 fg=#FFBB0000; 10-11 bg=#FF00BB00 fg=default; 11-12 bg=- fg=default; 12-16 bg=#FFBB00BB fg=#FF00BBBB; 
+=== sgr bright colours
+000|0-2 bg=- fg=#FFFF5555; 2-4 bg=- fg=#FF55FF55; 4-7 bg=#FFFFFF55 fg=#FF5555FF; 7-12 bg=#FFFFFFFF fg=#FF5555FF; 
+=== sgr 256 colours
+000|0-3 bg=- fg=#FFFF0000; 3-7 bg=#FF0000FF fg=#FFFF0000; 7-12 bg=#FF0000FF fg=#FF000000; 12-16 bg=#FF080808 fg=#FFEEEEEE; 16-20 bg=- fg=#FFEEEEEE; 
+=== sgr true colours
+000|0-6 bg=- fg=#FFFF8000; 6-13 bg=#FF004080 fg=#FFFF8000; 13-16 bg=- fg=#FFFF0000; 
+=== sgr colon forms
+000|0-1 bg=- fg=#FF875FFF; 1-2 bg=- fg=#FF0A141E; 2-3 bg=#FF010203 fg=#FF0A141E; 
+=== sgr reset forms
+000|0-1 bg=- fg=#FFFF5555; 1-6 bg=- fg=default; 6-9 bg=#FFFF5555 fg=#FF00BB00 u; 9-14 bg=- fg=default; 
+=== sgr unknown
+000|0-22 bg=- fg=default; 
+=== sgr bold bright
+000|0-4 bg=- fg=#FFFF5555; 4-5 bg=-; 5-8 bg=- fg=#FFFF5555; 8-14 bg=- fg=#FFBB0000; 14-15 bg=-; 15-23 bg=- fg=#FFBB0000; 23-24 bg=-; 24-31 bg=- fg=#FFBB0000; 31-32 bg=-; 32-34 bg=- fg=#FFBB0000; 
+=== styles survive wrapping and scrolling
+000|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+001|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+002|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+003|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+004|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+005|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+006|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+007|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+008|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-72 bg=#FFBB0000 fg=default; 
+009|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+010|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+011|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+012|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+013|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+014|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+015|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+016|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+017|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+018|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+019|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+020|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+021|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+022|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+023|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+024|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+025|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+026|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+027|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+028|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+029|0-70 bg=#FFBB0000 fg=default; 70-71 bg=#FFBB0000; 71-73 bg=#FFBB0000 fg=default; 
+030|
+=== styled blank cells
+000|0-9 bg=-; 9-80 bg=#FF0000BB; 
+001|0-1 bg=- fg=default; 1-5 bg=-; 
+=== alternate screen 1049
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 
+=== alternate screen 47
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 
+=== alternate screen 1047
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-4 bg=- fg=default; 
+=== alternate screen stays on
+000|
+001|
+002|0-2 bg=-; 2-3 bg=- fg=default; 
+003|
+004|
+005|
+006|0-3 bg=- fg=default; 3-4 bg=-; 4-8 bg=- fg=default; 
+007|0-4 bg=- fg=default; 
+=== alternate screen twice
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+001|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-6 bg=- fg=default; 
+006|0-1 bg=- fg=default; 
+=== alternate screen scroll
+000|
+=== cursor save 1048
+000|0-4 bg=- fg=default; 
+001|
+002|
+003|
+004|0-4 bg=-; 4-5 bg=- fg=default; 
+=== osc title
+000|0-4 bg=- fg=default; 
+=== osc title with st
+000|0-4 bg=- fg=default; 
+=== osc icon name
+000|0-4 bg=- fg=default; 
+=== osc title with control characters
+000|0-1 bg=- fg=default; 
+=== osc title with semicolons
+000|0-1 bg=- fg=default; 
+=== osc without a command
+000|0-3 bg=- fg=default; 
+=== osc empty
+000|0-1 bg=- fg=default; 
+=== osc unknown
+000|0-2 bg=- fg=default; 
+=== osc directory
+000|0-1 bg=- fg=default; 
+=== osc directory variants
+000|0-6 bg=- fg=default; 
+=== osc directory plain
+000|0-1 bg=- fg=default; 
+=== osc colours
+000|0-1 bg=- fg=default; 
+=== osc clipboard
+000|0-1 bg=- fg=default; 
+=== osc hyperlink
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-10 bg=- fg=default; 
+=== osc 133 marks
+000|0-1 bg=- fg=default; 1-2 bg=-; 2-4 bg=- fg=default; 
+001|0-3 bg=- fg=default; 
+002|
+=== dcs ignored
+000|0-8 bg=- fg=default; 
+=== osc cancelled
+000|0-8 bg=- fg=default; 
+=== osc aborted by esc
+000|0-3 bg=- fg=#FFBB0000; 
+=== device status report
+000|
+001|
+002|
+003|
+004|0-4 bg=-; 
+=== cursor position report in region
+000|
+=== device attributes
+000|
+=== soft reset
+000|0-1 bg=- fg=#FFFF5555; 1-2 bg=- fg=default; 
+=== full reset
+000|0-1 bg=- fg=default; 
+=== private modes saved and restored
+000|
+=== private modes restored without a save
+000|
+=== private modes saved twice
+000|
+=== application cursor keys
+000|
+=== application keypad
+000|
+=== numeric keypad
+000|
+=== bracketed paste
+000|
+=== bracketed paste off
+000|
+=== focus reporting
+000|
+=== mouse mode 9
+000|
+=== mouse mode 1000
+000|
+=== mouse mode 1002
+000|
+=== mouse mode 1003
+000|
+=== mouse mode off again
+000|
+=== mouse encodings
+000|
+=== cursor visibility
+000|0-1 bg=- fg=default; 
+=== origin mode
+000|0-1 bg=- fg=default; 
+001|
+002|
+003|
+004|
+005|
+006|
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|0-1 bg=- fg=default; 
+=== line feed mode
+000|0-1 bg=- fg=default; 
+001|0-1 bg=-; 1-3 bg=- fg=default; 
+002|0-3 bg=-; 3-4 bg=- fg=default; 
+=== reverse video mode
+000|0-1 bg=- fg=default; 
+=== unknown modes
+000|
+=== multiple modes in one
+000|
+=== line drawing g0
+000|0-6 bg=- fg=default; 
+001|0-1 bg=- fg=default; 1-5 bg=-; 5-6 bg=- fg=default; 
+002|0-6 bg=- fg=default; 
+003|0-3 bg=- fg=default; 
+=== line drawing g1 shift
+000|0-6 bg=- fg=default; 
+=== charset designations
+000|0-7 bg=- fg=default; 
+=== charset cut short
+000|
+001|0-1 bg=- fg=default; 1-2 bg=- fg=#FFBB0000; 
+=== split csi
+000|0-4 bg=-; 4-5 bg=- fg=#FFBB0000; 5-80 bg=-; 
+=== split osc
+000|0-2 bg=- fg=default; 
+=== split charset
+000|0-3 bg=- fg=default; 
+=== esc at the end
+000|0-3 bg=- fg=default; 
+=== csi cancelled by control
+000|
+001|0-4 bg=- fg=default; 4-9 bg=- fg=#FF00BB00; 
+=== csi with intermediates
+000|0-5 bg=- fg=default; 
+=== csi parameter limits
+000|0-2 bg=- fg=#FF000000; 
+=== csi huge repeat
+000|0-80 bg=- fg=default; 
+001|0-80 bg=- fg=default; 
+002|0-80 bg=- fg=default; 
+003|0-80 bg=- fg=default; 
+004|0-80 bg=- fg=default; 
+005|0-80 bg=- fg=default; 
+006|0-80 bg=- fg=default; 
+007|0-80 bg=- fg=default; 
+008|0-80 bg=- fg=default; 
+009|0-80 bg=- fg=default; 
+010|0-80 bg=- fg=default; 
+011|0-80 bg=- fg=default; 
+012|0-80 bg=- fg=default; 
+013|0-80 bg=- fg=default; 
+014|0-80 bg=- fg=default; 
+015|0-80 bg=- fg=default; 
+016|0-80 bg=- fg=default; 
+017|0-80 bg=- fg=default; 
+018|0-80 bg=- fg=default; 
+019|0-80 bg=- fg=default; 
+020|0-80 bg=- fg=default; 
+021|0-80 bg=- fg=default; 
+022|0-80 bg=- fg=default; 
+023|0-80 bg=- fg=default; 
+024|0-1 bg=- fg=default; 
+=== unterminated csi
+000|0-5 bg=- fg=default; 
+=== unterminated osc
+000|
+=== lone escapes
+000|0-5 bg=- fg=#FFBB0000; 
+=== esc then letters
+000|
+=== many small chunks
+000|0-5 bg=- fg=default; 
+001|0-5 bg=- fg=default; 
+=== chunk longer than the limit
+000|
+001|0-3 bg=- fg=default; 3-4 bg=-; 4-11 bg=- fg=default; 11-12 bg=-; 12-15 bg=- fg=default; 15-16 bg=-; 16-21 bg=- fg=default; 21-22 bg=-; 22-25 bg=- fg=default; 
+002|
+003|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+004|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+005|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+006|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+007|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+008|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+009|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+010|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+011|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+012|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+013|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+014|
+=== unrecognised as hex
+000|0-13 bg=- fg=default; 
+=== replies suppressed
+000|
+=== enter sequence
+000|0-1 bg=- fg=default; 
+=== tab width
+000|0-1 bg=- fg=default; 1-4 bg=-; 4-5 bg=- fg=default; 5-8 bg=-; 8-9 bg=- fg=default; 
+=== log levels
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-7 bg=- fg=default; 
+001|0-7 bg=- fg=#FFFFFF55; 7-8 bg=-; 8-15 bg=- fg=#FFFFFF55; 
+002|0-5 bg=- fg=#FFFF5555; 5-6 bg=-; 6-12 bg=- fg=#FFFF5555; 
+003|0-1 bg=- fg=default; 1-7 bg=- fg=#FFFF5555; 7-8 bg=-; 8-13 bg=- fg=#FFFF5555; 
+004|0-5 bg=- fg=default; 
+005|
+=== links
+000|0-3 bg=- fg=default; 3-4 bg=-; 4-32 bg=- fg=default u; 32-33 bg=-; 33-36 bg=- fg=default; 36-37 bg=-; 37-52 bg=- fg=default u; 52-55 bg=- fg=default; 55-56 bg=-; 56-80 bg=- fg=default; 
+001|0-1 bg=- fg=default; 1-2 bg=-; 2-4 bg=- fg=default; 4-5 bg=-; 5-17 bg=- fg=default; 
+002|0-80 bg=- fg=default u; 
+003|0-40 bg=- fg=default u; 
+004|
+=== links relative to the reported directory
+000|0-16 bg=- fg=default; 16-17 bg=-; 17-23 bg=- fg=default; 23-24 bg=-; 24-25 bg=- fg=default; 
+001|0-10 bg=- fg=default; 
+002|0-9 bg=- fg=default; 9-10 bg=-; 10-13 bg=- fg=default; 13-14 bg=-; 14-22 bg=- fg=default u; 22-23 bg=-; 23-26 bg=- fg=default; 26-27 bg=-; 27-42 bg=- fg=default; 
+003|
+=== links relative to the fallback directory
+000|0-16 bg=- fg=default; 16-17 bg=-; 17-23 bg=- fg=default; 23-24 bg=-; 24-25 bg=- fg=default; 
+001|0-8 bg=- fg=default u; 
+002|0-8 bg=- fg=default; 
+003|0-7 bg=- fg=default; 
+004|0-12 bg=- fg=default; 
+005|
+=== no links on the alternate screen
+000|0-25 bg=- fg=default u; 25-26 bg=-; 26-38 bg=- fg=default u; 
+001|
+=== no links while the mouse is taken
+000|0-24 bg=- fg=default; 24-25 bg=-; 25-39 bg=- fg=default; 
+001|0-25 bg=- fg=default u; 
+002|
+=== urls only
+000|0-1 bg=- fg=default; 1-27 bg=- fg=default u; 27-28 bg=-; 28-29 bg=- fg=default; 29-41 bg=- fg=default u; 41-43 bg=- fg=default; 43-44 bg=-; 44-56 bg=- fg=default u; 56-57 bg=-; 57-72 bg=- fg=default; 72-73 bg=-; 73-80 bg=- fg=default; 
+001|0-9 bg=- fg=default; 9-10 bg=-; 10-18 bg=- fg=default; 
+=== files only
+000|0-13 bg=- fg=default; 13-14 bg=-; 14-17 bg=- fg=default; 
+001|0-5 bg=- fg=default; 5-6 bg=-; 6-11 bg=- fg=default; 11-12 bg=-; 12-14 bg=- fg=default; 14-15 bg=-; 15-16 bg=- fg=default; 16-17 bg=-; 17-26 bg=- fg=default; 
+002|0-14 bg=- fg=default u; 14-24 bg=- fg=default; 24-25 bg=-; 25-31 bg=- fg=default; 31-32 bg=-; 32-40 bg=- fg=default; 40-41 bg=-; 41-49 bg=- fg=default; 
+003|
+=== links off
+000|0-3 bg=- fg=default; 3-4 bg=-; 4-28 bg=- fg=default; 28-29 bg=-; 29-32 bg=- fg=default; 32-33 bg=-; 33-47 bg=- fg=default; 
+001|
+=== always track lines
+000|0-5 bg=- fg=default; 
+001|0-3 bg=- fg=#FFBB0000; 
+002|
+=== typed text goes to the host
+000|0-1 bg=- fg=default; 1-2 bg=-; 
+=== full screen program
+000|0-2 bg=#FFD3D3D3; 2-7 bg=#FFD3D3D3 fg=#FF000000; 7-8 bg=#FFD3D3D3; 8-11 bg=#FFD3D3D3 fg=#FF000000; 11-79 bg=#FFD3D3D3; 
+001|0-1 bg=- fg=default; 
+002|0-1 bg=- fg=default; 
+003|
+004|
+005|
+006|
+007|
+008|
+009|
+010|
+011|
+012|
+013|
+014|
+015|
+016|
+017|
+018|
+019|
+020|
+021|
+022|
+023|0-2 bg=#FFBB0000 fg=#FFFFFFFF; 2-3 bg=#FFBB0000; 3-9 bg=#FFBB0000 fg=#FFFFFFFF; 9-10 bg=#FFBB0000; 10-12 bg=#FFBB0000 fg=#FFFFFFFF; 12-13 bg=-; 
+=== colourful ls and prompt
+000|0-9 bg=- fg=#FF55FF55; 9-10 bg=- fg=default; 10-15 bg=- fg=#FF5555FF; 15-16 bg=- fg=default; 16-17 bg=-; 17-19 bg=- fg=default; 19-20 bg=-; 20-27 bg=- fg=default; 
+001|0-3 bg=- fg=#FF5555FF; 3-5 bg=-; 5-11 bg=- fg=#FF55FF55; 11-13 bg=-; 13-24 bg=- fg=#FFBB0000; 24-26 bg=-; 26-35 bg=- fg=default; 
+002|0-9 bg=- fg=#FF55FF55; 9-10 bg=- fg=default; 10-15 bg=- fg=#FF5555FF; 15-16 bg=- fg=default; 16-17 bg=-; 
+=== override colour
+000|0-4 bg=- fg=#FFCC8800; 4-5 bg=-; 5-13 bg=- fg=#FFCC8800; 13-18 bg=- fg=default; 
+001|0-6 bg=- fg=default; 
+=== override with transparent colour
+000|0-4 bg=- fg=#00000000; 4-5 bg=-; 5-9 bg=- fg=#00000000; 
+=== override without a colour
+000|0-4 bg=- fg=default; 4-5 bg=-; 5-9 bg=- fg=default; 
+001|0-3 bg=- fg=#FFBB0000; 
+=== override over log levels and colours
+000|0-5 bg=- fg=#FF00AA55; 5-6 bg=-; 6-12 bg=- fg=#FF00AA55; 
+001|0-7 bg=- fg=#FF00AA55; 7-8 bg=-; 8-15 bg=- fg=#FF00AA55; 
+002|0-7 bg=#FFD3D3D3 fg=#FF00AA55; 
+003|0-3 bg=- fg=#FFFF0000; 
+=== two override colours
+000|0-5 bg=- fg=#FF112233; 
+=== progress bar redraw
+000|0-8 bg=- fg=default; 8-9 bg=-; 9-13 bg=- fg=default; 
+001|0-4 bg=-; 4-6 bg=- fg=default; 
+002|0-4 bg=- fg=default; 
+random 1/0 2dae488ea70743e6a3efc8c2bd817024d42db4cc
+random 1/1 e6f3473d3b66a12af32c28cd134625f0ba29c48c
+random 1/2 907cf3790dffe020b004182e7e2d373f1ebbcd3f
+random 1/3 cc9810dee40ee008a0ee94ad70fb1306a7ff0087
+random 1/4 1d6bf263ad0614fbf5f23cd5afb94602e41cc61d
+random 1/5 f343afa66053d3d705f276ba31c74a1f89b0545c
+random 1/6 0bbb3ba5613c588b93ac19a9cffcb4e3bbc894b2
+random 1/7 adefa8b6382528f54eceeeb781ad57c9d992fe8f
+random 1/8 22cad3a7659cfeba6a6b80c9fd69c7e81c968895
+random 1/9 baec4869d58829bbce705cba4d5d9dd62ae95ace
+random 1/10 9d3df49cde371cee9d58d472effcb6f3478cae23
+random 1/11 559af05371f9ab30dcedce7c152a31f913af51dc
+random 1/12 ef6caa03b184e90c323522238e50dfdf538e1392
+random 1/13 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 1/14 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 1/15 d4743d8e3153bbe77267aeb4313fd58ce8a7773c
+random 1/16 9759ac635b2159c7af019f9ae9fbb8935d6e946f
+random 1/17 87a6e7e6416df9fe529ef911eed1563f922fea60
+random 1/18 976ebc6d5c3afe8d0eca870d801d1e16d3ada0ec
+random 1/19 eed07df8858e7428935d2c663e08033acb3f0363
+random 1/20 b35f1ff6b8fb609a70d548da1195da093451d60e
+random 1/21 ed25a5a8c750236134c31aba97226fba36c74f8e
+random 1/22 32354969679969b2aefef2cf83de91f14b1c0b17
+random 1/23 76d47be5c638458c1d62aa98ec7137988a6f8c72
+random 1/24 7d01582fee7167af356e9adb21929058d1eb0db9
+random 1/25 a4a12580417ea1dde2f58ff95c77867972769760
+random 1/26 01538cd0735aa15a55b028710a098255fd654251
+random 1/27 f099911db83719612d1d0410a80fca887a8b638d
+random 1/28 abf2a9f59efc65d64cdee22494d7f10a6654db78
+random 1/29 d20bf2bb9bc4259930fe919a4b1c4ef5e5c38716
+random 1/30 f8b09c44409255ee78837e1d587eb41f5358ad69
+random 1/31 ac9a2081fad947e844b398dc826f12d55c90d369
+random 1/32 c3b38754d654ff0cd6a49d4adee462a9cbb4cedd
+random 1/33 532fe1a4c3b8371add7a04ecbda5d8196f83d55e
+random 1/34 a8ee30ac4898c4eddb6c31583ae89444de447580
+random 1/35 7b5864f3df8387f22f41fe6a1d51659a08e38cb7
+random 1/36 31add1000fe609df2a0f03ceb5c4dcfd5920231c
+random 1/37 a2b1b3a5faf40251106962313c757e7ae64f4e7d
+random 1/38 2425d4633def69567f1fde7e3207e55300079db7
+random 1/39 e09a1ba827b270eedea4e8743728a82a5100abdf
+random 1/40 1d344a844e225f3819cb7bfab0cb86ed3bcac2d5
+random 1/41 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 1/42 b88472b537459cd4d329e2a9ee9370e883890ef9
+random 1/43 74f25faba9f2754e3ebe24ee10108b356730e05c
+random 1/44 94af9ec4db32a000e6f3c460db20bd4c7e54134b
+random 1/45 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 1/46 a07151125ca4a37d67034f89e7ae3861c2c901f0
+random 1/47 90d1110dce6adfd21fc8991d4252e8c669cb4f4c
+random 1/48 2cb8756e333af8336a53bce04aeecf6fd41072de
+random 1/49 982b936687b3bed7fdcbc4b030361ff2f7b90d26
+random 1/50 f8fcaa2b96bfe46de4186c8b6dc3b0e449d07269
+random 1/51 8218477ff9718695b47c409d1d353f7cc0222711
+random 1/52 04c6cf61839810b0b9a309017b9074fded66a6db
+random 1/53 bb23b02fdbcc74f88f56fc0fe6bbd8b199975b63
+random 1/54 775e0a0074672a6882bc3c187c6566451239d724
+random 1/55 069ee31e283704a6fd32a1e85aee1d0be74fbfd3
+random 1/56 9993181608c200349fea18cdf4111c9a51c35a1b
+random 1/57 235e82295ca3a60ff0aab2567d722500314b911c
+random 1/58 fa0f86f7e325ee61f385f96796d71f5faebfdc2d
+random 1/59 60dc475faf85b3b797eadd480b36e56ada763890
+random 2/0 1f126c450f28faa6af8e86aa129aabde657ef184
+random 2/1 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 2/2 846e5e73572d68173d5e23db67dfaf4783c27e2d
+random 2/3 b8b542deb0bd747801e981004dd053896d458647
+random 2/4 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 2/5 5bdd0277aab96c0770189a8c8ace9ef6bb5abc49
+random 2/6 557633aa3cc539dc6f0bc442e99ee91a1042cc48
+random 2/7 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 2/8 c6b058b040596e634489a29ece3f4ddce77cb0a8
+random 2/9 e25604384c959e6ce612decac1540d8342eabf43
+random 2/10 e91d5527c7d7e156bf8d512b5d99e04f9f83f998
+random 2/11 5f41a15d2c46344608dbd292c6badfe3625acd60
+random 2/12 99c4c6f168972c0effb7740f8bdc81ec5ae9f8f4
+random 2/13 e9955715026ecd3fe03a54a58cdcd1ac0ca16e96
+random 2/14 9ebc904fa26b39b81aba5ec604fc74880b022098
+random 2/15 1df5b75b4e129cb1738a6a5f058ee2df5b43455f
+random 2/16 bcb2c52cc2d54b6eb66ccf00b8c314df1716e986
+random 2/17 128a8c0fb50f252eb11bb04c9c75bd702f6c488a
+random 2/18 fee93fd36f13945f7301f2e7e5922e7c054a7646
+random 2/19 3fd3da2a1858121a06334d0cb2be89514ad290be
+random 2/20 3ec25ce566fabb6bbbdb23c78cf5c325afacb859
+random 2/21 235e82295ca3a60ff0aab2567d722500314b911c
+random 2/22 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 2/23 ddd5626f86aabebfacb8fe73917adb95158f575d
+random 2/24 e8d3ba464564c8a4952f94eec1bc81b4affeaff9
+random 2/25 219915e897a92d4533f1dc14bbedf993333e54d0
+random 2/26 8822c7809398ee13ba4477003cc8060341c011c5
+random 2/27 5d517950a56378456769d9cdf5921b5057c8773c
+random 2/28 b750bb2efc966eb3dbaed0fb98630b26bc0c8f75
+random 2/29 a6c80cfd8b8f4954b9f3ffe49f207dba10db4fec
+random 2/30 7203e73788fde29ec20e973f91e2811102f940bd
+random 2/31 2a2c3f5bf98718f2cbdff1e1cd9c22c89ecef6d6
+random 2/32 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 2/33 40848207ac6f58292d2857518d681a03464f340f
+random 2/34 bdfc42f1e2782092786019b2d3b0be313a10628b
+random 2/35 8b4f60f4af2bb3507eb41f9891061d4c663cbcc5
+random 2/36 8079c0f1f16bfc6e9944282027aee964473b753d
+random 2/37 94b7362fbe0ba073071d72d8bdf8db3c12c3fa75
+random 2/38 42bd611e8f53dd1178adb7f94653144b0f257ff5
+random 2/39 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 2/40 765d96aeab0564f77f685622f1428d51acb05053
+random 2/41 7d01582fee7167af356e9adb21929058d1eb0db9
+random 2/42 b3ea0ad22c7ae0eae47501c378a82295aeae0d8a
+random 2/43 532fe1a4c3b8371add7a04ecbda5d8196f83d55e
+random 2/44 1d91d19824cb0c04f487e1760483e037d780fd5b
+random 2/45 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 2/46 85c663eef69bb134e60903cb667db4ed9bdc636d
+random 2/47 651921edfdd591564fff5c925f8a608e51990ddd
+random 2/48 adb947cf9b96853f239416ed368a339e45ef2812
+random 2/49 d5e86738a4d197d10fc0d179eca2ec2fd446f19b
+random 2/50 aaf4210c1c6b422237b6d2e4c35f7577bbabf0a4
+random 2/51 d4545e9dc4c6407dbbac559f50d75eb7b7136add
+random 2/52 97b8cbfcc9a30bcee46fd1ef7ead87e6b4bdab1e
+random 2/53 550a82fd335e5e33bb0fb95ab35eae0e91cddc26
+random 2/54 3b6bc35d354c23080f169a35fdba8aaf03e34bfb
+random 2/55 940d61e29d0a11821217263b13dd25456ef66c10
+random 2/56 4b2b4d9558365531b8b3bea8313fb7e7639cc839
+random 2/57 292de785acfcc05946e7f002731b08409a6056d6
+random 2/58 f780c5dc6cf85ff692c91b1d3ede0edd80ac08d8
+random 2/59 fff8dd9f360c481fb19ccf7cb977dd4ca7cab549
+random 3/0 b81363e1438ff5022be14c99071cd694f044296b
+random 3/1 b7656b9cbe0b6e83c7ca16d17f07ebf41c6a8595
+random 3/2 ac63f9be600904d7c5322e44807300eeca86aad0
+random 3/3 235e82295ca3a60ff0aab2567d722500314b911c
+random 3/4 af2311e91e100ae31e05e033acc7f4e009a927c8
+random 3/5 53eff60c4746b23913f923b871815393879f1179
+random 3/6 2e6cda5f5f498ba5b9869deb6ea5ab9202df191e
+random 3/7 64ee56698b44ff44f2555e9554822f1108140498
+random 3/8 6347db90e91fc39d4a503b2eccbacf14687e7baf
+random 3/9 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 3/10 b1327853e1ce7ebe2815a811f1bff5aa0c70a2ac
+random 3/11 23ac9a34322a09b9d474607475e9205621eb4eb8
+random 3/12 573648ed39cfdfa45ae35834249baeeaa55a3a34
+random 3/13 c9b5ea125a966e3e17b7fb49a6f66a5d6b39179d
+random 3/14 356befd27f576bb833256baab188963e1287b039
+random 3/15 50e6368f4e2ee3fadf5fda5185661873f1c49ed1
+random 3/16 389e3177015a8a2a94b28f1a23a18e2ccb2256e2
+random 3/17 2de5b44b3582a3adca4f6976bdd177a177d3d0ed
+random 3/18 3fb0a225e9122d482704ef6afbb67a3390300741
+random 3/19 aade43dec615653c61b9ebb994935b73f0a3031f
+random 3/20 6b0eb3b60086f5f1af3201cdd6b3a0bf83a7c519
+random 3/21 0359328f9283438608f11459168350e1d8082d81
+random 3/22 2d7ff796e3ea6ae9a62f6d5a8cf5183197da5c59
+random 3/23 51ab12504c526dabc6b58bb6b30dabba5cd59eb6
+random 3/24 cb2936ddbbe2d6c971ce848676262deb575ca852
+random 3/25 8f0c0a50ddb758f01ff94917b01c4553f52773b8
+random 3/26 bf9bc2904330ad7271bfd372f5220fe79d848c0e
+random 3/27 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 3/28 adb72badacd60c5197b82035ab6cdd445415bed2
+random 3/29 7c4228ef015b63bb8e35321a3377daf88a41f0ba
+random 3/30 0f534daa2bd1a7562f7edcd86deebbe06679f5e4
+random 3/31 bb2e4991e75f521033b7e21fbdc31b9c17339800
+random 3/32 490a27110edee91ece5827df2f76d8ac829d1f7b
+random 3/33 d27aee14faa90ea5fa23677fc404c4f876ce1c6b
+random 3/34 3b227b9354d9989df822cd04c1e9fc6532070158
+random 3/35 0389906f517d05605ca7f30962abe2ee5282c9ed
+random 3/36 007cd3260fba49e83d32a9ee7ac7515e089b5573
+random 3/37 bdfc42f1e2782092786019b2d3b0be313a10628b
+random 3/38 2e6cda5f5f498ba5b9869deb6ea5ab9202df191e
+random 3/39 e0250a33bf33effe109ea18183f006584cd97baa
+random 3/40 f11d32055e49f344380c07fe80a58648659fc5e0
+random 3/41 e79c846bd752b5e7b9c30df427225a311fdd8d3d
+random 3/42 9061e36a0cb2d2ff8c46ce844d6691f2a305dfeb
+random 3/43 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 3/44 d2caa147af90a68e95867a5ad90f1115b337359e
+random 3/45 235e82295ca3a60ff0aab2567d722500314b911c
+random 3/46 39f331a3e79cc2b4ee3d071fe137de9e5c0a9246
+random 3/47 1e68c8a40f43807916918bcd686a376c57213d74
+random 3/48 6821604f0dbfaca9b5019caec66af253da0a298d
+random 3/49 39225464109b26f31ca2eb6c0186c17f67ed637b
+random 3/50 235e82295ca3a60ff0aab2567d722500314b911c
+random 3/51 032ad2e17853397db68810519abed80997213042
+random 3/52 d626f2883630e18df0e5729e0b5b5f5186cb9e9a
+random 3/53 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 3/54 9ba97ff160b2406f3adb7ec4a3b3458bae805d9a
+random 3/55 235e82295ca3a60ff0aab2567d722500314b911c
+random 3/56 7e77e17986714e1168127e2c9809acbdb2d74dcd
+random 3/57 b42d0849bb6ba3b54610b4d028597d27e2ef3b89
+random 3/58 1e68c8a40f43807916918bcd686a376c57213d74
+random 3/59 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 4/0 7b42de1b785797473e0c79649ba553e7c4f44a5c
+random 4/1 cd811bb64bc9f10c3beeb76897424503068b8050
+random 4/2 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 4/3 4d2ff0b8779a91324b57e5d68c6b37ca8e9de10c
+random 4/4 906017cb33873a87354f728ddce9e6f2c094319c
+random 4/5 ab66af391126f269e4d485f24deef2b34b7414a7
+random 4/6 6913106d15b455ec7e7aed00002a42e840e9c730
+random 4/7 3e3a32310365bc6011e818f06ffe95e175300f24
+random 4/8 a59e5e8782c0c82c5dd79d15df99c54118d8237f
+random 4/9 cc57c8ed56c4fe10cd2d5d9588eca9fe1fcb4537
+random 4/10 86bd7f86b041683ddfc403d180053de312e8bb9c
+random 4/11 c16e9c2e334a1de4b32fb33cc59ebe0721900400
+random 4/12 452180032d4eb96946cb84b3c37f62c5a0e5d9a6
+random 4/13 ad21467976343bd798f26c27508599863dd85a95
+random 4/14 14385a2c4f99b132a84e33b6004afd92a57b9b4e
+random 4/15 63e4cb3fb0373acd1599453249402201b8925dea
+random 4/16 1058db947759544c22289108e26d9075e0349941
+random 4/17 8ab8b0bb3d98861b3bf06ef82c75b927a09c89b9
+random 4/18 8cfab68fa3c815877550d861ffc9db848587e751
+random 4/19 1d68ca9cb3321a0b8bf35ae0a8d1a5a33f53e0e0
+random 4/20 08dddf302c15808f45f5a03cddb70a05179912aa
+random 4/21 25ca4948466aaec893fc1f4b17f9772463bc43b0
+random 4/22 a8963890c68714fee3e742150491f4f18754540d
+random 4/23 74aba68cfec81bc63d8271027d7b8e6e70dff7e2
+random 4/24 5da021b15f811af8e0d4fdbecabacb4ba93046c9
+random 4/25 b74d522354b7506acf0ab7b8e14e8c75b2a8aa7b
+random 4/26 e0d9a5859dfdb554880f06897efc00da2f3729af
+random 4/27 8e768da3ad25fb3a24bc42b88a6db7b4529775ef
+random 4/28 c5e344ec53f4c7d529c9e0b7bfdb224f5ea4372c
+random 4/29 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 4/30 b80e6c24f70bde5fc10e09f7ac7ccdec6de1b149
+random 4/31 458ce23803c05c95fa2509a4da14294494e3f737
+random 4/32 0576fcadf0c4382a67f239564dcc282f090f48a0
+random 4/33 d31e6d03bc57294e1a4a6fb3e7f8ea46b6fa5953
+random 4/34 7717d9f0a115264f0cafe3379575603459c48d9c
+random 4/35 97acf686b1840e0b1bce1d9bebdbe643fbd6bf5d
+random 4/36 53a10a819409cf7806c23d575823542c9f3b7190
+random 4/37 09f189148912a2bda2cea8e60058e853f0938bb3
+random 4/38 1fde62f31fe0986c01004f2c78d7bbf02e85cf19
+random 4/39 bdfc42f1e2782092786019b2d3b0be313a10628b
+random 4/40 6879c3c87156ed77598363090181a72629fdb3fc
+random 4/41 25dc2666c0311133fc8e57721d19b81858f6701f
+random 4/42 714e6f2311d76d11e6b5faaa276882a3b3813124
+random 4/43 8e8283d092b8795eca80634ddac1c592f2c142ea
+random 4/44 aa235dcd626adeb07cfb67901296f2e8d7b170fb
+random 4/45 6cbae6a81d9a9144b6f062f763af4affd49f49bd
+random 4/46 e6af35d91af3828c597d8f02f527d382497e8ac1
+random 4/47 753e827ec97944cfe141843e7529dfda2d40b199
+random 4/48 4ee9013ee5bab47d48ada081ead765658872ea27
+random 4/49 7621ce953c63977898999a350d689ae8293c84a5
+random 4/50 cba6194a4b6c8298635df27603d4ce71b8e31675
+random 4/51 3717b8c1babc9d2ebe1150637dc014e1baea79a4
+random 4/52 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 4/53 1d05cdcc88f8c71711dd31e393cb5e9a0f8fe246
+random 4/54 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 4/55 2cd625955a1ef441242914faeddc0ecc1a386058
+random 4/56 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 4/57 829b9de458e63eb2a422832b5c280e916d432874
+random 4/58 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 4/59 b805a5594b86a68bed9d7f30a1a92f84eb8325fe
+random 5/0 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 5/1 9a7c204c831c1a0f5dff14c4ef83e8e358916052
+random 5/2 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 5/3 cf116fc71cfaac90e631e504e2e52d74157a8e30
+random 5/4 4ebfb93ac08a54d78d73d85309db625e2efeb58c
+random 5/5 0ce53a488aff62f92da1f702de05de5875bb83dc
+random 5/6 4f6d6fec656886e02977b002547f3eb1269dfafe
+random 5/7 99c4c6f168972c0effb7740f8bdc81ec5ae9f8f4
+random 5/8 dbbfe07af2051105670226012efb99ee1e88a461
+random 5/9 c0023e5f039569a717109fd410f9f9b90857ac17
+random 5/10 9a55dc4cd5f5143a858bad2ef1b78a14b331e917
+random 5/11 f82c9ed939d3c51c1de69c6db963e8054828fd4d
+random 5/12 f2512e6476045ffa54718f2bf74098bf2688fcea
+random 5/13 f64ea75ee7a7306acea6ef46d9eebb24fb2093df
+random 5/14 c9b5ea125a966e3e17b7fb49a6f66a5d6b39179d
+random 5/15 2e9ca84c3e56cdaf928fe3c8f3ce23a4c86b276b
+random 5/16 0e2c0c5e121841a0df8ccf2b383140e579da7c4d
+random 5/17 cb7c876d88f79f211efbba59432af7492ddf7c14
+random 5/18 99c4c6f168972c0effb7740f8bdc81ec5ae9f8f4
+random 5/19 12cc2dc40d5f6d6101b54eb2873c81305aba81f0
+random 5/20 c2321e2cdd9b828d115c4a49b65d8dd73f724d9a
+random 5/21 2c03a9d7044095cf3a5d78f30133f05d221a54a5
+random 5/22 e913860d47ba01b1fd87bfdf1cc1b28a95f2579e
+random 5/23 622107df2986fb657aaf948e0e473035bde1fdf9
+random 5/24 6da831b0694d4659dee583c4c90925e7451e9138
+random 5/25 3381fe16b0f0cdbf0b3c01d05595ed584385256e
+random 5/26 42879828ef31035b69fcd36c1e3b6d19994cd96b
+random 5/27 5c121595f7dbbdc7fadc9816134c59b98df50e0b
+random 5/28 5255f2c2f1365f873a434cedd1a6792c0e09d531
+random 5/29 9f3964b47d181ca6fd70c4165946fd15414db279
+random 5/30 0fe99019462eba1debddcb5c182186f75ce873bd
+random 5/31 fdddcacbec0f1dc7b708aebf57ea33f82c63f515
+random 5/32 4a4759ee78fa66c03f80bf119d1bf015b0baa7a7
+random 5/33 d0c522ab959743a27a68218f6721fd3b7bb22c2a
+random 5/34 85a599a270b8716d2c92ad5e44d81daaca51b07f
+random 5/35 3250f1c7303591403575c6be0a6062d160ab59a2
+random 5/36 74daa77b74927b6125397a475e0ec26ec537cd18
+random 5/37 3d5eaea8652f34718c37a51f11f35bbd70efa4f4
+random 5/38 2cc945bda4e1d87d9a66964815b40c330b364e9a
+random 5/39 5d820a86a057eb7cfdc8f1393e8cece6ee8acb49
+random 5/40 5c6b155127b093eda7d46a3210f37cbf05e6195f
+random 5/41 976ebc6d5c3afe8d0eca870d801d1e16d3ada0ec
+random 5/42 77a3bf74ea68234d1f61ad04f84392ee6c187059
+random 5/43 b1c2875b087fa180d12e618266f9bf74522f73e7
+random 5/44 1435fcd31791a2b14e3edcfebda5da4e93769dc4
+random 5/45 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 5/46 588198928ec908049d8b3baf3339bfe4038c08b2
+random 5/47 5a19cfdb4ad89ba3fba95377c5951d2d8a231dcb
+random 5/48 35e419d29ea9aec7da30b005347393072175864c
+random 5/49 d49510db0c4f216e610688fcd6f300cd7250a1af
+random 5/50 105f0f5e0efd4270b8ba87cac6afb68f11354e0b
+random 5/51 976ebc6d5c3afe8d0eca870d801d1e16d3ada0ec
+random 5/52 532fe1a4c3b8371add7a04ecbda5d8196f83d55e
+random 5/53 13eebc3082631450d478c00d4535f359988cb4e0
+random 5/54 caf617769c6035caf43ba155fff3909931432fe7
+random 5/55 b571850fe8636dbc24981e514f553efac5bd74ac
+random 5/56 1efa1f1dc5991bbaebc60fe6d81abc66d775a9a6
+random 5/57 6879c3c87156ed77598363090181a72629fdb3fc
+random 5/58 d1a090a5ab60331d1e7f25f18508e42f15dd107e
+random 5/59 478339083ff2657c32af1082a2a2040b25c4f134
+random 6/0 937307590068580c0883286773448e0792794188
+random 6/1 100266265054a100b32a2b612d64b4d4bbc20dd7
+random 6/2 e609423b1ba1da87acd4e57728029f444766513c
+random 6/3 ed7c8529a859399e362fb48f501ff29902384c56
+random 6/4 1106e845a96866fde08eef5246bd665a07949599
+random 6/5 a45cc99facd95d0ae2577d03efad5388f2dc317a
+random 6/6 3e479cbbe3503da0bc9d7817944b5b7e02d61229
+random 6/7 f9af09e9432edaa7b7db23acb712d20986799efa
+random 6/8 5e509d3c049e8a7de9d3d729f3f889801689de53
+random 6/9 bd35dd77ef9c21120e91ac257598df7a379a1f7d
+random 6/10 ed70a96b2085612fe7517f206ce0fddbea3b1ee4
+random 6/11 421ae3f6f94a2e3ea65ad15416cdd1615cae3585
+random 6/12 65bdcf6675c275b73c158608e43bd2178d22dc90
+random 6/13 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 6/14 ca4af4cb482df0967e4c66e2bd2e363c02796151
+random 6/15 37307aa1f0a35988693826b3043dc9f41ce7169a
+random 6/16 542b77c1d9410b26512c699a334d84383cbba7f8
+random 6/17 19a4fe1a701af57b1d433b07d959fac8cb948f28
+random 6/18 8e768da3ad25fb3a24bc42b88a6db7b4529775ef
+random 6/19 0c6c07e8ba24df855ab83a8510731678fb39e404
+random 6/20 921b3b71e28b9f97831b9554c3bed9aaab3b034d
+random 6/21 c04c13c0d38ceccce02f532986ff966ee49f88e2
+random 6/22 52e184a8fb9064b3f983ec180cde5117d2913fa6
+random 6/23 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 6/24 c7c3701bf185d8861f94f132d1080393363a1f0c
+random 6/25 794a0d8533287d119db0d44201033d0500f30614
+random 6/26 aefa3fb8e275e01448b1ea8cc3c7ca63d2d277ac
+random 6/27 47df932529aee80e340304461dd422a637f9710a
+random 6/28 89a531de49f821a2efd8b2de0bc1399f99bd8948
+random 6/29 aa39fa284ec3e229286a8d00fa8db224dcb336d7
+random 6/30 2db3077b19bc274e43d06453ebf206be667527ce
+random 6/31 21a387983a3d0b9e5b2f312b408c6fed3f4caf93
+random 6/32 6879c3c87156ed77598363090181a72629fdb3fc
+random 6/33 fff8a4d1475dfe01730e4ff979dedad13d10ce42
+random 6/34 31625512eb9ea1561ed44bbedf7c491d6281ffae
+random 6/35 84e8188a5bda52d68e3f824ee87cc6a91a872dd9
+random 6/36 0ce53a488aff62f92da1f702de05de5875bb83dc
+random 6/37 7d4944b5675fd5d4aa5e12cca6c947d17dcee90e
+random 6/38 b72db0f4b0fb7b6698fac74c6cb3d45e08355bb0
+random 6/39 d7925625505322dd8c56eb2b1539aea40ab2fcb9
+random 6/40 1b7cf44e5cbd82526629bf8cbf49b9a9dcd64f0f
+random 6/41 a33d211b439ae07136cf0209bc912d77ecb74d31
+random 6/42 50e6577e2e9792776e5549c0b4473b2b765d44d3
+random 6/43 fb21b26455c2fe6a3b901ede82e875e68d146702
+random 6/44 82c7ac616d9f9451a19d38106c0648df21236eb9
+random 6/45 b82768f15bc1da6736552ad478b6eb810d49a99d
+random 6/46 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 6/47 097262c6583f82304339719fab2a5ea3277d5d26
+random 6/48 a147c0b5c5d274f0d303083334216c1b413558c5
+random 6/49 f12a0d3576882c03c7d8b4cf819f0ca9e14febaf
+random 6/50 c396fea5a2e778756b55e00a476fc1b0b3455918
+random 6/51 2a5309513445159d0f13969045db9164c3cbc03c
+random 6/52 3676eaaff79d8f78af4dc8c420117f69cd551dee
+random 6/53 3795c91eed4c6451d1cbfcfc6dc37c695c93ab51
+random 6/54 cc84855742e53e88a0bba60e0cfcd91081d6ce78
+random 6/55 56406d9f7ba8d81f8383f837fec909524e5bab30
+random 6/56 4c05dec8639b1db468e25dfe50cdf1beb074d865
+random 6/57 12b0ddc95006f5fe3aaae1218e7418b9d3960ecf
+random 6/58 f357d8eaffc6b9562d58a76af846ec8611f926e8
+random 6/59 bcb2c52cc2d54b6eb66ccf00b8c314df1716e986

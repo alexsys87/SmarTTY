@@ -270,6 +270,9 @@ jobs:
       - name: Run WPF terminal view model checks (the colours of the cells, the runs of a row, the output queue of a frame, the display model)
         run: dotnet run --project tests/TerminalRenderModelTests -c Release
 
+      - name: Run the terminal goldens on the WPF display model (screen state, painted colours, mouse reports)
+        run: dotnet run --project tests/TerminalModelSnapshots -c Release
+
       - name: Run WPF terminal keyboard checks (KeyDown and TextInput to xterm bytes, AltGr, Alt codes, dead keys, IME)
         run: dotnet run --project tests/TerminalKeyEncoderTests -c Release
 

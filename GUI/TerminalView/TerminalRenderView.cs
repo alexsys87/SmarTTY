@@ -1800,7 +1800,8 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
         if (ReportsMouse())
         {
-            byte[] report = _mouse.MouseWheel(_model.MouseMode, e.Delta < 0, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
+            // A step of 0 counts as down, as in the WinForms terminal (its mouse golden has it).
+            byte[] report = _mouse.MouseWheel(_model.MouseMode, e.Delta <= 0, MouseModifierBits(), HitTestCell(e.GetPosition(this)), _model.Columns, _model.Rows, _model.SgrMouse);
             SendBytes(report, TerminalInputKind.MouseReport, "wheel");
         }
         else if (WheelSendsArrowKeys && (Keyboard.Modifiers & ModifierKeys.Alt) == 0)
