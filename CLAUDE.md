@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 138 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `SmartTerminalIntegrationTests`,
@@ -48,6 +48,7 @@ PR that changes them.
 | `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext`, `EditorTabContext`, `DeviceTabContext` host WinForms controls through `WinFormsHostWrapper : WindowsFormsHost`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
+| `GUI/TextView/` | Stage 3D-2: the text view on WPF on the models of the text view (`WpfTextEditor`) and Tools > WPF text editor lab (`TextLabWindow`); not in the editor tab yet | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
 | `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
@@ -67,9 +68,9 @@ PR that changes them.
 
 ```
 DpiAwareControl (WinForms UserControl)
-└─ ReadonlyTextBrowser            3340 lines (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves, the wrap map and the selection are CodeEditing/CaretNavigator, WrapMap and TextSelection
+└─ ReadonlyTextBrowser            3312 lines (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves and the navigation keys, the wrap map and the selection are CodeEditing/CaretNavigator, WrapMap and TextSelection
    └─ ReadonlySmartScrollBrowser
-      └─ EditableTextBrowser      the edits: their commands are CodeEditing/TextEditCommands, their undo history CodeEditing/UndoHistory
+      └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
          └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
             ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor): completion, folding, inline messages
             │  └─ RemoteFileEditor (+ .Syntax): load/save over SSH, drafts, sudo, encodings; hosts HexEditorControl, or
@@ -100,7 +101,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | Planned |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) done; next 3D-2, the WPF text view and its lab window |
+| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) done; next 3D-3, what `CodeEditorPP` draws (the syntax colours, the folds, the inline messages, the completion) on the WPF view, then the view in the editor tab |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -658,3 +659,51 @@ checks of the two models (300 in all: a fake view over a real document that logs
 once, three led to checks (the default line break of a line that inherits it, the removal of the last lines from the second one, an unindent by two
 levels) and one is an equivalent change (`DeleteRange` moves its local end line, which is not read
 again). `EditableTextBrowser.cs` is 623 lines before and 358 after, `TextEditorControl.cs` 474 and 188.
+
+Done in 3D-2: first a net for what the edits run of `tests/TextViewTests` did not reach: a replace run at its end, written by the code before the move (the
+1315 lines of before did not change; 1334 in all, the same on every run): a single-line view drops the line breaks of the text, a lone CR in an
+edit within a line breaks the line, an insertion with CR LF takes the line ending of an LF text and keeps its own without the existing one, Replace
+All up to the end column of a range, a replacement with line breaks whose new lines would match again (after LF and after a lone CR), the end of the
+range after line breaks in its last line and in the same line, and the caret brought into a line that became shorter. Of 17 mutations of the old code
+15 make it fail; two are equivalent changes (the read-only test of Replace All, which `ExecuteAsSingleUndoStep` and `ReplaceText` make again, and
+the caret column, which `SetCaret` brings into the line). A fault it found, kept as it is: when a line of the range before the last one gets line
+breaks, Replace All looks for the last line of the range at its old index, so its limit and the new end of the range are worked out for another
+line. Then `CodeEditing/TextReplace.cs` (public): `Replace` (the old `ReplaceTextCore`: an empty edit, the columns -1, a single-line view, the
+indentation a join drops, a replacement within a line or of a range), `ReplaceAll` (one undo step, the range and its new end, the caret brought into
+its line) and `CountLineBreaks`, as they were, through `ITextReplaceHost` (what the edit commands see, `SingleLine`, the line ending flag,
+`GetLineOrNull`, `GetIndentation` and the view's own `ReplaceText`, which the terminals route), implemented in `Controls/EditableTextBrowser.Edits.cs`;
+the view keeps read-only and its events. And the switch of `TryGetNavigationTarget` is `CaretNavigator.TryMapKey` and `KeepsColumn` (the view still
+reads Ctrl from the keyboard and asks its own `GetMovedPosition`, which the terminals override; Ctrl cannot be held by a test, so Ctrl+Left and
+Ctrl+Right are checked on the model only). The golden, the three terminal goldens, the hex editor golden and every stand pass unchanged after each
+move. `CaretNavigatorTests` has 48 more checks (348 in all); of 32 mutations of `TextReplace` 28 made a check fail at once, two after checks were
+added (select within a line, a column -1 at the start of a range) and two are equivalent changes (with select the end is the start already; the
+matcher makes a null replacement empty itself); all 9 of the key map. `EditableTextBrowser.cs` is 358 lines before and 248 after.
+
+Then new code for the new view (not a move; the WinForms view keeps its own): `CodeEditing/TextViewLayout.cs` (public, in device pixels, through
+`ITextLayoutView`: the rows, a line each or the rows of the wrap map, which keeps room for the vertical scroll bar so that showing it does not wrap
+the lines again; the margin of the line numbers; the rows and the width in view; what a row shows with the tabs spread over their columns; the
+selected columns of a row and whether its line break is selected; the widest line; the position under a point, the nearer edge of a character
+brought into its row, and the point of a position; the scroll that keeps the caret in view, with four columns before it on the left; which scroll
+bars are needed; the wheel and the automatic scrolling of a drag with `HexScroll`) and `CodeEditing/TextPointer.cs` (public: a click, a click with
+Shift from where the selection starts or the caret, a double click on a word as the navigator finds it, a triple click or a click in the margin on a
+line, and a drag by the same unit). `tests/TextViewLayoutTests` (net8.0, a fake view over a real document, the real selection and navigator, 155
+checks); of 58 mutations 52 made a check fail at once, two after a check was added, two are equivalent changes and two showed code that changed
+nothing, which was taken out. Then `GUI/TextView/WpfTextEditor.cs` (internal), a `FrameworkElement` on all these models: the keys in the order of
+`TextEditorControl` and its base class (the edit keys and chords of `TextTyping`, Ctrl+Up/Down, Ctrl+A, Ctrl+S as `SaveRequested`, the navigation
+keys with and without Shift, Insert, then Backspace, Enter and Tab as the characters the WinForms view gets as `KeyPress`; the other characters
+through `TextInput`), the mouse through `TextPointer` (the mouse captured while a drag runs, the automatic scrolling by a `DispatcherTimer`, the right
+button moves the caret outside the selection), the wheel (Shift: sideways), the clipboard of WPF (as the WinForms view: the caret line when nothing
+is selected), a context menu of the edit commands, and the drawing in whole device pixels as the WPF hex view does (one `GlyphRun` a colour in a row,
+only the columns in view, the selection with a cell for a selected line break, the caret as a bar or as a block in overwrite mode, the margin with the
+number of the caret line in the colour of the text). With no folds, the line before and after a line are its neighbours (so the fault of Right at
+the end of a wrapped line of 3C-1 is not in it). Not in it yet: the syntax colours, the folds, the inline messages, the completion, the marks of the
+blanks, the search highlights, characters the font has no glyph for (drawn as "?") and characters of two cells. Tools > WPF text editor lab
+(`GUI/TextView/TextLabWindow.cs`) opens a file of this computer (up to 16 MB, UTF-8 unless it has another byte order mark) with the colours, the
+zoom, the tab size, the indentation, word wrap and the line numbers of the editor settings and switches for them; the text is never saved. The view
+is compile-checked on Linux only. Manual check on Windows (the lab): typing, with a selection and in overwrite mode (Insert), Enter with the
+indentation, Backspace in space indentation, Tab and Shift+Tab with and without a selection of lines, Delete, Ctrl+Delete, Ctrl+Backspace; Ctrl+Z,
+Ctrl+Y, Ctrl+Shift+Z; Ctrl+C and Ctrl+X without a selection (the line), Ctrl+V, Shift+Insert, Shift+Delete; the arrows, Ctrl+Left/Right, Home/End,
+Ctrl+Home/End, PageUp/Down with and without Shift, Ctrl+Up/Down, Ctrl+A; a click, a double and a triple click, a click in the margin, a drag inside
+the text and beyond its edges, a Shift+click, the right button and the context menu; the wheel and Shift+wheel; word wrap on and off (the first line
+stays in view), the line numbers, the tab sizes; a file of some MB (scrolling and paging stay fast); 100 %, 150 % and 200 % scaling and a window moved
+between monitors; light and dark theme; AltGr letters and an IME.
