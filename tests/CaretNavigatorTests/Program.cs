@@ -8,7 +8,9 @@ using SmarTTY.TextEditing;
 // the column Up, Down and the pages keep, the word under the caret, what the view is asked at the ends of the text), with a fake view over a real
 // document; what 3C-2 took: CodeEditing/TextSelection.cs (the state of the selection and its rules); and what 3C-3 took: CodeEditing/UndoHistory.cs
 // (undo, redo, the saved state, single steps) with fake steps that log what they are asked, and CodeEditing/IndentEdits.cs (the indentation of the
-// indent commands and of a join). The same code is run in the real text view by tests/TextViewTests (its golden file).
+// indent commands and of a join); and what 3D-1 took: CodeEditing/TextEditCommands.cs (the undoable edits on a real document, with a fake view
+// that logs what it is told) and CodeEditing/TextTyping.cs (what typing and the edit keys ask of the editor). The same code is run in the real text
+// view by tests/TextViewTests (its golden file).
 // Run with: dotnet run --project tests/CaretNavigatorTests
 internal static class Program
 {
@@ -590,6 +592,458 @@ internal static class Program
         Equal(IndentEdits.SharedIndentLength("", "  x"), 0, "no indentation: nothing");
     }
 
+    // The text view as the edit commands and the typing see it: a real document, a caret and a selection, and a log of what it is told.
+    private sealed class EditView : ITextEditView, ITextTypingHost
+    {
+        public readonly List<string> Log = new List<string>();
+
+        public EditableTextDocument Text;
+
+        public TextDocument.TextPosition Caret;
+
+        public bool Selected;
+
+        public TextDocument.TextPosition Anchor;
+
+        public bool Overwrite;
+
+        public bool Spaces;
+
+        public int Tabs = 4;
+
+        public bool Editable = true;
+
+        public bool CopyLine = true;
+
+        public string Indentation = "";
+
+        public TextDocument.TextPosition Moved = new TextDocument.TextPosition(-1, -1);
+
+        public Func<char, string> HookText;
+
+        public TextDocument.TextPosition HookCaret = new TextDocument.TextPosition(-1, -1);
+
+        public EditView(params string[] lines)
+        {
+            Text = new EditableTextDocument(lines, TextDocument.LineEnding.Lf);
+        }
+
+        public EditableTextDocument Document => Text;
+
+        public TextDocument.TextPosition CaretPosition => Caret;
+
+        public bool HasSelection
+        {
+            get => Selected;
+            set
+            {
+                Log.Add("selection " + (value ? "on" : "off"));
+                Selected = value;
+            }
+        }
+
+        public TextDocument.TextPosition SelectionStart => Anchor;
+
+        public TextDocument.TextPosition SelectionEnd => Caret;
+
+        public bool OverwriteMode => Overwrite;
+
+        public bool InsertSpaces => Spaces;
+
+        public int TabSize => Tabs;
+
+        public bool IsEditable => Editable;
+
+        public bool CopyLineWhenNoSelection => CopyLine;
+
+        public void GetSelectedLines(out int first, out int last)
+        {
+            if (!Selected || Anchor == Caret)
+            {
+                first = 0;
+                last = -1;
+                return;
+            }
+            TextDocument.TextPosition start = Anchor < Caret ? Anchor : Caret;
+            TextDocument.TextPosition end = Anchor < Caret ? Caret : Anchor;
+            first = start.Line;
+            last = end.LastFullLine;
+        }
+
+        public void SetSelection(bool select, TextDocument.TextPosition start)
+        {
+            Log.Add("set selection " + (select ? "on " : "off ") + P(start));
+            Selected = select;
+            Anchor = start;
+        }
+
+        public void SetCaret(TextDocument.TextPosition position)
+        {
+            Log.Add("caret " + P(position));
+            Caret = position;
+        }
+
+        public void SetCaretColumn(int column)
+        {
+            Log.Add("caret column " + column);
+            Caret = new TextDocument.TextPosition(column, Caret.Line);
+        }
+
+        public void OnLineChanged(int line, int column, int addedLength, int removedLength) => Log.Add("line " + line + "," + column + "," + addedLength + "," + removedLength);
+
+        public void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd) => Log.Add("range " + P(start) + "," + P(oldEnd) + "," + P(newEnd));
+
+        public void InvalidateLine(int line) => Log.Add("invalidate " + line);
+
+        public void UpdateLayout() => Log.Add("layout");
+
+        public void Redraw() => Log.Add("redraw");
+
+        public bool IsWordChar(char ch) => char.IsLetterOrDigit(ch) || ch == '_';
+
+        public string GetIndentation(int line) => Indentation;
+
+        public int IndexToColumn(int line, int index) => Text.IndexToColumn(line, index, Tabs);
+
+        public TextDocument.TextPosition GetMovedPosition(CaretMove move)
+        {
+            Log.Add("moved " + move);
+            return Moved;
+        }
+
+        public void ReplaceText(TextDocument.TextPosition start, TextDocument.TextPosition end, bool select, string text) => Log.Add("replace " + P(start) + " " + P(end) + (select ? " select" : "") + " '" + text.Replace("\n", "\\n") + "'");
+
+        public void Indent(int levels) => Log.Add("indent " + levels);
+
+        public void UpdateMaxLineWidth(int line) => Log.Add("width " + line);
+
+        public void OnCharTyping(char ch, ref string text, ref TextDocument.TextPosition textPosition)
+        {
+            Log.Add("typing " + ch);
+            if (HookText != null)
+            {
+                text = HookText(ch);
+                textPosition = HookCaret;
+            }
+        }
+
+        public void OnCharTyped(char ch, TextDocument.TextPosition textPosition) => Log.Add("typed " + ch + "@" + P(textPosition));
+
+        public void CopySelection(bool select) => Log.Add("copy " + select);
+
+        public void Paste() => Log.Add("paste");
+
+        public void Cut() => Log.Add("cut");
+
+        public void Undo() => Log.Add("undo");
+
+        public void Redo() => Log.Add("redo");
+
+        public string Take()
+        {
+            string text = string.Join("; ", Log);
+            Log.Clear();
+            return text;
+        }
+
+        public string All => Text.GetText().Replace("\n", "|");
+    }
+
+    private static void EditCommands()
+    {
+        EditView view = new EditView("alpha beta", "gamma", "delta");
+        view.Caret = At(0, 2);
+        view.Selected = true;
+        view.Anchor = At(0, 0);
+        ReplaceInLineCommand inLine = new ReplaceInLineCommand(view, 0, 6, 4, "BETA!");
+        inLine.Execute();
+        Equal(view.All, "alpha BETA!|gamma|delta", "a part of a line is replaced");
+        Equal(view.Take(), "line 0,6,4,5; selection off; caret column 11; invalidate 0; layout", "the view is told the line, the selection goes, the caret goes after the new text, the line is drawn");
+        inLine.Undo();
+        Equal(view.All, "alpha beta|gamma|delta", "undone");
+        Equal(view.Take(), "line 0,6,5,4; set selection on 0:0; caret 0:2", "the selection and the caret come back as they were");
+        inLine.Execute();
+        Equal(view.All, "alpha BETA!|gamma|delta", "redone");
+        view.Take();
+
+        view = new EditView("one", "two", "three");
+        view.Caret = At(2, 1);
+        view.Selected = true;
+        view.Anchor = At(0, 1);
+        ReplaceRangeCommand range = new ReplaceRangeCommand(view, At(0, 1), At(2, 1), "X\nY", true);
+        range.Execute();
+        Equal(view.All, "oX|Yhree", "a range across lines is replaced, with a line break in the new text");
+        Equal(view.Take(), "caret 0:1; selection off; range 0:1,2:1,1:1; layout; caret 1:1; redraw", "the range goes (the caret to its start, the selection off), the view is told, the caret goes after the new text");
+        range.Undo();
+        Equal(view.All, "one|two|three", "undone: the removed text comes back");
+        Equal(view.Take(), "caret 0:1; selection off; range 0:1,1:1,2:1; set selection off 0:1; caret 2:1", "and no selection comes back: a range replacement drops it");
+        ReplaceRangeCommand insert = new ReplaceRangeCommand(view, At(1, 3), At(1, 3), "!", true);
+        insert.Execute();
+        Equal(view.All, "one|two!|three", "an insertion at a point removes nothing");
+        insert.Undo();
+        Equal(view.All, "one|two|three", "and its undo removes the inserted text");
+        view.Take();
+        ReplaceRangeCommand delete = new ReplaceRangeCommand(view, At(0, 2), At(1, 1), "", true);
+        delete.Execute();
+        Equal(view.All, "onwo|three", "a deletion across a line break");
+        delete.Undo();
+        Equal(view.All, "one|two|three", "undone");
+        EditView crlf = new EditView();
+        crlf.Text = new EditableTextDocument(new[] { "a", "b", "c" }, TextDocument.LineEnding.Lf);
+        ReplaceRangeCommand lines = new ReplaceRangeCommand(crlf, At(0, 1), At(2, 0), "", true);
+        lines.Execute();
+        lines.Undo();
+        Equal(crlf.Text.GetText(), "a\nb\nc", "an undone deletion of lines keeps the line breaks of the file");
+
+        view = new EditView("first", "  second", "", "third");
+        view.Caret = At(3, 0);
+        view.Selected = true;
+        view.Anchor = At(0, 2);
+        IndentCommand indent = new IndentCommand(view, 1);
+        indent.Execute();
+        Equal(view.All, "\tfirst|\t  second||third", "the lines of the selection are indented by a tab (not the blank line, not the line the selection ends at the start of)");
+        Equal(view.Take(), "line 0,0,0,1; invalidate 0; layout; line 1,0,0,1; invalidate 1; layout", "each indented line is told and drawn");
+        indent.Undo();
+        Equal(view.All, "first|  second||third", "undone: exactly the indentation that was added");
+        Equal(view.Take(), "line 0,0,1,0; invalidate 0; line 1,0,1,0; invalidate 1; layout; set selection on 0:2; caret 3:0", "and the selection comes back");
+        view.Selected = false;
+        view.Caret = At(1, 4);
+        view.Spaces = true;
+        IndentCommand twice = new IndentCommand(view, 2);
+        twice.Execute();
+        Equal(view.All, "first|          second||third", "without a selection the caret line, by two levels of spaces");
+        twice.Undo();
+        Equal(view.All, "first|  second||third", "undone");
+        IndentCommand unindent = new IndentCommand(view, -1);
+        unindent.Execute();
+        Equal(view.All, "first|second||third", "unindent removes what there is of a level");
+        view.Take();
+        unindent.Undo();
+        Equal(view.All, "first|  second||third", "undone: what was removed comes back");
+        Equal(view.Take(), "line 1,0,0,2; set selection off 0:2; caret 1:4", "told");
+        EditView deep = new EditView("\t\t\tx");
+        IndentCommand two = new IndentCommand(deep, -2);
+        two.Execute();
+        Equal(deep.All, "\tx", "unindent by two levels");
+        two.Undo();
+        Equal(deep.All, "\t\t\tx", "undone");
+        IndentCommand none = new IndentCommand(view, 0);
+        none.Execute();
+        Equal(view.Take(), "", "an indent by no level does nothing");
+        none.Undo();
+        Equal(view.Take(), "set selection off 0:2; caret 1:4", "and its undo only puts the caret back");
+    }
+
+    private static void Typing()
+    {
+        EditView view = new EditView("abc", "    ind", "tail");
+        TextTyping typing = new TextTyping(view);
+        view.Caret = At(0, 1);
+        typing.TypeCharacter('x', false);
+        Equal(view.Take(), "typing x; replace 0:1 0:0 select 'x'; typed x@0:1; width 0", "a character is put at the caret");
+        view.Selected = true;
+        view.Anchor = At(0, 0);
+        view.Caret = At(0, 2);
+        typing.TypeCharacter('y', false);
+        Equal(view.Take(), "typing y; replace 0:2 0:0 'y'; typed y@0:2; width 0", "over a selection it replaces it");
+        view.Selected = false;
+        typing.TypeCharacter('\u0001', false);
+        Equal(view.Take(), "", "a control character does nothing");
+        view.Overwrite = true;
+        view.Caret = At(0, 1);
+        typing.TypeCharacter('z', false);
+        Equal(view.Take(), "replace 0:1 0:2 'z'; width 0", "overwrite replaces the next character, without the hooks");
+        view.Caret = At(0, 3);
+        typing.TypeCharacter('z', false);
+        Equal(view.Take(), "typing z; replace 0:3 0:0 select 'z'; typed z@0:3; width 0", "at the end of a line it inserts");
+        view.Overwrite = false;
+        view.HookText = ch => "()";
+        view.HookCaret = At(0, 2);
+        view.Caret = At(0, 1);
+        typing.TypeCharacter('(', false);
+        Equal(view.Take(), "typing (; replace 0:1 0:0 select '()'; caret 0:2; typed (@0:2; width 0", "the hook changes the text and the caret");
+        view.HookText = ch => null;
+        view.HookCaret = At(-1, -1);
+        typing.TypeCharacter('#', false);
+        Equal(view.Take(), "typing #; typed #@0:2; width 0", "a hook that types nothing");
+        view.HookText = null;
+
+        view.Caret = At(1, 7);
+        view.Indentation = "    ";
+        typing.TypeCharacter('\r', false);
+        Equal(view.Take(), "replace 1:7 0:0 select '\\n    '", "Enter types the line break of the line and the indentation");
+        view.Caret = At(1, 2);
+        typing.TypeCharacter('\r', false);
+        Equal(view.Take(), "replace 1:2 0:0 select '\\n  '", "with the caret inside the indentation only the part before it");
+        view.Caret = At(2, 4);
+        view.Indentation = "";
+        typing.TypeCharacter('\r', false);
+        Equal(view.Take(), "replace 2:4 0:0 select '\\n'", "a last line takes the line break of the line before it");
+        EditView single = new EditView();
+        single.Text = new EditableTextDocument(new[] { "one" }, TextDocument.LineEnding.Inherit);
+        single.Text.DefaultLineEnding = TextDocument.LineEnding.Lf;
+        single.Caret = At(0, 3);
+        new TextTyping(single).TypeCharacter('\r', false);
+        Equal(single.Take(), "replace 0:3 0:0 select '\\n'", "a line with an inherited line break (the only line of a file): the default line break of the document");
+
+        view.Caret = At(0, 2);
+        view.Moved = At(0, 1);
+        typing.TypeCharacter('\b', false);
+        Equal(view.Take(), "moved Left; replace 0:2 0:1 ''; width 0", "Backspace removes up to where Left goes");
+        view.Spaces = true;
+        view.Caret = At(1, 3);
+        typing.TypeCharacter('\b', false);
+        Equal(view.Take(), "replace 1:3 1:0 ''; width 1", "in space indentation back to the tab stop");
+        view.Caret = At(1, 4);
+        typing.TypeCharacter('\b', false);
+        Equal(view.Take(), "replace 1:4 1:0 ''; width 1", "a whole level");
+        view.Caret = At(1, 6);
+        typing.TypeCharacter('\b', false);
+        Equal(view.Take(), "moved Left; replace 1:6 0:1 ''; width 1", "after the indentation a character");
+        view.Selected = true;
+        view.Anchor = At(0, 0);
+        typing.TypeCharacter('\b', false);
+        Equal(view.Take(), "replace 1:6 0:0 ''; width 1", "over a selection it removes it");
+        view.Selected = false;
+        view.Caret = At(0, 1);
+        typing.TypeCharacter('\t', false);
+        Equal(view.Take(), "typing \t; replace 0:1 0:0 select '   '; typed \t@0:1; width 0", "Tab with spaces: to the next tab stop");
+        view.Spaces = false;
+        typing.TypeCharacter('\t', false);
+        Equal(view.Take(), "typing \t; replace 0:1 0:0 select '\t'; typed \t@0:1; width 0", "Tab without spaces: a tab");
+        typing.TypeCharacter('\t', true);
+        Equal(view.Take(), "indent -1", "Shift+Tab unindents");
+        view.Selected = true;
+        view.Anchor = At(2, 0);
+        typing.TypeCharacter('\t', false);
+        Equal(view.Take(), "indent 1", "Tab over a selection of several lines indents");
+        view.Anchor = At(0, 3);
+        typing.TypeCharacter('\t', false);
+        Equal(view.Take(), "typing \t; replace 0:1 0:3 '\t'; typed \t@0:1; width 0", "over a selection in one line it is typed");
+        view.Spaces = true;
+        Equal(typing.SpacesToNextTabStop(), "   ", "the spaces start at the start of the selection");
+        view.Selected = false;
+
+        view = new EditView("foo  bar.baz", "next");
+        typing = new TextTyping(view);
+        view.Caret = At(0, 0);
+        Equal(typing.KeyDown(VirtualKey.Delete, true, false, false), TypingKeyResult.Handled, "Ctrl+Delete is handled");
+        Equal(view.Take(), "replace 0:0 0:3 ''; width 0; width 0", "and removes the word (the width is looked at by the word and again by Delete, as before)");
+        view.Caret = At(0, 3);
+        typing.KeyDown(VirtualKey.Delete, true, false, false);
+        Equal(view.Take(), "replace 0:3 0:8 ''; width 0; width 0", "and the blanks before the next word with it");
+        view.Caret = At(0, 8);
+        typing.KeyDown(VirtualKey.Delete, true, false, false);
+        Equal(view.Take(), "replace 0:8 0:9 ''; width 0; width 0", "a mark is a word of its own");
+        view.Caret = At(0, 12);
+        typing.KeyDown(VirtualKey.Delete, true, false, false);
+        Equal(view.Take(), "replace 0:12 1:0 ''; width 0; width 0", "at the end of a line the line break");
+        view.Caret = At(1, 4);
+        typing.KeyDown(VirtualKey.Delete, true, false, false);
+        Equal(view.Take(), "width 1", "at the end of the text nothing but the width");
+        view.Moved = At(1, 4);
+        Equal(typing.KeyDown(VirtualKey.Delete, false, false, false), TypingKeyResult.None, "Delete is not marked handled");
+        Equal(view.Take(), "moved Right; replace 1:4 1:4 ''; width 1", "and removes up to where Right goes");
+        Equal(typing.KeyDown(VirtualKey.Back, true, false, false), TypingKeyResult.Handled | TypingKeyResult.SuppressKeyPress, "Ctrl+Backspace is handled and types nothing");
+        Equal(view.Take(), "replace 1:4 1:0 ''; width 1", "and removes the word before the caret");
+        view.Caret = At(0, 7);
+        typing.KeyDown(VirtualKey.Back, true, false, false);
+        Equal(view.Take(), "replace 0:7 0:5 ''; width 0", "inside a word the part before the caret");
+        view.Caret = At(0, 5);
+        typing.KeyDown(VirtualKey.Back, true, false, false);
+        Equal(view.Take(), "replace 0:5 0:0 ''; width 0", "with the blanks after the word");
+        view.Caret = At(1, 0);
+        typing.KeyDown(VirtualKey.Back, true, false, false);
+        Equal(view.Take(), "replace 1:0 0:12 ''; width 1", "at the start of a line the line break");
+        view.Caret = At(0, 0);
+        typing.KeyDown(VirtualKey.Back, true, false, false);
+        Equal(view.Take(), "", "at the start of the text nothing");
+        Equal(typing.KeyDown(VirtualKey.Back, true, true, false), TypingKeyResult.None, "Ctrl+Alt+Backspace (AltGr) is not a command");
+        Equal(typing.KeyDown(VirtualKey.Back, true, false, true), TypingKeyResult.None, "nor Ctrl+Shift+Backspace");
+        view.Selected = true;
+        view.Anchor = At(0, 2);
+        typing.KeyDown(VirtualKey.Delete, true, false, false);
+        Equal(view.Take(), "replace 0:0 0:2 ''; width 0", "Ctrl+Delete over a selection removes it");
+        typing.KeyDown(VirtualKey.Back, true, false, false);
+        Equal(view.Take(), "replace 0:0 0:2 ''; width 0", "and so does Ctrl+Backspace");
+        view.Selected = false;
+
+        Check(typing.KeyDown(VirtualKey.C, true, false, false) == TypingKeyResult.Handled && view.Take() == "copy True", "Ctrl+C copies (the line without a selection)");
+        view.CopyLine = false;
+        Check(typing.KeyDown(VirtualKey.Insert, true, false, false) == TypingKeyResult.Handled && view.Take() == "copy False", "Ctrl+Insert copies too");
+        Check(typing.KeyDown(VirtualKey.V, true, false, false) == TypingKeyResult.Handled && view.Take() == "paste", "Ctrl+V pastes");
+        Check(typing.KeyDown(VirtualKey.Insert, false, false, true) == TypingKeyResult.Handled && view.Take() == "paste", "Shift+Insert pastes");
+        Check(typing.KeyDown(VirtualKey.X, true, false, false) == TypingKeyResult.Handled && view.Take() == "cut", "Ctrl+X cuts");
+        Check(typing.KeyDown(VirtualKey.Delete, false, false, true) == TypingKeyResult.Handled && view.Take() == "cut", "Shift+Delete cuts (and deletes nothing first)");
+        Check(typing.KeyDown(VirtualKey.Z, true, false, false) == TypingKeyResult.Handled && view.Take() == "undo", "Ctrl+Z undoes");
+        Check(typing.KeyDown(VirtualKey.Z, true, false, true) == TypingKeyResult.Handled && view.Take() == "redo", "Ctrl+Shift+Z redoes");
+        Check(typing.KeyDown(VirtualKey.Y, true, false, false) == TypingKeyResult.Handled && view.Take() == "redo", "Ctrl+Y redoes");
+        Check(typing.KeyDown(VirtualKey.Z, true, true, false) == TypingKeyResult.None && view.Take() == "", "Ctrl+Alt+Z (AltGr) is not a command");
+        Check(typing.KeyDown(VirtualKey.A, false, false, false) == TypingKeyResult.None && view.Take() == "", "another key is not the typing's");
+        view.Editable = false;
+        Check(typing.KeyDown(VirtualKey.Z, true, false, false) == TypingKeyResult.None && view.Take() == "", "a text that cannot be edited takes no key");
+        view.Editable = true;
+
+        view = new EditView("l0", "l1", "l2", "l3");
+        typing = new TextTyping(view);
+        typing.RemoveLines(1, 2);
+        Equal(view.Take(), "replace 1:0 3:0 ''", "lines before the last go with their line breaks");
+        typing.RemoveLines(2, 3);
+        Equal(view.Take(), "replace 1:2 3:2 ''", "the last lines go with the line break before them");
+        typing.RemoveLines(1, 3);
+        Equal(view.Take(), "replace 0:2 3:2 ''", "from the second line: the line break of the first");
+        typing.RemoveLines(0, 3);
+        Equal(view.Take(), "replace 0:0 3:2 ''", "all lines");
+        typing.DeleteSelection();
+        Equal(view.Take(), "", "DeleteSelection without a selection does nothing");
+        view.Selected = true;
+        view.Anchor = At(0, 1);
+        view.Caret = At(1, 1);
+        typing.DeleteSelection();
+        Equal(view.Take(), "replace 1:1 0:1 ''; width 1", "DeleteSelection removes it");
+        view.Editable = false;
+        typing.DeleteSelection();
+        Equal(view.Take(), "", "not in a text that cannot be edited");
+        view.Editable = true;
+        typing.InsertText("ins");
+        Equal(view.Take(), "replace 1:1 0:1 'ins'", "InsertText over the selection");
+        view.Selected = false;
+        typing.InsertText("ins");
+        Equal(view.Take(), "replace 1:1 0:1 select 'ins'", "InsertText at the caret");
+
+        view = new EditView("alpha beta_2 gamma");
+        typing = new TextTyping(view);
+        List<string> words = new List<string>();
+        foreach (int column in new[] { 0, 3, 5, 6, 12, 18 })
+        {
+            view.Caret = At(0, column);
+            string word = typing.GetWordAtCaret(out int start, out int length);
+            words.Add(column + ":" + (word ?? "null") + "/" + start + "+" + length);
+        }
+        Equal(string.Join(" ", words), "0:null/-1+0 3:alpha/0+5 5:alpha/0+5 6:beta_2/6+6 12:beta_2/6+6 18:gamma/13+5", "the word at the caret");
+        view.Caret = At(0, 8);
+        typing.ReplaceWordAtCaret("B");
+        Equal(view.Take(), "replace 0:6 0:12 'B'", "the word at the caret is replaced");
+        view.Caret = At(0, 0);
+        typing.ReplaceWordAtCaret("B");
+        Equal(view.Take(), "replace 0:0 0:0 select 'B'", "no word: the text is inserted");
+        view = new EditView("a  b");
+        typing = new TextTyping(view);
+        view.Caret = At(0, 2);
+        typing.ReplaceWordAtCaret("B");
+        Equal(view.Take(), "replace 0:2 0:0 select 'B'", "between blanks: inserted");
+        bool thrown = false;
+        try
+        {
+            new TextTyping(null);
+        }
+        catch (ArgumentNullException)
+        {
+            thrown = true;
+        }
+        Check(thrown, "the typing needs its editor");
+    }
+
     private static int Main()
     {
         try
@@ -603,6 +1057,8 @@ internal static class Program
             Selection();
             Undo();
             Indents();
+            EditCommands();
+            Typing();
         }
         catch (Exception exception)
         {
