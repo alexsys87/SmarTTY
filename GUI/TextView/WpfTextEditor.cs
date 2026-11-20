@@ -1,4 +1,5 @@
 using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -18,11 +19,13 @@ namespace SmarTTY.GUI.TextView;
 /// <see cref="TextTyping"/>: the code the WinForms view (<c>Controls/TextEditorControl</c>) runs. The layout and the mouse selection are
 /// <see cref="TextViewLayout"/> and <see cref="TextPointer"/>. It draws itself in whole pixels of the device: the layout counts in device pixels,
 /// the drawing is scaled back by the DPI, and every row is one <see cref="GlyphRun"/> a colour on the grid of the characters of a monospaced font.
-/// Not in it yet: the syntax colours, the folds, the inline messages, the completion, the marks of the blanks, the search highlights, characters
-/// that the font has no glyph for (they are drawn as "?") and characters of two cells; it is tried in Tools > WPF text editor lab
-/// (<see cref="TextLabWindow"/>) before it goes into the editor tab.
+/// The syntax colours, the folds and the inline messages are those of <c>CodeEditorPP</c> (3D-3 to 3D-5), the word list and the parameter hint
+/// are <see cref="EditorCompletion"/> with WPF windows (<see cref="WpfSuggestionList"/>, <see cref="WpfHintView"/>, 3D-6).
+/// Not in it yet: the marks of the blanks, the search highlights, characters that the font has no glyph for (they are drawn as "?") and
+/// characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
 /// </summary>
-internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost
+internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost, IEditorCompletionHost,
+    IWpfSuggestionHost
 {
     // What a word is for Ctrl+Left/Right, a double click and Ctrl+Backspace (as ReadonlyTextBrowser.IsWordChar).
     private const string WordCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -42,6 +45,12 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     private readonly TextTyping _typing;
 
     private readonly TextPointer _pointer;
+
+    // The word list and the parameter hint, with the rules of CodeEditorPP.
+    private readonly EditorCompletion _completion;
+
+    // The word list the completion made last (it makes a new one each time it opens the list).
+    private WpfSuggestionList _suggestionList;
 
     // The tokens of the syntax of the lines (as CodeEditorPP keeps them) and the colours of the token types (none: the colour of the text).
     private readonly TokenCache _tokens = new TokenCache();
@@ -141,6 +150,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _history = new UndoHistory(OnModifiedChanged);
         _replace = new TextReplace(this, _history);
         _typing = new TextTyping(this);
+        _completion = new EditorCompletion(this);
         _pointer = new TextPointer(_selection, _navigator, () => _document);
         _tokens.SetDocument(_document, null);
         _folding = new FoldingManager(_tokens);
@@ -412,6 +422,44 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     }
 
     /// <summary>The font: a monospaced family and its size in points (before the scale of the monitor).</summary>
+    /// <summary>Enables the word list (Ctrl+Space and, with <see cref="CompletionOnTyping"/>, typing) and the parameter hint.</summary>
+    public bool CompletionEnabled
+    {
+        get => _completion.Enabled;
+        set => _completion.Enabled = value;
+    }
+
+    /// <summary>Opens the word list by itself once a couple of letters of an identifier have been typed.</summary>
+    public bool CompletionOnTyping
+    {
+        get => _completion.OnTyping;
+        set => _completion.OnTyping = value;
+    }
+
+    /// <summary>The words of this language are offered by the word list.</summary>
+    public SyntaxHighlighting.Language CompletionLanguage
+    {
+        get => _completion.Language;
+        set => _completion.Language = value;
+    }
+
+    /// <summary>The standard API symbols offered in the list and used by the hint; null: keywords and the words of the text only.</summary>
+    public ApiSymbolDatabase ApiSymbols
+    {
+        get => _completion.ApiSymbols;
+        set => _completion.ApiSymbols = value;
+    }
+
+    public bool IsSuggestionVisible => _completion.IsSuggestionVisible;
+
+    public bool IsSignatureHintVisible => _completion.IsSignatureHintVisible;
+
+    /// <summary>Opens the word list for the word the caret is in (Ctrl+Space).</summary>
+    public void ShowCompletion()
+    {
+        _completion.ShowCompletion();
+    }
+
     public void SetFont(string familyName, double sizeInPoints)
     {
         _fontFamily = string.IsNullOrEmpty(familyName) ? "Courier New" : familyName;
@@ -660,6 +708,28 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         bool shift = (modifiers & ModifierKeys.Shift) != 0;
         bool alt = (modifiers & ModifierKeys.Alt) != 0;
         VirtualKey virtualKey = (VirtualKey)KeyInterop.VirtualKeyFromKey(key);
+        // The open word list takes its keys first, as the WinForms list, which has the keyboard while it is open, does.
+        if (_suggestionList != null && _suggestionList.IsVisible
+            && _suggestionList.HandleKey(virtualKey, () => ((IEditorCompletionHost)this).CurrentText, out bool typeBlank))
+        {
+            if (typeBlank)
+            {
+                TypeCharacters(" ");
+            }
+            e.Handled = true;
+            return;
+        }
+        // The key binding of CodeEditorPP: Ctrl+Space opens the word list.
+        if (virtualKey == VirtualKey.Space && control && !shift && !alt)
+        {
+            _completion.ShowCompletion();
+            e.Handled = true;
+            return;
+        }
+        if (virtualKey == VirtualKey.Escape)
+        {
+            _completion.OnEscape();
+        }
         // The edit keys and the Ctrl and Shift chords first, then the view's keys, as in TextEditorControl and its base class.
         TypingKeyResult result = _typing.KeyDown(virtualKey, control, alt, shift);
         bool handled = (result & TypingKeyResult.Handled) != 0 || (virtualKey == VirtualKey.Delete && !shift);
@@ -674,6 +744,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                         int firstRow = _layout.FirstRow;
                         SetFirstRow(firstRow + (virtualKey == VirtualKey.Up ? -1 : 1));
                         e.Handled = _layout.FirstRow != firstRow;
+                        _completion.AfterKeyDown(virtualKey);
                         return;
                     }
                 case VirtualKey.A:
@@ -712,6 +783,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             if (typed != '\0')
             {
                 _typing.TypeCharacter(typed, shift);
+                _completion.AfterKeyPress(typed);
                 handled = true;
             }
         }
@@ -721,6 +793,19 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             e.Handled = true;
             AfterEdit();
         }
+        // As CodeEditorPP after its base class: the keys that move the caret or delete look at the call the caret is in.
+        _completion.AfterKeyDown(virtualKey);
+    }
+
+    // Characters typed as the WinForms view gets them as KeyPress: the edit, then the word list follows the typed word.
+    private void TypeCharacters(string text)
+    {
+        foreach (char character in text)
+        {
+            _typing.TypeCharacter(character, false);
+            _completion.AfterKeyPress(character);
+        }
+        AfterEdit();
     }
 
     // The navigation keys of ReadonlyTextBrowser.OnKeyDown: without Shift the selection goes, with Shift it starts at the caret or goes on.
@@ -777,6 +862,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 continue;
             }
             _typing.TypeCharacter(character, false);
+            _completion.AfterKeyPress(character);
             typed = true;
         }
         if (typed)
@@ -798,6 +884,9 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     {
         base.OnLostKeyboardFocus(e);
         _caretTimer.Stop();
+        // The hint closes as in CodeEditorPP; the list closes too, as the WinForms list does when its window is left.
+        _completion.OnLostFocus();
+        _completion.HideCompletion();
         InvalidateVisual();
     }
 
@@ -826,6 +915,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             return;
         }
         Focus();
+        // A click in the text closes the word list, as the WinForms list closes when its window is left.
+        _completion.HideCompletion();
         DevicePoint(e.GetPosition(this), out int x, out int y);
         if (x >= _layout.VisibleWidth || y >= _layout.VisibleHeight)
         {
@@ -1143,10 +1234,96 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     void ITextTypingHost.OnCharTyping(char ch, ref string text, ref TextDocument.TextPosition textPosition)
     {
+        _completion.OnCharTyping(ch, (Keyboard.Modifiers & ModifierKeys.Control) != 0);
     }
 
     void ITextTypingHost.OnCharTyped(char ch, TextDocument.TextPosition textPosition)
     {
+        _completion.OnCharTyped(ch, (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+    }
+
+    // ---- completion
+
+    EditableTextDocument IEditorCompletionHost.Document => _document;
+
+    TextDocument.TextPosition IEditorCompletionHost.CaretPosition => _caret;
+
+    string IEditorCompletionHost.CurrentText
+    {
+        get
+        {
+            if (_document == null || _caret.Line == -1)
+            {
+                return null;
+            }
+            return _typing.GetWordAtCaret(out _, out _) ?? "";
+        }
+    }
+
+    RgbColor IEditorCompletionHost.SuggestionBackColor => _backColor;
+
+    ISuggestionPopupFactory IEditorCompletionHost.CreatePopupFactory()
+    {
+        return new ListFactory(this);
+    }
+
+    IHintView IEditorCompletionHost.CreateHintView()
+    {
+        return new WpfHintView(this);
+    }
+
+    void IEditorCompletionHost.FocusView()
+    {
+        Focus();
+    }
+
+    bool IEditorCompletionHost.IsWordSeparator(char ch)
+    {
+        return WordCharacters.IndexOf(ch) == -1;
+    }
+
+    UIElement IWpfSuggestionHost.PlacementTarget => this;
+
+    Rect IWpfSuggestionHost.CaretBounds
+    {
+        get
+        {
+            _layout.PositionToPoint(_caret, out int x, out int y);
+            return new Rect(x / _scale, y / _scale, _layout.CharWidth / _scale, _layout.RowHeight / _scale);
+        }
+    }
+
+    RgbColor IWpfSuggestionHost.ItemForeColor => _foreColor;
+
+    FontFamily IWpfSuggestionHost.ItemFontFamily => new FontFamily(_fontFamily);
+
+    double IWpfSuggestionHost.ItemFontSize => _fontPoints * 96.0 / 72.0;
+
+    void IWpfSuggestionHost.AcceptSuggestion(ISuggestion suggestion, VirtualKey key)
+    {
+        // As CodeEditorPP.OnSuggestionAccepted: the word replaces the one at the caret.
+        if (suggestion != null && !_readOnly)
+        {
+            _typing.ReplaceWordAtCaret(suggestion.DisplayName);
+            AfterEdit();
+        }
+    }
+
+    // Keeps the list the completion made, so that the keys can reach it.
+    private sealed class ListFactory : ISuggestionPopupFactory
+    {
+        private readonly WpfTextEditor _editor;
+
+        public ListFactory(WpfTextEditor editor)
+        {
+            _editor = editor;
+        }
+
+        public ISuggestionPopup Create(ISuggestionSource suggestionSource, bool allowMultiSelect)
+        {
+            _editor._suggestionList = new WpfSuggestionList(_editor, suggestionSource, allowMultiSelect);
+            return _editor._suggestionList;
+        }
     }
 
     // ---- layout and scrolling
@@ -1242,6 +1419,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _layout.FirstRow = _layout.ClampFirstRow((int)Math.Round(_verticalBar.Value));
         _layout.ScrollX = _layout.ClampScrollX((int)Math.Round(_horizontalBar.Value));
         InvalidateVisual();
+        // As CodeEditorPP.OnScroll: the hint follows the caret.
+        _completion.RepositionHint();
     }
 
     private void SetFirstRow(int row)
@@ -1257,6 +1436,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             _updatingScrollBars = false;
         }
         InvalidateVisual();
+        _completion?.RepositionHint();
     }
 
     private void UpdateScrollBars()
@@ -1315,6 +1495,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             _updatingScrollBars = false;
         }
         InvalidateVisual();
+        _completion?.RepositionHint();
     }
 
     // ---- changes

@@ -1,4 +1,5 @@
 using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
@@ -58,6 +59,10 @@ internal sealed class TextLabWindow : Window
         _editor.InsertSpaces = settings.Editor.InsertSpaces;
         _editor.WordWrap = settings.Editor.WordWrap;
         _editor.ShowLineNumbers = settings.Editor.ShowLineNumbers;
+        // The completion as MainWindowController sets it on the editor of a tab.
+        _editor.CompletionEnabled = settings.Editor.Autocompletion;
+        _editor.CompletionOnTyping = settings.Editor.AutocompletionOnTyping;
+        _editor.ApiSymbols = settings.Editor.ApiSymbols ? ApiSymbolDatabase.Load() : null;
         _editor.Document = new EditableTextDocument(new[] { "/* Open a file, or type here: the text is never saved. */", "#include <stdio.h>", "int main(void) { return printf(\"%d\\n\", 42) > 0; } // C", "\tA tab,", "    four spaces,", "and a long line that goes on " + string.Concat(Enumerable.Repeat("and on ", 30)) + "to the end." }, TextDocument.LineEnding.CrLf);
         _editor.IsModified = false;
 
@@ -70,6 +75,12 @@ internal sealed class TextLabWindow : Window
         numbers.Click += (sender, e) => _editor.ShowLineNumbers = numbers.IsChecked == true;
         CheckBox spaces = Option("Insert spaces", _editor.InsertSpaces);
         spaces.Click += (sender, e) => _editor.InsertSpaces = spaces.IsChecked == true;
+        CheckBox completion = Option("Completion", _editor.CompletionEnabled);
+        completion.ToolTip = "The word list (Ctrl+Space) and the parameter hint";
+        completion.Click += (sender, e) => _editor.CompletionEnabled = completion.IsChecked == true;
+        CheckBox onTyping = Option("On typing", _editor.CompletionOnTyping);
+        onTyping.ToolTip = "The word list opens by itself after two letters of a word";
+        onTyping.Click += (sender, e) => _editor.CompletionOnTyping = onTyping.IsChecked == true;
         ComboBox tabSize = new ComboBox { MinWidth = 50, ToolTip = "Tab size" };
         foreach (int size in TabSizes)
         {
@@ -88,12 +99,14 @@ internal sealed class TextLabWindow : Window
             }
         };
 
-        StackPanel tools = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6) };
+        WrapPanel tools = new WrapPanel { Margin = new Thickness(6) };
         tools.Children.Add(open);
         tools.Children.Add(_readOnly);
         tools.Children.Add(wrap);
         tools.Children.Add(numbers);
         tools.Children.Add(spaces);
+        tools.Children.Add(completion);
+        tools.Children.Add(onTyping);
         tools.Children.Add(new TextBlock { Text = "Tab size:", Margin = new Thickness(10, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
         tools.Children.Add(tabSize);
         foreach (SyntaxHighlighting.Language language in SyntaxHighlighting.SelectableLanguages)
@@ -209,6 +222,8 @@ internal sealed class TextLabWindow : Window
     // The tokenizer of the language and the colours of the token types of the settings, in the order MainWindowController gives them to the editor.
     private void ApplySyntax(SyntaxHighlighting.Language language)
     {
+        // As RemoteFileEditor: the word list offers the words of the syntax of the file.
+        _editor.CompletionLanguage = language;
         TokenCache.LineTokenizer tokenizer = SyntaxHighlighting.GetTokenizer(language);
         if (tokenizer == null)
         {
