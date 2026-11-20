@@ -20,35 +20,43 @@ internal partial class SuggestionListView : ListView
             if (msg.Msg == 256 || msg.Msg == 260)
             {
                 Keys keys = (Keys)(long)msg.WParam;
-                if (HandleKey(keys))
+                ISuggestion suggestion = (ISuggestion)(FocusedItem?.Tag);
+                switch (SuggestionListMatch.MapKey(keys.ToVirtualKey(), suggestion, () => Host.CurrentText))
                 {
-                    return true;
-                }
-                if (keys == Keys.Left || keys == Keys.Right || keys == Keys.Home || keys == Keys.End || keys == Keys.Delete || keys == Keys.Tab)
-                {
-                    Host.ForwardMessage(msg);
-                    switch (keys)
-                    {
-                        case Keys.Home:
-                            if (Items.Count > 0)
-                            {
-                                SelectedItems.Clear();
-                                Items[0].Selected = true;
-                                FocusedItem = Items[0];
-                                FocusedItem.EnsureVisible();
-                            }
-                            break;
-                        case Keys.End:
-                            if (Items.Count > 0)
-                            {
-                                SelectedItems.Clear();
-                                Items[Items.Count - 1].Selected = true;
-                                FocusedItem = Items[Items.Count - 1];
-                                FocusedItem.EnsureVisible();
-                            }
-                            break;
-                    }
-                    return true;
+                    case SuggestionListKeyAction.Hide:
+                        Parent.Hide();
+                        return true;
+                    case SuggestionListKeyAction.HideAndTypeBlank:
+                        Parent.Hide();
+                        Host.ForwardMessage(Message.Create(Host.HostControl.Handle, 258, (IntPtr)32, IntPtr.Zero));
+                        return true;
+                    case SuggestionListKeyAction.Accept:
+                        Parent.Hide();
+                        Host.AcceptSuggestion(suggestion, keys);
+                        return true;
+                    case SuggestionListKeyAction.Forward:
+                        Host.ForwardMessage(msg);
+                        return true;
+                    case SuggestionListKeyAction.ForwardAndSelectFirst:
+                        Host.ForwardMessage(msg);
+                        if (Items.Count > 0)
+                        {
+                            SelectedItems.Clear();
+                            Items[0].Selected = true;
+                            FocusedItem = Items[0];
+                            FocusedItem.EnsureVisible();
+                        }
+                        return true;
+                    case SuggestionListKeyAction.ForwardAndSelectLast:
+                        Host.ForwardMessage(msg);
+                        if (Items.Count > 0)
+                        {
+                            SelectedItems.Clear();
+                            Items[Items.Count - 1].Selected = true;
+                            FocusedItem = Items[Items.Count - 1];
+                            FocusedItem.EnsureVisible();
+                        }
+                        return true;
                 }
             }
             if (msg.Msg == 258)
@@ -58,38 +66,6 @@ internal partial class SuggestionListView : ListView
             }
         }
         return base.PreProcessMessage(ref msg);
-    }
-
-    private bool HandleKey(Keys keys)
-    {
-        switch (keys)
-        {
-            case Keys.Menu:
-            case Keys.Escape:
-                Parent.Hide();
-                return true;
-            case Keys.Tab:
-            case Keys.Return:
-            case Keys.Space:
-                if (Host != null)
-                {
-                    ISuggestion suggestion = (ISuggestion)(FocusedItem?.Tag);
-                    if (suggestion == null)
-                    {
-                        return false;
-                    }
-                    Parent.Hide();
-                    if (keys == Keys.Space && (Host.CurrentText.Length > suggestion.DisplayName.Length || suggestion.DisplayName.Substring(0, Host.CurrentText.Length) != Host.CurrentText))
-                    {
-                        Host.ForwardMessage(Message.Create(Host.HostControl.Handle, 258, (IntPtr)32, IntPtr.Zero));
-                        return true;
-                    }
-                    Host.AcceptSuggestion(suggestion, keys);
-                }
-                return true;
-            default:
-                return false;
-        }
     }
 
     protected override void OnDoubleClick(EventArgs e)

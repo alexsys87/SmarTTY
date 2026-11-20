@@ -115,39 +115,6 @@ internal partial class SuggestionListForm : Form
         listView1.Focus();
     }
 
-    private string[] SplitWords(string text)
-    {
-        int start = 0;
-        List<string> words = new List<string>();
-        int i;
-        for (i = 0; i < text.Length; i++)
-        {
-            if (char.IsUpper(text[i]) || i == 0 || char.IsDigit(text[i]))
-            {
-                if (start < i)
-                {
-                    words.Add(text.Substring(start, i - start));
-                }
-                start = i;
-            }
-            else if (text[i] == '_')
-            {
-                if (start < i)
-                {
-                    words.Add(text.Substring(start, i - start));
-                }
-                for (start = i + 1; start < text.Length && text[start] != '_'; start++)
-                {
-                }
-            }
-        }
-        if (start < i)
-        {
-            words.Add(text.Substring(start, i - start));
-        }
-        return words.ToArray();
-    }
-
     private void ResetFilter(string prefix)
     {
         if (!_isFiltered)
@@ -164,139 +131,28 @@ internal partial class SuggestionListForm : Form
         SelectMatch(prefix, allowSubstrings: false);
     }
 
-    private void AddSubstringMatches(string filterText, List<ListViewItem> matches)
-    {
-        for (int i = 0; i < listView1.Items.Count; i++)
-        {
-            if (listView1.Items[i].Text.IndexOf(filterText) != -1 && !matches.Contains(listView1.Items[i]))
-            {
-                matches.Add(listView1.Items[i]);
-            }
-        }
-        for (int i = 0; i < listView1.Items.Count; i++)
-        {
-            if (listView1.Items[i].Text.IndexOf(filterText, StringComparison.CurrentCultureIgnoreCase) != -1 && !matches.Contains(listView1.Items[i]))
-            {
-                matches.Add(listView1.Items[i]);
-            }
-        }
-    }
-
-    private ListViewItem AddAbbreviationMatches(string prefix, List<ListViewItem> matches)
-    {
-        List<ListViewItem> exactAbbrev = new List<ListViewItem>();
-        List<ListViewItem> prefixAbbrev = new List<ListViewItem>();
-        List<ListViewItem> exactWord = new List<ListViewItem>();
-        List<ListViewItem> prefixWord = new List<ListViewItem>();
-        for (int i = 0; i < listView1.Items.Count; i++)
-        {
-            string[] words = SplitWords(listView1.Items[i].Text);
-            string abbrev = "";
-            foreach (string word in words)
-            {
-                abbrev += char.ToUpper(word[0]);
-            }
-            foreach (string word in words)
-            {
-                if (StringComparer.CurrentCultureIgnoreCase.Compare(word, prefix) == 0)
-                {
-                    exactWord.Add(listView1.Items[i]);
-                }
-                if (word.StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    prefixWord.Add(listView1.Items[i]);
-                }
-            }
-            if (abbrev == prefix)
-            {
-                exactAbbrev.Add(listView1.Items[i]);
-            }
-            if (abbrev.StartsWith(prefix))
-            {
-                prefixAbbrev.Add(listView1.Items[i]);
-            }
-        }
-        ListViewItem bestMatch = null;
-        if (exactAbbrev.Count > 0)
-        {
-            bestMatch = exactAbbrev[0];
-        }
-        else if (exactWord.Count > 0)
-        {
-            bestMatch = exactWord[0];
-        }
-        foreach (ListViewItem item in exactAbbrev)
-        {
-            if (!matches.Contains(item))
-            {
-                matches.Add(item);
-            }
-        }
-        foreach (ListViewItem item in prefixAbbrev)
-        {
-            if (!matches.Contains(item))
-            {
-                matches.Add(item);
-            }
-        }
-        foreach (ListViewItem item in exactWord)
-        {
-            if (!matches.Contains(item))
-            {
-                matches.Add(item);
-            }
-        }
-        foreach (ListViewItem item in prefixWord)
-        {
-            if (!matches.Contains(item))
-            {
-                matches.Add(item);
-            }
-        }
-        return bestMatch;
-    }
-
     internal void SelectMatch(string prefix, bool allowSubstrings)
     {
-        int nearestIdx = 0;
+        List<string> names = new List<string>();
         for (int i = 0; i < listView1.Items.Count; i++)
         {
-            if (Comparer.Compare(listView1.Items[i].Text, prefix) == 0)
+            names.Add(listView1.Items[i].Text);
+        }
+        SuggestionMatch match = SuggestionListMatch.Find(names, prefix, allowSubstrings, Comparer);
+        if (match.Kind == SuggestionMatchKind.Item)
+        {
+            SelectIndex(match.Index);
+            ResetFilter(prefix);
+            return;
+        }
+        if (match.Kind == SuggestionMatchKind.Filtered)
+        {
+            List<ListViewItem> matches = new List<ListViewItem>();
+            foreach (int index in match.Matches)
             {
-                SelectIndex(i);
-                ResetFilter(prefix);
-                return;
+                matches.Add(listView1.Items[index]);
             }
-        }
-        for (int i = 0; i < listView1.Items.Count; i++)
-        {
-            string itemText = listView1.Items[i].Text;
-            if (Comparer.Compare(itemText, prefix) < 0)
-            {
-                nearestIdx = i;
-            }
-            if (itemText.Length >= prefix.Length && Comparer.Compare(itemText.Substring(0, prefix.Length), prefix) == 0)
-            {
-                SelectIndex(i);
-                ResetFilter(prefix);
-                return;
-            }
-        }
-        List<ListViewItem> matches = new List<ListViewItem>();
-        ListViewItem bestMatch = null;
-        if (allowSubstrings)
-        {
-            bestMatch = AddAbbreviationMatches(prefix, matches);
-            AddSubstringMatches(prefix, matches);
-        }
-        int topCount = 0;
-        if (bestMatch != null)
-        {
-            matches.Remove(bestMatch);
-            matches.Insert(0, bestMatch);
-        }
-        if (matches.Count != 0)
-        {
+            int topCount = 0;
             foreach (ListViewItem item in matches)
             {
                 item.Remove();
@@ -315,7 +171,7 @@ internal partial class SuggestionListForm : Form
         else
         {
             ResetFilter(prefix);
-            SelectIndex(nearestIdx);
+            SelectIndex(match.Index);
         }
     }
 
