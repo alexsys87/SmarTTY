@@ -394,7 +394,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private void TftpFirmware_Click(object sender, RoutedEventArgs e)
     {
-        DeviceTerminalControl terminal = Controller.ActiveSession?.DeviceTab?.Terminal;
+        SmarTTY.GUI.DevicePanel.WpfDeviceTerminal terminal = Controller.ActiveSession?.DeviceTab?.Terminal;
         if (terminal == null)
         {
             return;
@@ -414,6 +414,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         try
         {
             CommandCompletionsEditorWindow.Open(this);
+        }
+        catch (Exception exception)
+        {
+            MessageBoxes.Exception(exception);
+        }
+    }
+
+    private void TerminalLab_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            new TerminalLabWindow { Owner = this }.Show();
         }
         catch (Exception exception)
         {
@@ -1206,7 +1218,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 activeSession.UploadAndInstallLocalPackages(packageManagerWindow2.LocalInstall);
                 return;
             }
-            if (accepted && packageManagerWindow2.CommandLine != null && (!(activeSession.ActiveTab.EditorControl is SshTerminalControl sshTerminalControl) || !sshTerminalControl.Submit(packageManagerWindow2.CommandLine)))
+            if (accepted && packageManagerWindow2.CommandLine != null && (!((activeSession.ActiveTab as NormalTabContext)?.Terminal is SmarTTY.GUI.TerminalView.WpfSmartTerminal smartTerminal) || !smartTerminal.Submit(packageManagerWindow2.CommandLine)))
             {
                 activeSession.CreateNewTerminalPage(virtualMode: false, new InitialCommand(packageManagerWindow2.CommandLine, echoInitialCommand: true, tabKeptAfterExit: () => ShowPackageManager(activeSession)));
             }
@@ -1231,39 +1243,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
                 return;
             }
         }
-        // COM/TCP tabs follow the same F10 and Alt+letter rules as SSH terminals (the shared "Action for Alt+letter" option).
-        ITabContext activeTab = Controller.ActiveSession?.ActiveTab;
-        if ((activeTab?.EditorControl as TerminalEmulatorControl ?? (activeTab as DeviceTabContext)?.Terminal.FocusedTextTerminal) is TerminalEmulatorControl terminalEmulatorControl)
-        {
-            if ((int)e.Key == 156 && (int)e.SystemKey == 99)
-            {
-                ((RoutedEventArgs)e).Handled = true;
-                terminalEmulatorControl?.SendKey(new System.Windows.Forms.KeyEventArgs(Keys.F10));
-            }
-            if ((int)e.Key == 156 && (int)e.SystemKey != 120 && (int)e.SystemKey != 116)
-            {
-                char ch = '\0';
-                bool shift = e.KeyboardDevice != null && (e.KeyboardDevice.Modifiers & ModifierKeys.Shift) != 0;
-                if ((int)e.SystemKey >= 44 && (int)e.SystemKey <= 69)
-                {
-                    // Alt+Shift+letter sends ESC and the capital letter (Meta-B is not Meta-b in readline).
-                    int value = (int)e.SystemKey - 44;
-                    ch = (char)((shift ? 65 : 97) + value);
-                }
-                else if ((int)e.SystemKey >= 34 && (int)e.SystemKey <= 43 && !shift)
-                {
-                    // Alt+digit (Key.D0..Key.D9). With Alt held the key arrives as Key.System, so the digit must be
-                    // read from SystemKey; checking Key never matched and Alt+digit was never sent.
-                    int currentValue = (int)e.SystemKey - 34;
-                    ch = (char)(48 + currentValue);
-                }
-                if (ch != '\0' && terminalEmulatorControl != null && terminalEmulatorControl.SendAltChar(ch))
-                {
-                    ((RoutedEventArgs)e).Handled = true;
-                    return;
-                }
-            }
-        }
+        // F10 and Alt+letter reach the WPF terminals of every tab as keys (TerminalKeyEncoder: the shared "Action for Alt+letter" option).
         base.OnPreviewKeyDown(e);
     }
 }

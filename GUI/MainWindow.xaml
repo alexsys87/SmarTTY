@@ -307,6 +307,7 @@
             <Image Source="../icons/edit16.png" />
           </MenuItem.Icon>
         </MenuItem>
+        <MenuItem Header="WPF _terminal lab (experimental)..." Click="TerminalLab_Click" ToolTip="The new WPF terminal view on its own: speed scripts, a mirror of a classic terminal tab for trying the keyboard and the IME, and how WPF renders here (GPU, software, Remote Desktop)" />
         <MenuItem Header="_Settings" Click="Settings_Click">
           <MenuItem.Icon>
             <Image Source="../icons/MainWindow/settings.png" />

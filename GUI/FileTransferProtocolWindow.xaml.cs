@@ -1,3 +1,4 @@
+using SmarTTY.GUI.DevicePanel;
 using SmarTTY.Controls;
 using System;
 using System.IO;

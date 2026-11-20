@@ -4,7 +4,7 @@ namespace SmarTTY.Controls;
 /// The "Tools -> TFTP server / U-Boot upload" window of a device terminal: it serves a firmware file over TFTP and
 /// types the U-Boot commands into the terminal's connection that make the board fetch it. The device terminal is
 /// compiled by the Mono test harness, which cannot reference the themed WPF window, so the window is injected
-/// through <see cref="DeviceTerminalControl.TftpFirmwareWindowFactory"/>.
+/// through <c>WpfDeviceTerminal.TftpFirmwareWindowFactory</c>.
 /// </summary>
 public interface ITftpFirmwareWindow
 {

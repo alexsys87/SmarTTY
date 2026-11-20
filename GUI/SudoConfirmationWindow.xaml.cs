@@ -1,22 +1,24 @@
+using VisualTTY;
 using System;
 using System.Windows;
 using SmarTTY.Controls;
-using SmarTTY.GUI.Backend;
+using SmarTTY.GUI.TerminalView;
 using SmarTTY.Ssh;
 using SmarTTY.Terminal;
+using SmarTTY.Terminal.Input;
 
 namespace SmarTTY.GUI;
 
 /// <summary>
 /// Shows a password prompt that a <c>sudo</c> command printed on a shell channel, and lets the user type the password
-/// into it. The window embeds the terminal control of the rest of the application, so the prompt looks the same as in
-/// a normal tab; it closes when the command finishes.
+/// into it. The window embeds the WPF terminal of the tabs, so the prompt looks the same as in a normal tab; it closes when
+/// the command finishes.
 /// </summary>
 public partial class SudoConfirmationWindow : Window
 {
     private readonly SshShellChannel _sshShellChannel;
 
-    private readonly TerminalEmulatorControl _terminal;
+    private readonly WpfTerminal _terminal;
 
     private readonly Utf8StreamDecoder _decoder = new Utf8StreamDecoder();
 
@@ -24,40 +26,25 @@ public partial class SudoConfirmationWindow : Window
     {
         InitializeComponent();
         _sshShellChannel = sshShellChannel;
-        _terminal = new TerminalEmulatorControl
+        // The WPF terminal of the tabs, with no bell and no scroll bar; it is a terminal like a tab, so the prompt looks the same.
+        _terminal = new WpfTerminal
         {
-            ActiveBufferIndex = 0,
-            AutoScroll = true,
-            AutoWrap = true,
-            BackColor = System.Drawing.Color.Black,
-            ForeColor = System.Drawing.Color.LightGray,
-            NormalTextColor = System.Drawing.Color.White,
-            BellMode = TerminalEmulatorControl.BeepMode.None,
-            CaptureDialogKeys = false,
-            TabWidth = 8,
-            Dock = System.Windows.Forms.DockStyle.Fill,
-            Font = new System.Drawing.Font("Courier New", 12f),
-            NavigationLocked = true,
-            HideCaret = false,
-            HideMargins = true,
-            HorizontalScrollBarVisible = false,
-            VerticalScrollBarVisible = false,
-            ShowLineNumbers = true,
-            CaretWhenUnfocused = true,
-            ReadOnly = true,
-            Dispatcher = null
+            BellMode = BeepMode.None,
+            ScrollBarVisible = false,
+            CaretWhenUnfocused = true
         };
-        WinFormsHostWrapper host = new WinFormsHostWrapper();
-        host.Child = _terminal;
-        TerminalHost.Content = host;
+        _terminal.View.TerminalFontFamily = new System.Windows.Media.FontFamily("Courier New");
+        _terminal.View.TerminalFontSize = 16;
+        TerminalHost.Content = _terminal;
 
         _terminal.ProcessOutput(promptText + "\r\n");
         sshShellChannel.Finished += OnChannelFinished;
-        sshShellChannel.ResizePty(_terminal.TerminalSize.Width, _terminal.TerminalSize.Height);
+        sshShellChannel.ResizePty(_terminal.GridSize.X, _terminal.GridSize.Y);
         sshShellChannel.DataReceived += OnChannelDataReceived;
         _terminal.DataEntered += OnTerminalInput;
         _terminal.TerminalSizeChanged += OnTerminalSizeChanged;
         sshShellChannel.PollingEnabled = true;
+        Loaded += (sender, e) => _terminal.FocusTerminal();
     }
 
     /// <summary>Shows the prompt; the window closes itself when the command ends.</summary>
@@ -78,12 +65,12 @@ public partial class SudoConfirmationWindow : Window
         _terminal.EnqueueOutput(_decoder.Decode(buffer, offset, count));
     }
 
-    private void OnTerminalInput(object sender, byte[] buffer, TerminalEmulatorControl.InputKind inputKind)
+    private void OnTerminalInput(WpfTerminal sender, byte[] buffer, TerminalInputKind inputKind)
     {
         _sshShellChannel.Input.Write(buffer, 0, buffer.Length);
     }
 
-    private void OnTerminalSizeChanged(TerminalEmulatorControl terminal, int width, int height)
+    private void OnTerminalSizeChanged(WpfTerminal terminal, int width, int height)
     {
         _sshShellChannel.ResizePty(width, height);
     }
@@ -92,6 +79,7 @@ public partial class SudoConfirmationWindow : Window
     {
         _sshShellChannel.Finished -= OnChannelFinished;
         _sshShellChannel.DataReceived -= OnChannelDataReceived;
+        _terminal.Dispose();
         base.OnClosed(e);
     }
 }

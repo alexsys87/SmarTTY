@@ -1799,7 +1799,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     }
 
     // A double click in a terminal selects the line under the mouse instead of a word. Terminals extend this to
-    // rows the line was wrapped onto, and Ctrl selects the visible screen (see TerminalEmulatorBase).
+    // rows the line was wrapped onto, and Ctrl selects the visible screen (the WinForms terminal, TerminalEmulatorBase, did until stage 2).
     protected virtual void SelectTerminalLine(TextDocument.TextPosition textPosition)
     {
         SelectLineRange(textPosition.Line, textPosition.Line);

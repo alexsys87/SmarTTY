@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The goldens of the WinForms terminal on the display model of the WPF terminal: the cases of tests/TerminalSnapshots (removed with the
+       WinForms terminal in stage 2) run on TerminalDisplayModel, the painted colours come from RowRunBuilder and the mouse reports from
+       TerminalInputEncoder, as the WPF view makes them. TerminalModelGolden.txt and TerminalCellColorsGolden.txt were written by that stand on
+       the WinForms control (its record-model option), TerminalMouseGolden.txt is its mouse golden; none is ever recorded again. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Terminal/Emulation/*.cs" />
+    <Compile Include="../../Terminal/Rendering/*.cs" />
+    <Compile Include="../../Terminal/AnsiEscapeUtils.cs" Link="AnsiEscapeUtils.cs" />
+    <Compile Include="../../Terminal/CsiRepeatLimit.cs" Link="CsiRepeatLimit.cs" />
+    <Compile Include="../../Terminal/DecCharsets.cs" Link="DecCharsets.cs" />
+    <Compile Include="../../Terminal/PrivateModeTable.cs" Link="PrivateModeTable.cs" />
+    <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
+    <Compile Include="../../Terminal/XtermProtocol.cs" Link="XtermProtocol.cs" />
+    <Compile Include="../../Terminal/ByteColumns.cs" Link="ByteColumns.cs" />
+    <Compile Include="../../Terminal/Utf8StreamDecoder.cs" Link="Utf8StreamDecoder.cs" />
+    <Compile Include="../../Terminal/OutputLinkScanner.cs" Link="OutputLinkScanner.cs" />
+    <Compile Include="../../Terminal/DiagnosticHighlighter.cs" Link="DiagnosticHighlighter.cs" />
+    <Compile Include="../../Terminal/BuildDirectories.cs" Link="BuildDirectories.cs" />
+    <Compile Include="../../CodeEditing/CompilerColumns.cs" Link="CompilerColumns.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/EnumDisplayText.cs" Link="EnumDisplayText.cs" />
+    <Compile Include="../../Utilities/UrlLinks.cs" Link="UrlLinks.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <Compile Include="../../TextEditing/TextMatcher.cs" Link="TextMatcher.cs" />
+    <Compile Include="../../Terminal/InputRegionMap.cs" Link="InputRegionMap.cs" />
+    <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
+    <Compile Include="../../TextEditing/GridPoint.cs" Link="GridPoint.cs" />
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+    <Compile Include="../../TextEditing/LineEndingDetector.cs" Link="LineEndingDetector.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="TerminalModelGolden.txt;TerminalCellColorsGolden.txt;TerminalMouseGolden.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
