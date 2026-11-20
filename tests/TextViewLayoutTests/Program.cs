@@ -477,6 +477,57 @@ internal static class Program
         }
     }
 
+    private static string Runs(TextViewLayout layout, int row, params TextRun[] lineRuns)
+    {
+        return string.Join(" ", layout.RowRuns(row, lineRuns));
+    }
+
+    private static TextRun R(int from, int to, int color) => new TextRun(from, to, color);
+
+    private static void Colors()
+    {
+        FakeView view = new FakeView("int a = 1; // one", "a\tb = c;", "", "xy");
+        TextViewLayout layout = view.Layout;
+        Equal(Runs(layout, 0, R(0, 3, 1), R(8, 9, 4), R(11, 17, 3)), "0-3:1 3-8:-1 8-9:4 9-11:-1 11-17:3", "the runs of a row cover it, the gaps in the colour of the text");
+        Equal(Runs(layout, 0), "0-17:-1", "no runs: the colour of the text");
+        Equal(Runs(layout, 0, null), "0-17:-1", "a null list too");
+        Equal(Runs(layout, 2, R(0, 0, 1)), "", "an empty row has none");
+        Equal(Runs(layout, 1, R(0, 1, 5), R(1, 2, 2), R(2, 3, 5)), "0-1:5 1-4:2 4-5:5 5-10:-1", "a tab takes its columns");
+        Equal(Runs(layout, 1, R(2, 3, 5)), "0-4:-1 4-5:5 5-10:-1", "a run after a tab starts after its columns");
+        Equal(Runs(layout, 0, R(0, 3, 1), R(3, 5, 1)), "0-5:1 5-17:-1", "neighbours of one colour are joined");
+        Equal(Runs(layout, 0, R(0, 4, -1), R(10, 12, -1)), "0-17:-1", "and with the colour of the text");
+        Equal(Runs(layout, 0, R(0, 5, 1), R(3, 8, 2)), "0-5:1 5-8:2 8-17:-1", "a run that goes back over an earlier one is cut");
+        Equal(Runs(layout, 0, R(5, 8, 1), R(2, 4, 2)), "0-5:-1 5-8:1 8-17:-1", "one that lies before is skipped");
+        Equal(Runs(layout, 3, R(0, 99, 6)), "0-2:6", "a run past the end of the line is cut to it");
+        Equal(Runs(layout, 0, R(4, 4, 1)), "0-17:-1", "an empty run adds nothing");
+        view.Text = new EditableTextDocument(new[] { "aaaa bbbb cccc dddd eeee" }, TextDocument.LineEnding.Lf);
+        view.Wrapping = true;
+        Equal(Runs(layout, 0, R(0, 4, 1), R(10, 19, 2), R(20, 24, 3)), "0-4:1 4-10:-1 10-15:2", "a wrapped line: the runs of its first row");
+        Equal(Runs(layout, 1, R(0, 4, 1), R(10, 19, 2), R(20, 24, 3)), "0-4:2 4-5:-1 5-9:3", "of its second row, from the start of the row");
+
+        TextDocument.TextPosition A(int line, int column) => At(line, column);
+        string Changed(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
+        {
+            SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int first, out int removed, out int added);
+            return first + "," + removed + "," + added;
+        }
+        Equal(Changed(A(3, 2), A(3, 5), A(3, 4)), "3,0,0", "an edit within a line: that line");
+        Equal(Changed(A(3, 2), A(5, 1), A(4, 0)), "3,2,1", "across lines: the lines it took and put in");
+        Equal(Changed(A(3, 0), A(3, 0), A(4, 0)), "2,0,1", "a line break put in at the start of a line: from the line before");
+        Equal(Changed(A(0, 0), A(0, 0), A(1, 0)), "0,0,1", "not before the first line");
+        Equal(Changed(A(3, 1), A(3, 1), A(4, 0)), "3,0,1", "a line break put in after the start: from that line");
+        Equal(Changed(A(3, 0), A(3, 0), A(4, 2)), "3,0,1", "a line break and more: from that line");
+        Equal(Changed(A(3, 0), A(3, 0), A(5, 0)), "3,0,2", "two line breaks: from that line");
+        Equal(Changed(A(3, 0), A(4, 0), A(3, 0)), "2,1,0", "an empty line taken out: from the line before");
+        Equal(Changed(A(0, 0), A(1, 0), A(0, 0)), "0,1,0", "not before the first line");
+        Equal(Changed(A(3, 0), A(4, 1), A(3, 0)), "3,1,0", "more than the line taken out: from that line");
+        Equal(Changed(A(3, 5), A(4, 0), A(3, 5)), "3,1,0", "the line break at the end of a line taken out: from that line");
+        Equal(Changed(A(3, 0), A(5, 0), A(3, 0)), "3,2,0", "two lines taken out: from that line");
+        Equal(Changed(A(3, 0), A(4, 0), A(3, 1)), "3,1,0", "a line replaced by a character: from that line");
+        Equal(SyntaxColoring.ColorIndex(3, 8) + " " + SyntaxColoring.ColorIndex(7, 8) + " " + SyntaxColoring.ColorIndex(8, 8) + " " + SyntaxColoring.ColorIndex(0, 8) + " " + SyntaxColoring.ColorIndex(5, 0), "3 7 0 0 -1",
+            "the colour of a token type: its own, the first past them, none without colours");
+    }
+
     private static int Main()
     {
         try
@@ -489,6 +540,7 @@ internal static class Program
             Bars();
             WheelAndDrag();
             Clicks();
+            Colors();
         }
         catch (Exception exception)
         {

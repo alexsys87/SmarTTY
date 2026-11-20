@@ -1,5 +1,6 @@
 using SmarTTY.TextEditing;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -29,6 +30,29 @@ public interface ITextLayoutView
     bool VerticalBarVisible { get; }
 
     bool HorizontalBarVisible { get; }
+}
+
+/// <summary>A part of a line drawn in one colour: from <see cref="From"/> to before <see cref="To"/>, in indexes of the line or in columns of a row.</summary>
+public struct TextRun
+{
+    public int From;
+
+    public int To;
+
+    /// <summary>Which of the colours of the view (-1: the colour of the text).</summary>
+    public int Color;
+
+    public TextRun(int from, int to, int color)
+    {
+        From = from;
+        To = to;
+        Color = color;
+    }
+
+    public override string ToString()
+    {
+        return From + "-" + To + ":" + Color;
+    }
 }
 
 /// <summary>
@@ -251,6 +275,55 @@ public sealed class TextViewLayout : IWrapMapSource
             column += width;
         }
         return result.ToString();
+    }
+
+    /// <summary>
+    /// The colours of a row: the parts of its line that <paramref name="lineRuns"/> colours (in indexes of the line, in the order of the line; what
+    /// one leaves out, or what goes back over an earlier one, is skipped), turned into columns of the row (a tab takes its columns) and cut to the
+    /// row, with the rest of the row in the colour of the text (-1), and neighbours of one colour joined. The runs cover the row from 0 to its width.
+    /// </summary>
+    public List<TextRun> RowRuns(int row, IList<TextRun> lineRuns)
+    {
+        int line = RowToLine(row, out int startColumn, out int endColumn);
+        int width = endColumn - startColumn;
+        List<TextRun> runs = new List<TextRun>();
+        int column = 0;
+        if (lineRuns != null)
+        {
+            foreach (TextRun run in lineRuns)
+            {
+                int from = Document.IndexToColumn(line, run.From, TabSize) - startColumn;
+                int to = Document.IndexToColumn(line, run.To, TabSize) - startColumn;
+                from = Math.Max(from, column);
+                to = Math.Min(to, width);
+                if (to <= from)
+                {
+                    continue;
+                }
+                Add(runs, column, from, -1);
+                Add(runs, from, to, run.Color);
+                column = to;
+            }
+        }
+        Add(runs, column, width, -1);
+        return runs;
+    }
+
+    // Adds a run that is not empty, joined to the last one when it has the same colour.
+    private static void Add(List<TextRun> runs, int from, int to, int color)
+    {
+        if (to <= from)
+        {
+            return;
+        }
+        if (runs.Count > 0 && runs[runs.Count - 1].Color == color && runs[runs.Count - 1].To == from)
+        {
+            TextRun last = runs[runs.Count - 1];
+            last.To = to;
+            runs[runs.Count - 1] = last;
+            return;
+        }
+        runs.Add(new TextRun(from, to, color));
     }
 
     /// <summary>
