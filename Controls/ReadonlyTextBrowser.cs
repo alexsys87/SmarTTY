@@ -894,9 +894,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     // The user's zoom of the text (Ctrl+wheel, Ctrl+0), on top of the monitor scale.
     private float _fontZoom = 1f;
 
-    public const float MinFontZoom = 0.5f;
+    public const float MinFontZoom = EditorZoom.Min;
 
-    public const float MaxFontZoom = 4f;
+    public const float MaxFontZoom = EditorZoom.Max;
 
     public override Font Font
     {
@@ -924,7 +924,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         }
         set
         {
-            value = Math.Max(MinFontZoom, Math.Min(MaxFontZoom, value));
+            value = EditorZoom.Clamp(value);
             if (value == _fontZoom)
             {
                 return;

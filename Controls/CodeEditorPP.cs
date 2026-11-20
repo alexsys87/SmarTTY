@@ -693,56 +693,13 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         {
             return false;
         }
-        int step = ((!searchPrevious) ? 1 : (-1));
-        int limitLine = (searchPrevious ? (-1) : LineCount);
-        List<TokenCache.Token> tokens = _tokenCache.GetLineTokens(CaretPosition.Line);
-        int tokenIdx = _tokenCache.FindTokenIndex(tokens, CaretPosition.Column, (!searchPrevious) ? TokenCache.TokenSearchMode.Next : TokenCache.TokenSearchMode.Previous);
-        int currentLine = CaretPosition.Line;
-        if (tokenIdx == -1)
+        if (!TokenMoves.TryFind(_tokenCache, EditableDocument, CaretPosition, searchPrevious, isOpening, callback, out TextDocument.TextPosition target))
         {
-            currentLine += step;
+            return false;
         }
-        for (int line = currentLine; line != limitLine; line += step)
-        {
-            tokens = _tokenCache.GetLineTokens(line);
-            int limitToken = (searchPrevious ? (-1) : tokens.Count);
-            if (tokenIdx == -1)
-            {
-                tokenIdx = tokens.Count - 1;
-            }
-            bool jumped = false;
-            for (; tokenIdx != limitToken && tokenIdx != -1 && tokenIdx < tokens.Count; tokenIdx += step)
-            {
-                TokenCache.Token token = tokens[tokenIdx];
-                if (token.Partner == null)
-                {
-                    continue;
-                }
-                if ((token.Partner.StartPosition > token.StartPosition) != searchPrevious)
-                {
-                    tokenIdx = token.Partner.Index + step;
-                    line = token.Partner.LineNumber - step;
-                    jumped = true;
-                    break;
-                }
-                string text = GetLineOrNull(token.LineNumber).Substring(token.Start, token.End - token.Start);
-                if (callback(text))
-                {
-                    TextDocument.TextPosition targetPos = ((searchPrevious == isOpening) ? token.StartPosition : token.EndPosition);
-                    if (!(targetPos == CaretPosition))
-                    {
-                        SetSelection(selectText, CaretPosition);
-                        SetCaret(targetPos);
-                        return true;
-                    }
-                }
-            }
-            if (!jumped)
-            {
-                tokenIdx = (searchPrevious ? (-1) : 0);
-            }
-        }
-        return false;
+        SetSelection(selectText, CaretPosition);
+        SetCaret(target);
+        return true;
     }
 
     public void ExpandCurrentFold()
