@@ -33,6 +33,15 @@ public interface ITextLayoutView
 
     /// <summary>The folded blocks of the text (null: the view does not fold).</summary>
     ITextFolds Folds { get; }
+
+    /// <summary>The messages shown in rows of their own under their lines (null: the view shows none).</summary>
+    ILineMessages Messages { get; }
+}
+
+/// <summary>Which lines have a message shown in a row of its own under them.</summary>
+public interface ILineMessages
+{
+    bool HasMessage(int line);
 }
 
 /// <summary>The folded blocks as the layout sees them: the lines a folded header hides after it, and the text the header shows instead of its own.</summary>
@@ -95,8 +104,8 @@ public sealed class TextViewLayout : IWrapMapSource
 
     private int _wheelRemainder;
 
-    // The lines shown, in order, while blocks can be folded (null: to be built again).
-    private int[] _visibleLines;
+    // The rows while blocks can be folded or messages shown, in order: a line, or a message under line n as -(n + 1) (null: to be built again).
+    private int[] _rows;
 
     public TextViewLayout(ITextLayoutView view)
     {
@@ -135,32 +144,51 @@ public sealed class TextViewLayout : IWrapMapSource
     // Folds hide lines only while the lines are not wrapped (as in the WinForms view).
     private bool Folding => !Wrapping && _view.Folds != null;
 
+    // The rows are a list of their own while lines can be hidden or messages shown, which the wrapped rows do not have (as in the WinForms view).
+    private bool HasRowList => !Wrapping && (_view.Folds != null || _view.Messages != null);
+
+    private static int LineOfRow(int entry)
+    {
+        return entry >= 0 ? entry : -entry - 1;
+    }
+
     /// <summary>The width of the margin of the fold marks, after the numbers, in pixels (it is there when the view folds).</summary>
     public int FoldMarginWidth { get; set; }
 
-    /// <summary>The folds or the number of the lines changed: the rows are built again when they are asked for.</summary>
+    /// <summary>The folds, the messages or the number of the lines changed: the rows are built again when they are asked for.</summary>
     public void InvalidateRows()
     {
-        _visibleLines = null;
+        _rows = null;
     }
 
-    private int[] VisibleLines
+    private int[] Rows
     {
         get
         {
-            if (_visibleLines == null)
+            if (_rows == null)
             {
-                List<int> lines = new List<int>();
+                List<int> rows = new List<int>();
                 int lineCount = Document.LineCount;
-                ITextFolds folds = _view.Folds;
-                for (int line = 0; line < lineCount; line += 1 + Math.Max(0, folds.GetHiddenLineCount(line)))
+                ITextFolds folds = Folding ? _view.Folds : null;
+                ILineMessages messages = _view.Messages;
+                for (int line = 0; line < lineCount; line += 1 + (folds == null ? 0 : Math.Max(0, folds.GetHiddenLineCount(line))))
                 {
-                    lines.Add(line);
+                    rows.Add(line);
+                    if (messages != null && messages.HasMessage(line))
+                    {
+                        rows.Add(-line - 1);
+                    }
                 }
-                _visibleLines = lines.ToArray();
+                _rows = rows.ToArray();
             }
-            return _visibleLines;
+            return _rows;
         }
+    }
+
+    /// <summary>The row shows the message of its line (the line above it), not text.</summary>
+    public bool IsMessageRow(int row)
+    {
+        return HasRowList && row >= 0 && row < Rows.Length && Rows[row] < 0;
     }
 
     /// <summary>The text a line shows: the text of its fold when it is a folded header, else its own.</summary>
@@ -223,7 +251,7 @@ public sealed class TextViewLayout : IWrapMapSource
             return Math.Max(0, line - 1);
         }
         int row = PositionToRow(new TextDocument.TextPosition(0, line));
-        return row > 0 ? VisibleLines[row - 1] : line;
+        return row > 0 ? LineOfRow(Rows[row - 1]) : line;
     }
 
     /// <summary>The line shown after <paramref name="line"/> (the line itself at the end), past the lines a fold hides.</summary>
@@ -233,8 +261,12 @@ public sealed class TextViewLayout : IWrapMapSource
         {
             return Math.Min(Document.LineCount - 1, line + 1);
         }
-        int row = PositionToRow(new TextDocument.TextPosition(0, line));
-        return row + 1 < VisibleLines.Length ? VisibleLines[row + 1] : line;
+        int row = PositionToRow(new TextDocument.TextPosition(0, line)) + 1;
+        while (row < Rows.Length && Rows[row] < 0)
+        {
+            row++;
+        }
+        return row < Rows.Length ? Rows[row] : line;
     }
 
     /// <summary>A point is on the margin of the fold marks.</summary>
@@ -295,7 +327,7 @@ public sealed class TextViewLayout : IWrapMapSource
     public int VisibleRows => Math.Max(1, VisibleHeight / RowHeight);
 
     /// <summary>All rows.</summary>
-    public int RowCount => Wrapping ? _wrap.RowCount : (Folding ? VisibleLines.Length : Document.LineCount);
+    public int RowCount => Wrapping ? _wrap.RowCount : (HasRowList ? Rows.Length : Document.LineCount);
 
     /// <summary>The columns of the text a line shows.</summary>
     public int LineColumns(int line)
@@ -326,7 +358,7 @@ public sealed class TextViewLayout : IWrapMapSource
     public void OnDocumentChanged()
     {
         _maxColumns = -1;
-        _visibleLines = null;
+        _rows = null;
         _wrap.Invalidate();
     }
 
@@ -355,7 +387,8 @@ public sealed class TextViewLayout : IWrapMapSource
         int lineCount = Document.LineCount;
         if (!Wrapping)
         {
-            int line = Folding ? VisibleLines[Math.Max(0, Math.Min(row, VisibleLines.Length - 1))] : Math.Max(0, Math.Min(row, lineCount - 1));
+            // The row of a message has the columns of its line, so that a point on it is a point on its line.
+            int line = HasRowList ? LineOfRow(Rows[Math.Max(0, Math.Min(row, Rows.Length - 1))]) : Math.Max(0, Math.Min(row, lineCount - 1));
             startColumn = 0;
             endColumn = LineColumns(line);
             return line;
@@ -372,7 +405,7 @@ public sealed class TextViewLayout : IWrapMapSource
     {
         if (!Wrapping)
         {
-            return true;
+            return !IsMessageRow(row);
         }
         _wrap.RowIndexToLine(row, out int segment);
         return segment == 0;
@@ -384,13 +417,27 @@ public sealed class TextViewLayout : IWrapMapSource
         int line = Math.Max(0, Math.Min(position.Line, Document.LineCount - 1));
         if (!Wrapping)
         {
-            if (!Folding)
+            if (!HasRowList)
             {
                 return line;
             }
-            // A hidden line is in the row of its header: the last line shown that is not after it.
-            int index = Array.BinarySearch(VisibleLines, line);
-            return index >= 0 ? index : Math.Max(0, ~index - 1);
+            // A hidden line is in the row of its header: the last line shown that is not after it (not the row of its message).
+            int[] rows = Rows;
+            int low = 0;
+            int high = rows.Length - 1;
+            while (low < high)
+            {
+                int middle = (low + high + 1) / 2;
+                if (LineOfRow(rows[middle]) <= line)
+                {
+                    low = middle;
+                }
+                else
+                {
+                    high = middle - 1;
+                }
+            }
+            return (low > 0 && rows[low] < 0) ? low - 1 : low;
         }
         return _wrap.PositionToRowIndex(line, Document.IndexToColumn(line, position.Column, TabSize));
     }
@@ -398,6 +445,10 @@ public sealed class TextViewLayout : IWrapMapSource
     /// <summary>The text of a row as it is drawn, one character a column: the tabs are spread over their columns as blanks.</summary>
     public string RowText(int row)
     {
+        if (IsMessageRow(row))
+        {
+            return "";
+        }
         int line = RowToLine(row, out int startColumn, out int endColumn);
         string text = LineText(line);
         StringBuilder result = new StringBuilder(Math.Max(0, endColumn - startColumn));
@@ -433,6 +484,10 @@ public sealed class TextViewLayout : IWrapMapSource
         int line = RowToLine(row, out int startColumn, out int endColumn);
         int width = endColumn - startColumn;
         List<TextRun> runs = new List<TextRun>();
+        if (IsMessageRow(row))
+        {
+            return runs;
+        }
         int column = 0;
         int labelStart = int.MaxValue;
         int labelLength = 0;
@@ -508,7 +563,7 @@ public sealed class TextViewLayout : IWrapMapSource
             end = swap;
         }
         int line = RowToLine(row, out int startColumn, out int endColumn);
-        if (line < start.Line || line > end.Line)
+        if (line < start.Line || line > end.Line || IsMessageRow(row))
         {
             return false;
         }

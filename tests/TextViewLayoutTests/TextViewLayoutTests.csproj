@@ -9,6 +9,8 @@
     <Compile Include="../../CodeEditing/TextViewLayout.cs" Link="TextViewLayout.cs" />
     <Compile Include="../../CodeEditing/TextPointer.cs" Link="TextPointer.cs" />
     <Compile Include="../../CodeEditing/SyntaxColoring.cs" Link="SyntaxColoring.cs" />
+    <Compile Include="../../CodeEditing/InlineMessageBand.cs" Link="InlineMessageBand.cs" />
+    <Compile Include="../../CodeEditing/InlineMessageProvider.cs" Link="InlineMessageProvider.cs" />
     <Compile Include="../../CodeEditing/TextSelection.cs" Link="TextSelection.cs" />
     <Compile Include="../../CodeEditing/CaretNavigator.cs" Link="CaretNavigator.cs" />
     <Compile Include="../../CodeEditing/WrapMap.cs" Link="WrapMap.cs" />

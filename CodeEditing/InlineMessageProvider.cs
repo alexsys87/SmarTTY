@@ -7,7 +7,7 @@ namespace SmarTTY.CodeEditing;
 /// lines go when the text changes. The rows, the painting, the font, the icons and the colours are in
 /// <c>Controls/TextView/InlineMessageView.cs</c>.
 /// </summary>
-public class InlineMessageProvider
+public class InlineMessageProvider : ILineMessages
 {
     public class InlineMessage
     {
@@ -195,6 +195,12 @@ public class InlineMessageProvider
             return 1;
         }
         return 0;
+    }
+
+    /// <summary>The line has a message under it (the WPF text view asks it through <see cref="ILineMessages"/>).</summary>
+    public bool HasMessage(int line)
+    {
+        return _messages.ContainsKey(line);
     }
 
     /// <summary>The message under the line, if there is one.</summary>

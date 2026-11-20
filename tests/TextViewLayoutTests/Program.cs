@@ -102,6 +102,10 @@ internal static class Program
 
         public ITextFolds Folds => FoldSource;
 
+        public ILineMessages MessageSource;
+
+        public ILineMessages Messages => MessageSource;
+
         int ICaretNavigationHost.VisibleRows => Layout.VisibleRows;
 
         bool ICaretNavigationHost.IsWrapping => Wrapping;
@@ -617,6 +621,87 @@ internal static class Program
         Check(same, "the columns of a text are counted as TextDocument counts them");
     }
 
+    private static void MessageRows()
+    {
+        FakeView view = new FakeView("int f()", "{", "  a();", "}", "\tg();", "x");
+        TextViewLayout layout = view.Layout;
+        InlineMessageProvider messages = new InlineMessageProvider();
+        view.MessageSource = messages;
+        messages.AddReported(3, InlineMessageProvider.MessageSeverity.Error, "on a", 4, view.Text.LineCount);
+        messages.AddReported(6, InlineMessageProvider.MessageSeverity.Warning, "on x", 0, view.Text.LineCount);
+        layout.InvalidateRows();
+        List<string> rows = new List<string>();
+        for (int row = 0; row < layout.RowCount; row++)
+        {
+            rows.Add((layout.IsMessageRow(row) ? "m" : "") + layout.RowToLine(row, out _, out _) + "'" + layout.RowText(row) + "'" + (layout.LineNumberText(row) ?? "-"));
+        }
+        Equal(string.Join(" ", rows), "0'int f()'1 1'{'2 2'  a();'3 m2''- 3'}'4 4'    g();'5 5'x'6 m5''-", "a message is a row of its own under its line, with no text and no number");
+        Equal(layout.PositionToRow(At(2, 3)) + " " + layout.PositionToRow(At(3, 0)) + " " + layout.PositionToRow(At(5, 0)), "2 4 6", "a position is in the row of its line, not of the message");
+        Equal(P(layout.HitTest(4 + 25, 3 * 18)), "2:3", "a point on the row of a message is a point on its line");
+        Equal(layout.LineAfter(2) + " " + layout.LineBefore(3) + " " + layout.LineAfter(5), "3 2 5", "the lines before and after are the lines, not the messages");
+        Equal(Runs(layout, 3, R(0, 2, 1)) + "|" + Selected(layout, At(2, 1), At(3, 1)), "|2:1-6+ 4:0-1", "the row of a message has no colours and is not selected");
+        Equal(Point(layout, At(3, 0)), "4,72", "the rows after a message are below it");
+        Equal(layout.RowToLine(3, out int start, out int end) + "[" + start + "," + end + ")", "2[0,6)", "the row of a message has the columns of its line");
+        Check(!layout.IsMessageRow(0) && !layout.IsMessageRow(-1) && !layout.IsMessageRow(99), "only those rows are rows of a message");
+
+        FakeFolds folds = new FakeFolds();
+        view.FoldSource = folds;
+        folds.Hidden[0] = 3;
+        layout.InvalidateRows();
+        rows.Clear();
+        for (int row = 0; row < layout.RowCount; row++)
+        {
+            rows.Add((layout.IsMessageRow(row) ? "m" : "") + layout.RowToLine(row, out _, out _));
+        }
+        Equal(string.Join(" ", rows), "0 4 5 m5", "the message of a hidden line is hidden with it");
+        Equal(layout.LineAfter(0) + " " + layout.LineAfter(5) + " " + layout.PositionToRow(At(5, 0)), "4 5 2", "past the hidden lines and the messages");
+        messages.AddReported(1, InlineMessageProvider.MessageSeverity.Error, "on the header", 0, view.Text.LineCount);
+        layout.InvalidateRows();
+        Equal(layout.RowCount + " " + layout.IsMessageRow(1) + " " + layout.LineAfter(0) + " " + layout.LineBefore(4), "5 True 4 0", "a message under a folded header follows it");
+        view.Wrapping = true;
+        Equal(layout.RowCount + " " + layout.IsMessageRow(1) + " " + layout.IsMessageRow(3), "6 False False", "while the lines are wrapped there are no rows of messages");
+        view.Wrapping = false;
+        view.FoldSource = null;
+        view.MessageSource = null;
+        layout.InvalidateRows();
+        Equal(layout.RowCount, 6, "no messages, no folds: a row a line");
+
+        InlineMessageProvider reported = new InlineMessageProvider();
+        reported.AddReported(1, InlineMessageProvider.MessageSeverity.Error, "a", 0, 5);
+        reported.AddReported(9, InlineMessageProvider.MessageSeverity.Warning, "b", 3, 5);
+        reported.AddReported(-2, InlineMessageProvider.MessageSeverity.Error, "c", -1, 5);
+        reported.AddReported(3, InlineMessageProvider.MessageSeverity.Error, "d", 1, 5);
+        List<string> found = new List<string>();
+        for (int line = 0; line < 5; line++)
+        {
+            if (reported.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+            {
+                found.Add(line + ":" + message.Column + ":" + message.Text);
+            }
+        }
+        Equal(string.Join(" ", found), "0:-2:c 2:0:d 4:2:b", "a reported message: lines and columns from 1, past the text on the last line, below 1 on the first (which it takes over)");
+        Check(reported.HasMessage(2) && !reported.HasMessage(1), "which lines have one");
+    }
+
+    private static string Band(InlineMessageBand band)
+    {
+        return band.IconLeft + "," + band.TextLeft + "," + band.TextWidth + "," + band.BandLeft + "," + band.BandWidth;
+    }
+
+    private static void Bands()
+    {
+        Equal(InlineMessageBand.IndentColumn(-1, 7, 2) + " " + InlineMessageBand.IndentColumn(3, 7, 2) + " " + InlineMessageBand.IndentColumn(3, 7, 9) + " " + InlineMessageBand.IndentColumn(0, 0, 0), "-1 5 0 0",
+            "the column of a message: none in the middle, the scrolled columns taken away, not less than 0");
+        Equal(InlineMessageBand.IndentColumn(3, 7, 8) + " " + InlineMessageBand.IndentColumn(-2, 4, 0), "0 4", "scrolled one column past it: the first column; only -1 is the middle");
+        Equal(Band(InlineMessageBand.Place(0, 400, 18, 347f, -1, 8)) + " " + Band(InlineMessageBand.Place(0, 400, 18, 348f, -1, 8)), "6,28,351,3,373 6,28,351,3,373", "a text just as wide as the row leaves room for, and one pixel wider");
+        Equal(Band(InlineMessageBand.Place(0, 400, 18, 100.7f, -1, 8)), "129,151,104,126,126", "in the middle: the text measured and 3 more, the icon in front of it, the band behind both");
+        Equal(Band(InlineMessageBand.Place(10, 400, 18, 100.7f, -1, 8)), "139,161,104,136,126", "from the left of the row");
+        Equal(Band(InlineMessageBand.Place(0, 400, 18, 100.7f, 5, 8)), "40,62,104,37,126", "under a column: the icon at the column, the text after it");
+        Equal(Band(InlineMessageBand.Place(0, 400, 18, 100.7f, 5, 7.5f)), "37,59,104,34,126", "with characters of a fraction of a pixel");
+        Equal(Band(InlineMessageBand.Place(0, 400, 24, 1000f, -1, 8)), "6,34,339,3,367", "a text too long: as wide as the row leaves room for");
+        Equal(Band(InlineMessageBand.Place(0, 400, 24, 1000f, 0, 8)), "0,28,339,-3,367", "under the first column");
+    }
+
     private static int Main()
     {
         try
@@ -631,6 +716,8 @@ internal static class Program
             Clicks();
             Colors();
             Folds();
+            MessageRows();
+            Bands();
         }
         catch (Exception exception)
         {
