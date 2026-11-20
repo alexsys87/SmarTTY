@@ -46,6 +46,9 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     // The tokens of the syntax of the lines (as CodeEditorPP keeps them) and the colours of the token types (none: the colour of the text).
     private readonly TokenCache _tokens = new TokenCache();
 
+    // The folded blocks, on the tokens (as CodeEditorPP keeps them); they hide lines only while the lines are not wrapped.
+    private readonly FoldingManager _folding;
+
     private TokenCache.LineTokenizer _tokenizer;
 
     private RgbColor[] _tokenColors = new RgbColor[0];
@@ -123,6 +126,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _typing = new TextTyping(this);
         _pointer = new TextPointer(_selection, _navigator, () => _document);
         _tokens.SetDocument(_document, null);
+        _folding = new FoldingManager(_tokens);
         _children = new VisualCollection(this) { _verticalBar, _horizontalBar };
         Focusable = true;
         FocusVisualStyle = null;
@@ -164,6 +168,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 document.SetText("");
             }
             _document = document;
+            _folding.Clear();
             _tokens.SetDocument(_document, _tokenizer);
             _selection.Clear();
             _pointer.Release();
@@ -264,6 +269,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             int firstLine = _layout.RowCount > 0 ? _layout.RowToLine(_layout.FirstRow, out _, out _) : 0;
             _wordWrap = value;
             _layout.Wrap.Invalidate();
+            _layout.InvalidateRows();
             _layout.ScrollX = 0;
             _layout.FirstRow = _layout.ClampFirstRow(_layout.PositionToRow(new TextDocument.TextPosition(0, firstLine)));
             OnLayoutOptionChanged();
@@ -298,7 +304,40 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     {
         _tokenizer = tokenizer;
         _tokenColors = colors ?? new RgbColor[0];
+        // The folds refer to the tokens of the old tokenizer (as CodeEditorPP.Retokenize).
+        _folding.Clear();
         _tokens.SetDocument(_document, tokenizer);
+        _layout.InvalidateRows();
+        UpdateScrollBars();
+        InvalidateVisual();
+    }
+
+    /// <summary>Folds the block of the caret line (nothing while the lines are wrapped).</summary>
+    public void CollapseCurrentFold()
+    {
+        if (!_wordWrap && _folding.CollapseLine(_caret.Line))
+        {
+            AfterFoldChange();
+        }
+    }
+
+    /// <summary>Unfolds the block of the caret line.</summary>
+    public void ExpandCurrentFold()
+    {
+        if (!_wordWrap && _folding.ExpandLine(_caret.Line))
+        {
+            AfterFoldChange();
+        }
+    }
+
+    private void AfterFoldChange()
+    {
+        _layout.InvalidateRows();
+        UpdateScrollBars();
+        if (_layout.EnsureVisible(_caret))
+        {
+            UpdateScrollBarValues();
+        }
         InvalidateVisual();
     }
 
@@ -433,6 +472,12 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     /// <summary>Moves the caret (brought into the text) and scrolls it into view; the selection, if any, now ends there.</summary>
     public void SetCaret(TextDocument.TextPosition position)
     {
+        // A caret put inside a folded block unfolds it (as the WinForms view tells its folds before it moves the caret).
+        if (_folding.OnCaretMoved(position.Line, position.Column))
+        {
+            _layout.InvalidateRows();
+            UpdateScrollBars();
+        }
         int line = Math.Max(0, Math.Min(position.Line, _document.LineCount - 1));
         int column = Math.Max(0, Math.Min(position.Column, _document.GetLineText(line).Length));
         _caret = new TextDocument.TextPosition(column, line);
@@ -487,6 +532,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         MenuItem paste = Item("_Paste", "Ctrl+V", Paste);
         MenuItem delete = Item("_Delete", "Del", DeleteSelection);
         MenuItem selectAll = Item("Select _All", "Ctrl+A", SelectAll);
+        MenuItem collapse = Item("_Fold", "", CollapseCurrentFold);
+        MenuItem expand = Item("U_nfold", "", ExpandCurrentFold);
         menu.Items.Add(undo);
         menu.Items.Add(redo);
         menu.Items.Add(new Separator());
@@ -496,8 +543,14 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         menu.Items.Add(delete);
         menu.Items.Add(new Separator());
         menu.Items.Add(selectAll);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(collapse);
+        menu.Items.Add(expand);
         menu.Opened += (sender, e) =>
         {
+            FoldingManager.GutterState state = _wordWrap ? FoldingManager.GutterState.Plain : _folding.GetGutterState(_caret.Line);
+            collapse.IsEnabled = state == FoldingManager.GutterState.Expandable;
+            expand.IsEnabled = state == FoldingManager.GutterState.Collapsed;
             undo.IsEnabled = CanUndo;
             redo.IsEnabled = CanRedo;
             cut.IsEnabled = !_readOnly;
@@ -710,10 +763,24 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             return;
         }
         TextDocument.TextPosition position = _layout.HitTest(x, y);
+        if (e.ChangedButton == MouseButton.Left && _layout.IsInFoldMargin(x))
+        {
+            // A click on the marks folds or unfolds the block of the row (as FoldingMarginPainter: the click goes no further).
+            if (y < (_layout.RowCount - _layout.FirstRow) * _layout.RowHeight && _folding.ClickMark(position.Line, _wordWrap, _caret, out TextDocument.TextPosition? caretTarget))
+            {
+                if (caretTarget.HasValue)
+                {
+                    SetCaret(caretTarget.Value);
+                }
+                AfterFoldChange();
+            }
+            e.Handled = true;
+            return;
+        }
         if (e.ChangedButton == MouseButton.Left)
         {
             bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
-            bool margin = x < _layout.GutterWidth;
+            bool margin = x < _layout.NumbersWidth;
             SetCaret(_pointer.Press(position, e.ClickCount, shift, _caret, lineUnit: margin));
             CaptureMouse();
             _autoScrollTimer.Start();
@@ -870,16 +937,18 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         return WordCharacters.IndexOf(ch) != -1;
     }
 
-    // No folds and no rows between the lines yet: the lines before and after are the neighbours.
+    // The lines shown before and after a line: past the lines a fold hides (no rows between the lines yet).
     int ICaretNavigationHost.GetPreviousRealLine(int line)
     {
-        return Math.Max(0, line - 1);
+        return _layout.LineBefore(line);
     }
 
     int ICaretNavigationHost.GetNextRealLine(int line)
     {
-        return Math.Min(_document.LineCount - 1, line + 1);
+        return _layout.LineAfter(line);
     }
+
+    ITextFolds ITextLayoutView.Folds => _folding;
 
     void ICaretNavigationHost.OnMoveBeyondDocument(ref TextDocument.TextPosition textPosition, int direction)
     {
@@ -905,6 +974,12 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     void ITextEditView.OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
         _tokens.RetokenizeLine(line, _tokenizer);
+        // The tokens of the line are new ones: a folded block that started or ended there refers to the old tokens (as CodeEditorPP).
+        _folding.RemoveStaleRegions(line, 0, 0, out bool staleRegionsRemoved);
+        if (staleRegionsRemoved)
+        {
+            _layout.InvalidateRows();
+        }
         _layout.Wrap.Invalidate();
         if (line == _caret.Line && _caret.Column > _document.GetLineText(line).Length)
         {
@@ -918,6 +993,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     {
         SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int firstLine, out int removedLines, out int addedLines);
         _tokens.OnLinesChanged(firstLine, removedLines, addedLines, _tokenizer);
+        _folding.RemoveStaleRegions(firstLine, removedLines, addedLines, out _);
+        _layout.InvalidateRows();
         _layout.Wrap.Invalidate();
         _layout.UpdateMaxColumns(-1);
         OnTextChangedOutsideEdit();
@@ -1073,6 +1150,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             _baseline = Math.Round(_glyphTypeface.Baseline * _emSize);
         }
         _layout.SetMetrics(charWidth, textHeight);
+        // The margin of the fold marks is 12 pixels at 96 DPI, as in the WinForms view.
+        _layout.FoldMarginWidth = (int)Math.Round(12 * _scale);
     }
 
     private static GlyphTypeface FindGlyphTypeface(string familyName)
@@ -1236,6 +1315,73 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         context.DrawGlyphRun(Brush(color), run);
     }
 
+    private static readonly RgbColor FoldLabelGrey = RgbColor.FromArgb(255, 169, 169, 169);
+
+    private Pen _framePen;
+
+    private Pen FramePen()
+    {
+        if (_framePen == null)
+        {
+            _framePen = new Pen(Brush(FoldLabelGrey), 1);
+            _framePen.Freeze();
+        }
+        return _framePen;
+    }
+
+    // The marks of the folds, as FoldingMarginPainter draws them, in device pixels: a line down the margin, a box with a minus at a block that
+    // can be folded (a plus when it is folded), a stroke to the right at the end of a block. While the lines are wrapped every row is plain.
+    private void DrawFoldMarks(DrawingContext context, int height)
+    {
+        int left = _layout.NumbersWidth;
+        int rowHeight = _layout.RowHeight;
+        int unit = Math.Max(1, (int)Math.Round(_scale));
+        int box = 10 * unit;
+        int xCenter = left + unit + 5 * unit;
+        Brush pen = Brush(RgbColor.FromArgb(170, _foreColor.R, _foreColor.G, _foreColor.B));
+        int rowCount = _layout.RowCount;
+        for (int row = _layout.FirstRow; row < rowCount; row++)
+        {
+            int y = (row - _layout.FirstRow) * rowHeight;
+            if (y >= height)
+            {
+                break;
+            }
+            FoldingManager.GutterState state = FoldingManager.GutterState.Plain;
+            if (!_wordWrap)
+            {
+                state = _folding.GetGutterState(_layout.RowToLine(row, out _, out _));
+            }
+            int boxTop = y + (rowHeight - box) / 2;
+            switch (state)
+            {
+                case FoldingManager.GutterState.Plain:
+                case FoldingManager.GutterState.SectionEnd:
+                    context.DrawRectangle(pen, null, new Rect(xCenter, y, unit, rowHeight));
+                    if (state == FoldingManager.GutterState.SectionEnd)
+                    {
+                        context.DrawRectangle(pen, null, new Rect(xCenter, y + rowHeight / 2, left + _layout.FoldMarginWidth - xCenter, unit));
+                    }
+                    break;
+                case FoldingManager.GutterState.Expandable:
+                case FoldingManager.GutterState.Collapsed:
+                    context.DrawRectangle(pen, null, new Rect(xCenter, y, unit, boxTop - y));
+                    context.DrawRectangle(pen, null, new Rect(xCenter, boxTop + box, unit, y + rowHeight - boxTop - box));
+                    // The box: four sides one device pixel thick.
+                    context.DrawRectangle(pen, null, new Rect(xCenter - 5 * unit, boxTop, box + unit, unit));
+                    context.DrawRectangle(pen, null, new Rect(xCenter - 5 * unit, boxTop + box, box + unit, unit));
+                    context.DrawRectangle(pen, null, new Rect(xCenter - 5 * unit, boxTop, unit, box));
+                    context.DrawRectangle(pen, null, new Rect(xCenter + 5 * unit, boxTop, unit, box));
+                    context.DrawRectangle(pen, null, new Rect(xCenter - 3 * unit, boxTop + 5 * unit, 7 * unit, unit));
+                    if (state == FoldingManager.GutterState.Collapsed)
+                    {
+                        context.DrawRectangle(pen, null, new Rect(xCenter, boxTop + 2 * unit, unit, box - 4 * unit + unit));
+                    }
+                    break;
+            }
+        }
+    }
+
     protected override void OnRender(DrawingContext context)
     {
         base.OnRender(context);
@@ -1289,6 +1435,12 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 foreach (TextRun run in _layout.RowRuns(row, LineRuns(_layout.RowToLine(row, out _, out _))))
                 {
                     RgbColor color = (run.Color < 0 || run.Color >= _tokenColors.Length) ? _foreColor : _tokenColors[run.Color];
+                    if (run.Color == TextViewLayout.FoldLabelColor)
+                    {
+                        // The label of a folded block: grey, in a grey frame (as FoldingLineProvider draws it).
+                        color = FoldLabelGrey;
+                        context.DrawRectangle(null, FramePen(), new Rect(textLeft + run.From * charWidth + 0.5, y + 0.5, (run.To - run.From) * charWidth - 1, rowHeight - 1));
+                    }
                     int from = Math.Min(run.To, Math.Max(run.From, selectedFrom));
                     int to = Math.Max(from, Math.Min(run.To, selectedTo));
                     DrawText(context, text, run.From, from, textLeft, y, gutter, width, color);
@@ -1322,6 +1474,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         if (gutter > 0)
         {
             context.DrawRectangle(Brush(_gutterBackColor), null, new Rect(0, 0, gutter, height));
+            DrawFoldMarks(context, height);
             int caretLine = _caret.Line;
             for (int row = _layout.FirstRow; row < rowCount; row++)
             {
@@ -1335,10 +1488,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
                 {
                     continue;
                 }
-                // Right-aligned, with a blank cell before the text; the caret line in the colour of the text.
-                int x = gutter - (number.Length + 1) * charWidth;
+                // Right-aligned, with a blank cell before the marks; the caret line in the colour of the text.
+                int numbersWidth = _layout.NumbersWidth;
+                int x = numbersWidth - (number.Length + 1) * charWidth;
                 bool caretRow = _layout.RowToLine(row, out _, out _) == caretLine;
-                DrawText(context, number, 0, number.Length, x, y, 0, gutter, caretRow ? _foreColor : _gutterForeColor);
+                DrawText(context, number, 0, number.Length, x, y, 0, numbersWidth, caretRow ? _foreColor : _gutterForeColor);
             }
         }
     }
