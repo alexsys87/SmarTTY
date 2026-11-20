@@ -16,8 +16,23 @@ using VisualTTY;
 
 namespace SmarTTY.Controls;
 
-public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost, IRemoteFileFlowHost
+/// <summary>
+/// The editor of a file on the server: the loading, the saves, the drafts, the encodings, the hex view and the questions. Until stage 3E-4 it was the
+/// text view itself (a <c>CodeEditorPP</c>); now it is given its text view (<see cref="IRemoteTextView"/>: the WPF view of the editor tab, or
+/// <see cref="RemoteTextView"/>, the WinForms one it makes when it is given none) and does through it what it did on its base class.
+/// </summary>
+public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost, IRemoteFileFlowHost
 {
+    // The text view: the one given to the constructor, or the WinForms one made by it (_textControl).
+    private readonly IRemoteTextView _text;
+
+    private readonly RemoteTextView _textControl;
+
+    /// <summary>The text view of the file.</summary>
+    public IRemoteTextView TextView => _text;
+
+    /// <summary>The text view as the WinForms control the editor made (for the panel and the tab); null when the view was given.</summary>
+    public RemoteTextView TextControl => _textControl;
 
     private ITerminalSessionContext _context;
 
@@ -57,8 +72,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     // Made by the constructor that opens a file: the base classes may ask for IsModified before that.
     private RemoteFileContent _content;
 
-    // The hex view of the file: the WinForms control of this editor, or a view given by the constructor (the WPF view of the tab), which is shown
-    // through _hexPlace.
+    // The hex view of the file: the WinForms control of this editor (hosted by its WinForms text view), or a view given by the constructor (the WPF
+    // view of the tab), which is shown through _hexPlace.
     private IHexEditorView _hexEditor;
 
     private HexEditorControl _hexControl;
@@ -168,29 +183,55 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     public event EventHandler LoadCompleted;
 
     public RemoteFileEditor()
-        : this((IHexEditorView)null)
+        : this(null, null)
     {
     }
 
-    // A null hex view: the editor makes its own WinForms one.
-    private RemoteFileEditor(IHexEditorView hexView)
+    // A null text view: the editor makes its own WinForms one. A null hex view: the editor makes its own WinForms one, which that text view hosts.
+    private RemoteFileEditor(IRemoteTextView textView, IHexEditorView hexView)
     {
-        InitializeComponent();
+        if (textView != null)
+        {
+            _text = textView;
+        }
+        else
+        {
+            _textControl = new RemoteTextView();
+            _text = _textControl;
+        }
+        _text.AppearanceChanged += (object sender, EventArgs e) => UpdateHexAppearance();
         if (hexView != null)
         {
             _hexEditor = hexView;
-            return;
         }
-        _hexControl = new HexEditorControl
+        else
         {
-            Dock = DockStyle.Fill,
-            Visible = false,
-            Font = Font,
-            BackColor = BackColor,
-            ForeColor = ForeColor
-        };
-        _hexEditor = _hexControl;
-        Controls.Add(_hexControl);
+            if (_textControl == null)
+            {
+                throw new ArgumentException("A text view that is given needs a hex view that is given.", nameof(hexView));
+            }
+            _hexControl = new HexEditorControl
+            {
+                Dock = DockStyle.Fill,
+                Visible = false,
+                Font = _textControl.Font,
+                BackColor = _textControl.BackColor,
+                ForeColor = _textControl.ForeColor
+            };
+            _hexEditor = _hexControl;
+            _textControl.Controls.Add(_hexControl);
+            _textControl.HexControl = _hexControl;
+        }
+        if (_textControl != null)
+        {
+            _textControl.Owner = this;
+        }
+    }
+
+    /// <summary>Closes the editor: its text view is closed (disposed), which stops the loading and the drafts.</summary>
+    public void Dispose()
+    {
+        _text.Close();
     }
 
     // Gives a hex view of the place its colours and font.
@@ -200,8 +241,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         {
             return;
         }
-        System.Drawing.Font font = LogicalFont ?? Font;
-        _hexPlace.SetAppearance(BackColor.ToRgb(), ForeColor.ToRgb(), font.FontFamily.Name, font.SizeInPoints * FontZoom);
+        _text.GetAppearance(out RgbColor background, out RgbColor foreground, out string fontFamily, out float fontSizeInPoints);
+        _hexPlace.SetAppearance(background, foreground, fontFamily, fontSizeInPoints);
     }
 
     /// <summary>Switches the editor between the text and the hex view.</summary>
@@ -212,7 +253,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             return;
         }
         // The messages are rows of the text view, so they do not belong in the hex view.
-        ClearMessages();
+        _text.ClearMessages();
         if (IsHexMode)
         {
             _content.ExitHexMode();
@@ -232,46 +273,16 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            Focus();
+            _text.FocusText();
         }
-    }
-
-    protected override void OnFontChanged(EventArgs e)
-    {
-        base.OnFontChanged(e);
-        if (_hexControl != null)
-        {
-            _hexControl.Font = Font;
-        }
-        UpdateHexAppearance();
-    }
-
-    protected override void OnBackColorChanged(EventArgs e)
-    {
-        base.OnBackColorChanged(e);
-        if (_hexControl != null)
-        {
-            _hexControl.BackColor = BackColor;
-        }
-        UpdateHexAppearance();
-    }
-
-    protected override void OnForeColorChanged(EventArgs e)
-    {
-        base.OnForeColorChanged(e);
-        if (_hexControl != null)
-        {
-            _hexControl.ForeColor = ForeColor;
-        }
-        UpdateHexAppearance();
     }
 
     /// <summary>The unsaved state covers both views: the bytes in hex mode, the text in text mode.</summary>
-    public override bool IsModified
+    public bool IsModified
     {
         get
         {
-            return (_content != null) ? _content.IsModified : base.IsModified;
+            return (_content != null) ? _content.IsModified : _text.IsTextModified;
         }
         set
         {
@@ -281,12 +292,12 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             }
             else
             {
-                base.IsModified = value;
+                _text.IsTextModified = value;
             }
         }
     }
 
-    public override void CopySelection(bool select = true)
+    public void CopySelection(bool select = true)
     {
         if (IsHexMode)
         {
@@ -294,11 +305,11 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.CopySelection(select);
+            _text.CopySelection(select);
         }
     }
 
-    public override void CopyAll()
+    public void CopyAll()
     {
         if (IsHexMode)
         {
@@ -306,11 +317,11 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.CopyAll();
+            _text.CopyAll();
         }
     }
 
-    public override void Cut()
+    public void Cut()
     {
         if (IsHexMode)
         {
@@ -318,11 +329,11 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.Cut();
+            _text.Cut();
         }
     }
 
-    public override void Paste()
+    public void Paste()
     {
         if (IsHexMode)
         {
@@ -330,11 +341,11 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.Paste();
+            _text.Paste();
         }
     }
 
-    public override void DeleteSelection()
+    public void DeleteSelection()
     {
         if (IsHexMode)
         {
@@ -342,11 +353,11 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.DeleteSelection();
+            _text.DeleteSelection();
         }
     }
 
-    public override void SelectAllText()
+    public void SelectAllText()
     {
         if (IsHexMode)
         {
@@ -354,14 +365,15 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         }
         else
         {
-            base.SelectAllText();
+            _text.SelectAllText();
         }
     }
 
     /// <param name="initialColumnUnit">What the column of <paramref name="textPosition"/> counts: the caret is put at the character it points at once the text is loaded.</param>
     /// <param name="hexView">The hex view of the file (the WPF view of the tab, shown through <see cref="HexViewPlace"/>); null: the editor makes its own WinForms one.</param>
-    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters, IHexEditorView hexView = null)
-        : this(hexView)
+    /// <param name="textView">The text view of the file (the WPF view of the tab); null: the editor makes its own WinForms one (then the hex view may be null too).</param>
+    public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters, IHexEditorView hexView = null, IRemoteTextView textView = null)
+        : this(textView, hexView)
     {
         _initialColumnUnit = initialColumnUnit;
         this._context = terminalSessionContext;
@@ -373,19 +385,19 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         _content.HexModeChanged += (object sender, EventArgs e) => HexModeChanged?.Invoke(this, EventArgs.Empty);
         _content.FormatChanged += (object sender, EventArgs e) => FormatChanged?.Invoke(this, EventArgs.Empty);
         _saver = new RemoteFileSaver(host, _server, text, () => _loader.SudoOnSave);
-        _loader = new RemoteFileLoader(_server, text, new ControlUserPrompt(this), new ControlUiDispatcher(this), this, () => _context.AutoConfirmSudo);
+        _loader = new RemoteFileLoader(_server, text, _text.UserPrompt, _text.UiDispatcher, this, () => _context.AutoConfirmSudo);
         _draftKey = DraftKeys.Claim(EditorDraftStore.KeyFor(terminalSessionContext?.TitleWithUserName, text));
         _drafts = new RemoteFileDrafts(Drafts, _draftKey);
         _flow = new RemoteFileFlow(text, this, _server, _saver, _session, _content, _loader);
         _flow.SavingChanged += (object sender, EventArgs e) => SavingChanged?.Invoke(this, EventArgs.Empty);
         _flow.FormatChanged += (object sender, EventArgs e) => FormatChanged?.Invoke(this, EventArgs.Empty);
         RemoteFileDrafts.StartCleanupOnce(Drafts);
-        Disposed += (object sender, EventArgs e) =>
+        _text.Closed += (object sender, EventArgs e) =>
         {
             _draftTimer?.Dispose();
             DraftKeys.Release(_draftKey);
         };
-        ((EditableTextBrowser)this).ReadOnly = true;
+        _text.ReadOnly = true;
         _initialCaret = textPosition;
         _loadThread = new Thread(_loader.Run);
         _loadThread.Start();
@@ -408,7 +420,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     // What the loading thread (RemoteFileLoader) tells the editor: these run on the UI thread.
     bool IRemoteFileLoadView.IsReloading => _flow.IsReloading;
 
-    bool IRemoteFileLoadView.IsClosed => IsDisposed;
+    bool IRemoteFileLoadView.IsClosed => _text.IsClosed;
 
     void IRemoteFileLoadView.ShowPreview(string text)
     {
@@ -417,7 +429,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             DefaultLineEnding = TextDocument.LineEnding.Lf
         };
         editableTextDocument.SetText(text);
-        SetDocument(editableTextDocument);
+        _text.SetDocument(editableTextDocument);
     }
 
     void IRemoteFileLoadView.Finish(byte[] file, string signature)
@@ -452,7 +464,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             string expiryNotice = RemoteFileDrafts.TakeExpiryNotice();
             if (expiryNotice != null)
             {
-                ThemedMessageBox.Show(this, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ThemedMessageBox.Show(_text.MessageOwner, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             EditorDraft restoredDraft = null;
             if (_flow.IsReloading)
@@ -470,7 +482,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             }
             _content.ApplyContent(file, encoding, text);
             _flow.FinishLoading(signature);
-            ((EditableTextBrowser)this).ReadOnly = IsReadOnlyMode;
+            _text.ReadOnly = IsReadOnlyMode;
             if (restoredDraft != null)
             {
                 if (restoredDraft.Bytes != null)
@@ -481,7 +493,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 else
                 {
                     // The restored text differs from the file: it is an unsaved change, and the draft timer keeps it safe again.
-                    ((EditableTextBrowser)this).IsModified = true;
+                    IsModified = true;
                 }
             }
             if (!IsReadOnlyMode)
@@ -494,8 +506,8 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 if (_restoreCaret)
                 {
                     _restoreCaret = false;
-                    int line = Math.Min(_caretToRestore.Line, Math.Max(0, base.EditableDocument.LineCount - 1));
-                    SetCaret(new TextDocument.TextPosition(Math.Min(_caretToRestore.Column, base.EditableDocument.GetLineText(line).Length), line));
+                    int line = Math.Min(_caretToRestore.Line, Math.Max(0, _text.Document.LineCount - 1));
+                    _text.SetCaret(new TextDocument.TextPosition(Math.Min(_caretToRestore.Column, _text.Document.GetLineText(line).Length), line));
                 }
                 else if (_initialCaret.IsValid)
                 {
@@ -516,7 +528,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                 _foldsToRestore = null;
                 if (folds != null && folds.Length != 0)
                 {
-                    RestoreFoldState(folds);
+                    _text.RestoreFoldState(folds);
                 }
             }
             catch
@@ -545,7 +557,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
             : "";
         string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        if (ThemedMessageBox.Show(this, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
+        if (ThemedMessageBox.Show(_text.MessageOwner, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
             + changed
             + "Yes: restore the draft.\n"
             + "No: discard it and open the file from the server.\n\n"
@@ -573,18 +585,18 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     {
         try
         {
-            if (IsDisposed || IsReadOnlyMode || !IsModified)
+            if (_text.IsClosed || IsReadOnlyMode || !IsModified)
             {
                 return;
             }
             HexDocument hexDocument = _content.HexDocument;
             bool hex = _content.HexMode && hexDocument != null;
-            object version = hex ? hexDocument.CurrentVersion : CurrentVersion;
+            object version = hex ? hexDocument.CurrentVersion : _text.CurrentVersion;
             if (!_drafts.ShouldCapture(version, hex ? hexDocument.Length : (long?)null))
             {
                 return;
             }
-            string draftText = hex ? null : base.EditableDocument.GetText();
+            string draftText = hex ? null : _text.Document.GetText();
             byte[] draftBytes = hex ? hexDocument.ToArray() : null;
             _drafts.Captured(hex ? draftBytes.Length : draftText.Length);
             _drafts.Queue(new EditorDraft
@@ -628,12 +640,12 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     /// </summary>
     public void SetCaretFromColumnUnit(TextDocument.TextPosition position, ColumnUnit unit)
     {
-        if (unit != ColumnUnit.Characters && unit != ColumnUnit.Auto && position.IsValid && base.EditableDocument != null
-            && position.Line >= 0 && position.Line < base.EditableDocument.LineCount)
+        if (unit != ColumnUnit.Characters && unit != ColumnUnit.Auto && position.IsValid && _text.Document != null
+            && position.Line >= 0 && position.Line < _text.Document.LineCount)
         {
-            position.Column = CompilerColumns.ToCharIndex(base.EditableDocument.GetLineText(position.Line), position.Column, unit);
+            position.Column = CompilerColumns.ToCharIndex(_text.Document.GetLineText(position.Line), position.Column, unit);
         }
-        SetCaret(position);
+        _text.SetCaret(position);
     }
 
     /// <summary>
@@ -704,15 +716,15 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
             return;
         }
         GlobalSettings.EditorColors colors = _settings.Editor.GetEffectiveColors(_settings.IsLightTheme);
-        ApplyMessageColors(colors.LineNumberBackground, colors.ErrorColor, colors.WarningColor, colors.LineNumberForeground);
+        _text.ApplyMessageColors(((System.Drawing.Color)colors.LineNumberBackground).ToRgb(), ((System.Drawing.Color)colors.ErrorColor).ToRgb(), ((System.Drawing.Color)colors.WarningColor).ToRgb(), ((System.Drawing.Color)colors.LineNumberForeground).ToRgb());
     }
 
     /// <summary>
     /// The file can be run in a terminal of the session (F5): it is loaded in full, the host has a shell, and the file
     /// name or the first line says how to run it.
     /// </summary>
-    public bool CanRunInTerminal => _flow.IsLoaded && !_flow.IsReloading && !IsPreview && !IsWindowsHost && base.EditableDocument != null
-        && RemoteScript.CanRun(RemotePathUtils.GetFileName(RemotePath), base.EditableDocument.GetLineText(0));
+    public bool CanRunInTerminal => _flow.IsLoaded && !_flow.IsReloading && !IsPreview && !IsWindowsHost && _text.Document != null
+        && RemoteScript.CanRun(RemotePathUtils.GetFileName(RemotePath), _text.Document.GetLineText(0));
 
     /// <summary>
     /// The file can be followed like tail -f in a terminal tab: it is on the server and the host is a Unix one. It is the
@@ -759,10 +771,10 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     string IRemoteSaveSource.GetText()
     {
-        return base.EditableDocument.GetText();
+        return _text.Document.GetText();
     }
 
-    object IRemoteSaveSource.TextVersion => CurrentVersion;
+    object IRemoteSaveSource.TextVersion => _text.CurrentVersion;
 
     LineEndingKind IRemoteSaveSource.LineEndings => LineEndings;
 
@@ -785,7 +797,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     void IRemoteSaveSource.ClearMessages()
     {
-        ClearMessages();
+        _text.ClearMessages();
     }
 
     SyntaxHighlighting.Language IRemoteSaveSource.DetectSyntax()
@@ -795,21 +807,21 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     string IRemoteSaveSource.FirstLine()
     {
-        return base.EditableDocument.GetLineText(0);
+        return _text.Document.GetLineText(0);
     }
 
     // What the content of the file and the switching between the views (RemoteFileContent) need from the editor.
-    EditableTextDocument IRemoteFileContentHost.TextDocument => base.EditableDocument;
+    EditableTextDocument IRemoteFileContentHost.TextDocument => _text.Document;
 
     bool IRemoteFileContentHost.IsTextModified
     {
         get
         {
-            return base.IsModified;
+            return _text.IsTextModified;
         }
         set
         {
-            base.IsModified = value;
+            _text.IsTextModified = value;
         }
     }
 
@@ -817,39 +829,39 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
     {
         get
         {
-            return ((EditableTextBrowser)this).ReadOnly;
+            return _text.ReadOnly;
         }
         set
         {
-            ((EditableTextBrowser)this).ReadOnly = value;
+            _text.ReadOnly = value;
         }
     }
 
-    TextDocument.TextPosition IRemoteFileContentHost.Caret => CaretPosition;
+    TextDocument.TextPosition IRemoteFileContentHost.Caret => _text.CaretPosition;
 
     void IRemoteFileContentHost.SetCaret(TextDocument.TextPosition position)
     {
-        SetCaret(position);
+        _text.SetCaret(position);
     }
 
     void IRemoteFileContentHost.SetDocument(EditableTextDocument document)
     {
-        SetDocument(document);
+        _text.SetDocument(document);
     }
 
     void IRemoteFileContentHost.FocusText()
     {
-        Focus();
+        _text.FocusText();
     }
 
     void IRemoteFileContentHost.MarkTextSaved(object version)
     {
-        MarkSaved(version);
+        _text.MarkSaved(version);
     }
 
     void IRemoteFileContentHost.RaiseModifiedChanged()
     {
-        OnModifiedChanged();
+        _text.RaiseModifiedChanged();
     }
 
     bool IRemoteFileContentHost.IsLoaded => _flow.IsLoaded;
@@ -879,12 +891,12 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     void IRemoteFileContentHost.ShowError(string message)
     {
-        ThemedMessageBox.Show(this, message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        ThemedMessageBox.Show(_text.MessageOwner, message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
     }
 
     bool IRemoteFileContentHost.ConfirmWarning(string question)
     {
-        return ThemedMessageBox.Show(this, question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        return ThemedMessageBox.Show(_text.MessageOwner, question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
     }
 
     // What the loading and the saves (RemoteFileFlow) need from the editor: the questions, the threads and the view.
@@ -925,7 +937,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
         // How many problems get an inline message; ParseIssues caps the list at the same number.
         const int MaxInline = 50;
         // The messages sit in the rows of the text view; the wrapped rows and the hex view have no such rows.
-        bool showInText = !WordWrap && !IsHexMode;
+        bool showInText = !_text.WordWrap && !IsHexMode;
         if (showInText)
         {
             RefreshMessageColors();
@@ -940,14 +952,14 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
                     Column = issues[i].Column
                 });
             }
-            AddMessages(messages);
+            _text.AddMessages(messages);
         }
         return showInText;
     }
 
     void IRemoteFileFlowHost.GoToIssue(ValidationIssue issue)
     {
-        GoToPosition(Math.Max(0, issue.Line - 1), Math.Max(0, issue.Column - 1));
+        _text.GoToPosition(Math.Max(0, issue.Line - 1), Math.Max(0, issue.Column - 1));
         FocusActiveView();
     }
 
@@ -975,35 +987,26 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     bool IRemoteFileFlowHost.Post(Action action)
     {
-        try
-        {
-            BeginInvoke((ThreadStart)(() => action()));
-            return true;
-        }
-        catch
-        {
-            // The editor was closed meanwhile.
-            return false;
-        }
+        return _text.Post(action);
     }
 
     void IRemoteFileFlowHost.ClearMessages()
     {
-        ClearMessages();
+        _text.ClearMessages();
     }
 
     void IRemoteFileFlowHost.KeepViewForReload()
     {
         _restoreCaret = true;
-        _caretToRestore = CaretPosition;
+        _caretToRestore = _text.CaretPosition;
         _restoreHexAfterReload = IsHexMode;
         _hexOffsetToRestore = IsHexMode ? _hexEditor.CaretOffset : 0;
-        _foldsToRestore = GetFoldState();
+        _foldsToRestore = _text.GetFoldState();
         if (IsHexMode)
         {
             _hexEditor.ReadOnly = true;
         }
-        ((EditableTextBrowser)this).ReadOnly = true;
+        _text.ReadOnly = true;
     }
 
     void IRemoteFileFlowHost.StartLoading()
@@ -1014,7 +1017,7 @@ public partial class RemoteFileEditor : CodeEditorPP, IRemoteFileLoadView, IRemo
 
     void IRemoteFileFlowHost.SetTextReadOnly(bool readOnly)
     {
-        ((EditableTextBrowser)this).ReadOnly = readOnly;
+        _text.ReadOnly = readOnly;
     }
 
     void IRemoteFileFlowHost.RaiseLoadFailed()

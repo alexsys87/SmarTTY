@@ -18,6 +18,9 @@ internal sealed class RemoteFileEditorPanel : UserControl
 {
     private readonly RemoteFileEditor _editor;
 
+    // The WinForms text view of the editor, which this panel hosts.
+    private readonly RemoteTextView _view;
+
     private readonly ContextMenuStrip _contextMenu;
 
     private readonly Dictionary<EditorToolbarCommand, ToolStripMenuItem> _menuItems = new Dictionary<EditorToolbarCommand, ToolStripMenuItem>();
@@ -92,6 +95,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
     public RemoteFileEditorPanel(RemoteFileEditor editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        _view = editor.TextControl ?? throw new ArgumentException("The panel hosts the WinForms text view of the editor.", nameof(editor));
         SuspendLayout();
 
         _contextMenu = new ContextMenuStrip();
@@ -140,24 +144,24 @@ internal sealed class RemoteFileEditorPanel : UserControl
             ApplyMenuTheme(_contextMenu);
             RefreshState();
         };
-        _editor.ContextMenuStrip = _contextMenu;
+        _view.ContextMenuStrip = _contextMenu;
         // A hex view given to the editor (the WPF one of the tab) has the context menu of the tab.
         if (_editor.HexEditorControl != null)
         {
             _editor.HexEditorControl.ContextMenuStrip = _contextMenu;
         }
 
-        _editor.Dock = DockStyle.Fill;
-        Controls.Add(_editor);
-        ActiveControl = _editor;
+        _view.Dock = DockStyle.Fill;
+        Controls.Add(_view);
+        ActiveControl = _view;
         ResumeLayout(performLayout: true);
 
         // What the commands depend on: the selection, the text and its undo history, the saved state and the load.
-        _editor.SelectionChanged += (editorControl, previousCaret, currentCaret, hasSelection) => ScheduleRefresh();
-        _editor.ModifiedChanged += (editorControl, modified) => ScheduleRefresh();
-        _editor.RangeChanged += (editorControl, start, oldEnd, newEnd) => ScheduleRefresh();
-        _editor.LineChanged += (editorControl, line, column, addedLength, removedLength) => ScheduleRefresh();
-        _editor.KeyUp += (sender, e) => ScheduleRefresh();
+        _view.SelectionChanged += (editorControl, previousCaret, currentCaret, hasSelection) => ScheduleRefresh();
+        _view.ModifiedChanged += (editorControl, modified) => ScheduleRefresh();
+        _view.RangeChanged += (editorControl, start, oldEnd, newEnd) => ScheduleRefresh();
+        _view.LineChanged += (editorControl, line, column, addedLength, removedLength) => ScheduleRefresh();
+        _view.KeyUp += (sender, e) => ScheduleRefresh();
         _editor.SavingChanged += (sender, e) => ScheduleRefresh();
         _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
         _editor.FormatChanged += (sender, e) => ScheduleRefresh();
@@ -203,7 +207,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
         }
         try
         {
-            _editor.ApplyLineTransform(kind);
+            _view.ApplyLineTransform(kind);
         }
         catch (Exception exception)
         {
@@ -238,7 +242,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     }
                     else
                     {
-                        _editor.Undo();
+                        _view.Undo();
                     }
                     break;
                 case EditorToolbarCommand.Redo:
@@ -248,7 +252,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     }
                     else
                     {
-                        _editor.Redo();
+                        _view.Redo();
                     }
                     break;
                 case EditorToolbarCommand.Cut:
@@ -297,11 +301,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
                     GoToLineRequested?.Invoke(this, EventArgs.Empty);
                     break;
                 case EditorToolbarCommand.ShowAllCharacters:
-                    _editor.ShowAllCharacters = !_editor.ShowAllCharacters;
+                    _view.ShowAllCharacters = !_view.ShowAllCharacters;
                     ShowAllCharactersChanged?.Invoke(this, EventArgs.Empty);
                     break;
                 case EditorToolbarCommand.WordWrap:
-                    _editor.WordWrap = !_editor.WordWrap;
+                    _view.WordWrap = !_view.WordWrap;
                     WordWrapChanged?.Invoke(this, EventArgs.Empty);
                     break;
                 case EditorToolbarCommand.ToggleHex:
@@ -344,19 +348,19 @@ internal sealed class RemoteFileEditorPanel : UserControl
                 CanRun = _editor.CanRunInTerminal,
                 CanFollow = _editor.CanFollowLog,
                 CanUseHex = _editor.CanToggleHexMode,
-                ShowAllCharacters = _editor.ShowAllCharacters,
-                WordWrap = _editor.WordWrap
+                ShowAllCharacters = _view.ShowAllCharacters,
+                WordWrap = _view.WordWrap
             };
         }
-        int lineCount = _editor.LineCount;
+        int lineCount = _view.LineCount;
         return new EditorCommandState
         {
-            ReadOnly = _editor.ReadOnly,
-            HasLineSelection = _editor.HasLineSelection,
-            HasSelection = _editor.HasSelection && _editor.SelectionStart != _editor.SelectionEnd,
-            HasText = lineCount > 1 || (lineCount == 1 && _editor.EditableDocument.GetLineText(0).Length > 0),
-            CanUndo = _editor.CanUndo,
-            CanRedo = _editor.CanRedo,
+            ReadOnly = _view.ReadOnly,
+            HasLineSelection = _view.HasLineSelection,
+            HasSelection = _view.HasSelection && _view.SelectionStart != _view.SelectionEnd,
+            HasText = lineCount > 1 || (lineCount == 1 && _view.EditableDocument.GetLineText(0).Length > 0),
+            CanUndo = _view.CanUndo,
+            CanRedo = _view.CanRedo,
             IsModified = _editor.IsModified,
             IsNewFile = _editor.IsNewFile,
             IsSaving = _editor.IsSaving,
@@ -364,8 +368,8 @@ internal sealed class RemoteFileEditorPanel : UserControl
             CanRun = _editor.CanRunInTerminal,
             CanFollow = _editor.CanFollowLog,
             CanUseHex = _editor.CanToggleHexMode,
-            ShowAllCharacters = _editor.ShowAllCharacters,
-            WordWrap = _editor.WordWrap
+            ShowAllCharacters = _view.ShowAllCharacters,
+            WordWrap = _view.WordWrap
         };
     }
 
@@ -423,7 +427,7 @@ internal sealed class RemoteFileEditorPanel : UserControl
     {
         base.OnGotFocus(e);
         // The host focuses its child: the keys are for the editor, not for the menu.
-        if (!_editor.Focused && !_editor.HexEditor.Focused)
+        if (!_view.Focused && !_editor.HexEditor.Focused)
         {
             _editor.FocusActiveView();
         }
@@ -435,11 +439,11 @@ internal sealed class RemoteFileEditorPanel : UserControl
     /// </summary>
     private void ScaleContextMenu()
     {
-        if (!_editor.IsHandleCreated)
+        if (!_view.IsHandleCreated)
         {
             return;
         }
-        int dpi = DpiScaling.GetWindowDpi(_editor.Handle);
+        int dpi = DpiScaling.GetWindowDpi(_view.Handle);
         if (dpi == _contextMenuDpi)
         {
             return;

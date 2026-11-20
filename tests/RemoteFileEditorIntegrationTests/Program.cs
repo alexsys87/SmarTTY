@@ -221,8 +221,9 @@ internal static class Program
         configure?.Invoke(settings);
         Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/" + name;
-        RemoteFileEditor editor = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition()) { Dock = DockStyle.Fill };
-        form.Controls.Add(editor);
+        RemoteFileEditor editor = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition());
+        editor.TextControl.Dock = DockStyle.Fill;
+        form.Controls.Add(editor.TextControl);
         form.Show();
         Pump(() => editor.CanSave || editor.IsReadOnlyMode, "the file " + name + " to load");
         Settle(server);
@@ -231,19 +232,19 @@ internal static class Program
 
     private static string Text(Opened opened)
     {
-        return opened.Editor.Document.GetText();
+        return opened.Editor.TextControl.Document.GetText();
     }
 
     // Replaces a word in a line of the text, as typing would.
     private static void Replace(Opened opened, int line, string oldText, string newText)
     {
-        string text = opened.Editor.Document.GetLineText(line);
+        string text = opened.Editor.TextControl.Document.GetLineText(line);
         int index = text.IndexOf(oldText, StringComparison.Ordinal);
         if (index < 0)
         {
             throw new InvalidOperationException("The line " + line + " is '" + text + "', it has no '" + oldText + "'");
         }
-        opened.Editor.ReplaceText(new TextDocument.TextPosition(index, line), new TextDocument.TextPosition(index + oldText.Length, line), select: false, newText);
+        opened.Editor.TextControl.ReplaceText(new TextDocument.TextPosition(index, line), new TextDocument.TextPosition(index + oldText.Length, line), select: false, newText);
     }
 
     private static void Prompted(Server server, string name, Func<string, MessageBoxButtons, DialogResult?> answer, Action action)
@@ -328,7 +329,7 @@ internal static class Program
         Console.WriteLine("-- the editor as the text of a search bar (ISearchTarget)");
         WriteRemote(server, "search.txt", Bytes("one two\nthree two\nfour\n"));
         Opened o = Open(server, "search.txt");
-        ISearchTarget target = o.Editor;
+        ISearchTarget target = o.Editor.TextControl;
         TextMatcher two = TextMatcher.Literal("two", ignoreCase: false);
         TextDocument.TextPosition none = TextDocument.TextPosition.Invalid;
         Check(!target.HasSelection, "nothing is selected in a file that was just opened");
@@ -419,8 +420,8 @@ internal static class Program
         Check(source.FileEncoding == TextFileEncodings.Utf8Bom, "the encoding to save in can be changed");
 
         // A selection of two lines is measured from the text and the line breaks of its lines.
-        o.Editor.SetSelection(true, new TextDocument.TextPosition(2, 1));
-        o.Editor.SetCaret(new TextDocument.TextPosition(4, 2));
+        o.Editor.TextControl.SetSelection(true, new TextDocument.TextPosition(2, 1));
+        o.Editor.TextControl.SetCaret(new TextDocument.TextPosition(4, 2));
         Check(source.HasSelection, "a selection");
         Check(source.SelectionStart.Line == 1 && source.SelectionEnd.Line == 2, "with its two ends");
         Equal(source.CaretPosition.Line + ":" + source.CaretPosition.Column, "2:4", "the caret");
@@ -552,7 +553,7 @@ internal static class Program
         Opened o = Open(server, "created.txt");
         Check(o.Editor.IsNewFile, "a file that does not exist is a new file");
         Equal(Text(o), "", "a new file is empty");
-        o.Editor.ReplaceText(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(0, 0), select: false, "first line\nsecond line\n");
+        o.Editor.TextControl.ReplaceText(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(0, 0), select: false, "first line\nsecond line\n");
         Prompted(server, "new file", (text, buttons) => null, () => Save(o));
         NoPrompt(server, "saving a new file");
         SameBytes(ReadRemote(server, "created.txt"), Bytes("first line\nsecond line\n"), "a new file is created by the save");
@@ -780,7 +781,7 @@ internal static class Program
     private static List<string> RecordEvents(RemoteFileEditor editor)
     {
         List<string> events = new List<string>();
-        editor.ModifiedChanged += (sender, modified) => events.Add("modified:" + modified);
+        editor.TextControl.ModifiedChanged += (sender, modified) => events.Add("modified:" + modified);
         editor.HexModeChanged += (sender, e) => events.Add("hex:" + editor.IsHexMode);
         editor.FormatChanged += (sender, e) => events.Add("format");
         return events;
@@ -795,7 +796,7 @@ internal static class Program
 
     private static string Caret(RemoteFileEditor editor)
     {
-        return editor.CaretPosition.Line + ":" + editor.CaretPosition.Column;
+        return editor.TextControl.CaretPosition.Line + ":" + editor.TextControl.CaretPosition.Column;
     }
 
     // The switching between the text and the hex view (stage 3, step 3A: the net before it moves out of the control): what each view shows, which
@@ -812,18 +813,18 @@ internal static class Program
 
         e.ToggleHexMode();
         Equal(Events(events), "modified:False,hex:True,format", "opening the hex view tells the modified state, the view and the format, in this order");
-        Check(e.IsHexMode && e.HexEditorControl.Visible && !e.HexEditor.ReadOnly && e.ReadOnly, "the hex view is shown and can be edited, the text is read-only");
+        Check(e.IsHexMode && e.HexEditorControl.Visible && !e.HexEditor.ReadOnly && e.TextControl.ReadOnly, "the hex view is shown and can be edited, the text is read-only");
         SameBytes(e.HexEditor.Document.ToArray(), Bytes("abc\ndef\n"), "the hex view shows the bytes of the file");
         Check(!e.IsModified, "a file that was not changed is not modified in the hex view");
         e.ToggleHexMode();
         Equal(Events(events), "modified:False,hex:False,format", "closing it tells the same, in the same order");
-        Check(!e.IsHexMode && !e.HexEditorControl.Visible && e.HexEditor.ReadOnly && !e.ReadOnly, "the text is shown and can be edited again, the hex view is read-only");
+        Check(!e.IsHexMode && !e.HexEditorControl.Visible && e.HexEditor.ReadOnly && !e.TextControl.ReadOnly, "the text is shown and can be edited again, the hex view is read-only");
         Equal(Text(o), "abc\ndef\n", "the text is the one before");
         Check(!e.IsModified, "and it is not modified");
 
         // An edited text: the hex view shows its bytes, and going back keeps the text, its undo history and the caret.
         Replace(o, 0, "abc", "ABC");
-        e.SetCaret(new TextDocument.TextPosition(2, 1));
+        e.TextControl.SetCaret(new TextDocument.TextPosition(2, 1));
         events.Clear();
         e.ToggleHexMode();
         Equal(Events(events), "modified:True,hex:True,format", "the hex view of an edited text is modified");
@@ -832,12 +833,12 @@ internal static class Program
         e.ToggleHexMode();
         Equal(Events(events), "modified:True,hex:False,format", "back in the text: modified");
         Equal(Text(o), "ABC\ndef\n", "the edited text is back");
-        Check(e.IsModified && e.CanUndo, "it is modified and its undo history is kept");
+        Check(e.IsModified && e.TextControl.CanUndo, "it is modified and its undo history is kept");
         Equal(Caret(e), "1:2", "the caret is where it was");
 
         // The same text again: the same hex document, with its own undo history. A change of the bytes makes a new text when the view closes:
         // its line breaks are found again, the caret is brought into the shorter line, and the undo history of the text is gone.
-        e.SetCaret(new TextDocument.TextPosition(3, 1));
+        e.TextControl.SetCaret(new TextDocument.TextPosition(3, 1));
         e.ToggleHexMode();
         Check(ReferenceEquals(e.HexEditor.Document, shown), "the hex view of a text that did not change is the same document");
         e.HexEditor.Document.Replace(4, 3, Bytes("D\r"));
@@ -847,7 +848,7 @@ internal static class Program
         Equal(Events(events), "modified:True,hex:False,format", "back in the text after a change of the bytes");
         Equal(Text(o), "ABC\nD\r\n", "the text is made of the changed bytes");
         Equal(e.LineEndings, LineEndingKind.Mixed, "and its line breaks are found again (LF and CRLF)");
-        Check(e.IsModified && !e.CanUndo, "it is modified and is a new document, without the undo history of the text");
+        Check(e.IsModified && !e.TextControl.CanUndo, "it is modified and is a new document, without the undo history of the text");
         Equal(Caret(e), "1:1", "the caret is brought into the line, which is shorter now");
 
         // A byte that is not UTF-8: the text could not hold it, so the editor asks.
@@ -892,7 +893,7 @@ internal static class Program
         WriteRemote(server, "hex.txt", Bytes("reloaded bytes\n"));
         events.Clear();
         e.Reload();
-        Check(e.HexEditor.ReadOnly && e.ReadOnly && !e.CanSave && !e.CanToggleHexMode, "while the file is loaded again neither view can be edited");
+        Check(e.HexEditor.ReadOnly && e.TextControl.ReadOnly && !e.CanSave && !e.CanToggleHexMode, "while the file is loaded again neither view can be edited");
         Pump(() => e.CanSave, "the file to be loaded again");
         Settle(server);
         Check(e.IsHexMode && e.HexEditorControl.Visible && !e.HexEditor.ReadOnly, "the hex view is open again");
@@ -966,19 +967,20 @@ internal static class Program
         Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/place.txt";
         HexEditorControl given = new HexEditorControl { Dock = DockStyle.Fill };
-        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(), null, ColumnUnit.Characters, given) { Dock = DockStyle.Fill };
+        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(), null, ColumnUnit.Characters, given);
+        e.TextControl.Dock = DockStyle.Fill;
         Check(ReferenceEquals(e.HexEditor, given), "the hex view of the editor is the one it was given");
         Check(e.HexEditorControl == null, "and it has no WinForms one of its own");
-        Check(!e.Controls.Contains(given), "the given view is not put among the editor's controls");
+        Check(!e.TextControl.Controls.Contains(given), "the given view is not put among the editor's controls");
         FakeHexPlace place = new FakeHexPlace();
         e.HexViewPlace = place;
         string look = place.Take();
         // The font of the text is Courier New of 12 points (Mono may give another family for that name).
-        string family = e.LogicalFont.FontFamily.Name;
-        Check(e.LogicalFont.SizeInPoints == 12f, "the font of the text has 12 points");
+        string family = e.TextControl.LogicalFont.FontFamily.Name;
+        Check(e.TextControl.LogicalFont.SizeInPoints == 12f, "the font of the text has 12 points");
         Check(look.StartsWith("look ", StringComparison.Ordinal) && look.EndsWith(" " + family + " 12", StringComparison.Ordinal), "the place gets the colours and the font of the text when it is set (" + look + ")");
         form.Controls.Add(given);
-        form.Controls.Add(e);
+        form.Controls.Add(e.TextControl);
         form.Show();
         Opened o = new Opened { Editor = e, Form = form, Server = server, Path = path };
         Pump(() => e.CanSave, "the file to load");
@@ -986,13 +988,13 @@ internal static class Program
         place.Calls.RemoveAll(call => call.StartsWith("look ", StringComparison.Ordinal));
         Equal(place.Take(), "hide", "loading the file hides the hex view, as it did the editor's own");
 
-        e.BackColor = System.Drawing.Color.FromArgb(10, 20, 30);
+        e.TextControl.BackColor = System.Drawing.Color.FromArgb(10, 20, 30);
         look = place.Take();
         Check(look.StartsWith("look ff0a141e ", StringComparison.Ordinal), "a new background goes to the place (" + look + ")");
-        e.ForeColor = System.Drawing.Color.FromArgb(200, 210, 220);
+        e.TextControl.ForeColor = System.Drawing.Color.FromArgb(200, 210, 220);
         look = place.Take();
         Check(look.EndsWith("look ff0a141e ffc8d2dc " + family + " 12", StringComparison.Ordinal), "a new text colour too (" + look + ")");
-        e.FontZoom = 1.5f;
+        e.TextControl.FontZoom = 1.5f;
         look = place.Take();
         Check(look.EndsWith(" " + family + " 18", StringComparison.Ordinal), "the zoom of the text goes with the font (" + look + ")");
 
@@ -1000,7 +1002,7 @@ internal static class Program
         e.ToggleHexMode();
         Equal(place.Take(), "show", "opening the hex view asks the place to show it");
         Equal(Events(events), "modified:False,hex:True,format", "and tells what the editor tells with its own view");
-        Check(e.IsHexMode && !given.ReadOnly && e.ReadOnly, "the given view can be edited, the text cannot");
+        Check(e.IsHexMode && !given.ReadOnly && e.TextControl.ReadOnly, "the given view can be edited, the text cannot");
         SameBytes(given.Document.ToArray(), Bytes("abc\ndef\n"), "the given view shows the bytes of the file");
         given.Document.ReplaceByte(0, (byte)'A');
         Check(e.IsModified, "a change in the given view modifies the editor");
@@ -1023,7 +1025,7 @@ internal static class Program
 
         e.ToggleHexMode();
         Equal(place.Take(), "hide", "closing the hex view asks the place to hide it");
-        Check(!e.IsHexMode && given.ReadOnly && !e.ReadOnly, "the given view is read-only again, the text can be edited");
+        Check(!e.IsHexMode && given.ReadOnly && !e.TextControl.ReadOnly, "the given view is read-only again, the text can be edited");
         Equal(Text(o), "reloaded\n", "the text is the file");
         o.Close();
     }
@@ -1071,8 +1073,9 @@ internal static class Program
         GlobalSettings settings = new GlobalSettings();
         Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/flow.txt";
-        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(8, 1), null, ColumnUnit.TabStops) { Dock = DockStyle.Fill };
-        form.Controls.Add(e);
+        RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(8, 1), null, ColumnUnit.TabStops);
+        e.TextControl.Dock = DockStyle.Fill;
+        form.Controls.Add(e.TextControl);
         form.Show();
         Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && !e.CanRunInTerminal, "before the file is loaded nothing can be saved, switched, read again, followed or run");
         int savingChanges = 0;
@@ -1094,11 +1097,11 @@ internal static class Program
 
         // While the file is loaded again the text cannot be saved: a save on close says so, and the caret comes back where it was.
         List<string> events = RecordEvents(e);
-        e.SetCaret(new TextDocument.TextPosition(2, 2));
+        e.TextControl.SetCaret(new TextDocument.TextPosition(2, 2));
         Thread.Sleep(1100);
         WriteRemote(server, "flow.txt", Bytes("one\n\tb=2\nthree, longer\n"));
         e.Reload();
-        Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && e.ReadOnly, "while the file is loaded again: read-only, nothing can be saved or switched");
+        Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && e.TextControl.ReadOnly, "while the file is loaded again: read-only, nothing can be saved or switched");
         try
         {
             e.Save();
@@ -1126,12 +1129,12 @@ internal static class Program
         Prompted(server, "failed reload", (text, buttons) => buttons == MessageBoxButtons.OK ? DialogResult.OK : (DialogResult?)null, () =>
         {
             e.Reload();
-            Pump(() => !e.ReadOnly, "the reload to fail");
+            Pump(() => !e.TextControl.ReadOnly, "the reload to fail");
         });
         Remote(server, "chmod 644 '" + path + "'");
         Settle(server);
         OnlyPrompt(server, "a reload that fails");
-        Check(e.CanSave && !e.ReadOnly && e.IsModified, "after a reload that failed the text can be edited and saved, and it is still modified");
+        Check(e.CanSave && !e.TextControl.ReadOnly && e.IsModified, "after a reload that failed the text can be edited and saved, and it is still modified");
         Equal(Text(o), "ONE\n\tb=2\nthree, longer\n", "the text of the user is kept");
         Equal(Events(events), "format,format", "the format is told when the reload starts and when it failed");
 
@@ -1166,7 +1169,7 @@ internal static class Program
         Replace(o, 2, "echo 2", "if true; then");
         Prompted(server, "check no", (text, buttons) => text.Contains("The check (") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
         OnlyPrompt(server, "a script with a problem");
-        Equal(o.Editor.CaretPosition.Line, 3, "answered No: the caret is on the line the check named");
+        Equal(o.Editor.TextControl.CaretPosition.Line, 3, "answered No: the caret is on the line the check named");
         o.Close();
 
         // A service reload that fails: the editor offers sudo for it.

@@ -44,7 +44,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FileExplorer FileExplorer => null;
 
-    public TextEditorControl EditorControl => Editor;
+    public TextEditorControl EditorControl => Editor.TextControl;
 
     /// <summary>The editor together with its context menu (the WinForms part of the tab).</summary>
     internal RemoteFileEditorPanel EditorPanel { get; }
@@ -112,7 +112,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
         StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, EditorPanel));
-        Searcher = new TextSearcher(editor)
+        Searcher = new TextSearcher(editor.TextControl)
         {
             CanReplace = true
         };
@@ -134,7 +134,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 Searcher.ActivateReplace();
             }
         };
-        editor.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
+        editor.TextControl.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
         editor.HexModeChanged += (object sender, EventArgs e) => UpdateEditorChrome();
         UpdateEditorChrome();
         Title = RemotePathUtils.GetFileName(filePath);
