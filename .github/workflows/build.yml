@@ -273,6 +273,9 @@ jobs:
       - name: Run text view layout checks (the rows, the margin, the point of a position and the position under a point, scrolling, the scroll bars, the selection by the mouse of the WPF text view)
         run: dotnet run --project tests/TextViewLayoutTests -c Release
 
+      - name: Run editor completion checks (when the word list of a code editor opens, what it selects and accepts, and the parameter hint of a call)
+        run: dotnet run --project tests/EditorCompletionTests -c Release
+
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
