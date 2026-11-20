@@ -1197,3 +1197,65 @@ row index to line: -1>0.0 0>0.0 1>1.0 2>2.0 3>3.0 4>4.0 5>5.0 6>5.1 7>5.2 8>6.0 
 position to row index / segment: -3:-1>0/0 -3:0>0/0 -3:7>0/0 -3:19>0/0 -3:20>0/0 -3:21>0/0 -3:39>0/0 -3:40>0/0 -3:45>0/0 -3:100>0/0 0:-1>0/0 0:0>0/0 0:7>0/0 0:19>0/0 0:20>0/0 0:21>0/0 0:39>0/0 0:40>0/0 0:45>0/0 0:100>0/0 1:-1>1/0 1:0>1/0 1:7>1/0 1:19>1/0 1:20>1/0 1:21>1/0 1:39>1/0 1:40>1/0 1:45>1/0 1:100>1/0 2:-1>2/0 2:0>2/0 2:7>2/0 2:19>2/0 2:20>2/0 2:21>2/0 2:39>2/0 2:40>2/0 2:45>2/0 2:100>2/0 5:-1>5/0 5:0>5/0 5:7>5/0 5:19>5/0 5:20>6/1 5:21>6/1 5:39>6/1 5:40>7/2 5:45>7/2 5:100>7/2 10:-1>12/0 10:0>12/0 10:7>12/0 10:19>13/1 10:20>13/1 10:21>13/1 10:39>13/1 10:40>13/1 10:45>13/1 10:100>13/1 29:-1>42/0 29:0>42/0 29:7>43/1 29:19>43/1 29:20>43/1 29:21>43/1 29:39>44/2 29:40>44/2 29:45>44/2 29:100>44/2 40:-1>42/0 40:0>42/0 40:7>43/0 40:19>43/0 40:20>43/0 40:21>43/0 40:39>44/0 40:40>44/0 40:45>44/0 40:100>44/0
 segments: 0.0>0-max 0.1>0-max 0.2>0-max 0.3>0-max 2.0>0-max 2.1>0-max 2.2>0-max 2.3>0-max 5.0>0-20 5.1>20-40 5.2>40-max 10.0>0-16 10.1>16-max
 == another text: 0:0[] 1:1[20,40,60] 2:5[16,32,51] rows 9
+== edits
+edit a new document: text=alpha beta\n    gamma\ndelta\n\n\tepsilon caret=0:0 sel=- mod=F undo=F redo=F events=
+edit a word replaced in a line: text=alpha BETA!\n    gamma\ndelta\n\n\tepsilon caret=0:11 sel=- mod=T undo=T redo=F events=line:0,6,4,5;mod:T
+edit an empty edit: text=alpha BETA!\n    gamma\ndelta\n\n\tepsilon caret=0:11 sel=- mod=T undo=T redo=F events=
+edit a range across lines replaced: text=alp-lta\n\n\tepsilon caret=0:4 sel=- mod=T undo=T redo=F events=range:0:3,2:2,0:4
+edit undone: text=alpha BETA!\n    gamma\ndelta\n\n\tepsilon caret=0:11 sel=- mod=T undo=T redo=T events=range:0:3,0:4,2:2
+edit undone again: the start: text=alpha beta\n    gamma\ndelta\n\n\tepsilon caret=0:0 sel=- mod=F undo=F redo=T events=line:0,6,5,4;mod:F
+edit nothing more to undo: text=alpha beta\n    gamma\ndelta\n\n\tepsilon caret=0:0 sel=- mod=F undo=F redo=T events=
+edit redone: text=alpha BETA!\n    gamma\ndelta\n\n\tepsilon caret=0:11 sel=- mod=T undo=T redo=T events=line:0,6,4,5;mod:T
+edit redone again: text=alp-lta\n\n\tepsilon caret=0:4 sel=- mod=T undo=T redo=F events=range:0:3,2:2,0:4
+edit nothing more to redo: text=alp-lta\n\n\tepsilon caret=0:4 sel=- mod=T undo=T redo=F events=
+edit an edit after an undo drops the redo: text=alpha BETA!\nX    gamma\ndelta\n\n\tepsilon caret=0:1 sel=- mod=T undo=T redo=F events=range:0:3,0:4,2:2;line:1,0,0,1
+edit a replacement with a line break: text=al1\n2 BETA!\nX    gamma\ndelta\n\n\tepsilon caret=1:1 sel=- mod=T undo=T redo=F events=range:0:2,0:5,1:1
+edit an end before the start: text=al1\n2<>A!\nX    gamma\ndelta\n\n\tepsilon caret=1:3 sel=- mod=T undo=T redo=F events=line:1,1,4,2
+edit an end column of -1 is the end of the line: text=al1\n2<>A!\nX!\ndelta\n\n\tepsilon caret=1:2 sel=- mod=T undo=T redo=F events=line:2,1,9,1
+edit a start column of -1 too: text=al1\n2<>A!\nX!\ndelta?\n\n\tepsilon caret=1:5 sel=- mod=T undo=T redo=F events=line:3,5,0,1
+edit the line break at the end of a line deleted (the next line joined): text=al1\n2<>A!\nX!delta?\n\n\tepsilon caret=2:2 sel=- mod=T undo=T redo=F events=range:2:2,3:0,2:2
+edit another document: text=    first\n    second\n\nthird caret=2:2 sel=- mod=T undo=F redo=F events=
+edit a join that drops the indentation the lines share: text=    firstsecond\n\nthird caret=0:9 sel=- mod=T undo=T redo=F events=range:0:9,1:4,0:9
+edit and its undo: text=    first\n    second\n\nthird caret=2:0 sel=- mod=T undo=F redo=T events=range:0:9,0:9,1:4
+edit indent of lines 0 to 2 (a selection that ends at the start of a line) with a tab: text=\t    first\n\t    second\n\nthird caret=3:0 sel=0:2 mod=T undo=T redo=F events=line:0,0,0,1;line:1,0,0,1
+edit unindent of them: text=    first\n    second\n\nthird caret=3:0 sel=0:2 mod=T undo=T redo=F events=line:0,0,1,0;line:1,0,1,0;line:2,0,0,0
+edit the unindent undone: text=\t    first\n\t    second\n\nthird caret=3:0 sel=0:2 mod=T undo=T redo=T events=line:0,0,0,1;line:1,0,0,1;line:2,0,0,0
+edit the indent undone: text=    first\n    second\n\nthird caret=3:0 sel=0:2 mod=T undo=F redo=T events=line:0,0,1,0;line:1,0,1,0
+edit indent of the caret line by two levels of spaces: text=    first\n            second\n\nthird caret=1:3 sel=- mod=T undo=T redo=F events=line:1,0,0,8
+edit unindent of the caret line by one: text=    first\n        second\n\nthird caret=1:3 sel=- mod=T undo=T redo=F events=line:1,0,4,0
+edit unindent by more than there is: text=    first\nsecond\n\nthird caret=1:3 sel=- mod=T undo=T redo=F events=line:1,0,8,0
+edit all three undone: text=    first\n    second\n\nthird caret=1:3 sel=- mod=T undo=F redo=T events=line:1,0,0,8;line:1,0,0,4;line:1,0,8,0
+edit the indent redone: text=    first\n            second\n\nthird caret=1:3 sel=- mod=T undo=T redo=T events=line:1,0,0,8
+edit a third document: text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=F events=
+edit an edit: text=one!\ntwo caret=1:3 sel=- mod=T undo=T redo=F events=line:0,3,0,1
+edit marked saved: text=one!\ntwo caret=1:3 sel=- mod=F undo=T redo=F events=mod:F
+edit another edit: text=one!\n+two caret=1:1 sel=- mod=T undo=T redo=F events=line:1,0,0,1;mod:T
+edit undone back to the saved text: text=one!\ntwo caret=1:3 sel=- mod=F undo=T redo=T events=line:1,0,1,0;mod:F
+edit undone past it: text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=T events=line:0,3,1,0;mod:T
+edit redone to the saved text: text=one!\ntwo caret=1:3 sel=- mod=F undo=T redo=T events=line:0,3,0,1;mod:F
+edit marked saved at the version of the start: text=one!\ntwo caret=1:3 sel=- mod=T undo=T redo=T events=mod:T
+edit undone to that version: text=one\ntwo caret=1:3 sel=- mod=F undo=F redo=T events=line:0,3,1,0;mod:F
+edit set modified: text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=T events=mod:T
+edit redone and undone: still modified (never saved): text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=T events=line:0,3,0,1;line:0,3,1,0
+edit set saved: text=one\ntwo caret=1:3 sel=- mod=F undo=F redo=T events=mod:F
+edit a change made outside an edit command: text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=T events=line:0,0,0,0;mod:T
+edit undone after it: still modified: text=one\ntwo caret=1:3 sel=- mod=T undo=F redo=T events=
+edit three edits as one step (one of them nested): text=Aaa\nBab\nCac caret=1:1 sel=- mod=T undo=T redo=F events=line:0,0,1,1;line:1,0,1,1;line:2,0,1,1;mod:T
+edit undone at once: text=aaa\nbab\ncac caret=1:3 sel=- mod=F undo=F redo=T events=line:2,0,1,1;line:1,0,1,1;line:0,0,1,1;mod:F
+edit redone at once: text=Aaa\nBab\nCac caret=1:1 sel=- mod=T undo=T redo=F events=line:0,0,1,1;line:1,0,1,1;line:2,0,1,1;mod:T
+edit an empty step: text=Aaa\nBab\nCac caret=1:1 sel=- mod=T undo=T redo=F events=
+edit the empty step left no undo of its own: text=aaa\nbab\ncac caret=1:3 sel=- mod=F undo=F redo=T events=line:2,0,1,1;line:1,0,1,1;line:0,0,1,1;mod:F
+edit before Replace All: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=T redo=F events=line:0,0,1,1;line:1,0,1,1;line:2,0,1,1;mod:T
+replace all a: 4
+edit Replace All: text=A<a><a>\nB<a>b\nC<a>c caret=2:3 sel=- mod=T undo=T redo=F events=line:0,0,3,7;line:1,0,3,5;line:2,0,3,5
+edit Replace All undone: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=T redo=T events=line:2,0,5,3;line:1,0,5,3;line:0,0,7,3
+replace all x: 0
+edit Replace All of nothing: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=T redo=T events=
+replace all empty: 0
+scoped: 3 end 1:2
+edit Replace All in a range, with a line break in the replacement: text=A1\n21\n2\nB1\n2b\nCac caret=2:1 sel=- mod=T undo=T redo=F events=range:0:0,0:3,2:1;range:3:0,3:3,4:2
+replace all read-only: 0
+edit read-only: no edit, no undo, no redo: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=F redo=F events=range:3:0,4:2,3:3;range:0:0,2:1,0:3
+edit editable again: text=Aaa\nBab\nCac caret=2:3 sel=- mod=T undo=T redo=T events=
+edit a new document while modified: text=new caret=2:3 sel=- mod=T undo=F redo=F events=
+edit a new document while saved: text=newer caret=2:3 sel=- mod=F undo=F redo=F events=mod:F

@@ -20,6 +20,7 @@ using K = System.Windows.Forms.Keys;
 //     of positions).
 //   - the selection (3C-2): the clicks, the margin, a drag, the buttons, a key without Shift, Select all, a range of lines, the setters and the
 //     selected lines, also in terminal mode (SelectionRuns).
+//   - the edits and their undo (3C-3): ReplaceText, Indent, Undo, Redo, the modified state, single steps, Replace All, read-only (EditRuns).
 // The view is sized until it shows exactly 8 rows (and wraps at 20 columns), so that the lines do not depend on the fonts.
 // TextViewGolden.txt is what the code wrote before the move; it is never written again. Since the move (3C-1) the accessors read the kept column
 // and the wrap map of the model (Navigator, WrapLayout) instead of the fields of the view.
@@ -277,6 +278,7 @@ internal static class Program
         _editor.SetDocument(new EditableTextDocument(new[] { "short", new string('w', 61), "\t\t\t\t\tafter tabs that pass the width" }, TextDocument.LineEnding.Lf));
         Application.DoEvents();
         WrapMap2(3);
+        EditRuns();
         _form.Dispose();
     }
 
@@ -467,6 +469,191 @@ internal static class Program
         SelectionState();
     }
 
+    // ---- 3C-3: the edits and their undo, written by the code before the undo history moved to the model.
+    // ReplaceText in a line, across lines, with the start only (select), an empty edit, the join of two lines that drops the indentation of
+    // the second, Indent and unindent with and without a selection (tabs, spaces, blank lines), Undo and Redo at the ends of the history, an
+    // edit after an undo (the redo is gone), the modified state with IsModified, CurrentVersion and MarkSaved, a change made outside an edit
+    // command, ExecuteAsSingleUndoStep (also nested), Replace All (literal, scoped, with line breaks), read-only, and a new document. Every
+    // step writes the text, the caret, the selection, the modified state, what can be undone and redone, and the events.
+
+    private static readonly List<string> EditEvents = new List<string>();
+
+    private static string Escape(string text)
+    {
+        return text.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+    }
+
+    private static void Edit(string what)
+    {
+        Lines.Add("edit " + what + ": text=" + Escape(_editor.EditableDocument.GetText()) + " caret=" + P(_editor.CaretPosition)
+            + " sel=" + (_editor.HasSelection ? P(_editor.SelectionStart) : "-") + " mod=" + Bool(_editor.IsModified)
+            + " undo=" + Bool(_editor.CanUndo) + " redo=" + Bool(_editor.CanRedo) + " events=" + string.Join(";", EditEvents));
+        EditEvents.Clear();
+    }
+
+    private static void EditRuns()
+    {
+        Lines.Add("== edits");
+        _editor.WordWrap = false;
+        _editor.TabSize = 4;
+        _editor.SetDocument(new EditableTextDocument(new[] { "alpha beta", "    gamma", "delta", "", "\tepsilon" }, TextDocument.LineEnding.Lf));
+        _editor.SetCaret(At(0, 0));
+        _editor.ClearSelection();
+        _editor.IsModified = false;
+        _editor.ModifiedChanged += (view, modified) => EditEvents.Add("mod:" + Bool(modified));
+        _editor.LineChanged += (view, line, column, added, removed) => EditEvents.Add("line:" + line + "," + column + "," + added + "," + removed);
+        _editor.RangeChanged += (view, start, oldEnd, newEnd) => EditEvents.Add("range:" + P(start) + "," + P(oldEnd) + "," + P(newEnd));
+        EditEvents.Clear();
+        Edit("a new document");
+        _editor.ReplaceText(At(0, 6), At(0, 10), false, "BETA!");
+        Edit("a word replaced in a line");
+        _editor.ReplaceText(At(0, 0), At(0, 0), true, "");
+        Edit("an empty edit");
+        _editor.ReplaceText(At(0, 3), At(2, 2), false, "-");
+        Edit("a range across lines replaced");
+        _editor.Undo();
+        Edit("undone");
+        _editor.Undo();
+        Edit("undone again: the start");
+        _editor.Undo();
+        Edit("nothing more to undo");
+        _editor.Redo();
+        Edit("redone");
+        _editor.Redo();
+        Edit("redone again");
+        _editor.Redo();
+        Edit("nothing more to redo");
+        _editor.Undo();
+        _editor.ReplaceText(At(1, 0), At(1, 0), true, "X");
+        Edit("an edit after an undo drops the redo");
+        _editor.ReplaceText(At(0, 2), At(0, 5), false, "1\n2");
+        Edit("a replacement with a line break");
+        _editor.ReplaceText(At(1, 5), At(1, 1), false, "<>");
+        Edit("an end before the start");
+        _editor.ReplaceText(At(2, 1), At(2, -1), false, "!");
+        Edit("an end column of -1 is the end of the line");
+        _editor.ReplaceText(At(3, -1), At(3, -1), true, "?");
+        Edit("a start column of -1 too");
+        _editor.SetCaret(At(3, 1));
+        _editor.ReplaceText(At(2, _editor.EditableDocument.GetLineText(2).Length), At(3, 0), false, "");
+        Edit("the line break at the end of a line deleted (the next line joined)");
+        _editor.SetDocument(new EditableTextDocument(new[] { "    first", "    second", "", "third" }, TextDocument.LineEnding.Lf));
+        EditEvents.Clear();
+        Edit("another document");
+        _editor.ReplaceText(At(0, 9), At(1, 0), false, "");
+        Edit("a join that drops the indentation the lines share");
+        _editor.Undo();
+        Edit("and its undo");
+
+        _editor.InsertSpaces = false;
+        _editor.SetSelection(true, At(0, 2));
+        _editor.SetCaret(At(3, 0));
+        _editor.Indent(1);
+        Edit("indent of lines 0 to 2 (a selection that ends at the start of a line) with a tab");
+        _editor.Indent(-1);
+        Edit("unindent of them");
+        _editor.Undo();
+        Edit("the unindent undone");
+        _editor.Undo();
+        Edit("the indent undone");
+        _editor.ClearSelection();
+        _editor.SetCaret(At(1, 3));
+        _editor.InsertSpaces = true;
+        _editor.Indent(2);
+        Edit("indent of the caret line by two levels of spaces");
+        _editor.Indent(-1);
+        Edit("unindent of the caret line by one");
+        _editor.Indent(-5);
+        Edit("unindent by more than there is");
+        _editor.Undo();
+        _editor.Undo();
+        _editor.Undo();
+        Edit("all three undone");
+        _editor.Redo();
+        Edit("the indent redone");
+
+        _editor.SetDocument(new EditableTextDocument(new[] { "one", "two" }, TextDocument.LineEnding.Lf));
+        EditEvents.Clear();
+        Edit("a third document");
+        object saved = _editor.CurrentVersion;
+        _editor.ReplaceText(At(0, 3), At(0, 3), false, "!");
+        Edit("an edit");
+        _editor.MarkSaved(_editor.CurrentVersion);
+        Edit("marked saved");
+        _editor.ReplaceText(At(1, 0), At(1, 0), false, "+");
+        Edit("another edit");
+        _editor.Undo();
+        Edit("undone back to the saved text");
+        _editor.Undo();
+        Edit("undone past it");
+        _editor.Redo();
+        Edit("redone to the saved text");
+        _editor.MarkSaved(saved);
+        Edit("marked saved at the version of the start");
+        _editor.Undo();
+        Edit("undone to that version");
+        _editor.IsModified = true;
+        Edit("set modified");
+        _editor.Redo();
+        _editor.Undo();
+        Edit("redone and undone: still modified (never saved)");
+        _editor.IsModified = false;
+        Edit("set saved");
+        typeof(EditableTextBrowser).GetMethod("OnLineChanged", Private).Invoke(_editor, new object[] { 0, 0, 0, 0 });
+        Edit("a change made outside an edit command");
+        _editor.Undo();
+        Edit("undone after it: still modified");
+
+        _editor.SetDocument(new EditableTextDocument(new[] { "aaa", "bab", "cac" }, TextDocument.LineEnding.Lf));
+        _editor.IsModified = false;
+        EditEvents.Clear();
+        _editor.ExecuteAsSingleUndoStep(() =>
+        {
+            _editor.ReplaceText(At(0, 0), At(0, 1), false, "A");
+            _editor.ExecuteAsSingleUndoStep(() => _editor.ReplaceText(At(1, 0), At(1, 1), false, "B"));
+            _editor.ReplaceText(At(2, 0), At(2, 1), false, "C");
+        });
+        Edit("three edits as one step (one of them nested)");
+        _editor.Undo();
+        Edit("undone at once");
+        _editor.Redo();
+        Edit("redone at once");
+        _editor.ExecuteAsSingleUndoStep(() => { });
+        Edit("an empty step");
+        _editor.Undo();
+        Edit("the empty step left no undo of its own");
+        _editor.Redo();
+        _editor.SetCaret(At(2, 3));
+        Edit("before Replace All");
+        Lines.Add("replace all a: " + _editor.ReplaceAll("a", "<a>", false));
+        Edit("Replace All");
+        _editor.Undo();
+        Edit("Replace All undone");
+        Lines.Add("replace all x: " + _editor.ReplaceAll("x", "y", false));
+        Edit("Replace All of nothing");
+        Lines.Add("replace all empty: " + _editor.ReplaceAll("", "y", false));
+        TextDocument.TextPosition newEnd;
+        Lines.Add("scoped: " + _editor.ReplaceAll(TextMatcher.Literal("A", true), "1\n2", At(0, 1), At(1, 2), out newEnd) + " end " + P(newEnd));
+        Edit("Replace All in a range, with a line break in the replacement");
+        _editor.Undo();
+
+        _editor.ReadOnly = true;
+        _editor.ReplaceText(At(0, 0), At(0, 0), false, "no");
+        _editor.Indent(1);
+        _editor.ExecuteAsSingleUndoStep(() => _editor.ReplaceText(At(0, 0), At(0, 0), false, "no"));
+        Lines.Add("replace all read-only: " + _editor.ReplaceAll("a", "b", false));
+        _editor.Undo();
+        Edit("read-only: no edit, no undo, no redo");
+        _editor.ReadOnly = false;
+        Edit("editable again");
+        _editor.IsModified = true;
+        _editor.SetDocument(new EditableTextDocument(new[] { "new" }, TextDocument.LineEnding.Lf));
+        Edit("a new document while modified");
+        _editor.IsModified = false;
+        _editor.SetDocument(new EditableTextDocument(new[] { "newer" }, TextDocument.LineEnding.Lf));
+        Edit("a new document while saved");
+    }
+
     private static string Bool(bool value)
     {
         return value ? "T" : "F";
@@ -481,6 +668,7 @@ internal static class Program
         catch (Exception exception)
         {
             Console.WriteLine(exception);
+            Console.WriteLine("after: " + (Lines.Count > 0 ? Lines[Lines.Count - 1] : "nothing"));
             return 1;
         }
         string text = string.Join("\n", Lines) + "\n";
