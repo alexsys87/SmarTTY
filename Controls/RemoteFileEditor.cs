@@ -31,6 +31,9 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
     /// <summary>The text view of the file.</summary>
     public IRemoteTextView TextView => _text;
 
+    /// <summary>What the owner of the editor keeps with it (the main window: the tab of the editor), as the <c>Tag</c> of a control.</summary>
+    public object Tag { get; set; }
+
     /// <summary>The text view as the WinForms control the editor made (for the panel and the tab); null when the view was given.</summary>
     public RemoteTextView TextControl => _textControl;
 

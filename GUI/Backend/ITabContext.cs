@@ -15,8 +15,6 @@ public interface ITabContext : IDisposable
     /// <summary>The WPF status bar below the tab content, or null for tabs without one.</summary>
     FrameworkElement StatusBar { get; }
 
-    TextEditorControl EditorControl { get; }
-
     string Title { get; }
 
     IconType Icon { get; }

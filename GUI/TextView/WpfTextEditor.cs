@@ -1,5 +1,6 @@
 using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
+using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -24,10 +25,10 @@ namespace SmarTTY.GUI.TextView;
 /// are <see cref="EditorCompletion"/> with WPF windows (<see cref="WpfSuggestionList"/>, <see cref="WpfHintView"/>, 3D-6); the commands and their
 /// keys, the search with its highlights, the pair of a bracket, the marks of the blanks and several cursors are those of <c>CodeEditorPP</c> too
 /// (<see cref="LineCommands"/>, <see cref="TextSearch"/>, <see cref="BracketPair"/>, <see cref="BlankMarks"/>, <see cref="MultiCursorSession"/>, 3E-1 to 3E-3).
-/// Not in it yet: characters that the font has no glyph for (they are drawn as "?") and characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
+/// Not in it yet: characters that the font has no glyph for (they are drawn as "?") and characters of two cells; it is the text view of the editor tab (stage 3E-4: the <see cref="IRemoteTextView"/> of a <c>RemoteFileEditor</c>) and is tried on a file of this computer in Tools > WPF text editor lab (<see cref="TextLabWindow"/>).
 /// </summary>
 internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost, IEditorCompletionHost,
-    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget, ISearchTarget, IMultiCursorHost
+    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget, ISearchTarget, IMultiCursorHost, IRemoteTextView
 {
     // What a word is for Ctrl+Left/Right, a double click and Ctrl+Backspace (as ReadonlyTextBrowser.IsWordChar).
     private const string WordCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -373,6 +374,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _gutterBackColor = marginBackground;
         _gutterForeColor = marginForeground;
         InvalidateVisual();
+        AppearanceChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -683,6 +685,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _fontPoints = sizeInPoints > 0 ? sizeInPoints : 12;
         _layout.Wrap.Invalidate();
         OnLayoutOptionChanged();
+        AppearanceChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>The zoom of the text was changed with Ctrl+wheel or the zoom commands.</summary>
@@ -705,6 +708,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             _fontZoom = value;
             _layout.Wrap.Invalidate();
             OnLayoutOptionChanged();
+            AppearanceChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -2482,4 +2486,117 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             }
         }
     }
+
+    // ---- the text view of a remote file editor (IRemoteTextView, stage 3E-4)
+
+    private bool _closed;
+
+    private WpfViewDispatcher _uiDispatcher;
+
+    /// <summary>The colours, the font or the zoom of the text changed (a hex view takes them).</summary>
+    public event EventHandler AppearanceChanged;
+
+    /// <summary>The view was closed: the editor of the file stops loading and writing drafts.</summary>
+    public event EventHandler Closed;
+
+    /// <summary>The view was closed (its tab was).</summary>
+    public bool IsClosed => _closed;
+
+    /// <summary>Closes the view: it stops its timers and tells the editor of the file.</summary>
+    public void Close()
+    {
+        if (_closed)
+        {
+            return;
+        }
+        _closed = true;
+        _caretTimer.Stop();
+        _autoScrollTimer.Stop();
+        _completion.HideCompletion();
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Moves the caret to a line and a column counted from 0 and shows it (a folded block around it opens).</summary>
+    public void GoToPosition(int line, int column)
+    {
+        SetCaret(new TextDocument.TextPosition(Math.Max(0, column), line));
+    }
+
+    /// <summary>Puts the whole text on the clipboard.</summary>
+    public void CopyAll()
+    {
+        TryCopyToClipboard(_document.GetRangeText(new TextDocument.TextPosition(0, 0), TextSelection.DocumentEnd(_document)));
+    }
+
+    public int LineCount => _document.LineCount;
+
+    bool IRemoteTextView.IsTextModified
+    {
+        get => IsModified;
+        set => IsModified = value;
+    }
+
+    object IRemoteTextView.CurrentVersion => _history.CurrentVersion;
+
+    void IRemoteTextView.SetDocument(EditableTextDocument document)
+    {
+        Document = document;
+    }
+
+    void IRemoteTextView.MarkSaved(object version)
+    {
+        _history.MarkSaved(version);
+    }
+
+    void IRemoteTextView.RaiseModifiedChanged()
+    {
+        OnModifiedChanged();
+    }
+
+    void IRemoteTextView.FocusText()
+    {
+        Focus();
+    }
+
+    void IRemoteTextView.ApplyMessageColors(RgbColor background, RgbColor error, RgbColor warning, RgbColor border)
+    {
+        SetMessageColors(background, error, warning, border);
+    }
+
+    FoldedLineInfo[] IRemoteTextView.GetFoldState()
+    {
+        return _folding.GetCollapsedRegions();
+    }
+
+    void IRemoteTextView.RestoreFoldState(FoldedLineInfo[] items)
+    {
+        _folding.RestoreFolds(items);
+        AfterFoldChange();
+    }
+
+    void IRemoteTextView.SelectAllText()
+    {
+        SelectAll();
+    }
+
+    void IRemoteTextView.GetAppearance(out RgbColor background, out RgbColor foreground, out string fontFamily, out float fontSizeInPoints)
+    {
+        background = _backColor;
+        foreground = _foreColor;
+        fontFamily = _fontFamily;
+        fontSizeInPoints = (float)(_fontPoints * _fontZoom);
+    }
+
+    bool IRemoteTextView.Post(Action action)
+    {
+        return UiDispatcherOfView.Post(action);
+    }
+
+    IUiDispatcher IRemoteTextView.UiDispatcher => UiDispatcherOfView;
+
+    IUserPrompt IRemoteTextView.UserPrompt => UiDispatcherOfView;
+
+    System.Windows.Forms.IWin32Window IRemoteTextView.MessageOwner => null;
+
+    private WpfViewDispatcher UiDispatcherOfView => _uiDispatcher ?? (_uiDispatcher = new WpfViewDispatcher(this));
 }

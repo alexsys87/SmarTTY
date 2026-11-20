@@ -55,8 +55,6 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     }
 
     /// <summary>The WinForms editor of the tab (the Smart Terminal), or null for a WPF terminal.</summary>
-    public TextEditorControl EditorControl => Terminal as TextEditorControl;
-
     public FrameworkElement VerticalScrollBar { get; }
 
     public FrameworkElement HorizontalScrollBar { get; }

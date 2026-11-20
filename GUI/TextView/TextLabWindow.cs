@@ -14,8 +14,8 @@ using DrawingColor = System.Drawing.Color;
 namespace SmarTTY.GUI.TextView;
 
 /// <summary>
-/// Tools > WPF text editor lab: the text view drawn with WPF (<see cref="WpfTextEditor"/>, stage 3D-2) on a file of this computer, before it takes
-/// the place of the WinForms text view in the editor tab. Typing, the edit keys, undo, the clipboard, the mouse selection, scrolling, word wrap,
+/// Tools > WPF text editor lab: the text view drawn with WPF (<see cref="WpfTextEditor"/>, stage 3D-2; the text view of the editor tab since 3E-4) on a
+/// file of this computer, without a server. Typing, the edit keys, undo, the clipboard, the mouse selection, scrolling, word wrap,
 /// the line numbers and the tab size can be tried here; the text can be changed but is never saved.
 /// </summary>
 internal sealed class TextLabWindow : Window
