@@ -2220,15 +2220,16 @@ internal static class Program
 
     private static string Cursors(CodeEditorPP code)
     {
-        System.Collections.IList extra = (System.Collections.IList)typeof(CodeEditorPP).GetField("_extraCursors", Private).GetValue(code);
+        object session = typeof(CodeEditorPP).GetProperty("CursorSession", Private).GetValue(code);
+        System.Collections.IList extra = (System.Collections.IList)typeof(MultiCursorSession).GetField("_extraCursors", Private).GetValue(session);
         List<string> items = new List<string>();
         foreach (object item in extra)
         {
             TextCursor cursor = (TextCursor)item;
             items.Add(cursor.Anchor.Line + ":" + cursor.Anchor.Column + (cursor.HasSelection ? ">" + cursor.Caret.Line + ":" + cursor.Caret.Column : "") + (cursor.Goal >= 0 ? "g" + cursor.Goal : ""));
         }
-        return "main=" + (code.HasSelection ? P(code.SelectionStart) + ">" : "") + P(code.CaretPosition) + " goal=" + typeof(CodeEditorPP).GetField("_primaryGoal", Private).GetValue(code)
-            + " whole=" + Bool((bool)typeof(CodeEditorPP).GetField("_wholeWordOccurrences", Private).GetValue(code)) + " extra=" + (items.Count == 0 ? "-" : string.Join(" ", items));
+        return "main=" + (code.HasSelection ? P(code.SelectionStart) + ">" : "") + P(code.CaretPosition) + " goal=" + typeof(MultiCursorSession).GetField("_primaryGoal", Private).GetValue(session)
+            + " whole=" + Bool((bool)typeof(MultiCursorSession).GetField("_wholeWordOccurrences", Private).GetValue(session)) + " extra=" + (items.Count == 0 ? "-" : string.Join(" ", items));
     }
 
     private static void CursorState(CodeEditorPP code, string what)
@@ -2374,8 +2375,10 @@ internal static class Program
         KeyDown(Keys.Control | Keys.Shift | Keys.Right);
         CursorState(code, "a word selected at each of three cursors");
         object[] copyArgs = { null };
-        bool copied = (bool)typeof(CodeEditorPP).GetMethod("TryCopyCursors", Private).Invoke(code, copyArgs);
-        string clip = (string)typeof(CodeEditorPP).GetMethod("ForClipboard", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { copyArgs[0] });
+        MultiCursorSession cursorSession = (MultiCursorSession)typeof(CodeEditorPP).GetProperty("CursorSession", Private).GetValue(code);
+        bool copied = cursorSession.TryCopyCursors(out List<string> copiedTexts);
+        copyArgs[0] = copiedTexts;
+        string clip = MultiCursorSession.ForClipboard(copiedTexts);
         Lines.Add("cursors copy: " + Bool(copied) + " text=" + Escape(clip));
         code.PasteText("A\r\nB\r\nC");
         CursorState(code, "a paste of a line for each cursor");
@@ -2404,7 +2407,7 @@ internal static class Program
         code.ReadOnly = false;
         object[] none = { null };
         code.ClearExtraCursors();
-        bool copiedOne = (bool)typeof(CodeEditorPP).GetMethod("TryCopyCursors", Private).Invoke(code, none);
+        bool copiedOne = cursorSession.TryCopyCursors(out _);
         Lines.Add("cursors copy with one cursor: " + Bool(copiedOne));
         _form.Controls.Remove(code);
         code.Dispose();

@@ -213,10 +213,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     protected override void OnLineChanged(int line, int column, int addedLength, int removedLength)
     {
-        if (!_applyingMultiCursor)
-        {
-            ClearExtraCursors();
-        }
+        CursorSession.OnViewChanged();
         DateTime now = DateTime.Now;
         int linesRetokenized = _tokenCache.RetokenizeLine(line, Tokenizing);
         Value = (DateTime.Now - now).TotalMilliseconds;
@@ -236,10 +233,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     protected override void OnRangeChanged(TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd)
     {
-        if (!_applyingMultiCursor)
-        {
-            ClearExtraCursors();
-        }
+        CursorSession.OnViewChanged();
         SyntaxColoring.ChangedLines(start, oldEnd, newEnd, out int changeStartLine, out int removedLineCount, out int addedLineCount);
         _inlineMessageProvider.ShiftLines(changeStartLine, removedLineCount, addedLineCount);
         DateTime now = DateTime.Now;
@@ -276,11 +270,8 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
 
     protected override void OnSelectionChanged(TextDocument.TextPosition previousCaret, TextDocument.TextPosition currentCaret, bool hasSelection, SelectionChangeSource selectionChangeSource)
     {
-        if (!_applyingMultiCursor)
-        {
-            // The caret was moved by something that knows of one cursor only (a find, a go to line, a click).
-            ClearExtraCursors();
-        }
+        // The caret was moved by something that knows of one cursor only (a find, a go to line, a click).
+        CursorSession.OnViewChanged();
         CancelHover();
         if (!hasSelection)
         {
@@ -644,7 +635,7 @@ public partial class CodeEditorPP : TextEditorControl, ICompletionHost, IEditorC
         base.OnMouseDown(e);
         if (e.Button == MouseButtons.Left)
         {
-            _columnAnchor = new SmarTTY.CodeEditing.TextPoint(CaretPosition.Line, CaretPosition.Column);
+            CursorSession.OnCaretClicked(CaretPosition);
         }
         if (!IsWindows())
         {
