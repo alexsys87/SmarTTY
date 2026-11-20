@@ -66,6 +66,68 @@ public sealed class CaretNavigator
         _host = host ?? throw new ArgumentNullException(nameof(host));
     }
 
+    /// <summary>Up, Down and the page keys keep the display column of the caret while they run (the other keys drop it).</summary>
+    public static bool KeepsColumn(VirtualKey key)
+    {
+        return (uint)(key - 33) <= 1u || key == VirtualKey.Up || key == VirtualKey.Down;
+    }
+
+    /// <summary>
+    /// The caret move of a navigation key (with Ctrl, Left and Right go by words); <paramref name="direction"/> is -1 for a move back by a
+    /// character or a word, 1 for one forward and 0 for the others. False for a key that does not move the caret. It is the switch of
+    /// <c>TryGetNavigationTarget</c> of <c>Controls/ReadonlyTextBrowser</c>, moved here as it was (stage 3D).
+    /// </summary>
+    public static bool TryMapKey(VirtualKey key, bool control, out CaretMove move, out int direction)
+    {
+        direction = 0;
+        switch (key)
+        {
+            case VirtualKey.Left:
+                if (control)
+                {
+                    move = CaretMove.WordLeft;
+                }
+                else
+                {
+                    move = CaretMove.Left;
+                }
+                direction = -1;
+                return true;
+            case VirtualKey.Right:
+                if (control)
+                {
+                    move = CaretMove.WordRight;
+                }
+                else
+                {
+                    move = CaretMove.Right;
+                }
+                direction = 1;
+                return true;
+            case VirtualKey.Up:
+                move = CaretMove.Up;
+                return true;
+            case VirtualKey.Down:
+                move = CaretMove.Down;
+                return true;
+            case VirtualKey.Home:
+                move = CaretMove.Home;
+                return true;
+            case VirtualKey.End:
+                move = CaretMove.End;
+                return true;
+            case VirtualKey.Prior:
+                move = CaretMove.PageUp;
+                return true;
+            case VirtualKey.Next:
+                move = CaretMove.PageDown;
+                return true;
+            default:
+                move = CaretMove.Left;
+                return false;
+        }
+    }
+
     /// <summary>The display column Up, Down and the pages keep while they run; -1 when it is taken anew at the next of them.</summary>
     public int DesiredColumn { get; set; } = -1;
 

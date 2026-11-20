@@ -1969,54 +1969,23 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     private bool TryGetNavigationTarget(KeyEventArgs e, bool extendSelection, out TextDocument.TextPosition textPosition, out CaretDirection caretDirection)
     {
         caretDirection = CaretDirection.Unspecified;
-        Keys keyCode = e.KeyCode;
-        Navigator.BeginMove((uint)(keyCode - 33) <= 1u || keyCode == Keys.Up || keyCode == Keys.Down, CaretPosition);
-        switch (e.KeyCode)
+        VirtualKey key = e.KeyCode.ToVirtualKey();
+        Navigator.BeginMove(CaretNavigator.KeepsColumn(key), CaretPosition);
+        if (!CaretNavigator.TryMapKey(key, (Control.ModifierKeys & Keys.Control) == Keys.Control, out CaretMove move, out int direction))
         {
-            case Keys.Left:
-                if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
-                {
-                    textPosition = GetMovedPosition(CaretMove.WordLeft, extendSelection);
-                }
-                else
-                {
-                    textPosition = GetMovedPosition(CaretMove.Left, extendSelection);
-                }
-                caretDirection = CaretDirection.Backward;
-                return true;
-            case Keys.Right:
-                if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
-                {
-                    textPosition = GetMovedPosition(CaretMove.WordRight, extendSelection);
-                }
-                else
-                {
-                    textPosition = GetMovedPosition(CaretMove.Right, extendSelection);
-                }
-                caretDirection = CaretDirection.Forward;
-                return true;
-            case Keys.Up:
-                textPosition = GetMovedPosition(CaretMove.Up, extendSelection);
-                return true;
-            case Keys.Down:
-                textPosition = GetMovedPosition(CaretMove.Down, extendSelection);
-                return true;
-            case Keys.Home:
-                textPosition = GetMovedPosition(CaretMove.Home, extendSelection);
-                return true;
-            case Keys.End:
-                textPosition = GetMovedPosition(CaretMove.End, extendSelection);
-                return true;
-            case Keys.Prior:
-                textPosition = GetMovedPosition(CaretMove.PageUp, extendSelection);
-                return true;
-            case Keys.Next:
-                textPosition = GetMovedPosition(CaretMove.PageDown, extendSelection);
-                return true;
-            default:
-                textPosition = new TextDocument.TextPosition(CaretPosition);
-                return false;
+            textPosition = new TextDocument.TextPosition(CaretPosition);
+            return false;
         }
+        textPosition = GetMovedPosition(move, extendSelection);
+        if (direction < 0)
+        {
+            caretDirection = CaretDirection.Backward;
+        }
+        else if (direction > 0)
+        {
+            caretDirection = CaretDirection.Forward;
+        }
+        return true;
     }
 
     protected override void OnPreviewKeyDown(PreviewKeyDownEventArgs e)
