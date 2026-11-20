@@ -50,8 +50,9 @@ internal sealed class TextLabWindow : Window
         _editor.SetColors(((DrawingColor)colors.BackColor).ToRgb(), ((DrawingColor)colors.TextColor).ToRgb(),
             ((DrawingColor)colors.LineNumberBackground).ToRgb(), ((DrawingColor)colors.LineNumberForeground).ToRgb());
         float zoom = settings.Editor.FontZoom > 0f ? settings.Editor.FontZoom : 1f;
-        // The font of the editor tab: Courier New of 12 points, with the zoom of the editor.
-        _editor.SetFont("Courier New", 12 * zoom);
+        // The font of the editor tab: Courier New of 12 points, with the zoom of the editor (Ctrl+wheel and Ctrl+Plus/Minus/0 change it here).
+        _editor.SetFont("Courier New", 12);
+        _editor.FontZoom = zoom;
         // As RemoteFileEditor.RefreshMessageColors: the band in the colour of the margin, its frame in the colour of the line numbers.
         _editor.SetMessageColors(((DrawingColor)colors.LineNumberBackground).ToRgb(), ((DrawingColor)colors.ErrorColor).ToRgb(),
             ((DrawingColor)colors.WarningColor).ToRgb(), ((DrawingColor)colors.LineNumberForeground).ToRgb());
@@ -141,6 +142,7 @@ internal sealed class TextLabWindow : Window
 
         ChooseSyntax(SyntaxHighlighting.Language.CLike);
         _editor.StateChanged += (sender, e) => UpdateStatus();
+        _editor.ZoomChanged += (sender, e) => UpdateStatus();
         _editor.SaveRequested += (sender, e) => Note("The lab does not save: the text stays in memory.");
         Loaded += (sender, e) => _editor.Focus();
         UpdateStatus();
@@ -224,6 +226,8 @@ internal sealed class TextLabWindow : Window
     {
         // As RemoteFileEditor: the word list offers the words of the syntax of the file.
         _editor.CompletionLanguage = language;
+        // As RemoteFileEditor: Ctrl+/ comments the lines with the marks of the syntax.
+        _editor.CommentStyle = CommentStyle.ForLanguage(language);
         TokenCache.LineTokenizer tokenizer = SyntaxHighlighting.GetTokenizer(language);
         if (tokenizer == null)
         {
@@ -251,6 +255,7 @@ internal sealed class TextLabWindow : Window
         string selection = _editor.HasSelection ? "selection " + _editor.SelectedText.Length.ToString(CultureInfo.InvariantCulture) + " characters" : "no selection";
         _status.Text = _fileName + "   |   Ln " + (caret.Line + 1).ToString(CultureInfo.InvariantCulture) + ", Col " + (column + 1).ToString(CultureInfo.InvariantCulture)
             + "   |   " + selection + "   |   " + _editor.Document.LineCount.ToString(CultureInfo.InvariantCulture) + " lines   |   " + (_editor.OverwriteMode ? "OVR" : "INS")
+            + "   |   " + Math.Round(_editor.FontZoom * 100).ToString(CultureInfo.InvariantCulture) + " %"
             + (_editor.MessageCount > 0 ? "   |   " + _editor.MessageCount.ToString(CultureInfo.InvariantCulture) + " message(s)" : "")
             + (_editor.ReadOnly ? "   |   read-only" : "") + (_editor.IsModified ? "   |   modified (not saved)" : "");
     }

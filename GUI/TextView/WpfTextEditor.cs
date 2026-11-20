@@ -25,7 +25,7 @@ namespace SmarTTY.GUI.TextView;
 /// characters of two cells; it is tried in Tools > WPF text editor lab (<see cref="TextLabWindow"/>) before it goes into the editor tab.
 /// </summary>
 internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretNavigationHost, ITextReplaceHost, ITextTypingHost, IEditorCompletionHost,
-    IWpfSuggestionHost
+    IWpfSuggestionHost, ILineCommandHost, IEditorCommandTarget
 {
     // What a word is for Ctrl+Left/Right, a double click and Ctrl+Backspace (as ReadonlyTextBrowser.IsWordChar).
     private const string WordCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
@@ -124,6 +124,14 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     private double _fontPoints = 12;
 
+    // The user's zoom of the text (Ctrl+wheel and the zoom commands), as FontZoom of the WinForms view.
+    private float _fontZoom = 1f;
+
+    // The commands of the editor by their keys, as CodeEditorPP keeps them (the defaults of EditorCommands until the settings give others).
+    private readonly KeyBindingMap _keyBindingMap = new KeyBindingMap(EditorCommands.All);
+
+    private readonly LineCommands _lineCommands;
+
     private GlyphTypeface _glyphTypeface;
 
     // The size of the font in device pixels.
@@ -151,6 +159,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _replace = new TextReplace(this, _history);
         _typing = new TextTyping(this);
         _completion = new EditorCompletion(this);
+        _lineCommands = new LineCommands(this);
         _pointer = new TextPointer(_selection, _navigator, () => _document);
         _tokens.SetDocument(_document, null);
         _folding = new FoldingManager(_tokens);
@@ -468,6 +477,168 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         OnLayoutOptionChanged();
     }
 
+    /// <summary>The zoom of the text was changed with Ctrl+wheel or the zoom commands.</summary>
+    public event EventHandler ZoomChanged;
+
+    /// <summary>The zoom of the text (1 is the size of the font), kept between the limits of <see cref="EditorZoom"/>.</summary>
+    public float FontZoom
+    {
+        get
+        {
+            return _fontZoom;
+        }
+        set
+        {
+            value = EditorZoom.Clamp(value);
+            if (value == _fontZoom)
+            {
+                return;
+            }
+            _fontZoom = value;
+            _layout.Wrap.Invalidate();
+            OnLayoutOptionChanged();
+        }
+    }
+
+    /// <summary>Makes the text bigger (1) or smaller (-1) by a tenth of its size.</summary>
+    public void ZoomBy(int steps)
+    {
+        SetZoom(EditorZoom.By(FontZoom, steps));
+    }
+
+    /// <summary>Shows the text in the size of the font again.</summary>
+    public void ResetZoom()
+    {
+        SetZoom(1f);
+    }
+
+    /// <summary>Sets the zoom (1 is the size of the font), rounded to hundredths and kept between its limits, as CodeEditorPP.SetZoom.</summary>
+    public void SetZoom(float zoom)
+    {
+        float before = FontZoom;
+        FontZoom = EditorZoom.Round(zoom);
+        if (FontZoom != before)
+        {
+            ZoomChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>How the text marks comments (Ctrl+/); null when its language has none.</summary>
+    public CommentStyle CommentStyle { get; set; }
+
+    /// <summary>The keys of the commands of the editor (the names of <see cref="EditorCommands"/> with their keys, as the settings keep them).</summary>
+    public void SetKeyBindings(IEnumerable<KeyValuePair<string, KeyBindingMap.KeyShortcut>> bindings)
+    {
+        foreach (KeyValuePair<string, KeyBindingMap.KeyShortcut> item in bindings)
+        {
+            _keyBindingMap.Bindings[item.Value] = _keyBindingMap.FindCommand(item.Key);
+        }
+    }
+
+    // ---- line commands (CodeEditing/LineCommands, as CodeEditorPP runs them)
+
+    /// <summary>The selection covers two lines or more (what sorting and removing duplicates work on).</summary>
+    public bool HasLineSelection => _lineCommands.HasLineSelection;
+
+    /// <summary>Rewrites lines as the Text menu says; false when nothing could be done.</summary>
+    public bool ApplyLineTransform(LineTransformKind kind)
+    {
+        bool done = _lineCommands.ApplyLineTransform(kind);
+        AfterEdit();
+        return done;
+    }
+
+    public void DuplicateLines()
+    {
+        _lineCommands.DuplicateLines();
+        AfterEdit();
+    }
+
+    public void MoveLines(int direction)
+    {
+        _lineCommands.MoveLines(direction);
+        AfterEdit();
+    }
+
+    public void DeleteLines()
+    {
+        _lineCommands.DeleteLines();
+        AfterEdit();
+    }
+
+    public bool ToggleComment()
+    {
+        bool done = _lineCommands.ToggleComment();
+        AfterEdit();
+        return done;
+    }
+
+    /// <summary>Moves the caret to the next bracket the predicate takes, forward or back, selecting the way when asked (as CodeEditorPP.MoveToToken).</summary>
+    public bool MoveToToken(bool searchPrevious, bool isOpening, bool selectText, TokenPredicate callback)
+    {
+        if (!TokenMoves.TryFind(_tokens, _document, _caret, searchPrevious, isOpening, callback, out TextDocument.TextPosition target))
+        {
+            return false;
+        }
+        ((ITextEditView)this).SetSelection(selectText, _caret);
+        SetCaret(target);
+        return true;
+    }
+
+    /// <summary>Builds the tokens again without treating the text as replaced (as CodeEditorPP.Retokenize: the folds go).</summary>
+    public void Retokenize()
+    {
+        _folding.Clear();
+        _tokens.SetDocument(_document, _tokenizer);
+        _layout.InvalidateRows();
+        UpdateScrollBars();
+        InvalidateVisual();
+    }
+
+    // The commands of several cursors come with 3E-3; until then their keys do nothing here.
+    public void AddNextOccurrence()
+    {
+    }
+
+    public void SelectAllOccurrences()
+    {
+    }
+
+    public void AddCursorAbove()
+    {
+    }
+
+    public void AddCursorBelow()
+    {
+    }
+
+    EditableTextDocument ILineCommandHost.Document => _document;
+
+    bool ILineCommandHost.CanEditLines => !_readOnly;
+
+    void ILineCommandHost.ExecuteAsSingleUndoStep(Action edits)
+    {
+        if (!_readOnly)
+        {
+            _history.ExecuteAsSingleStep(edits);
+        }
+    }
+
+    void ILineCommandHost.SetSelection(bool select, TextDocument.TextPosition anchor)
+    {
+        ((ITextEditView)this).SetSelection(select, anchor);
+    }
+
+    void ILineCommandHost.RemoveLines(int first, int last)
+    {
+        _typing.RemoveLines(first, last);
+    }
+
+    void ILineCommandHost.UpdateMaxLineWidth(int line)
+    {
+        _layout.UpdateMaxColumns(line);
+    }
+
     // ---- commands
 
     public void Undo()
@@ -719,10 +890,12 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             e.Handled = true;
             return;
         }
-        // The key binding of CodeEditorPP: Ctrl+Space opens the word list.
-        if (virtualKey == VirtualKey.Space && control && !shift && !alt)
+        // The key bindings of CodeEditorPP: a key that has a command runs it and nothing else (Ctrl+Space opens the word list, Ctrl+Shift+D
+        // duplicates the lines, Alt+Up moves them, Ctrl+/ comments them, Ctrl+Plus zooms, Ctrl+Alt+9 goes to a bracket and the others).
+        VirtualKey keyData = virtualKey | (control ? VirtualKey.Control : 0) | (shift ? VirtualKey.Shift : 0) | (alt ? VirtualKey.Alt : 0);
+        if (_keyBindingMap.Bindings.TryGetValue(new KeyBindingMap.KeyShortcut(new KeyStroke(keyData)), out KeyBindingMap.EditorCommand command))
         {
-            _completion.ShowCompletion();
+            command.Execute(this);
             e.Handled = true;
             return;
         }
@@ -1045,9 +1218,15 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         ModifierKeys modifiers = Keyboard.Modifiers;
+        if ((modifiers & ModifierKeys.Control) != 0 && e.Delta != 0)
+        {
+            // Ctrl+wheel zooms the text, as in CodeEditorPP.
+            ZoomBy(e.Delta > 0 ? 1 : -1);
+            e.Handled = true;
+            return;
+        }
         if (modifiers != ModifierKeys.None && modifiers != ModifierKeys.Shift)
         {
-            // Ctrl+wheel and the like are the window's (the zoom).
             base.OnMouseWheel(e);
             return;
         }
@@ -1297,7 +1476,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     FontFamily IWpfSuggestionHost.ItemFontFamily => new FontFamily(_fontFamily);
 
-    double IWpfSuggestionHost.ItemFontSize => _fontPoints * 96.0 / 72.0;
+    double IWpfSuggestionHost.ItemFontSize => _fontPoints * _fontZoom * 96.0 / 72.0;
 
     void IWpfSuggestionHost.AcceptSuggestion(ISuggestion suggestion, VirtualKey key)
     {
@@ -1390,7 +1569,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         }
         _glyphTypeface = FindGlyphTypeface(_fontFamily) ?? FindGlyphTypeface("Courier New") ?? FindGlyphTypeface("Consolas");
         // Points to device pixels: 96 DIPs an inch, 72 points an inch.
-        _emSize = _fontPoints * 96.0 / 72.0 * _scale;
+        _emSize = _fontPoints * _fontZoom * 96.0 / 72.0 * _scale;
         int charWidth = 8;
         int textHeight = 16;
         if (_glyphTypeface != null && _glyphTypeface.CharacterToGlyphMap.TryGetValue('0', out ushort zero))
