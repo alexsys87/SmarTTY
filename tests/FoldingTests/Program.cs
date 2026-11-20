@@ -206,9 +206,37 @@ internal static class Program
         Equal(RestoredFolds(twice, L.CLike, Info(1, "int b() {")), "6=int b() { hidden=2", "a line with another text is found by its own text");
     }
 
+    // FoldingManager.ClickMark: what a click on the mark of the fold margin does (3D-4, moved from FoldingMarginPainter.OnMouseDown).
+    private static void ClickChecks()
+    {
+        EditableTextDocument doc = Doc(Docs[0][1]);
+        FoldingManager manager = new FoldingManager(new TokenCache(doc, SyntaxHighlighting.GetTokenizer(L.CLike)));
+        string Click(int line, bool wrapping, int caretLine)
+        {
+            bool changed = manager.ClickMark(line, wrapping, new TextDocument.TextPosition(2, caretLine), out TextDocument.TextPosition? target);
+            return changed + " " + (target.HasValue ? target.Value.Line + ":" + target.Value.Column : "-") + " hidden=" + manager.GetTotalHiddenLines();
+        }
+        Equal(Click(0, true, 3), "False - hidden=0", "while the lines are wrapped a click folds nothing");
+        Equal(Click(0, false, 3), "True -1:0 hidden=7", "a block whose brace ends its header line: the caret inside goes to the line before that line (-1 here)");
+        Equal(Click(0, false, 3), "True - hidden=0", "a click on a folded line unfolds it, the caret stays");
+        Equal(Click(1, false, 3), "True 1:0 hidden=3", "a block whose brace is on the next line: the caret inside goes to the start of the header");
+        Equal(Click(1, false, 3), "True - hidden=0", "unfolded");
+        Equal(Click(1, false, 1), "True - hidden=3", "the caret on the header, before the line of the brace, stays");
+        Click(1, false, 1);
+        Equal(Click(1, false, 2), "True 1:0 hidden=3", "the caret on the line of the opening brace moves");
+        Click(1, false, 1);
+        Equal(Click(1, false, 4), "True 1:0 hidden=3", "and on the line of the closing brace");
+        Click(1, false, 1);
+        Equal(Click(1, false, 5), "True - hidden=3", "the caret after the block stays");
+        Click(1, false, 1);
+        Equal(Click(5, false, 3), "False - hidden=0", "a blank line has no block");
+        Equal(Click(99, false, 3), "False - hidden=0", "nor a line past the text");
+    }
+
     private static void Main()
     {
         RestoreChecks();
+        ClickChecks();
         string expected = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FoldingGolden.txt")).Replace("\r\n", "\n");
         string actual = RunScript().Replace("\r\n", "\n");
         string[] expectedLines = expected.Split('\n');
