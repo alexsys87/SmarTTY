@@ -1233,6 +1233,149 @@ internal static class Program
         }
     }
 
+    // The commands of the editor tab (RemoteFileEditorCommands, moved out of the WinForms panel in stage 3E-4, so that the WPF tab runs them too)
+    // on the real editor: the state they read of the text view, the editor and the hex view, what each command does, the events of the commands
+    // that the main window runs, a refresh asked for many times that runs once, a disabled command that does nothing, Reload with its question.
+    private static void CommandsOfTheTab(Server server)
+    {
+        Console.WriteLine("-- the commands of the tab on the editor");
+        WriteRemote(server, "commands.txt", Bytes("b\na\nc\n"));
+        Opened o = Open(server, "commands.txt");
+        try
+        {
+            RemoteFileEditor e = o.Editor;
+            List<Action> posted = new List<Action>();
+            RemoteFileEditorCommands commands = new RemoteFileEditorCommands(e, action =>
+            {
+                posted.Add(action);
+                return true;
+            });
+            List<string> events = new List<string>();
+            commands.StateChanged += (sender, args) => events.Add("state");
+            commands.SaveRequested += (sender, args) => events.Add("save");
+            commands.FindRequested += (sender, args) => events.Add("find");
+            commands.ReplaceRequested += (sender, args) => events.Add("replace");
+            commands.GoToLineRequested += (sender, args) => events.Add("goto");
+            commands.ShowChangesRequested += (sender, args) => events.Add("changes");
+            commands.RunRequested += (sender, args) => events.Add("run");
+            commands.FollowLogRequested += (sender, args) => events.Add("follow");
+            commands.ShowAllCharactersChanged += (sender, args) => events.Add("marks");
+            commands.WordWrapChanged += (sender, args) => events.Add("wrap");
+            commands.HexDialogRequested += (sender, args) => events.Add("dialog:" + args.Kind);
+
+            commands.RefreshState();
+            EditorCommandState state = commands.CommandState;
+            Equal(Events(events), "state", "a refresh tells the state once");
+            Check(!state.HexMode && !state.ReadOnly && !state.IsModified && !state.IsNewFile && !state.IsSaving && state.HasText && !state.HasSelection
+                && !state.HasLineSelection && !state.CanUndo && !state.CanRedo && state.CanUseHex && !state.ShowAllCharacters && !state.WordWrap,
+                "the state of a file just loaded");
+            Check(!state.IsEnabled(EditorToolbarCommand.Save) && state.IsEnabled(EditorToolbarCommand.Reload) && !state.IsEnabled(LineTransformKind.SortAscending),
+                "nothing to save, Reload can run, sorting needs a selection of lines");
+
+            events.Clear();
+            commands.ScheduleRefresh();
+            commands.ScheduleRefresh();
+            commands.ScheduleRefresh();
+            Equal(posted.Count, 1, "a refresh asked for three times is posted once");
+            posted[0]();
+            posted.Clear();
+            Equal(Events(events), "state", "and tells the state once when it runs");
+            commands.ScheduleRefresh();
+            Equal(posted.Count, 1, "after it ran a refresh is posted again");
+            posted.Clear();
+
+            events.Clear();
+            commands.RunCommand(EditorToolbarCommand.Redo);
+            Equal(Events(events), "state", "a disabled command (Redo with nothing to redo) only reads the state again");
+            Equal(Text(o), "b\na\nc\n", "and changes nothing");
+
+            events.Clear();
+            commands.RunCommand(EditorToolbarCommand.ShowAllCharacters);
+            Check(e.TextControl.ShowAllCharacters && commands.CommandState.ShowAllCharacters && commands.CommandState.IsChecked(EditorToolbarCommand.ShowAllCharacters),
+                "Show All Characters switches the marks on, and the state shows it checked");
+            commands.RunCommand(EditorToolbarCommand.WordWrap);
+            Check(e.TextControl.WordWrap && commands.CommandState.WordWrap, "Word Wrap switches the wrap on");
+            commands.RunCommand(EditorToolbarCommand.WordWrap);
+            commands.RunCommand(EditorToolbarCommand.ShowAllCharacters);
+            Check(!e.TextControl.WordWrap && !e.TextControl.ShowAllCharacters, "and again off");
+            Equal(Events(events), "marks,state,wrap,state,wrap,state,marks,state", "each switch tells the main window, then the state");
+
+            events.Clear();
+            foreach (EditorToolbarCommand command in new[] { EditorToolbarCommand.Find, EditorToolbarCommand.Replace, EditorToolbarCommand.GoToLine,
+                EditorToolbarCommand.FollowLog, EditorToolbarCommand.Save, EditorToolbarCommand.ShowChanges })
+            {
+                commands.RunCommand(command);
+            }
+            Equal(Events(events), "find,state,replace,state,goto,state,follow,state,state,state",
+                "Find, Replace, Go to Line and Follow Log go to the main window; Save and Show Changes are disabled while nothing changed");
+
+            e.TextControl.SetSelection(true, new TextDocument.TextPosition(0, 0));
+            e.TextControl.SetCaret(new TextDocument.TextPosition(0, 3));
+            commands.RefreshState();
+            Check(commands.CommandState.HasLineSelection && commands.CommandState.HasSelection && commands.CommandState.IsEnabled(LineTransformKind.SortAscending),
+                "with the lines selected sorting can run");
+            commands.RunTransform(LineTransformKind.SortAscending);
+            Equal(Text(o), "a\nb\nc\n", "Sort Ascending sorts the selected lines");
+            state = commands.CommandState;
+            Check(state.IsModified && state.CanUndo && state.IsEnabled(EditorToolbarCommand.Save) && state.IsEnabled(EditorToolbarCommand.ShowChanges),
+                "the file is modified: it can be saved, undone and compared");
+            commands.RunCommand(EditorToolbarCommand.Undo);
+            Equal(Text(o), "b\na\nc\n", "Undo takes the sort back");
+            Check(commands.CommandState.CanRedo && !commands.CommandState.IsModified, "and the text is as saved, with a Redo");
+            commands.RunCommand(EditorToolbarCommand.Redo);
+            Equal(Text(o), "a\nb\nc\n", "Redo sorts again");
+            events.Clear();
+            commands.RunCommand(EditorToolbarCommand.Save);
+            commands.RunCommand(EditorToolbarCommand.ShowChanges);
+            Equal(Events(events), "save,state,changes,state", "Save and Show Changes go to the main window when there is a change");
+
+            commands.RunCommand(EditorToolbarCommand.ToggleHex);
+            state = commands.CommandState;
+            Check(e.IsHexMode && state.HexMode && state.HasText && state.IsVisible(EditorToolbarCommand.DataInspector) && !state.IsEnabled(EditorToolbarCommand.WordWrap)
+                && !state.IsEnabled(LineTransformKind.TrimTrailingWhitespace), "Hex View opens the hex view: the inspector is offered, the wrap and the Text menu are not");
+            bool inspector = e.HexEditor.ShowDataInspector;
+            commands.RunCommand(EditorToolbarCommand.DataInspector);
+            Check(e.HexEditor.ShowDataInspector == !inspector && commands.CommandState.ShowDataInspector == !inspector, "Data Inspector switches the inspector");
+            commands.RunCommand(EditorToolbarCommand.DataInspector);
+            events.Clear();
+            commands.RequestHexDialog(HexDialogKind.Checksums);
+            Equal(Events(events), "dialog:Checksums", "a dialog of the hex view goes to the main window");
+            commands.RunCommand(EditorToolbarCommand.ToggleHex);
+            Check(!e.IsHexMode && !commands.CommandState.HexMode, "Hex View again closes it");
+
+            Prompted(server, "reload", (text, buttons) => DialogResult.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Check(server.Prompts.Count == 1 && server.Prompts[0].Contains("load " + o.Path + " from the server again"), "Reload with a change asks first");
+            Equal(Text(o), "a\nb\nc\n", "answered No it keeps the text");
+            Prompted(server, "reload", (text, buttons) => DialogResult.Yes, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Pump(() => e.CanSave && Text(o) == "b\na\nc\n", "the file to load again");
+            Check(!e.IsModified, "answered Yes it loads the file from the server again");
+            WriteRemote(server, "commands.txt", Bytes("c\nb\na\n"));
+            Prompted(server, "reload", (text, buttons) => DialogResult.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Pump(() => e.CanSave && Text(o) == "c\nb\na\n", "the file to load again");
+            Equal(server.Prompts.Count, 0, "Reload without a change asks nothing and loads the file again");
+        }
+        finally
+        {
+            o.Close();
+        }
+        foreach (string[] item in new[] { new[] { "", "False" }, new[] { "x", "True" }, new[] { "\n", "True" } })
+        {
+            WriteRemote(server, "commands-text.txt", Bytes(item[0]));
+            Opened one = Open(server, "commands-text.txt");
+            try
+            {
+                RemoteFileEditorCommands commands = new RemoteFileEditorCommands(one.Editor, action => true);
+                commands.RefreshState();
+                Equal(commands.CommandState.HasText.ToString(), item[1], "a file of '" + item[0].Replace("\n", "\\n") + "' has text: " + item[1]);
+                Equal(commands.CommandState.IsEnabled(EditorToolbarCommand.SelectAll).ToString(), item[1], "and Select All follows it");
+            }
+            finally
+            {
+                one.Close();
+            }
+        }
+    }
+
     private static void Scenarios(Server server)
     {
         RunScenario(server, "load-save", LoadAndSave);
@@ -1253,6 +1396,7 @@ internal static class Program
         RunScenario(server, "hex-draft", HexDraft);
         RunScenario(server, "flow", Flow);
         RunScenario(server, "hex-place", HexPlace);
+        RunScenario(server, "commands", CommandsOfTheTab);
     }
 
     private static void RunServer(string name, string host, int port, string user, string password)
