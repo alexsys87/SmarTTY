@@ -1,4 +1,5 @@
 using SmarTTY.CodeEditing;
+using SmarTTY.Completion;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
@@ -286,6 +287,7 @@ internal static class Program
         SyntaxRuns();
         FoldRuns();
         MessageRuns();
+        CompletionRuns();
         _form.Dispose();
     }
 
@@ -1356,6 +1358,222 @@ internal static class Program
             MessageBand(code, 2, 0, rowHeight, "too long, in the middle, row " + rowHeight);
             MessageBand(code, 3, 0, rowHeight, "too long, under its column, row " + rowHeight);
         }
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-6: the completion of CodeEditorPP, written by the code before what the view decides about it moved to the model: the word list opened by
+    // itself after two letters of a word (not after one, not with completion on typing off, not when completion is off), the typed word it is told to
+    // select, a separator that accepts the selected word when it continues what was typed and closes the list when it does not, a word that starts
+    // with a digit closing it, Escape, the list opened by Ctrl+Space (ShowCompletion), the language and the switch closing it; and the parameter hint
+    // of a call (opened by the parenthesis, the active parameter after a comma, closed after the call, opened again by a key that moves the caret
+    // back into it, not while the list is open, closed when the editor loses the focus). The list is a stand-in that logs what it is asked (the real
+    // one is a window of its own); the hint is the real one.
+
+    private static readonly List<string> PopupLog = new List<string>();
+
+    private static object _lastHintView;
+
+    private sealed class LoggingPopup : ISuggestionPopup
+    {
+        private readonly List<ISuggestion> _items;
+
+        private readonly CodeEditorPP _host;
+
+        private string _prefix = "";
+
+        public LoggingPopup(ISuggestionSource source, CodeEditorPP host)
+        {
+            _items = new List<ISuggestion>(source.Items);
+            _host = host;
+            PopupLog.Add("create " + _items.Count);
+        }
+
+        public bool IsVisible { get; private set; }
+
+        public SmarTTY.TextEditing.RgbColor BackColor { set { } }
+
+        public ISuggestion SelectedSuggestion
+        {
+            get
+            {
+                foreach (ISuggestion item in _items)
+                {
+                    if (item.DisplayName.StartsWith(_prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return item;
+                    }
+                }
+                return _items.Count > 0 ? _items[0] : null;
+            }
+        }
+
+        public void Show(bool autoSize)
+        {
+            IsVisible = true;
+            PopupLog.Add("show");
+        }
+
+        public void Hide()
+        {
+            IsVisible = false;
+            PopupLog.Add("hide");
+        }
+
+        public void SelectMatch(string prefix, bool exactMatch)
+        {
+            _prefix = prefix;
+            PopupLog.Add("select " + prefix + (exactMatch ? " exact" : ""));
+        }
+
+        public void AcceptSelected()
+        {
+            ISuggestion selected = SelectedSuggestion;
+            PopupLog.Add("accept " + (selected == null ? "-" : selected.DisplayName));
+            IsVisible = false;
+            _host.AcceptSuggestion(selected, Keys.Return);
+        }
+
+        public void Dispose()
+        {
+            IsVisible = false;
+            PopupLog.Add("dispose");
+        }
+    }
+
+    private sealed class LoggingPopupFactory : ISuggestionPopupFactory
+    {
+        public CodeEditorPP Host;
+
+        public ISuggestionPopup Create(ISuggestionSource suggestionSource, bool allowMultiSelect)
+        {
+            return new LoggingPopup(suggestionSource, Host);
+        }
+    }
+
+    private static void Completion(CodeEditorPP code, string what)
+    {
+        string hint = (string)typeof(CodeEditorPP).GetField("_signatureHintName", Private).GetValue(code);
+        object controller = typeof(CodeEditorPP).GetField("_signatureHintController", Private).GetValue(code);
+        object view = controller == null ? null : typeof(SignatureHintController).GetField("_view", Private).GetValue(controller);
+        if (view != null)
+        {
+            object label = view.GetType().GetField("label1", Private).GetValue(view);
+            hint += " active=" + label.GetType().GetProperty("ActiveIndex").GetValue(label) + " " + Escape(((IHintView)view).SignatureText)
+                + (ReferenceEquals(view, _lastHintView) ? " (the same window)" : " (a new window)");
+        }
+        _lastHintView = view;
+        Lines.Add("completion " + what + ": line=" + Escape(code.EditableDocument.GetLineText(code.CaretPosition.Line)) + " caret=" + P(code.CaretPosition)
+            + " list=" + (code.IsSuggestionVisible ? "shown" : "-") + " log=" + string.Join(";", PopupLog) + " hint=" + (code.IsSignatureHintVisible ? "shown " : "- ") + (hint ?? ""));
+        PopupLog.Clear();
+    }
+
+    private static void CompletionRuns()
+    {
+        Lines.Add("== completion");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "int value = 1;", "int valid = 2;", "int sum(int a, int b) { return a + b; }", "" }, TextDocument.LineEnding.Lf));
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        code.CompletionLanguage = SyntaxHighlighting.Language.CLike;
+        code.CompletionEnabled = true;
+        code.CompletionOnTyping = true;
+        typeof(CodeEditorPP).GetField("_suggestionController", Private).SetValue(code, new SuggestionController(new LoggingPopupFactory { Host = code }));
+        Application.DoEvents();
+        void TypeInto(string text)
+        {
+            foreach (char ch in text)
+            {
+                KeyPressMethod.Invoke(code, new object[] { new KeyPressEventArgs(ch) });
+            }
+        }
+        void PressKey(Keys keys)
+        {
+            EditorKeyDownMethod.Invoke(code, new object[] { new KeyEventArgs(keys) });
+        }
+        code.SetCaret(At(3, 0));
+        PopupLog.Clear();
+        TypeInto("v");
+        Completion(code, "one letter");
+        TypeInto("a");
+        Completion(code, "two letters open the list by themselves");
+        TypeInto("l");
+        Completion(code, "a third letter");
+        TypeInto("i");
+        Completion(code, "a fourth");
+        TypeInto("\b");
+        Completion(code, "Backspace");
+        TypeInto("i");
+        TypeInto(" ");
+        Completion(code, "a blank accepts the selected word that continues what was typed");
+        TypeInto("xy");
+        Completion(code, "a word no item continues");
+        TypeInto(".");
+        Completion(code, "a mark closes the list without accepting");
+        TypeInto(" 12");
+        Completion(code, "a word that starts with a digit closes the list");
+        TypeInto(" ");
+        code.ShowCompletion();
+        Completion(code, "Ctrl+Space on no word");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape");
+        TypeInto("va");
+        Completion(code, "opened again");
+        code.CompletionLanguage = SyntaxHighlighting.Language.Bash;
+        Completion(code, "another language closes it");
+        code.CompletionLanguage = SyntaxHighlighting.Language.CLike;
+        code.ShowCompletion();
+        code.CompletionEnabled = false;
+        Completion(code, "completion switched off closes it");
+        TypeInto("lu");
+        Completion(code, "and typing does not open it");
+        code.ShowCompletion();
+        Completion(code, "nor Ctrl+Space");
+        code.CompletionEnabled = true;
+        code.CompletionOnTyping = false;
+        TypeInto("e");
+        Completion(code, "completion on typing off");
+        code.CompletionOnTyping = true;
+
+        code.SetDocument(new EditableTextDocument(new[] { "int sum(int a, int b) { return a + b; }", "" }, TextDocument.LineEnding.Lf));
+        code.SetCaret(At(1, 0));
+        TypeInto(";");
+        PopupLog.Clear();
+        code.SetCaret(At(1, 0));
+        TypeInto("x = sum(");
+        Completion(code, "the parenthesis of a call opens the hint");
+        TypeInto("1");
+        Completion(code, "a digit leaves it");
+        TypeInto(",");
+        Completion(code, "a comma: the next parameter");
+        TypeInto(" 2)");
+        Completion(code, "after the call it closes");
+        PressKey(Keys.Left);
+        Completion(code, "Left back into the call");
+        code.ShowCompletion();
+        Completion(code, "Ctrl+Space on a number");
+        PressKey(Keys.Left);
+        PressKey(Keys.Right);
+        Completion(code, "Left and Right");
+        TypeInto("+ab");
+        Completion(code, "the list opened by typing closes the hint");
+        PressKey(Keys.Left);
+        Completion(code, "no hint while the list is open");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape closes both");
+        PressKey(Keys.Left);
+        Completion(code, "Left again");
+        PressKey(Keys.Escape);
+        Completion(code, "Escape closes the hint");
+        PressKey(Keys.Left);
+        typeof(CodeEditorPP).GetMethod("OnLostFocus", Private).Invoke(code, new object[] { EventArgs.Empty });
+        Completion(code, "the focus lost");
+        PressKey(Keys.Right);
+        Completion(code, "Right");
+        code.CompletionEnabled = false;
+        Completion(code, "completion switched off");
+        PressKey(Keys.Left);
+        Completion(code, "no hint with completion off");
         _form.Controls.Remove(code);
         code.Dispose();
     }

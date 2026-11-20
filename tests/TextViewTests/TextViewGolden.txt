@@ -1397,3 +1397,37 @@ message band scrolled, row 24: left=13 top=0 width less the text=30 height=25 cl
 message band scrolled past its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=F
 message band too long, in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=T
 message band too long, under its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=T
+== completion
+completion one letter: line=v caret=3:1 list=- log= hint=- 
+completion two letters open the list by themselves: line=va caret=3:2 list=shown log=create 80;show;select va exact;select va exact hint=- 
+completion a third letter: line=val caret=3:3 list=shown log=select val exact hint=- 
+completion a fourth: line=vali caret=3:4 list=shown log=select vali exact hint=- 
+completion Backspace: line=val caret=3:3 list=shown log=select val exact hint=- 
+completion a blank accepts the selected word that continues what was typed: line=valid  caret=3:6 list=- log=select vali exact;accept valid hint=- 
+completion a word no item continues: line=valid xy caret=3:8 list=shown log=dispose;create 80;show;select xy exact;select xy exact hint=- 
+completion a mark closes the list without accepting: line=valid xy. caret=3:9 list=- log=accept xy hint=- 
+completion a word that starts with a digit closes the list: line=valid xy. 12 caret=3:12 list=- log=dispose;create 80;show;hide hint=- 
+completion Ctrl+Space on no word: line=valid xy. 12  caret=3:13 list=shown log=dispose;create 80;show;select  exact hint=- 
+completion Escape: line=valid xy. 12  caret=3:13 list=- log=hide hint=- 
+completion opened again: line=valid xy. 12 va caret=3:15 list=shown log=dispose;create 81;show;select va exact;select va exact hint=- 
+completion another language closes it: line=valid xy. 12 va caret=3:15 list=- log=hide hint=- 
+completion completion switched off closes it: line=valid xy. 12 va caret=3:15 list=- log=dispose;create 81;show;select va exact;hide hint=- 
+completion and typing does not open it: line=valid xy. 12 valu caret=3:17 list=- log= hint=- 
+completion nor Ctrl+Space: line=valid xy. 12 valu caret=3:17 list=- log= hint=- 
+completion completion on typing off: line=valid xy. 12 value caret=3:18 list=- log= hint=- 
+completion the parenthesis of a call opens the hint: line=x = sum(; caret=1:8 list=- log=dispose;create 79;show;select su exact;select su exact;select sum exact;accept sum hint=shown sum active=0 int a, int b (a new window)
+completion a digit leaves it: line=x = sum(1; caret=1:9 list=- log= hint=shown sum active=0 int a, int b (the same window)
+completion a comma: the next parameter: line=x = sum(1,; caret=1:10 list=- log= hint=shown sum active=1 int a, int b (the same window)
+completion after the call it closes: line=x = sum(1, 2); caret=1:13 list=- log= hint=- 
+completion Left back into the call: line=x = sum(1, 2); caret=1:12 list=- log= hint=shown sum active=1 int a, int b (a new window)
+completion Ctrl+Space on a number: line=x = sum(1, 2); caret=1:12 list=- log=dispose;create 78;show;hide hint=- 
+completion Left and Right: line=x = sum(1, 2); caret=1:12 list=- log= hint=shown sum active=1 int a, int b (a new window)
+completion the list opened by typing closes the hint: line=x = sum(1, 2+ab); caret=1:15 list=shown log=dispose;create 79;show;select ab exact;select ab exact hint=- 
+completion no hint while the list is open: line=x = sum(1, 2+ab); caret=1:14 list=shown log= hint=- 
+completion Escape closes both: line=x = sum(1, 2+ab); caret=1:14 list=- log=hide hint=- 
+completion Left again: line=x = sum(1, 2+ab); caret=1:13 list=- log= hint=shown sum active=1 int a, int b (a new window)
+completion Escape closes the hint: line=x = sum(1, 2+ab); caret=1:13 list=- log=hide hint=- 
+completion the focus lost: line=x = sum(1, 2+ab); caret=1:12 list=- log= hint=- 
+completion Right: line=x = sum(1, 2+ab); caret=1:13 list=- log= hint=shown sum active=1 int a, int b (a new window)
+completion completion switched off: line=x = sum(1, 2+ab); caret=1:13 list=- log=hide hint=shown sum active=1 int a, int b (the same window)
+completion no hint with completion off: line=x = sum(1, 2+ab); caret=1:12 list=- log= hint=- 
