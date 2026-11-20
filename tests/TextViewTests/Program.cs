@@ -18,6 +18,8 @@ using K = System.Windows.Forms.Keys;
 //   - runs of keys through the real key handler, where Up, Down and the pages keep the column the caret came from;
 //   - the same with word wrap at 20 columns, and the wrap map (the breaks of every line, the line and the row of every row index, the row index
 //     of positions).
+//   - the selection (3C-2): the clicks, the margin, a drag, the buttons, a key without Shift, Select all, a range of lines, the setters and the
+//     selected lines, also in terminal mode (SelectionRuns).
 // The view is sized until it shows exactly 8 rows (and wraps at 20 columns), so that the lines do not depend on the fonts.
 // TextViewGolden.txt is what the code wrote before the move; it is never written again. Since the move (3C-1) the accessors read the kept column
 // and the wrap map of the model (Navigator, WrapLayout) instead of the fields of the view.
@@ -243,6 +245,11 @@ internal static class Program
         _form = new Form { FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(0, 0), ClientSize = new System.Drawing.Size(900, 150) };
         _editor = new TextEditorControl { Dock = DockStyle.Fill };
         _form.Controls.Add(_editor);
+        _editor.SelectionChanged += (view, previous, current, has) =>
+        {
+            _selectionEvents++;
+            _lastSelectionEvent = P(previous) + ">" + P(current) + (has ? "+sel" : "");
+        };
         _editor.SetDocument(new EditableTextDocument(DocumentLines, TextDocument.LineEnding.Lf));
         _editor.TabSize = 4;
         _form.Show();
@@ -250,6 +257,7 @@ internal static class Program
         Lines.Add("rows " + Field<int>("_visibleRows") + ", wrapping " + Bool(_editor.IsWrapping));
         Moves("without wrap");
         Runs("without wrap");
+        SelectionRuns("without wrap");
 
         _editor.WordWrap = true;
         _form.ClientSize = new System.Drawing.Size(300, _form.ClientSize.Height);
@@ -260,6 +268,8 @@ internal static class Program
         Runs("with wrap");
         Press("down through the rows of a wrapped line", At(4, 15), K.Down, K.Down, K.Down, K.Down, K.Down, K.Up, K.Up, K.Up, K.Up);
         Press("the end of a row", At(5, 19), K.Down, K.Up, K.End, K.Home, K.Down);
+
+        SelectionRuns("with wrap");
 
         // The tab size changes the breaks; a text that changes too.
         _editor.TabSize = 8;
@@ -283,6 +293,178 @@ internal static class Program
             parts.Add(line + ":" + firstRow[line] + "[" + (breaks[line] == null ? "" : string.Join(",", Array.ConvertAll(breaks[line], b => b.ToString(CultureInfo.InvariantCulture)))) + "]");
         }
         Lines.Add("== another text: " + string.Join(" ", parts) + " rows " + firstRow[lineCount]);
+    }
+
+    // ---- 3C-2: the selection, written by the code before the selection moved to the model.
+    // The mouse (single, double and triple clicks, the margin, a drag with the left button, a drag after a double click, the right button), a
+    // key without Shift, Select all, a range of lines, the programmatic setters and the selected lines; and the same in terminal mode, where the
+    // selection has an end of its own. Shift cannot be held by a test (the view reads Control.ModifierKeys), so Shift with the keys and the mouse
+    // is not here. The clicks are given at the left edge of a character cell, found from the view (ColumnToX and the row of the line).
+
+    private static int _selectionEvents;
+
+    private static string _lastSelectionEvent = "-";
+
+    private static System.Drawing.Point CellPoint(int line, int column)
+    {
+        float y = (float)View.GetMethod("LineToY", Private).Invoke(_editor, new object[] { line });
+        return new System.Drawing.Point((int)Math.Ceiling(_editor.ColumnToX(column)) + 1, (int)y + 2);
+    }
+
+    private static void ForgetClicks()
+    {
+        SetField("_lastClickTime", DateTime.MinValue);
+        SetField("_lastDoubleClickTime", DateTime.MinValue);
+        SetField("_lastClickPoint", new System.Drawing.Point(-100, -100));
+    }
+
+    private static void Mouse(string method, MouseButtons button, System.Drawing.Point point)
+    {
+        View.GetMethod(method, Private).Invoke(_editor, new object[] { new MouseEventArgs(button, 1, point.X, point.Y, 0) });
+    }
+
+    private static string SelectionState()
+    {
+        ReadonlyTextBrowser.LineRange lines = _editor.SelectedLines;
+        string text = "has=" + Bool(_editor.HasSelection) + " start=" + P(_editor.SelectionStart) + " end=" + P(_editor.SelectionEnd) + " caret=" + P(_editor.CaretPosition)
+            + " lines=" + lines.First + ".." + lines.Last + " events=" + _selectionEvents + " last=" + _lastSelectionEvent;
+        _selectionEvents = 0;
+        _lastSelectionEvent = "-";
+        return text;
+    }
+
+    private static void Sel(string what)
+    {
+        Lines.Add("sel " + what + ": " + SelectionState());
+    }
+
+    private static void SelectionRuns(string title)
+    {
+        Lines.Add("== selection " + title);
+        _editor.SetCaret(At(0, 0));
+        _editor.ClearSelection();
+        ForgetClicks();
+        SelectionState();
+        System.Drawing.Point word = CellPoint(1, 5);
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a click in a word");
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a second click at once: the word");
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseUp", MouseButtons.Left, word);
+        Sel("a third click at once");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(1, 12));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(1, 12));
+        Sel("a double click on a blank between words");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(0, 0));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(0, 0));
+        Sel("a double click on an empty line");
+        ForgetClicks();
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(0, 0));
+
+        System.Drawing.Point from = CellPoint(3, 2);
+        Mouse("OnMouseDown", MouseButtons.Left, from);
+        Sel("a press for a drag");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(5, 10));
+        Sel("dragged down");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(2, 1));
+        Sel("dragged above the start");
+        Mouse("OnMouseMove", MouseButtons.Left, from);
+        Sel("dragged back to the start");
+        Mouse("OnMouseMove", MouseButtons.None, CellPoint(6, 0));
+        Sel("moved without a button");
+        Mouse("OnMouseUp", MouseButtons.Left, from);
+        ForgetClicks();
+
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseDown", MouseButtons.Left, word);
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 3));
+        Sel("moved after a double click (no drag)");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(4, 3));
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 3));
+        Sel("moved with the button after the release");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(4, 3));
+        ForgetClicks();
+
+        int marginX = ((System.Drawing.Rectangle)View.GetProperty("TextArea", Private).GetValue(_editor, null)).Left - 1;
+        Mouse("OnMouseDown", MouseButtons.Left, new System.Drawing.Point(marginX, CellPoint(2, 0).Y));
+        Sel("a click left of the text");
+        Mouse("OnMouseUp", MouseButtons.Left, new System.Drawing.Point(marginX, CellPoint(2, 0).Y));
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(4, 1));
+        Sel("the right button with a selection");
+        _editor.ClearSelection();
+        Sel("cleared");
+        _editor.ClearSelection();
+        Sel("cleared again");
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(4, 1));
+        Sel("the right button without a selection");
+        Mouse("OnMouseDown", MouseButtons.Middle, CellPoint(6, 0));
+        Sel("the middle button");
+        ForgetClicks();
+
+        _editor.SetSelection(true, At(1, 0));
+        _editor.SetCaret(At(1, 5));
+        Sel("set programmatically");
+        _editor.SetSelection(true, At(1, 0));
+        Sel("set again the same");
+        _editor.SetSelection(false, At(1, 0));
+        Sel("set off");
+        _editor.SetSelection(true, At(2, 3));
+        View.GetMethod("OnKeyDown", Private).Invoke(_editor, new object[] { new KeyEventArgs(K.Right) });
+        Sel("a key without Shift drops it");
+        _editor.SelectAllText();
+        Sel("select all");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { 4, 2 });
+        Sel("lines 4 to 2");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { -3, 100 });
+        Sel("lines -3 to 100");
+        View.GetMethod("SelectLineRange", Private).Invoke(_editor, new object[] { 5, 5 });
+        Sel("line 5");
+        foreach (int[] pair in new[] { new[] { 1, 0, 3, 0 }, new[] { 3, 0, 1, 0 }, new[] { 1, 2, 3, 4 }, new[] { 3, 4, 1, 2 }, new[] { 2, 2, 2, 2 }, new[] { 0, 0, 1, 0 } })
+        {
+            _editor.SetCaret(At(pair[2], pair[3]));
+            _editor.SetSelection(true, At(pair[0], pair[1]));
+            Sel("from " + pair[0] + ":" + pair[1] + " to the caret");
+        }
+        _editor.SetSelectionEnd(At(6, 2));
+        Sel("an end set outside terminal mode");
+        _editor.ClearSelection();
+        SelectionState();
+
+        _editor.TerminalMode = true;
+        Sel("terminal mode");
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(2, 3));
+        Sel("terminal: a press");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(4, 1));
+        Sel("terminal: dragged");
+        Mouse("OnMouseMove", MouseButtons.Left, CellPoint(2, 3));
+        Sel("terminal: dragged back");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(2, 3));
+        ForgetClicks();
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(3, 4));
+        Mouse("OnMouseDown", MouseButtons.Left, CellPoint(3, 4));
+        Sel("terminal: a double click selects the line");
+        Mouse("OnMouseUp", MouseButtons.Left, CellPoint(3, 4));
+        ForgetClicks();
+        _editor.SelectAllText();
+        Sel("terminal: select all does nothing");
+        _editor.SetSelectionEnd(At(5, 2));
+        _editor.SetSelection(true, At(1, 1));
+        Sel("terminal: an end set and a start");
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(6, 0));
+        Sel("terminal: the right button with a selection");
+        _editor.ClearSelection();
+        Mouse("OnMouseDown", MouseButtons.Right, CellPoint(6, 1));
+        Sel("terminal: the right button without one");
+        _editor.TerminalMode = false;
+        _editor.ClearSelection();
+        SelectionState();
     }
 
     private static string Bool(bool value)
