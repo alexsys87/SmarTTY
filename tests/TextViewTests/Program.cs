@@ -291,6 +291,7 @@ internal static class Program
         ListRuns();
         LineCommandRuns();
         SearchRuns();
+        CursorRuns();
         _form.Dispose();
     }
 
@@ -2207,6 +2208,204 @@ internal static class Program
             }, 4, 14, 0.5f, color => color.ToArgb() == darkGray.ToArgb()));
         }
         code.ShowTabs = false;
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3E-3: several cursors in CodeEditorPP, written by the code before what the editor decides about them moved to the model: the commands
+    // that make them (Ctrl+D, Ctrl+Shift+L, Ctrl+Alt+Up/Down by their keys), typing, Enter, Backspace with space indentation, Tab, a control
+    // character, the keys that move them with and without Shift and Ctrl, Ctrl+Backspace, Delete, Ctrl+Delete, the keys that go back to one cursor
+    // (Escape, PageUp, Ctrl+A, Ctrl+Z, Ctrl+Home), a command for one cursor, the undo step of an edit, Copy and Cut with several cursors, a paste of a
+    // line for each cursor and of one text for all, read-only, and a caret moved by something that knows of one cursor (a click, SetCaret).
+
+    private static string Cursors(CodeEditorPP code)
+    {
+        System.Collections.IList extra = (System.Collections.IList)typeof(CodeEditorPP).GetField("_extraCursors", Private).GetValue(code);
+        List<string> items = new List<string>();
+        foreach (object item in extra)
+        {
+            TextCursor cursor = (TextCursor)item;
+            items.Add(cursor.Anchor.Line + ":" + cursor.Anchor.Column + (cursor.HasSelection ? ">" + cursor.Caret.Line + ":" + cursor.Caret.Column : "") + (cursor.Goal >= 0 ? "g" + cursor.Goal : ""));
+        }
+        return "main=" + (code.HasSelection ? P(code.SelectionStart) + ">" : "") + P(code.CaretPosition) + " goal=" + typeof(CodeEditorPP).GetField("_primaryGoal", Private).GetValue(code)
+            + " whole=" + Bool((bool)typeof(CodeEditorPP).GetField("_wholeWordOccurrences", Private).GetValue(code)) + " extra=" + (items.Count == 0 ? "-" : string.Join(" ", items));
+    }
+
+    private static void CursorState(CodeEditorPP code, string what)
+    {
+        Lines.Add("cursors " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " " + Cursors(code) + " undo=" + Bool(code.CanUndo));
+    }
+
+    private static void CursorRuns()
+    {
+        Lines.Add("== cursors");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(400, 200) };
+        _form.Controls.Add(code);
+        code.WordWrap = false;
+        code.TabSize = 4;
+        Application.DoEvents();
+        void Reset(params string[] lines)
+        {
+            code.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+            code.ClearSelection();
+            code.SetCaret(At(0, 0));
+        }
+        bool KeyDown(Keys keys)
+        {
+            KeyEventArgs args = new KeyEventArgs(keys);
+            EditorKeyDownMethod.Invoke(code, new object[] { args });
+            return args.Handled;
+        }
+        void Press(char ch)
+        {
+            KeyPressMethod.Invoke(code, new object[] { new KeyPressEventArgs(ch) });
+        }
+        Reset("foo bar foo", "baz foo", "foo");
+        code.SetCaret(At(0, 1));
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "Ctrl+D selects the word under the caret");
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "again: the next occurrence of the whole word");
+        KeyDown(Keys.Control | Keys.D);
+        KeyDown(Keys.Control | Keys.D);
+        CursorState(code, "and the others, round to the start");
+        Press('X');
+        CursorState(code, "typing replaces every selection");
+        code.Undo();
+        CursorState(code, "one undo step (one cursor after it)");
+        code.SetCaret(At(0, 1));
+        code.ClearSelection();
+        KeyDown(Keys.Control | Keys.Shift | Keys.L);
+        CursorState(code, "Ctrl+Shift+L: every occurrence of the word");
+        KeyDown(Keys.Right);
+        CursorState(code, "Right ends every selection at its end");
+        KeyDown(Keys.Shift | Keys.Left);
+        CursorState(code, "Shift+Left selects a letter back");
+        KeyDown(Keys.Control | Keys.Left);
+        CursorState(code, "Ctrl+Left: word left");
+        KeyDown(Keys.Control | Keys.Right);
+        CursorState(code, "Ctrl+Right: word right");
+        KeyDown(Keys.End);
+        CursorState(code, "End");
+        KeyDown(Keys.Home);
+        CursorState(code, "Home");
+        KeyDown(Keys.Down);
+        CursorState(code, "Down");
+        KeyDown(Keys.Up);
+        CursorState(code, "Up");
+        bool altLeft = KeyDown(Keys.Alt | Keys.Left);
+        CursorState(code, "Alt+Left is not a move of the cursors: handled=" + Bool(altLeft));
+        KeyDown(Keys.Escape);
+        CursorState(code, "Escape: one cursor");
+
+        Reset("a", "bb", "ccc", "");
+        code.SetCaret(At(0, 1));
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        CursorState(code, "Ctrl+Alt+Down twice: a cursor on each line below");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Up);
+        CursorState(code, "Ctrl+Alt+Up");
+        Press('-');
+        CursorState(code, "a letter typed at each cursor");
+        Press('\r');
+        CursorState(code, "Enter at each");
+        Press('\b');
+        CursorState(code, "Backspace at each");
+        code.InsertSpaces = true;
+        Press('\t');
+        CursorState(code, "Tab with spaces");
+        Press('\b');
+        CursorState(code, "Backspace takes a level of spaces");
+        code.InsertSpaces = false;
+        Press('\t');
+        CursorState(code, "Tab with a tab");
+        Press((char)1);
+        CursorState(code, "a control character types nothing");
+        KeyDown(Keys.Delete);
+        CursorState(code, "Delete at each");
+        KeyDown(Keys.Control | Keys.Back);
+        CursorState(code, "Ctrl+Backspace at each");
+        KeyDown(Keys.Control | Keys.Delete);
+        CursorState(code, "Ctrl+Delete at each");
+        bool shiftDelete = KeyDown(Keys.Shift | Keys.Delete);
+        CursorState(code, "Shift+Delete is not a delete of the cursors: handled=" + Bool(shiftDelete));
+
+        foreach (Keys keys in new[] { Keys.PageDown, Keys.Control | Keys.A, Keys.Control | Keys.Home, Keys.Control | Keys.End, Keys.Control | Keys.Z, Keys.Control | Keys.Y, Keys.PageUp })
+        {
+            Reset("a1", "a2", "a3");
+            KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+            bool handled = KeyDown(keys);
+            CursorState(code, keys + " goes back to one cursor first: handled=" + Bool(handled));
+        }
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Shift | Keys.D);
+        CursorState(code, "a command of one cursor (duplicate lines) drops the others first");
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Oemplus);
+        CursorState(code, "a command that does not move the caret (zoom) drops the others first");
+        code.ResetZoom();
+        Reset("foo bar", "foo bar");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Delete);
+        CursorState(code, "Ctrl+Delete takes a word at each");
+        Reset("x", "x");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        code.InsertSpaces = true;
+        Press('\t');
+        Press('\b');
+        CursorState(code, "Backspace after a tab of spaces takes the level");
+        code.InsertSpaces = false;
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        code.SetCaret(At(2, 1));
+        CursorState(code, "a caret set by something of one cursor drops the others");
+        Reset("a1", "a2", "a3");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        typeof(CodeEditorPP).GetMethod("OnMouseDown", Private).Invoke(code, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 5, 5, 0) });
+        typeof(ReadonlyTextBrowser).GetMethod("OnMouseUp", Private).Invoke(code, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 5, 5, 0) });
+        CursorState(code, "a click drops them");
+
+        // Copy, cut and paste with several cursors.
+        Reset("one two", "three four", "five");
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        KeyDown(Keys.Control | Keys.Shift | Keys.Right);
+        CursorState(code, "a word selected at each of three cursors");
+        object[] copyArgs = { null };
+        bool copied = (bool)typeof(CodeEditorPP).GetMethod("TryCopyCursors", Private).Invoke(code, copyArgs);
+        string clip = (string)typeof(CodeEditorPP).GetMethod("ForClipboard", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { copyArgs[0] });
+        Lines.Add("cursors copy: " + Bool(copied) + " text=" + Escape(clip));
+        code.PasteText("A\r\nB\r\nC");
+        CursorState(code, "a paste of a line for each cursor");
+        code.PasteText("Z");
+        CursorState(code, "a paste of one text for all");
+        code.PasteText("p\nq");
+        CursorState(code, "a paste of two lines at three cursors: all of it at each");
+        code.PasteText("");
+        CursorState(code, "an empty paste");
+        KeyDown(Keys.Control | Keys.Shift | Keys.Left);
+        bool cut = false;
+        try
+        {
+            code.Cut();
+            cut = true;
+        }
+        catch (Exception exception)
+        {
+            Lines.Add("cursors cut threw " + exception.GetType().Name);
+        }
+        CursorState(code, "Cut takes every selection out (" + Bool(cut) + ")");
+        code.ReadOnly = true;
+        Press('Q');
+        KeyDown(Keys.Control | Keys.Alt | Keys.Down);
+        CursorState(code, "read-only: typing with several cursors and a new one do nothing to the text");
+        code.ReadOnly = false;
+        object[] none = { null };
+        code.ClearExtraCursors();
+        bool copiedOne = (bool)typeof(CodeEditorPP).GetMethod("TryCopyCursors", Private).Invoke(code, none);
+        Lines.Add("cursors copy with one cursor: " + Bool(copiedOne));
         _form.Controls.Remove(code);
         code.Dispose();
     }

@@ -1680,3 +1680,55 @@ marks the lines, the dot of a space, the arrow of a tab, the line ends but the l
 marks scrolled by two columns: .##....#......|..##...#......|..............|..............
 tab lines not shown: ..............|..............|..............|..............
 tab lines shown: ...#####......|####.###......|..............|..............
+== cursors
+cursors Ctrl+D selects the word under the caret: text=foo bar foo\nbaz foo\nfoo main=0:0>0:3 goal=-1 whole=T extra=- undo=F
+cursors again: the next occurrence of the whole word: text=foo bar foo\nbaz foo\nfoo main=0:8>0:11 goal=-1 whole=T extra=0:0>0:3 undo=F
+cursors and the others, round to the start: text=foo bar foo\nbaz foo\nfoo main=2:0>2:3 goal=-1 whole=T extra=0:0>0:3 0:8>0:11 1:4>1:7 undo=F
+cursors typing replaces every selection: text=X bar X\nbaz X\nX main=2:1 goal=-1 whole=F extra=0:1 0:7 1:5 undo=T
+cursors one undo step (one cursor after it): text=foo bar foo\nbaz foo\nfoo main=2:0>2:3 goal=-1 whole=F extra=- undo=F
+cursors Ctrl+Shift+L: every occurrence of the word: text=foo bar foo\nbaz foo\nfoo main=0:0>0:3 goal=-1 whole=T extra=0:8>0:11 1:4>1:7 2:0>2:3 undo=F
+cursors Right ends every selection at its end: text=foo bar foo\nbaz foo\nfoo main=0:3 goal=-1 whole=F extra=0:11 1:7 2:3 undo=F
+cursors Shift+Left selects a letter back: text=foo bar foo\nbaz foo\nfoo main=0:3>0:2 goal=-1 whole=F extra=0:11>0:10 1:7>1:6 2:3>2:2 undo=F
+cursors Ctrl+Left: word left: text=foo bar foo\nbaz foo\nfoo main=0:0 goal=-1 whole=F extra=0:8 1:4 2:0 undo=F
+cursors Ctrl+Right: word right: text=foo bar foo\nbaz foo\nfoo main=0:3 goal=-1 whole=F extra=0:11 1:7 2:3 undo=F
+cursors End: text=foo bar foo\nbaz foo\nfoo main=0:11 goal=-1 whole=F extra=1:7 2:3 undo=F
+cursors Home: text=foo bar foo\nbaz foo\nfoo main=0:0 goal=-1 whole=F extra=1:0 2:0 undo=F
+cursors Down: text=foo bar foo\nbaz foo\nfoo main=1:0 goal=0 whole=F extra=2:0g0 2:3g0 undo=F
+cursors Up: text=foo bar foo\nbaz foo\nfoo main=0:0 goal=0 whole=F extra=1:0 undo=F
+cursors Alt+Left is not a move of the cursors: handled=T: text=foo bar foo\nbaz foo\nfoo main=0:0 goal=0 whole=F extra=1:0 undo=F
+cursors Escape: one cursor: text=foo bar foo\nbaz foo\nfoo main=0:0 goal=-1 whole=F extra=- undo=F
+cursors Ctrl+Alt+Down twice: a cursor on each line below: text=a\nbb\nccc\n main=2:1 goal=1 whole=F extra=0:1 1:1g1 undo=F
+cursors Ctrl+Alt+Up: text=a\nbb\nccc\n main=2:1 goal=1 whole=F extra=0:1 1:1g1 undo=F
+cursors a letter typed at each cursor: text=a-\nb-b\nc-cc\n main=2:2 goal=-1 whole=F extra=0:2 1:2 undo=T
+cursors Enter at each: text=a-\n\nb-\nb\nc-\ncc\n main=5:0 goal=-1 whole=F extra=1:0 3:0 undo=T
+cursors Backspace at each: text=a-\nb-b\nc-cc\n main=2:2 goal=-1 whole=F extra=0:2 1:2 undo=T
+cursors Tab with spaces: text=a-  \nb-  b\nc-  cc\n main=2:4 goal=-1 whole=F extra=0:4 1:4 undo=T
+cursors Backspace takes a level of spaces: text=a- \nb- b\nc- cc\n main=2:3 goal=-1 whole=F extra=0:3 1:3 undo=T
+cursors Tab with a tab: text=a- \t\nb- \tb\nc- \tcc\n main=2:4 goal=-1 whole=F extra=0:4 1:4 undo=T
+cursors a control character types nothing: text=a- \t\nb- \tb\nc- \tcc\n main=2:4 goal=-1 whole=F extra=0:4 1:4 undo=T
+cursors Delete at each: text=a- \tb- \t\nc- \tc\n main=1:4 goal=-1 whole=F extra=0:4 0:8 undo=T
+cursors Ctrl+Backspace at each: text=ab\ncc\n main=1:1 goal=-1 whole=F extra=0:1 0:2 undo=T
+cursors Ctrl+Delete at each: text=ac\n main=0:2 goal=-1 whole=F extra=0:1 undo=T
+cursors Shift+Delete is not a delete of the cursors: handled=T: text= main=0:0 goal=-1 whole=F extra=- undo=T
+cursors Next goes back to one cursor first: handled=T: text=a1\na2\na3 main=2:0 goal=-1 whole=F extra=- undo=F
+cursors A, Control goes back to one cursor first: handled=F: text=a1\na2\na3 main=1:0 goal=-1 whole=F extra=- undo=F
+cursors Home, Control goes back to one cursor first: handled=T: text=a1\na2\na3 main=1:0 goal=-1 whole=F extra=- undo=F
+cursors End, Control goes back to one cursor first: handled=T: text=a1\na2\na3 main=1:2 goal=-1 whole=F extra=- undo=F
+cursors Z, Control goes back to one cursor first: handled=T: text=a1\na2\na3 main=1:0 goal=-1 whole=F extra=- undo=F
+cursors Y, Control goes back to one cursor first: handled=T: text=a1\na2\na3 main=1:0 goal=-1 whole=F extra=- undo=F
+cursors Prior goes back to one cursor first: handled=T: text=a1\na2\na3 main=0:0 goal=-1 whole=F extra=- undo=F
+cursors a command of one cursor (duplicate lines) drops the others first: text=a1\na2\na2\na3 main=2:0 goal=-1 whole=F extra=- undo=T
+cursors a command that does not move the caret (zoom) drops the others first: text=a1\na2\na3 main=1:0 goal=-1 whole=F extra=- undo=F
+cursors Ctrl+Delete takes a word at each: text= bar\n bar main=1:0 goal=-1 whole=F extra=0:0 undo=T
+cursors Backspace after a tab of spaces takes the level: text=x\nx main=1:0 goal=-1 whole=F extra=0:0 undo=T
+cursors a caret set by something of one cursor drops the others: text=a1\na2\na3 main=2:1 goal=-1 whole=F extra=- undo=F
+cursors a click drops them: text=a1\na2\na3 main=0:0>0:2 goal=-1 whole=F extra=- undo=F
+cursors a word selected at each of three cursors: text=one two\nthree four\nfive main=2:0>2:4 goal=-1 whole=F extra=0:0>0:3 1:0>1:5 undo=F
+cursors copy: T text=one\r\nthree\r\nfive
+cursors a paste of a line for each cursor: text=A two\nB four\nC main=2:1 goal=-1 whole=F extra=0:1 1:1 undo=T
+cursors a paste of one text for all: text=AZ two\nBZ four\nCZ main=2:2 goal=-1 whole=F extra=0:2 1:2 undo=T
+cursors a paste of two lines at three cursors: all of it at each: text=AZp\nq two\nBZp\nq four\nCZp\nq main=5:1 goal=-1 whole=F extra=1:1 3:1 undo=T
+cursors an empty paste: text=AZp\nq two\nBZp\nq four\nCZp\nq main=5:1 goal=-1 whole=F extra=1:1 3:1 undo=T
+cursors Cut takes every selection out (T): text=AZp\n two\nBZp\n four\nCZp\n main=5:0 goal=-1 whole=F extra=1:0 3:0 undo=T
+cursors read-only: typing with several cursors and a new one do nothing to the text: text=AZp\n two\nBZp\n four\nCZp\n main=5:0 goal=-1 whole=F extra=1:0 3:0 undo=F
+cursors copy with one cursor: F
