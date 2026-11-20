@@ -326,6 +326,27 @@ internal class FoldingManager
         return false;
     }
 
+    /// <summary>
+    /// A click on the mark of the fold margin at a line: nothing while the lines are wrapped (folding is not available then); otherwise the block
+    /// of the line is folded or unfolded, and when a block is folded with the caret between the line of its opening token and the line of its
+    /// closing one, <paramref name="caretTarget"/> is where the caret goes: the start of the line before the opening token (the header of a block
+    /// whose opening token is on the next line). It is what <c>Controls/TextView/FoldingMarginPainter.OnMouseDown</c> decided, moved here as it was
+    /// (stage 3D). True when a fold changed.
+    /// </summary>
+    internal bool ClickMark(int lineIndex, bool wrapping, TextDocument.TextPosition caret, out TextDocument.TextPosition? caretTarget)
+    {
+        caretTarget = null;
+        if (wrapping || !ToggleFold(lineIndex, out var endToken, collapseOnly: false))
+        {
+            return false;
+        }
+        if (endToken != null && caret.Line <= endToken.LineNumber && caret.Line >= endToken.Partner.LineNumber)
+        {
+            caretTarget = new TextDocument.TextPosition(0, endToken.Partner.LineNumber - 1);
+        }
+        return true;
+    }
+
     public int GetTotalHiddenLines()
     {
         // A folded block inside another folded block hides lines the outer one hides already: count each line once.

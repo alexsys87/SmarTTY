@@ -66,11 +66,11 @@ internal class FoldingMarginPainter : IMargin
 
     public bool OnMouseDown(Point point, ReadonlyTextBrowser readonlyTextBrowser, int firstLineIndex, int lastLineIndex, SizeF charSize, int rowIdx)
     {
-        if (!readonlyTextBrowser.IsWrapping && readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ToggleFold(readonlyTextBrowser.DisplayRows[rowIdx].Line, out var endToken, collapseOnly: false))
+        if (readonlyTextBrowser.DisplayRows[rowIdx].VirtualLine == null && this._manager.ClickMark(readonlyTextBrowser.DisplayRows[rowIdx].Line, readonlyTextBrowser.IsWrapping, readonlyTextBrowser.CaretPosition, out TextDocument.TextPosition? caretTarget))
         {
-            if (endToken != null && readonlyTextBrowser.CaretPosition.Line <= endToken.LineNumber && readonlyTextBrowser.CaretPosition.Line >= endToken.Partner.LineNumber)
+            if (caretTarget.HasValue)
             {
-                readonlyTextBrowser.SetCaret(new TextDocument.TextPosition(0, endToken.Partner.LineNumber - 1));
+                readonlyTextBrowser.SetCaret(caretTarget.Value);
             }
             readonlyTextBrowser.RebuildDisplayRows();
             readonlyTextBrowser.UpdateLayout();
