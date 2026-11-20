@@ -276,6 +276,9 @@ jobs:
       - name: Run editor completion checks (when the word list of a code editor opens, what it selects and accepts, and the parameter hint of a call; what the list selects and puts on top, and its keys)
         run: dotnet run --project tests/EditorCompletionModelTests -c Release
 
+      - name: Run line command checks (duplicate, move, delete and comment lines, the transforms of the Text menu, the moves to a bracket, the zoom steps)
+        run: dotnet run --project tests/LineCommandTests -c Release
+
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
