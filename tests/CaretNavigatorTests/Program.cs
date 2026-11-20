@@ -6,7 +6,8 @@ using SmarTTY.TextEditing;
 // Checks of what stage 3C-1 took out of Controls/ReadonlyTextBrowser: CodeEditing/WrapMap.cs (where the lines break while word wrap is on, when the
 // map is built again, the line and the row of a row index, the row of a column) and CodeEditing/CaretNavigator.cs (where the caret goes by a key,
 // the column Up, Down and the pages keep, the word under the caret, what the view is asked at the ends of the text), with a fake view over a real
-// document. The same code is run in the real text view by tests/TextViewTests (its golden file).
+// document; and what 3C-2 took: CodeEditing/TextSelection.cs (the state of the selection and its rules). The same code is run in the real text view
+// by tests/TextViewTests (its golden file).
 // Run with: dotnet run --project tests/CaretNavigatorTests
 internal static class Program
 {
@@ -348,6 +349,64 @@ internal static class Program
         Check(thrown, "the navigator needs its view");
     }
 
+    private static void Selection()
+    {
+        TextSelection selection = new TextSelection();
+        Check(!selection.HasSelection, "no selection at first");
+        Equal(P(selection.End(false, At(3, 4))), "3:4", "outside terminal mode the end is the caret");
+        selection.TerminalEnd = At(5, 1);
+        Equal(P(selection.End(true, At(3, 4))), "5:1", "in terminal mode it is its own end");
+        Check(selection.SetActive(true), "switched on: changed");
+        Check(!selection.SetActive(true), "on again: no change");
+        Check(selection.SetActive(false), "switched off: changed");
+        Check(!selection.SetActive(false), "off again: no change");
+        Check(selection.MoveAnchor(At(1, 2)), "a new start: moved");
+        Check(!selection.MoveAnchor(At(1, 2)), "the same start: not moved");
+        Equal(P(selection.Anchor), "1:2", "the start");
+        Check(selection.MoveTerminalEnd(At(2, 0)), "a new terminal end: moved");
+        Check(!selection.MoveTerminalEnd(At(2, 0)), "the same: not moved");
+        Equal(P(selection.TerminalEnd), "2:0", "the terminal end");
+        Check(!selection.Clear(), "clearing no selection: false");
+        Check(selection.StartIfNone(At(4, 4)), "a selection starts when there is none");
+        Check(selection.HasSelection && P(selection.Anchor) == "4:4", "at the given place");
+        Check(!selection.StartIfNone(At(0, 0)), "and not when there is one");
+        Equal(P(selection.Anchor), "4:4", "which keeps its start");
+        Check(selection.Clear() && !selection.HasSelection, "clearing a selection: true, and it is gone");
+        Equal(P(selection.Anchor), "4:4", "the start is kept");
+
+        string Lines(int anchorLine, int anchorColumn, int endLine, int endColumn, bool has = true)
+        {
+            TextSelection lines = new TextSelection { HasSelection = has, Anchor = At(anchorLine, anchorColumn) };
+            lines.GetSelectedLines(At(endLine, endColumn), out int first, out int last);
+            return first + ".." + last;
+        }
+        Equal(Lines(1, 2, 3, 4, has: false), "0..-1", "no selection: no lines");
+        Equal(Lines(2, 2, 2, 2), "0..-1", "an empty selection: no lines");
+        Equal(Lines(1, 2, 3, 4), "1..3", "from the start to the end");
+        Equal(Lines(3, 4, 1, 2), "1..3", "backward the same");
+        Equal(Lines(1, 0, 3, 0), "1..2", "an end at the start of a line does not take it");
+        Equal(Lines(3, 0, 1, 0), "1..2", "nor a start there when the selection goes backward");
+        Equal(Lines(0, 0, 1, 0), "0..0", "the first line alone");
+        Equal(Lines(0, 3, 0, 0), "0..0", "a backward selection in the first line");
+
+        string Range(int first, int last, int count)
+        {
+            bool any = TextSelection.ClampLineRange(ref first, ref last, count);
+            return any ? first + ".." + last : "none";
+        }
+        Equal(Range(2, 4, 10), "2..4", "a range in the text");
+        Equal(Range(4, 2, 10), "2..4", "a reversed range is put in order");
+        Equal(Range(-3, 100, 10), "0..9", "a range past both ends is brought into the text");
+        Equal(Range(5, 5, 10), "5..5", "one line");
+        Equal(Range(-1, 3, 10), "0..3", "a range that starts one line before the text starts at its first line");
+        Equal(Range(12, 15, 10), "none", "a range after the text: nothing");
+        Equal(Range(0, 0, 0), "none", "an empty text: nothing");
+
+        FakeView view = new FakeView("one", "", "three!");
+        Equal(P(TextSelection.DocumentEnd(view.Text)), "2:6", "Select all ends at the end of the last line");
+        Equal(P(TextSelection.DocumentEnd(new FakeView("only").Text)), "0:4", "of a text of one line too");
+    }
+
     private static int Main()
     {
         try
@@ -358,6 +417,7 @@ internal static class Program
             WrappedMoves();
             WordBounds();
             Arguments();
+            Selection();
         }
         catch (Exception exception)
         {

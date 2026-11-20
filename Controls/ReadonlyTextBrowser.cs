@@ -455,11 +455,31 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     private TextDocument.TextPosition _caretPosition;
 
-    private TextDocument.TextPosition _selectionStart;
+    // The selection is CodeEditing/TextSelection (stage 3C); these three are aliases into it, kept so that the view and its subclasses read as
+    // before. The model is made when first used: the base classes may ask before the constructor has run.
+    private TextSelection _selection;
 
-    private TextDocument.TextPosition _selectionEnd;
+    /// <summary>The selection: whether there is one, its start and the end of a terminal selection.</summary>
+    internal TextSelection Selection => _selection ?? (_selection = new TextSelection());
 
-    protected internal bool _hasSelection;
+    private TextDocument.TextPosition _selectionStart
+    {
+        get => Selection.Anchor;
+        set => Selection.Anchor = value;
+    }
+
+    private TextDocument.TextPosition _selectionEnd
+    {
+        get => Selection.TerminalEnd;
+        set => Selection.TerminalEnd = value;
+    }
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    protected internal bool _hasSelection
+    {
+        get => Selection.HasSelection;
+        set => Selection.HasSelection = value;
+    }
 
     private bool _terminalMode;
 
@@ -759,17 +779,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     public TextDocument.TextPosition SelectionStart => _selectionStart;
 
-    public TextDocument.TextPosition SelectionEnd
-    {
-        get
-        {
-            if (TerminalMode)
-            {
-                return _selectionEnd;
-            }
-            return _caretPosition;
-        }
-    }
+    public TextDocument.TextPosition SelectionEnd => Selection.End(TerminalMode, _caretPosition);
 
     public bool IsCaretAtLineEnd => _document.GetLineText(_caretPosition.Line).Length == _caretPosition.Column;
 
@@ -778,11 +788,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     /// <summary>Removes the selection (the text stays).</summary>
     public void ClearSelection()
     {
-        if (!_hasSelection)
+        if (!Selection.Clear())
         {
             return;
         }
-        _hasSelection = false;
         OnSelectionStartChanged();
         Redraw();
     }
@@ -797,15 +806,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     {
         get
         {
-            if (!_hasSelection || SelectionEnd == SelectionStart)
-            {
-                return new LineRange(0, -1);
-            }
-            if (SelectionEnd < SelectionStart)
-            {
-                return new LineRange(SelectionEnd.Line, SelectionStart.LastFullLine);
-            }
-            return new LineRange(SelectionStart.Line, SelectionEnd.LastFullLine);
+            Selection.GetSelectedLines(SelectionEnd, out int first, out int last);
+            return new LineRange(first, last);
         }
     }
 
@@ -1108,16 +1110,10 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected void SetSelectionCore(bool select, TextDocument.TextPosition textPosition, SelectionChangeSource selectionChangeSource)
     {
-        bool selectionChanged = false;
         TextDocument.TextPosition previousCaret = _caretPosition;
-        if (_hasSelection != select)
+        bool selectionChanged = Selection.SetActive(select);
+        if (Selection.MoveAnchor(textPosition))
         {
-            selectionChanged = true;
-            _hasSelection = select;
-        }
-        if (_selectionStart != textPosition)
-        {
-            _selectionStart = textPosition;
             OnSelectionStartChanged();
             selectionChanged = true;
         }
@@ -1743,8 +1739,8 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
                 int line = YToLine(e.Location.Y);
                 if (!handled && line != -1)
                 {
-                    _hasSelection = true;
-                    _selectionStart = new TextDocument.TextPosition(0, line);
+                    Selection.HasSelection = true;
+                    Selection.Anchor = new TextDocument.TextPosition(0, line);
                     OnSelectionStartChanged();
                     if (!_terminalMode && !NavigationLocked)
                     {
@@ -1756,16 +1752,14 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             {
                 if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
                 {
-                    if (!_hasSelection)
+                    if (Selection.StartIfNone(SelectionEnd))
                     {
-                        _hasSelection = true;
-                        _selectionStart = SelectionEnd;
                         OnSelectionStartChanged();
                     }
                 }
                 else
                 {
-                    _hasSelection = false;
+                    Selection.HasSelection = false;
                     OnSelectionStartChanged();
                 }
                 PlaceCaretAt(e.Location);
@@ -1813,21 +1807,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected void SelectLineRange(int firstLine, int lastLine)
     {
-        if (firstLine > lastLine)
-        {
-            int swap = firstLine;
-            firstLine = lastLine;
-            lastLine = swap;
-        }
-        if (firstLine < 0)
-        {
-            firstLine = 0;
-        }
-        if (lastLine >= LineCount)
-        {
-            lastLine = LineCount - 1;
-        }
-        if (lastLine < firstLine)
+        if (!TextSelection.ClampLineRange(ref firstLine, ref lastLine, LineCount))
         {
             return;
         }
@@ -1843,26 +1823,19 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             return;
         }
-        bool selectionChanged = false;
         TextDocument.TextPosition previousCaret = _caretPosition;
-        if (_hasSelection != select)
-        {
-            selectionChanged = true;
-            _hasSelection = select;
-        }
+        bool selectionChanged = Selection.SetActive(select);
         if (adjustStart)
         {
             AdjustSelectionEnd(ref textPosition);
-            if (_selectionStart != textPosition)
+            if (Selection.MoveAnchor(textPosition))
             {
-                _selectionStart = textPosition;
                 selectionChanged = true;
                 OnSelectionStartChanged();
             }
         }
-        else if (_selectionEnd != textPosition)
+        else if (Selection.MoveTerminalEnd(textPosition))
         {
-            _selectionEnd = textPosition;
             selectionChanged = true;
         }
         if (selectionChanged)
@@ -1891,8 +1864,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             if (!_hasSelection && (!_terminalMode || HitTest(e.Location, allowPastEnd: true).IsValid))
             {
-                _selectionStart = CaretPosition;
-                _hasSelection = true;
+                Selection.StartIfNone(CaretPosition);
                 OnSelectionStartChanged();
             }
             TextDocument.TextPosition textPosition = CaretPosition;
@@ -2144,12 +2116,9 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
             }
             else
             {
-                bool selectionStarted = false;
-                if (!_hasSelection)
+                bool selectionStarted = Selection.StartIfNone(CaretPosition);
+                if (selectionStarted)
                 {
-                    _hasSelection = true;
-                    _selectionStart = CaretPosition;
-                    selectionStarted = true;
                     OnSelectionStartChanged();
                 }
                 if (TryGetNavigationTarget(e, extendSelection: true, out var navigationTarget, out caretDirection))
@@ -2207,7 +2176,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         {
             _selectionStart = new TextDocument.TextPosition(0, 0);
             OnSelectionStartChanged();
-            SetCaret(new TextDocument.TextPosition(_document.GetLineText(_document.LineCount - 1).Length, _document.LineCount - 1));
+            SetCaret(TextSelection.DocumentEnd(_document));
             _hasSelection = true;
             EnsureCaretVisible(CaretPosition);
             Redraw();
