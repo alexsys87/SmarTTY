@@ -1513,3 +1513,111 @@ list key Tab with nothing selected: handled=True items=Value ValueType get_value
 list key a blank with nothing selected: handled=True items=Value ValueType get_value getValue int MAX_VALUE max sum valid value values xvalue my_get_value MaxAllowed ReadAllText ReadAllLines SunRa Vector3d ReadAll GetAllItems OmeGa selected= focused=OmeGa filtered=False visible=False log=active False;forward 258 32
 list double click: items=Value ValueType get_value getValue int MAX_VALUE max sum valid value values xvalue my_get_value MaxAllowed ReadAllText ReadAllLines SunRa Vector3d ReadAll GetAllItems OmeGa selected=7 focused=sum filtered=False visible=False log=accept sum None
 list accept with nothing selected: items=Value ValueType get_value getValue int MAX_VALUE max sum valid value values xvalue my_get_value MaxAllowed ReadAllText ReadAllLines SunRa Vector3d ReadAll GetAllItems OmeGa selected= focused=sum filtered=False visible=True log=
+== line commands
+command duplicate the caret line: text=one\ntwo\ntwo\nthree\nfour caret=2:2 sel=- undo=T zoom=1.000 events=
+command undone in one step: text=one\ntwo\nthree\nfour caret=1:2 sel=- undo=F zoom=1.000 events=
+command duplicate two selected lines: text=one\ntwo\nthree\ntwo\nthree\nfour caret=4:2 sel=3:1 undo=T zoom=1.000 events=
+command duplicate the last line (no final line break): text=one\ntwo\nthree\nfour\nfour caret=4:1 sel=- undo=T zoom=1.000 events=
+command duplicate a line before an empty last line: text=one\ntwo\ntwo\n caret=2:0 sel=- undo=T zoom=1.000 events=
+command move the caret line up: text=two\none\nthree\nfour caret=0:1 sel=- undo=T zoom=1.000 events=
+command move it up at the first line: text=two\none\nthree\nfour caret=0:1 sel=- undo=T zoom=1.000 events=
+command move it down twice: text=one\nthree\ntwo\nfour caret=2:1 sel=- undo=T zoom=1.000 events=
+command move the last line down: text=one\nthree\ntwo\nfour caret=3:0 sel=- undo=T zoom=1.000 events=
+command a selection ending at the start of a line: down at the last line: text=one\nfour\ntwo\nthree caret=4:0 sel=2:0 undo=T zoom=1.000 events=
+command and up: text=one\ntwo\nthree\nfour caret=3:0 sel=1:0 undo=T zoom=1.000 events=
+command undone: text=one\nfour\ntwo\nthree caret=4:0 sel=- undo=T zoom=1.000 events=
+command delete the caret line: text=one\nthree\nfour caret=1:0 sel=- undo=T zoom=1.000 events=
+command delete the last line: text=one\ntwo\nthree caret=2:5 sel=- undo=T zoom=1.000 events=
+command delete three selected lines: text=four caret=0:0 sel=- undo=T zoom=1.000 events=
+command no comment style: F
+command comment: T
+command four lines commented: text=// a\n//   b\n\n// c caret=3:4 sel=0:0 undo=T zoom=1.000 events=
+command and uncommented: text=a\n  b\n\nc caret=3:1 sel=0:0 undo=T zoom=1.000 events=
+command the caret line commented, the caret moved with its text: text=a\n  // b\n\nc caret=1:6 sel=- undo=T zoom=1.000 events=
+command a comment with an end: text=a\n  // b\n\n<!-- c --> caret=3:0 sel=- undo=T zoom=1.000 events=
+command transform TrimTrailingWhitespace without a selection: T
+command TrimTrailingWhitespace: text=b\na\nb\n\tc\na caret=3:2 sel=- undo=T zoom=1.000 events=
+command transform SortAscending without a selection: F
+command SortAscending: text=b\na\nb\n\tc\na caret=3:2 sel=- undo=T zoom=1.000 events=
+command transform RemoveDuplicateLines without a selection: F
+command RemoveDuplicateLines: text=b\na\nb\n\tc\na caret=3:2 sel=- undo=T zoom=1.000 events=
+command transform IndentationToSpaces without a selection: T
+command IndentationToSpaces: text=b\na\nb\n    c\na caret=3:5 sel=- undo=T zoom=1.000 events=
+command transform IndentationToTabs without a selection: T
+command IndentationToTabs: text=b\na\nb\n\tc\na caret=3:2 sel=- undo=T zoom=1.000 events=
+command transform SortDescending without a selection: F
+command SortDescending: text=b\na\nb\n\tc\na caret=3:2 sel=- undo=T zoom=1.000 events=
+command transform EnsureFinalNewline without a selection: T
+command EnsureFinalNewline: text=b\na\nb\n\tc\na\n caret=5:0 sel=- undo=T zoom=1.000 events=
+command final newline again: T
+command nothing to add: text=b\na\nb\n\tc\na\n caret=5:0 sel=- undo=T zoom=1.000 events=
+command sort of three lines: T
+command sorted: text=c\na\nb\nb caret=3:1 sel=1:0 undo=T zoom=1.000 events=
+command duplicates of the sorted lines: T
+command the block replaced and selected: text=c\na\nb caret=2:1 sel=1:0 undo=T zoom=1.000 events=
+command line selection: F
+command sort of one line: F
+command trim without a selection: T
+command read-only: comment F, transform F
+command nothing changed while read-only: text=c\na\nb caret=2:1 sel=- undo=F zoom=1.000 events=
+command zoom in: text=c\na\nb caret=2:1 sel=- undo=T zoom=1.100 events=zoom
+command zoom out twice: text=c\na\nb caret=2:1 sel=- undo=T zoom=0.900 events=zoom;zoom
+command reset: text=c\na\nb caret=2:1 sel=- undo=T zoom=1.000 events=zoom
+command reset again: no event: text=c\na\nb caret=2:1 sel=- undo=T zoom=1.000 events=
+command a zoom past the largest: text=c\na\nb caret=2:1 sel=- undo=T zoom=4.000 events=zoom
+command zoom in at the largest: text=c\na\nb caret=2:1 sel=- undo=T zoom=4.000 events=
+command a zoom below the smallest: text=c\na\nb caret=2:1 sel=- undo=T zoom=0.500 events=zoom
+command a zoom rounded: text=c\na\nb caret=2:1 sel=- undo=T zoom=1.230 events=zoom
+command zoom in from it: to the next tenth: text=c\na\nb caret=2:1 sel=- undo=T zoom=1.300 events=zoom
+command to ( forward opening: F caret=0:3
+command to ( forward closing: F caret=0:3
+command to ( back opening: T caret=0:1
+command to ( back closing: T caret=0:2
+command to ) forward opening: T caret=0:15
+command to ) forward closing: T caret=0:14
+command to ) back opening: F caret=0:10
+command to ) back closing: F caret=0:10
+command to [ forward opening: F caret=0:3
+command to [ forward closing: F caret=0:3
+command to [ back opening: F caret=0:10
+command to [ back closing: F caret=0:10
+command to ] forward opening: F caret=0:3
+command to ] forward closing: F caret=0:3
+command to ] back opening: F caret=0:10
+command to ] back closing: F caret=0:10
+command to { forward opening: F caret=0:3
+command to { forward closing: F caret=0:3
+command to { back opening: F caret=0:10
+command to { back closing: F caret=0:10
+command to } forward opening: F caret=0:3
+command to } forward closing: F caret=0:3
+command to } back opening: F caret=0:10
+command to } back closing: F caret=0:10
+command to < forward opening: F caret=0:3
+command to < forward closing: F caret=0:3
+command to < back opening: F caret=0:10
+command to < back closing: F caret=0:10
+command to > forward opening: F caret=0:3
+command to > forward closing: F caret=0:3
+command to > back opening: F caret=0:10
+command to > back closing: F caret=0:10
+command back to the end of a ( the caret is at: the one before it: text=f(a, g(b), [c]) {\n  x = <y>;\n} caret=0:2 sel=- undo=F zoom=1.000 events=
+command select to the next ): text=f(a, g(b), [c]) {\n  x = <y>;\n} caret=0:14 sel=0:3 undo=F zoom=1.000 events=
+command the next ( from inside a call: text=f(a, g(b), [c]) {\n  x = <y>;\n} caret=0:4 sel=0:3 undo=F zoom=1.000 events=
+command and the one after it: text=f(a, g(b), [c]) {\n  x = <y>;\n} caret=0:4 sel=0:3 undo=F zoom=1.000 events=
+command key D, Shift, Control handled=T: text=one\ntwo\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key Down, Alt handled=T: text=one\ntwo\nthree\ntwo\nfour caret=3:0 sel=- undo=T zoom=1.000 events=
+command key Up, Alt handled=T: text=one\ntwo\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key OemQuestion, Control handled=T: text=one\ntwo\n# two\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key Divide, Control handled=T: text=one\ntwo\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key K, Shift, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key Oemplus, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.100 events=zoom
+command key Oemplus, Shift, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.200 events=zoom
+command key Add, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.300 events=zoom
+command key OemMinus, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.200 events=zoom
+command key Subtract, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.100 events=zoom
+command key D0, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=zoom
+command key NumPad0, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key D9, Control, Alt handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key R, Control handled=T: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=
+command key Q, Control handled=F: text=one\ntwo\nthree\nfour caret=2:0 sel=- undo=T zoom=1.000 events=

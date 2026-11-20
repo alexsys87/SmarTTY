@@ -289,6 +289,7 @@ internal static class Program
         MessageRuns();
         CompletionRuns();
         ListRuns();
+        LineCommandRuns();
         _form.Dispose();
     }
 
@@ -1742,5 +1743,204 @@ internal static class Program
         form.AcceptSelected();
         Lines.Add("list accept with nothing selected: " + ListState(form, view) + " log=" + string.Join(";", host.Log));
         form.Dispose();
+    }
+
+    // ---- 3E-1: the line commands of CodeEditorPP (duplicate, move, delete, comment, the transforms of the Text menu), the moves to a bracket,
+    // the zoom and the key bindings that run them, written by the code before they moved to the model: the caret line and a selection of
+    // lines, the first and the last line, a text without a final line break, read-only, no comment style, the undo step each command makes,
+    // the zoom steps and their limits with the ZoomChanged events, and the bracket moves forward and back with and without the selection.
+
+    private sealed class CommentingEditor : CodeEditorPP
+    {
+        public CommentStyle Comment;
+
+        public override CommentStyle CommentStyle => Comment;
+    }
+
+    private static void Command(CodeEditorPP code, string what, List<string> events)
+    {
+        Lines.Add("command " + what + ": text=" + Escape(code.EditableDocument.GetText()) + " caret=" + P(code.CaretPosition)
+            + " sel=" + (code.HasSelection ? P(code.SelectionStart) : "-") + " undo=" + Bool(code.CanUndo) + " zoom="
+            + code.FontZoom.ToString("0.000", CultureInfo.InvariantCulture) + " events=" + string.Join(";", events));
+        events.Clear();
+    }
+
+    private static void LineCommandRuns()
+    {
+        Lines.Add("== line commands");
+        CommentingEditor code = new CommentingEditor { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        List<string> events = new List<string>();
+        code.ZoomChanged += (sender, e) => events.Add("zoom");
+        void Reset(string[] lines, int caretLine, int caretColumn)
+        {
+            code.SetDocument(new EditableTextDocument(lines, TextDocument.LineEnding.Lf));
+            code.ClearSelection();
+            code.SetCaret(At(caretLine, caretColumn));
+            events.Clear();
+        }
+        string[] text = { "one", "two", "three", "four" };
+        Reset(text, 1, 2);
+        code.DuplicateLines();
+        Command(code, "duplicate the caret line", events);
+        code.Undo();
+        Command(code, "undone in one step", events);
+        code.SetSelection(true, At(1, 1));
+        code.SetCaret(At(2, 2));
+        code.DuplicateLines();
+        Command(code, "duplicate two selected lines", events);
+        Reset(text, 3, 1);
+        code.DuplicateLines();
+        Command(code, "duplicate the last line (no final line break)", events);
+        Reset(new[] { "one", "two", "" }, 1, 0);
+        code.DuplicateLines();
+        Command(code, "duplicate a line before an empty last line", events);
+        Reset(text, 1, 1);
+        code.MoveLines(-1);
+        Command(code, "move the caret line up", events);
+        code.MoveLines(-1);
+        Command(code, "move it up at the first line", events);
+        code.MoveLines(1);
+        code.MoveLines(1);
+        Command(code, "move it down twice", events);
+        code.SetCaret(At(3, 0));
+        code.MoveLines(1);
+        Command(code, "move the last line down", events);
+        Reset(text, 2, 0);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 0));
+        code.MoveLines(1);
+        Command(code, "a selection ending at the start of a line: down at the last line", events);
+        code.MoveLines(-1);
+        Command(code, "and up", events);
+        code.Undo();
+        Command(code, "undone", events);
+        Reset(text, 1, 2);
+        code.DeleteLines();
+        Command(code, "delete the caret line", events);
+        Reset(text, 3, 2);
+        code.DeleteLines();
+        Command(code, "delete the last line", events);
+        Reset(text, 0, 1);
+        code.SetSelection(true, At(0, 1));
+        code.SetCaret(At(2, 1));
+        code.DeleteLines();
+        Command(code, "delete three selected lines", events);
+        Reset(new[] { "a", "  b", "", "c" }, 0, 1);
+        Lines.Add("command no comment style: " + Bool(code.ToggleComment()));
+        code.Comment = new CommentStyle("// ");
+        code.SetSelection(true, At(0, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command comment: " + Bool(code.ToggleComment()));
+        Command(code, "four lines commented", events);
+        code.ToggleComment();
+        Command(code, "and uncommented", events);
+        code.ClearSelection();
+        code.SetCaret(At(1, 3));
+        code.ToggleComment();
+        Command(code, "the caret line commented, the caret moved with its text", events);
+        code.Comment = new CommentStyle("<!-- ", " -->");
+        code.SetCaret(At(3, 0));
+        code.ToggleComment();
+        Command(code, "a comment with an end", events);
+        Reset(new[] { "b ", "a", "b ", "\tc  ", "a" }, 3, 2);
+        foreach (LineTransformKind kind in new[] { LineTransformKind.TrimTrailingWhitespace, LineTransformKind.SortAscending, LineTransformKind.RemoveDuplicateLines,
+            LineTransformKind.IndentationToSpaces, LineTransformKind.IndentationToTabs, LineTransformKind.SortDescending, LineTransformKind.EnsureFinalNewline })
+        {
+            Lines.Add("command transform " + kind + " without a selection: " + Bool(code.ApplyLineTransform(kind)));
+            Command(code, kind.ToString(), events);
+        }
+        Lines.Add("command final newline again: " + Bool(code.ApplyLineTransform(LineTransformKind.EnsureFinalNewline)));
+        Command(code, "nothing to add", events);
+        Reset(new[] { "c", "b", "a", "b" }, 1, 0);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command sort of three lines: " + Bool(code.ApplyLineTransform(LineTransformKind.SortAscending)));
+        Command(code, "sorted", events);
+        code.SetSelection(true, At(1, 0));
+        code.SetCaret(At(3, 1));
+        Lines.Add("command duplicates of the sorted lines: " + Bool(code.ApplyLineTransform(LineTransformKind.RemoveDuplicateLines)));
+        Command(code, "the block replaced and selected", events);
+        code.ClearSelection();
+        Lines.Add("command line selection: " + Bool(code.HasLineSelection));
+        Lines.Add("command sort of one line: " + Bool(code.ApplyLineTransform(LineTransformKind.SortAscending)));
+        Lines.Add("command trim without a selection: " + Bool(code.ApplyLineTransform(LineTransformKind.TrimTrailingWhitespace)));
+        code.ReadOnly = true;
+        code.DuplicateLines();
+        code.MoveLines(1);
+        code.DeleteLines();
+        Lines.Add("command read-only: comment " + Bool(code.ToggleComment()) + ", transform " + Bool(code.ApplyLineTransform(LineTransformKind.SortDescending)));
+        Command(code, "nothing changed while read-only", events);
+        code.ReadOnly = false;
+
+        code.ResetZoom();
+        events.Clear();
+        code.ZoomBy(1);
+        Command(code, "zoom in", events);
+        code.ZoomBy(-1);
+        code.ZoomBy(-1);
+        Command(code, "zoom out twice", events);
+        code.ResetZoom();
+        Command(code, "reset", events);
+        code.ResetZoom();
+        Command(code, "reset again: no event", events);
+        code.SetZoom(10f);
+        Command(code, "a zoom past the largest", events);
+        code.ZoomBy(1);
+        Command(code, "zoom in at the largest", events);
+        code.SetZoom(0.123f);
+        Command(code, "a zoom below the smallest", events);
+        code.SetZoom(1.234f);
+        Command(code, "a zoom rounded", events);
+        code.ZoomBy(1);
+        Command(code, "zoom in from it: to the next tenth", events);
+        code.ResetZoom();
+
+        Reset(new[] { "f(a, g(b), [c]) {", "  x = <y>;", "}" }, 0, 0);
+        code.SetTokenizer(SyntaxHighlighting.GetTokenizer(SyntaxHighlighting.Language.CLike));
+        events.Clear();
+        foreach (string token in new[] { "(", ")", "[", "]", "{", "}", "<", ">" })
+        {
+            foreach (bool back in new[] { false, true })
+            {
+                foreach (bool opening in new[] { true, false })
+                {
+                    // Backward from the end of the call, not from the end of the text: a search backward that skips a pair whose opening bracket is
+                    // the first token of its line never ends (recorded in CLAUDE.md, not run here).
+                    code.SetCaret(back ? At(0, 10) : At(0, 3));
+                    code.ClearSelection();
+                    bool moved = code.MoveToToken(back, opening, false, t => t == token);
+                    Lines.Add("command to " + token + (back ? " back" : " forward") + (opening ? " opening" : " closing") + ": " + Bool(moved) + " caret=" + P(code.CaretPosition));
+                }
+            }
+        }
+        code.SetCaret(At(0, 7));
+        code.ClearSelection();
+        code.MoveToToken(true, false, false, t => t == "(");
+        Command(code, "back to the end of a ( the caret is at: the one before it", events);
+        code.SetCaret(At(0, 3));
+        code.ClearSelection();
+        code.MoveToToken(false, false, true, t => t == ")");
+        Command(code, "select to the next )", events);
+        code.SetCaret(At(0, 4));
+        code.MoveToToken(false, true, false, t => t == "(");
+        Command(code, "the next ( from inside a call", events);
+        code.MoveToToken(false, true, false, t => t == "(");
+        Command(code, "and the one after it", events);
+
+        // The key bindings run the commands (the keys with their modifiers in KeyData).
+        Reset(text, 1, 0);
+        code.Comment = new CommentStyle("# ");
+        foreach (Keys keys in new[] { Keys.Control | Keys.Shift | Keys.D, Keys.Alt | Keys.Down, Keys.Alt | Keys.Up, Keys.Control | Keys.OemQuestion,
+            Keys.Control | Keys.Divide, Keys.Control | Keys.Shift | Keys.K, Keys.Control | Keys.Oemplus, Keys.Control | Keys.Shift | Keys.Oemplus,
+            Keys.Control | Keys.Add, Keys.Control | Keys.OemMinus, Keys.Control | Keys.Subtract, Keys.Control | Keys.D0, Keys.Control | Keys.NumPad0,
+            Keys.Control | Keys.Alt | Keys.D9, Keys.Control | Keys.R, Keys.Control | Keys.Q })
+        {
+            KeyEventArgs args = new KeyEventArgs(keys);
+            EditorKeyDownMethod.Invoke(code, new object[] { args });
+            Command(code, "key " + keys + " handled=" + Bool(args.Handled), events);
+        }
+        _form.Controls.Remove(code);
+        code.Dispose();
     }
 }
