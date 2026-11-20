@@ -6,8 +6,9 @@ using SmarTTY.TextEditing;
 // Checks of what stage 3C-1 took out of Controls/ReadonlyTextBrowser: CodeEditing/WrapMap.cs (where the lines break while word wrap is on, when the
 // map is built again, the line and the row of a row index, the row of a column) and CodeEditing/CaretNavigator.cs (where the caret goes by a key,
 // the column Up, Down and the pages keep, the word under the caret, what the view is asked at the ends of the text), with a fake view over a real
-// document; and what 3C-2 took: CodeEditing/TextSelection.cs (the state of the selection and its rules). The same code is run in the real text view
-// by tests/TextViewTests (its golden file).
+// document; what 3C-2 took: CodeEditing/TextSelection.cs (the state of the selection and its rules); and what 3C-3 took: CodeEditing/UndoHistory.cs
+// (undo, redo, the saved state, single steps) with fake steps that log what they are asked, and CodeEditing/IndentEdits.cs (the indentation of the
+// indent commands and of a join). The same code is run in the real text view by tests/TextViewTests (its golden file).
 // Run with: dotnet run --project tests/CaretNavigatorTests
 internal static class Program
 {
@@ -407,6 +408,188 @@ internal static class Program
         Equal(P(TextSelection.DocumentEnd(new FakeView("only").Text)), "0:4", "of a text of one line too");
     }
 
+    // An edit that logs what it is asked.
+    private sealed class Step : IUndoStep
+    {
+        private readonly string _name;
+
+        private readonly List<string> _log;
+
+        public Step(string name, List<string> log)
+        {
+            _name = name;
+            _log = log;
+        }
+
+        public void Execute() => _log.Add("do " + _name);
+
+        public void Undo() => _log.Add("undo " + _name);
+    }
+
+    private static void Undo()
+    {
+        List<string> log = new List<string>();
+        int changes = 0;
+        UndoHistory history = null;
+        history = new UndoHistory(() => { changes++; log.Add("modified " + (history.IsModified ? "T" : "F")); });
+        string Take()
+        {
+            string text = string.Join(",", log);
+            log.Clear();
+            return text;
+        }
+        Check(!history.IsModified && !history.HasUndo && !history.HasRedo && history.CurrentVersion == null, "an empty history: saved, nothing to undo or redo");
+        Check(!history.Undo() && !history.Redo(), "undo and redo of nothing do nothing");
+        Equal(Take(), "", "and tell nothing");
+        history.Execute(new Step("a", log));
+        Equal(Take(), "do a,modified T", "an edit is made and the text is modified");
+        Check(history.HasUndo && !history.HasRedo, "it can be undone");
+        object afterA = history.CurrentVersion;
+        Check(afterA != null, "the version is the edit");
+        history.Execute(new Step("b", log));
+        Equal(Take(), "do b", "a second edit, still modified: no news");
+        Check(history.Undo(), "undo");
+        Equal(Take(), "undo b", "undoes the newest edit");
+        Check(history.HasRedo, "which can be redone");
+        Check(ReferenceEquals(history.CurrentVersion, afterA), "the version is the edit before it");
+        history.Undo();
+        Equal(Take(), "undo a,modified F", "undoing back to the start: saved again");
+        Check(!history.HasUndo, "nothing more to undo");
+        history.Redo();
+        Equal(Take(), "do a,modified T", "redo does the edit again");
+        history.Execute(new Step("c", log));
+        Equal(Take(), "do c", "an edit after an undo");
+        Check(!history.HasRedo, "drops what could be redone");
+
+        history.MarkSaved(history.CurrentVersion);
+        Equal(Take(), "modified F", "marked saved");
+        history.Undo();
+        Equal(Take(), "undo c,modified T", "undone past the saved text: modified");
+        history.Redo();
+        Equal(Take(), "do c,modified F", "redone to it: saved");
+        history.MarkSaved(afterA);
+        Equal(Take(), "modified T", "saved at an older version: modified now");
+        history.Undo();
+        Equal(Take(), "undo c,modified F", "and saved when that version comes back");
+        history.IsModified = true;
+        Equal(Take(), "modified T", "set modified: the text was never saved like this");
+        history.Redo();
+        history.Undo();
+        Equal(Take(), "do c,undo c", "so no undo or redo brings the saved state back");
+        Check(history.IsModified, "still modified");
+        history.IsModified = false;
+        Equal(Take(), "modified F", "set saved: the text as it is now");
+        history.IsModified = false;
+        Equal(Take(), "", "set saved again: no news");
+
+        Check(!history.InEdit, "no edit runs between edits");
+        bool inEdit = false;
+        history.Execute(new ActionStep(() => inEdit = history.InEdit));
+        Check(inEdit, "an edit runs while it is made");
+        history.Undo();
+        log.Clear();
+        history.ExecuteAsSingleStep(() =>
+        {
+            history.Execute(new Step("x", log));
+            history.ExecuteAsSingleStep(() => history.Execute(new Step("y", log)));
+            history.Execute(new Step("z", log));
+            inEdit = history.InEdit;
+        });
+        Equal(Take(), "do x,do y,do z,modified T", "three edits as one step, one of them nested");
+        Check(inEdit, "a single step is an edit");
+        history.Undo();
+        Equal(Take(), "undo z,undo y,undo x,modified F", "undone at once, the newest first");
+        history.Redo();
+        Equal(Take(), "do x,do y,do z,modified T", "redone at once, in order");
+        history.ExecuteAsSingleStep(() => { });
+        history.Undo();
+        Equal(Take(), "undo z,undo y,undo x,modified F", "an empty single step is no step of its own");
+        bool thrown = false;
+        try
+        {
+            history.ExecuteAsSingleStep(() =>
+            {
+                history.Execute(new Step("w", log));
+                throw new InvalidOperationException("broken");
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            thrown = true;
+        }
+        Check(thrown && !history.InEdit, "what a single step throws goes on, and the edit is over");
+        Equal(Take(), "do w", "the edits made before it stay, recorded as one step, and the modified state is not looked at again (as the old code)");
+        history.Undo();
+        Check(!history.IsModified, "so the text counts as saved though it was changed");
+        Equal(Take(), "undo w", "undone as one step");
+
+        history.Execute(new Step("v", log));
+        history.Undo();
+        log.Clear();
+        history.Reset();
+        Check(!history.HasUndo && !history.HasRedo && !history.IsModified, "a new document: an empty history, saved");
+        history.Execute(new Step("u", log));
+        history.Undo();
+        Equal(Take(), "do u,modified T,undo u,modified F", "its saved state is the empty history");
+        history.IsModified = true;
+        history.Reset();
+        log.Clear();
+        history.Execute(new Step("t", log));
+        history.Undo();
+        Equal(Take(), "do t,undo t", "a new document while modified: the empty history is not the saved text");
+        Check(history.IsModified, "so it stays modified");
+        thrown = false;
+        try
+        {
+            new UndoHistory(null);
+        }
+        catch (ArgumentNullException)
+        {
+            thrown = true;
+        }
+        Check(thrown, "the history needs to tell the view");
+    }
+
+    private sealed class ActionStep : IUndoStep
+    {
+        private readonly Action _action;
+
+        public ActionStep(Action action)
+        {
+            _action = action;
+        }
+
+        public void Execute() => _action();
+
+        public void Undo() => _action();
+    }
+
+    private static void Indents()
+    {
+        Equal(IndentEdits.IndentUnit(false, 4), "\t", "a tab without spaces");
+        Equal(IndentEdits.IndentUnit(true, 4), "    ", "the tab size in spaces");
+        Equal(IndentEdits.IndentUnit(true, 0), " ", "at least one space");
+        Equal(IndentEdits.IndentText("\t", 3), "\t\t\t", "three levels");
+        Equal(IndentEdits.IndentText("  ", 0), "", "no level");
+        Equal(IndentEdits.IndentText("  ", -2), "", "fewer than none");
+        Equal(IndentEdits.UnindentWidth("\tx", 1, 4), 1, "a tab is a level");
+        Equal(IndentEdits.UnindentWidth("        x", 1, 4), 4, "four spaces are a level");
+        Equal(IndentEdits.UnindentWidth("        x", 2, 4), 8, "and two levels");
+        Equal(IndentEdits.UnindentWidth("  x", 1, 4), 2, "fewer spaces are what there is");
+        Equal(IndentEdits.UnindentWidth("x", 3, 4), 0, "no indentation: nothing");
+        Equal(IndentEdits.UnindentWidth("\t  \tx", 3, 4), 4, "a tab, spaces and a tab");
+        Equal(IndentEdits.UnindentWidth("    ", 2, 4), 4, "a line of blanks: never more than the line");
+        Equal(IndentEdits.UnindentWidth("\t", 2, 4), 1, "a single tab is unindented too");
+        Equal(IndentEdits.UnindentWidth("", 1, 4), 0, "an empty line");
+        Equal(IndentEdits.UnindentWidth("     x", 1, 4), 4, "a level of spaces takes up to the tab size");
+        Equal(IndentEdits.UnindentWidth("        x", 1, 2), 2, "with a tab size of 2");
+        Equal(IndentEdits.SharedIndentLength("    ", "    second"), 4, "a join drops the indentation the lines share");
+        Equal(IndentEdits.SharedIndentLength("  ", "    second"), 2, "no more than the first line's");
+        Equal(IndentEdits.SharedIndentLength("\t", "    x"), 0, "a tab and spaces share nothing");
+        Equal(IndentEdits.SharedIndentLength("    ", "  "), 2, "no more than the next line");
+        Equal(IndentEdits.SharedIndentLength("", "  x"), 0, "no indentation: nothing");
+    }
+
     private static int Main()
     {
         try
@@ -418,6 +601,8 @@ internal static class Program
             WordBounds();
             Arguments();
             Selection();
+            Undo();
+            Indents();
         }
         catch (Exception exception)
         {

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -8,7 +9,8 @@ namespace SmarTTY.Controls;
 
 public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTarget
 {
-    private abstract class EditCommand
+    // The edits the undo history (CodeEditing/UndoHistory, stage 3C) records: each works on the document and on this view.
+    private abstract class EditCommand : IUndoStep
     {
         public class ReplaceInLineCommand : EditCommand
         {
@@ -121,7 +123,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
             public IndentCommand(EditableTextBrowser editableTextBrowser, int levels)
                 : base(editableTextBrowser)
             {
-                _indentUnit = editableTextBrowser.InsertSpaces ? new string(' ', Math.Max(1, editableTextBrowser.TabSize)) : "\t";
+                _indentUnit = IndentEdits.IndentUnit(editableTextBrowser.InsertSpaces, editableTextBrowser.TabSize);
                 this._lines = editableTextBrowser.SelectedLines;
                 if (this._lines.Count == 0)
                 {
@@ -161,37 +163,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
                     _removedIndents = new string[this._lines.Count];
                     for (int currentLine = this._lines.First; currentLine <= this._lines.Last; currentLine++)
                     {
-                        string lineText = editableTextBrowser.Doc.GetLineText(currentLine) + " \t";
-                        if (lineText.Length == 0)
-                        {
-                            continue;
-                        }
-                        int indentWidth = 0;
-                        for (int level = 0; level < -levels; level++)
-                        {
-                            if (lineText[indentWidth] == '\t')
-                            {
-                                indentWidth++;
-                                continue;
-                            }
-                            if (lineText[indentWidth] != ' ')
-                            {
-                                break;
-                            }
-                            for (int tabOffset = 0; tabOffset < editableTextBrowser.TabSize; tabOffset++)
-                            {
-                                if (lineText[++indentWidth] != ' ')
-                                {
-                                    break;
-                                }
-                            }
-                        }
-                        // lineText carries 2 sentinel characters; never remove more than the real line
-                        // (a whitespace-only line such as a single tab must still be unindented).
-                        if (indentWidth > lineText.Length - 2)
-                        {
-                            indentWidth = lineText.Length - 2;
-                        }
+                        int indentWidth = IndentEdits.UnindentWidth(editableTextBrowser.Doc.GetLineText(currentLine), -levels, editableTextBrowser.TabSize);
                         _removedIndents[currentLine - this._lines.First] = editableTextBrowser.Doc.ReplaceInLine(currentLine, 0, indentWidth, "");
                         editableTextBrowser.OnLineChanged(currentLine, 0, indentWidth, 0);
                         editableTextBrowser.InvalidateLine(currentLine);
@@ -235,39 +207,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
 
             private string IndentText(int levels)
             {
-                StringBuilder text = new StringBuilder();
-                for (int i = 0; i < levels; i++)
-                {
-                    text.Append(_indentUnit);
-                }
-                return text.ToString();
-            }
-        }
-
-        /// <summary>Several edits undone and redone as one step (e.g. Replace All).</summary>
-        public class CompoundCommand : EditCommand
-        {
-            public readonly List<EditCommand> Commands = new List<EditCommand>();
-
-            public CompoundCommand(EditableTextBrowser editableTextBrowser)
-                : base(editableTextBrowser)
-            {
-            }
-
-            public override void Execute(EditableTextBrowser editableTextBrowser)
-            {
-                foreach (EditCommand command in Commands)
-                {
-                    command.Execute(editableTextBrowser);
-                }
-            }
-
-            public override void Undo(EditableTextBrowser editableTextBrowser)
-            {
-                for (int i = Commands.Count - 1; i >= 0; i--)
-                {
-                    Commands[i].Undo(editableTextBrowser);
-                }
+                return IndentEdits.IndentText(_indentUnit, levels);
             }
         }
 
@@ -279,8 +219,12 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
 
         protected bool _overwriteBefore;
 
+        // The view the command works on when the history runs it.
+        private readonly EditableTextBrowser _view;
+
         private EditCommand(EditableTextBrowser editableTextBrowser)
         {
+            _view = editableTextBrowser;
             _overwriteBefore = editableTextBrowser.OverwriteMode;
             _caretBefore = editableTextBrowser.CaretPosition;
             _hadSelection = ((ReadonlyTextBrowser)editableTextBrowser)._hasSelection;
@@ -296,6 +240,16 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         public abstract void Undo(EditableTextBrowser editableTextBrowser);
 
         public abstract void Execute(EditableTextBrowser editableTextBrowser);
+
+        void IUndoStep.Execute()
+        {
+            Execute(_view);
+        }
+
+        void IUndoStep.Undo()
+        {
+            Undo(_view);
+        }
     }
 
     public delegate void ModifiedChangedHandler(EditableTextBrowser editableTextBrowser, bool modified);
@@ -304,9 +258,11 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
 
     public delegate void RangeChangedHandler(EditableTextBrowser editableTextBrowser, TextDocument.TextPosition start, TextDocument.TextPosition oldEnd, TextDocument.TextPosition newEnd);
 
-    private Stack<EditCommand> _undoStack = new Stack<EditCommand>();
+    // The undo history and the saved state (made when first used: the base classes may ask before the constructor has run).
+    private UndoHistory _history;
 
-    private Stack<EditCommand> _redoStack = new Stack<EditCommand>();
+    /// <summary>The undo history of the edits and whether the text is saved.</summary>
+    internal UndoHistory History => _history ?? (_history = new UndoHistory(OnModifiedChanged));
 
     private bool _readOnly;
 
@@ -315,20 +271,6 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
     /// <summary>Tab and Indent insert TabSize spaces instead of a tab character.</summary>
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool InsertSpaces { get; set; }
-
-    private bool _modified;
-
-    // The undo step the text matched when it was last saved (null: the empty undo history). Undoing or
-    // redoing back to it clears IsModified. NeverSaved is a marker no undo step can match.
-    private static readonly object NeverSaved = new object();
-
-    private object _savedUndoStep;
-
-    // > 0 while an edit command runs: its own change notifications must not overwrite the saved marker.
-    private int _commandDepth;
-
-    // Collects the edits of ExecuteAsSingleUndoStep.
-    private EditCommand.CompoundCommand _compoundCommand;
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool ReadOnly
@@ -352,51 +294,24 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
     {
         get
         {
-            return _modified;
+            return History.IsModified;
         }
         set
         {
-            _savedUndoStep = value ? NeverSaved : CurrentUndoStep;
-            SetModified(value);
+            History.IsModified = value;
         }
     }
-
-    private object CurrentUndoStep => (_undoStack.Count > 0) ? _undoStack.Peek() : null;
 
     /// <summary>
     /// Identifies the current text for <see cref="MarkSaved"/>. A save that runs in the background takes it
     /// before reading the text, so edits made meanwhile keep the document modified.
     /// </summary>
-    public object CurrentVersion => CurrentUndoStep;
+    public object CurrentVersion => History.CurrentVersion;
 
     /// <summary>Records that the text of <paramref name="version"/> (from <see cref="CurrentVersion"/>) has been saved.</summary>
     public void MarkSaved(object version)
     {
-        _savedUndoStep = version;
-        SetModified(CurrentUndoStep != version);
-    }
-
-    private void SetModified(bool modified)
-    {
-        if (modified != _modified)
-        {
-            _modified = modified;
-            OnModifiedChanged();
-        }
-    }
-
-    private void RunCommand(Action action)
-    {
-        _commandDepth++;
-        try
-        {
-            action();
-        }
-        finally
-        {
-            _commandDepth--;
-        }
-        SetModified(CurrentUndoStep != _savedUndoStep);
+        History.MarkSaved(version);
     }
 
     public event ModifiedChangedHandler ModifiedChanged;
@@ -432,21 +347,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
 
     private void ExecuteCommand(EditCommand editCommand)
     {
-        if (_compoundCommand != null)
-        {
-            editCommand.Execute(this);
-            _compoundCommand.Commands.Add(editCommand);
-            return;
-        }
-        RunCommand(() =>
-        {
-            editCommand.Execute(this);
-            if (_redoStack.Count > 0)
-            {
-                _redoStack.Clear();
-            }
-            _undoStack.Push(editCommand);
-        });
+        History.Execute(editCommand);
     }
 
     /// <summary>Runs several edits (ReplaceText calls) so that a single Undo reverts all of them.</summary>
@@ -456,29 +357,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         {
             return;
         }
-        if (_compoundCommand != null)
-        {
-            edits();
-            return;
-        }
-        EditCommand.CompoundCommand compound = new EditCommand.CompoundCommand(this);
-        RunCommand(() =>
-        {
-            _compoundCommand = compound;
-            try
-            {
-                edits();
-            }
-            finally
-            {
-                _compoundCommand = null;
-                if (compound.Commands.Count > 0)
-                {
-                    _redoStack.Clear();
-                    _undoStack.Push(compound);
-                }
-            }
-        });
+        History.ExecuteAsSingleStep(edits);
     }
 
     /// <summary>
@@ -569,35 +448,24 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
     }
 
     /// <summary>There is an edit that <see cref="Undo"/> would revert.</summary>
-    public bool CanUndo => !_readOnly && _undoStack.Count > 0;
+    public bool CanUndo => !_readOnly && History.HasUndo;
 
     /// <summary>There is an undone edit that <see cref="Redo"/> would repeat.</summary>
-    public bool CanRedo => !_readOnly && _redoStack.Count > 0;
+    public bool CanRedo => !_readOnly && History.HasRedo;
 
     public void Undo()
     {
-        if (!_readOnly && _undoStack.Count > 0)
+        if (!_readOnly && History.Undo())
         {
-            RunCommand(() =>
-            {
-                EditCommand editCommand = _undoStack.Pop();
-                editCommand.Undo(this);
-                _redoStack.Push(editCommand);
-            });
             Redraw();
         }
     }
 
     public void Redo()
     {
-        if (!_readOnly && _redoStack.Count > 0)
+        if (!_readOnly)
         {
-            RunCommand(() =>
-            {
-                EditCommand editCommand = _redoStack.Pop();
-                editCommand.Execute(this);
-                _undoStack.Push(editCommand);
-            });
+            History.Redo();
         }
         Redraw();
     }
@@ -663,13 +531,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
         }
         if (replacement == "" && end.Column == 0 && end.Line == start.Line + 1 && start.Column == EditableDocument.GetLineText(start.Line).Length)
         {
-            string text = GetIndentation(start.Line);
-            string lineText = EditableDocument.GetLineText(end.Line);
-            int commonPrefixLength;
-            for (commonPrefixLength = 0; commonPrefixLength < Math.Min(lineText.Length, text.Length) && lineText[commonPrefixLength] == text[commonPrefixLength]; commonPrefixLength++)
-            {
-            }
-            end.Column = commonPrefixLength;
+            end.Column = IndentEdits.SharedIndentLength(GetIndentation(start.Line), EditableDocument.GetLineText(end.Line));
         }
         if (start.Line == end.Line && replacement.IndexOfAny(new char[2] { '\r', '\n' }) == -1)
         {
@@ -737,7 +599,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
     {
         // Edit commands decide IsModified when they finish; a change made any other way can never be
         // undone back to the saved text.
-        if (_commandDepth == 0)
+        if (!History.InEdit)
         {
             IsModified = true;
         }
@@ -755,9 +617,7 @@ public partial class EditableTextBrowser : ReadonlySmartScrollBrowser, ISearchTa
     protected override void OnTextReplaced()
     {
         base.OnTextReplaced();
-        _undoStack.Clear();
-        _redoStack.Clear();
         // A new document: its saved state is the empty undo history, unless it was already modified.
-        _savedUndoStep = _modified ? NeverSaved : null;
+        History.Reset();
     }
 }
