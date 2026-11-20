@@ -30,6 +30,22 @@ public interface ITextLayoutView
     bool VerticalBarVisible { get; }
 
     bool HorizontalBarVisible { get; }
+
+    /// <summary>The folded blocks of the text (null: the view does not fold).</summary>
+    ITextFolds Folds { get; }
+}
+
+/// <summary>The folded blocks as the layout sees them: the lines a folded header hides after it, and the text the header shows instead of its own.</summary>
+public interface ITextFolds
+{
+    /// <summary>How many lines after <paramref name="line"/> its folded block hides (0: the line is not a folded header).</summary>
+    int GetHiddenLineCount(int line);
+
+    /// <summary>
+    /// The text a folded header shows instead of <paramref name="lineText"/> and where its label is in it (an index and a length); null when the line
+    /// is not a folded header.
+    /// </summary>
+    string GetFoldedText(int line, string lineText, out int labelStart, out int labelLength);
 }
 
 /// <summary>A part of a line drawn in one colour: from <see cref="From"/> to before <see cref="To"/>, in indexes of the line or in columns of a row.</summary>
@@ -39,7 +55,7 @@ public struct TextRun
 
     public int To;
 
-    /// <summary>Which of the colours of the view (-1: the colour of the text).</summary>
+    /// <summary>Which of the colours of the view (-1: the colour of the text, <see cref="TextViewLayout.FoldLabelColor"/>: the label of a folded header).</summary>
     public int Color;
 
     public TextRun(int from, int to, int color)
@@ -67,6 +83,9 @@ public sealed class TextViewLayout : IWrapMapSource
     /// <summary>The blank between the margin (or the left edge) and the text, in pixels.</summary>
     public const int Margin = 4;
 
+    /// <summary>The colour of a run that is the label of a folded header (drawn grey in a frame).</summary>
+    public const int FoldLabelColor = -2;
+
     private readonly ITextLayoutView _view;
 
     private readonly WrapMap _wrap;
@@ -75,6 +94,9 @@ public sealed class TextViewLayout : IWrapMapSource
     private int _maxColumns = -1;
 
     private int _wheelRemainder;
+
+    // The lines shown, in order, while blocks can be folded (null: to be built again).
+    private int[] _visibleLines;
 
     public TextViewLayout(ITextLayoutView view)
     {
@@ -110,6 +132,118 @@ public sealed class TextViewLayout : IWrapMapSource
 
     private bool Wrapping => _view.WordWrap;
 
+    // Folds hide lines only while the lines are not wrapped (as in the WinForms view).
+    private bool Folding => !Wrapping && _view.Folds != null;
+
+    /// <summary>The width of the margin of the fold marks, after the numbers, in pixels (it is there when the view folds).</summary>
+    public int FoldMarginWidth { get; set; }
+
+    /// <summary>The folds or the number of the lines changed: the rows are built again when they are asked for.</summary>
+    public void InvalidateRows()
+    {
+        _visibleLines = null;
+    }
+
+    private int[] VisibleLines
+    {
+        get
+        {
+            if (_visibleLines == null)
+            {
+                List<int> lines = new List<int>();
+                int lineCount = Document.LineCount;
+                ITextFolds folds = _view.Folds;
+                for (int line = 0; line < lineCount; line += 1 + Math.Max(0, folds.GetHiddenLineCount(line)))
+                {
+                    lines.Add(line);
+                }
+                _visibleLines = lines.ToArray();
+            }
+            return _visibleLines;
+        }
+    }
+
+    /// <summary>The text a line shows: the text of its fold when it is a folded header, else its own.</summary>
+    public string LineText(int line)
+    {
+        string text = Document.GetLineText(line);
+        if (!Folding)
+        {
+            return text;
+        }
+        return _view.Folds.GetFoldedText(line, text, out _, out _) ?? text;
+    }
+
+    /// <summary>The display column of an index of a text (a tab goes to the next tab stop; an index past the end is the column after the text).</summary>
+    public static int IndexToColumn(string text, int index, int tabSize)
+    {
+        int column = 0;
+        for (int i = 0; i < text.Length && i < index; i++)
+        {
+            column = (text[i] != '\t') ? (column + 1) : (column + (tabSize - column % tabSize));
+        }
+        return column;
+    }
+
+    /// <summary>The index of a display column of a text (a column inside a tab is the tab; a column past the end is the end), as TextDocument counts.</summary>
+    public static int ColumnToIndex(string text, int column, int tabSize)
+    {
+        int currentColumn = 0;
+        int index = 0;
+        while (true)
+        {
+            if (currentColumn == column)
+            {
+                return index;
+            }
+            if (currentColumn > column)
+            {
+                return index - 1;
+            }
+            if (index >= text.Length)
+            {
+                return index;
+            }
+            currentColumn = (text[index] != '\t') ? (currentColumn + 1) : (currentColumn + (tabSize - currentColumn % tabSize));
+            index++;
+        }
+    }
+
+    // The display column of an index of the text a line shows.
+    private int ColumnOf(int line, int index)
+    {
+        return IndexToColumn(LineText(line), index, TabSize);
+    }
+
+    /// <summary>The line shown before <paramref name="line"/> (the line itself at the top), past the lines a fold hides.</summary>
+    public int LineBefore(int line)
+    {
+        if (!Folding)
+        {
+            return Math.Max(0, line - 1);
+        }
+        int row = PositionToRow(new TextDocument.TextPosition(0, line));
+        return row > 0 ? VisibleLines[row - 1] : line;
+    }
+
+    /// <summary>The line shown after <paramref name="line"/> (the line itself at the end), past the lines a fold hides.</summary>
+    public int LineAfter(int line)
+    {
+        if (!Folding)
+        {
+            return Math.Min(Document.LineCount - 1, line + 1);
+        }
+        int row = PositionToRow(new TextDocument.TextPosition(0, line));
+        return row + 1 < VisibleLines.Length ? VisibleLines[row + 1] : line;
+    }
+
+    /// <summary>A point is on the margin of the fold marks.</summary>
+    public bool IsInFoldMargin(int x)
+    {
+        int left = NumbersWidth;
+        return _view.Folds != null && x >= left && x < left + FoldMarginWidth;
+    }
+
     // ---- IWrapMapSource
 
     int IWrapMapSource.LineCount => Document.LineCount;
@@ -131,8 +265,8 @@ public sealed class TextViewLayout : IWrapMapSource
 
     // ---- the margin and the text area
 
-    /// <summary>The width of the margin of the line numbers (0 when they are not shown).</summary>
-    public int GutterWidth
+    /// <summary>The width of the line numbers (0 when they are not shown).</summary>
+    public int NumbersWidth
     {
         get
         {
@@ -144,6 +278,9 @@ public sealed class TextViewLayout : IWrapMapSource
             return Margin + (digits + 1) * CharWidth;
         }
     }
+
+    /// <summary>The width of the margin: the line numbers and the fold marks.</summary>
+    public int GutterWidth => NumbersWidth + (_view.Folds != null ? FoldMarginWidth : 0);
 
     /// <summary>Where the text starts, before the horizontal scroll.</summary>
     public int TextLeft => GutterWidth + Margin;
@@ -158,12 +295,13 @@ public sealed class TextViewLayout : IWrapMapSource
     public int VisibleRows => Math.Max(1, VisibleHeight / RowHeight);
 
     /// <summary>All rows.</summary>
-    public int RowCount => Wrapping ? _wrap.RowCount : Document.LineCount;
+    public int RowCount => Wrapping ? _wrap.RowCount : (Folding ? VisibleLines.Length : Document.LineCount);
 
-    /// <summary>The columns of a line.</summary>
+    /// <summary>The columns of the text a line shows.</summary>
     public int LineColumns(int line)
     {
-        return Document.IndexToColumn(line, Document.GetLineText(line).Length, TabSize);
+        string text = LineText(line);
+        return IndexToColumn(text, text.Length, TabSize);
     }
 
     /// <summary>The widest line in columns (counted again after <see cref="UpdateMaxColumns"/> with -1).</summary>
@@ -188,6 +326,7 @@ public sealed class TextViewLayout : IWrapMapSource
     public void OnDocumentChanged()
     {
         _maxColumns = -1;
+        _visibleLines = null;
         _wrap.Invalidate();
     }
 
@@ -216,7 +355,7 @@ public sealed class TextViewLayout : IWrapMapSource
         int lineCount = Document.LineCount;
         if (!Wrapping)
         {
-            int line = Math.Max(0, Math.Min(row, lineCount - 1));
+            int line = Folding ? VisibleLines[Math.Max(0, Math.Min(row, VisibleLines.Length - 1))] : Math.Max(0, Math.Min(row, lineCount - 1));
             startColumn = 0;
             endColumn = LineColumns(line);
             return line;
@@ -245,7 +384,13 @@ public sealed class TextViewLayout : IWrapMapSource
         int line = Math.Max(0, Math.Min(position.Line, Document.LineCount - 1));
         if (!Wrapping)
         {
-            return line;
+            if (!Folding)
+            {
+                return line;
+            }
+            // A hidden line is in the row of its header: the last line shown that is not after it.
+            int index = Array.BinarySearch(VisibleLines, line);
+            return index >= 0 ? index : Math.Max(0, ~index - 1);
         }
         return _wrap.PositionToRowIndex(line, Document.IndexToColumn(line, position.Column, TabSize));
     }
@@ -254,7 +399,7 @@ public sealed class TextViewLayout : IWrapMapSource
     public string RowText(int row)
     {
         int line = RowToLine(row, out int startColumn, out int endColumn);
-        string text = Document.GetLineText(line);
+        string text = LineText(line);
         StringBuilder result = new StringBuilder(Math.Max(0, endColumn - startColumn));
         int column = 0;
         int tabSize = TabSize;
@@ -281,6 +426,7 @@ public sealed class TextViewLayout : IWrapMapSource
     /// The colours of a row: the parts of its line that <paramref name="lineRuns"/> colours (in indexes of the line, in the order of the line; what
     /// one leaves out, or what goes back over an earlier one, is skipped), turned into columns of the row (a tab takes its columns) and cut to the
     /// row, with the rest of the row in the colour of the text (-1), and neighbours of one colour joined. The runs cover the row from 0 to its width.
+    /// The row of a folded header has the colours up to its label, the label (<see cref="FoldLabelColor"/>), and the rest in the colour of the text.
     /// </summary>
     public List<TextRun> RowRuns(int row, IList<TextRun> lineRuns)
     {
@@ -288,12 +434,23 @@ public sealed class TextViewLayout : IWrapMapSource
         int width = endColumn - startColumn;
         List<TextRun> runs = new List<TextRun>();
         int column = 0;
+        int labelStart = int.MaxValue;
+        int labelLength = 0;
+        string text = Document.GetLineText(line);
+        if (Folding && _view.Folds.GetFoldedText(line, text, out labelStart, out labelLength) != null)
+        {
+            text = LineText(line);
+        }
+        else
+        {
+            labelStart = int.MaxValue;
+        }
         if (lineRuns != null)
         {
             foreach (TextRun run in lineRuns)
             {
-                int from = Document.IndexToColumn(line, run.From, TabSize) - startColumn;
-                int to = Document.IndexToColumn(line, run.To, TabSize) - startColumn;
+                int from = IndexToColumn(text, run.From, TabSize) - startColumn;
+                int to = IndexToColumn(text, Math.Min(run.To, labelStart), TabSize) - startColumn;
                 from = Math.Max(from, column);
                 to = Math.Min(to, width);
                 if (to <= from)
@@ -304,6 +461,14 @@ public sealed class TextViewLayout : IWrapMapSource
                 Add(runs, from, to, run.Color);
                 column = to;
             }
+        }
+        if (labelStart != int.MaxValue)
+        {
+            int labelFrom = Math.Max(column, IndexToColumn(text, labelStart, TabSize) - startColumn);
+            int labelTo = Math.Min(width, IndexToColumn(text, labelStart + labelLength, TabSize) - startColumn);
+            Add(runs, column, labelFrom, -1);
+            Add(runs, labelFrom, labelTo, FoldLabelColor);
+            column = Math.Max(column, labelTo);
         }
         Add(runs, column, width, -1);
         return runs;
@@ -348,8 +513,8 @@ public sealed class TextViewLayout : IWrapMapSource
             return false;
         }
         int lineColumns = LineColumns(line);
-        int first = (line == start.Line) ? Document.IndexToColumn(line, start.Column, TabSize) : 0;
-        int last = (line == end.Line) ? Document.IndexToColumn(line, end.Column, TabSize) : lineColumns;
+        int first = (line == start.Line) ? ColumnOf(line, start.Column) : 0;
+        int last = (line == end.Line) ? ColumnOf(line, end.Column) : lineColumns;
         bool lastRowOfLine = endColumn >= lineColumns;
         pastEnd = line < end.Line && lastRowOfLine;
         from = Math.Max(first, startColumn) - startColumn;
@@ -387,8 +552,9 @@ public sealed class TextViewLayout : IWrapMapSource
         int offset = x - TextLeft + (Wrapping ? 0 : ScrollX);
         int column = startColumn + (int)Math.Floor((offset + CharWidth / 2.0) / CharWidth);
         column = Math.Max(startColumn, Math.Min(column, endColumn));
-        int index = Document.ColumnToIndex(line, column, TabSize);
-        int length = Document.GetLineText(line).Length;
+        string text = LineText(line);
+        int index = ColumnToIndex(text, column, TabSize);
+        int length = text.Length;
         return new TextDocument.TextPosition(Math.Max(0, Math.Min(index, length)), line);
     }
 
@@ -397,7 +563,14 @@ public sealed class TextViewLayout : IWrapMapSource
     {
         int row = PositionToRow(position);
         int line = Math.Max(0, Math.Min(position.Line, Document.LineCount - 1));
-        int column = Document.IndexToColumn(line, position.Column, TabSize);
+        if (Folding && RowToLine(row, out _, out _) != line)
+        {
+            // A hidden line: the start of the row of its header.
+            x = TextLeft - ScrollX;
+            y = (row - FirstRow) * RowHeight;
+            return;
+        }
+        int column = ColumnOf(line, position.Column);
         int startColumn = 0;
         if (Wrapping)
         {
@@ -444,7 +617,7 @@ public sealed class TextViewLayout : IWrapMapSource
         else
         {
             int line = Math.Max(0, Math.Min(position.Line, Document.LineCount - 1));
-            int x = Document.IndexToColumn(line, position.Column, TabSize) * CharWidth;
+            int x = ColumnOf(line, position.Column) * CharWidth;
             int width = Math.Max(CharWidth, VisibleWidth - TextLeft);
             if (x < ScrollX)
             {

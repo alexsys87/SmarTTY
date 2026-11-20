@@ -98,6 +98,10 @@ internal static class Program
 
         public bool HorizontalBarVisible => HorizontalBar;
 
+        public ITextFolds FoldSource;
+
+        public ITextFolds Folds => FoldSource;
+
         int ICaretNavigationHost.VisibleRows => Layout.VisibleRows;
 
         bool ICaretNavigationHost.IsWrapping => Wrapping;
@@ -528,6 +532,91 @@ internal static class Program
             "the colour of a token type: its own, the first past them, none without colours");
     }
 
+    // Folds as a folding model gives them: a header hides some lines and shows its text, a label and the end of its block.
+    private sealed class FakeFolds : ITextFolds
+    {
+        public readonly Dictionary<int, int> Hidden = new Dictionary<int, int>();
+
+        public int GetHiddenLineCount(int line) => Hidden.TryGetValue(line, out int count) ? count : 0;
+
+        public string GetFoldedText(int line, string lineText, out int labelStart, out int labelLength)
+        {
+            if (!Hidden.ContainsKey(line))
+            {
+                // What a line that is not folded gives back is no label: the layout must not use it.
+                labelStart = 0;
+                labelLength = 3;
+                return null;
+            }
+            labelStart = lineText.Length + 1;
+            labelLength = 5;
+            return lineText + " {...} end";
+        }
+    }
+
+    private static void Folds()
+    {
+        FakeView view = new FakeView("int f()", "{", "  a();", "}", "\tg();", "x");
+        TextViewLayout layout = view.Layout;
+        FakeFolds folds = new FakeFolds();
+        layout.FoldMarginWidth = 12;
+        Equal(layout.GutterWidth + " " + layout.IsInFoldMargin(2), "0 False", "no folds: no margin of the marks");
+        view.FoldSource = folds;
+        Equal(layout.GutterWidth + " " + layout.TextLeft + " " + layout.IsInFoldMargin(0) + " " + layout.IsInFoldMargin(11) + " " + layout.IsInFoldMargin(12), "12 16 True True False", "a view that folds has the margin of the marks");
+        view.Numbers = true;
+        Equal(layout.NumbersWidth + " " + layout.GutterWidth + " " + layout.IsInFoldMargin(33) + " " + layout.IsInFoldMargin(34) + " " + layout.IsInFoldMargin(45) + " " + layout.IsInFoldMargin(46), "34 46 False True True False", "after the numbers");
+        view.Numbers = false;
+        Equal(Rows(layout), "0[0,7)'int f()' 1[0,1)'{' 2[0,6)'  a();' 3[0,1)'}' 4[0,8)'    g();' 5[0,1)'x'", "nothing folded: a row a line");
+        folds.Hidden[0] = 3;
+        Equal(layout.RowCount, 6, "the rows are kept until they are made again");
+        layout.InvalidateRows();
+        Equal(Rows(layout), "0[0,17)'int f() {...} end' 4[0,8)'    g();' 5[0,1)'x'", "a folded header shows the text of its fold and hides its lines");
+        Equal(layout.LineText(0) + "|" + layout.LineText(2), "int f() {...} end|  a();", "the text a line shows");
+        Equal(layout.PositionToRow(At(0, 3)) + " " + layout.PositionToRow(At(2, 1)) + " " + layout.PositionToRow(At(3, 0)) + " " + layout.PositionToRow(At(4, 0)) + " " + layout.PositionToRow(At(5, 0)), "0 0 0 1 2", "a hidden line is in the row of its header");
+        Equal(Point(layout, At(0, 3)) + " " + Point(layout, At(2, 1)) + " " + Point(layout, At(4, 1)), "46,0 16,0 56,18", "the point of a hidden line is the start of the row of its header");
+        Equal(P(layout.HitTest(16 + 120, 0)) + " " + P(layout.HitTest(16 + 500, 0)) + " " + P(layout.HitTest(16, 18)), "0:12 0:17 4:0", "a point on a folded header is an index of its text; the next row is the line after the block");
+        Equal(layout.LineBefore(4) + " " + layout.LineAfter(0) + " " + layout.LineAfter(2) + " " + layout.LineBefore(0) + " " + layout.LineAfter(5) + " " + layout.LineBefore(5), "0 4 4 0 5 4", "the lines before and after go past the hidden lines");
+        Equal(Runs(layout, 0, R(0, 3, 1), R(4, 12, 2)), "0-3:1 3-4:-1 4-8:2 8-13:-2 13-17:-1", "the colours of a folded header end at its label, the label has its own, the rest of the text");
+        Equal(Runs(layout, 0), "0-8:-1 8-13:-2 13-17:-1", "without colours");
+        Equal(Runs(layout, 1, R(1, 3, 4)), "0-4:-1 4-6:4 6-8:-1", "a line that is not folded has no label");
+        Equal(Selected(layout, At(0, 2), At(4, 1)), "0:2-17+ 1:0-4", "a selection over a folded block");
+        layout.UpdateMaxColumns(-1);
+        Equal(layout.MaxColumns, 17, "the widest line counts the text of a folded header");
+        folds.Hidden[4] = 1;
+        layout.InvalidateRows();
+        Equal(Rows(layout), "0[0,17)'int f() {...} end' 4[0,18)'    g(); {...} end'", "a fold that hides the last line");
+        Equal(layout.LineAfter(4) + " " + layout.PositionToRow(At(5, 0)), "4 1", "nothing after the last row");
+        view.Wrapping = true;
+        Equal(layout.RowCount + " " + layout.LineText(0), "6 int f()", "while the lines are wrapped nothing is folded");
+        Equal(layout.LineBefore(2) + " " + layout.LineAfter(2) + " " + layout.LineBefore(0) + " " + layout.LineAfter(5), "1 3 0 5", "and the neighbours are the next lines");
+        view.Wrapping = false;
+        folds.Hidden.Clear();
+        layout.InvalidateRows();
+        Equal(layout.RowCount, 6, "unfolded again");
+        view.Text = new EditableTextDocument(new[] { "a" }, TextDocument.LineEnding.Lf);
+        folds.Hidden[0] = 1;
+        Equal(layout.RowCount, 1, "a new document makes the rows again");
+
+        string[] texts = { "", "abc", "\tx", "a\tb\t\tc", "\t\t", "  \t z" };
+        bool same = true;
+        foreach (int tabSize in new[] { 1, 3, 4, 8 })
+        {
+            foreach (string text in texts)
+            {
+                EditableTextDocument document = new EditableTextDocument(new[] { text }, TextDocument.LineEnding.Lf);
+                for (int i = -1; i <= text.Length + 2; i++)
+                {
+                    same &= TextViewLayout.IndexToColumn(text, i, tabSize) == document.IndexToColumn(0, i, tabSize);
+                }
+                for (int column = -1; column <= 3 * tabSize + 6; column++)
+                {
+                    same &= TextViewLayout.ColumnToIndex(text, column, tabSize) == document.ColumnToIndex(0, column, tabSize);
+                }
+            }
+        }
+        Check(same, "the columns of a text are counted as TextDocument counts them");
+    }
+
     private static int Main()
     {
         try
@@ -541,6 +630,7 @@ internal static class Program
             WheelAndDrag();
             Clicks();
             Colors();
+            Folds();
         }
         catch (Exception exception)
         {

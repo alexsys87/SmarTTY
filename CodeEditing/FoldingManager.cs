@@ -9,7 +9,7 @@ namespace SmarTTY.CodeEditing;
 /// control: the rows, the margin and the painting are in <c>Controls/TextView/FoldingLineProvider.cs</c> and
 /// <c>FoldingMarginPainter.cs</c>.
 /// </summary>
-internal class FoldingManager
+internal class FoldingManager : ITextFolds
 {
     internal enum GutterState
     {
@@ -419,6 +419,19 @@ internal class FoldingManager
             _regions[region.HeaderLine] = region;
         }
         modified = toDelete.Count != 0 || relocated.Count != 0;
+    }
+
+    /// <summary>The text a folded header shows (the WPF text view asks it through <see cref="ITextFolds"/>); null for a line that is not one.</summary>
+    string ITextFolds.GetFoldedText(int line, string lineText, out int labelStart, out int labelLength)
+    {
+        FoldedRegion region = GetRegion(line);
+        if (region == null)
+        {
+            labelStart = 0;
+            labelLength = 0;
+            return null;
+        }
+        return region.Transform(lineText, out labelStart, out labelLength);
     }
 
     /// <summary>The folded block whose header is the line, or null.</summary>

@@ -20,6 +20,9 @@
     <Compile Include="../../CodeEditing/LineWrapper.cs" Link="LineWrapper.cs" />
     <Compile Include="../../CodeEditing/FoldedLineInfo.cs" Link="FoldedLineInfo.cs" />
     <Compile Include="../../CodeEditing/FoldingManager.cs" Link="FoldingManager.cs" />
+    <Compile Include="../../CodeEditing/TextViewLayout.cs" Link="TextViewLayout.cs" />
+    <Compile Include="../../CodeEditing/WrapMap.cs" Link="WrapMap.cs" />
+    <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
     <None Include="FoldingGolden.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

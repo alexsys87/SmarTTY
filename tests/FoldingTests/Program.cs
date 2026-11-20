@@ -231,6 +231,11 @@ internal static class Program
         Click(1, false, 1);
         Equal(Click(5, false, 3), "False - hidden=0", "a blank line has no block");
         Equal(Click(99, false, 3), "False - hidden=0", "nor a line past the text");
+        ITextFolds folds = manager;
+        Click(1, false, 1);
+        string folded = folds.GetFoldedText(1, doc.GetLineText(1), out int labelStart, out int labelLength);
+        Equal(folded + " [" + labelStart + "," + labelLength + "] " + folds.GetHiddenLineCount(1), "    if (x) {...} [12,3] 3", "the text of a folded header as the WPF view asks for it");
+        Equal((folds.GetFoldedText(0, doc.GetLineText(0), out _, out _) ?? "null") + " " + folds.GetHiddenLineCount(0), "null 0", "a line that is not folded has none");
     }
 
     private static void Main()
