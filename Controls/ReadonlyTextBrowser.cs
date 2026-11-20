@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -150,20 +151,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
         public Cursor Cursor;
 
         public Action ClickAction;
-    }
-
-    protected enum CaretMove
-    {
-        Left,
-        Right,
-        Up,
-        Down,
-        WordLeft,
-        WordRight,
-        Home,
-        End,
-        PageUp,
-        PageDown
     }
 
     public struct ColorSpan(int start, int end, Brush brush)
@@ -507,8 +494,6 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     private Point _lastClickPoint;
 
     private HoverTarget _hoverTarget;
-
-    private int _desiredColumn = -1;
 
     protected ColorSpan[] _defaultColors = new ColorSpan[1]
     {
@@ -1992,47 +1977,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
     /// </summary>
     private bool TryGetWordBounds(TextDocument.TextPosition caret, out TextDocument.TextPosition start, out TextDocument.TextPosition end)
     {
-        start = caret;
-        end = caret;
-        if (caret.Line < 0 || caret.Column < 0)
-        {
-            return false;
-        }
-        string text = _document.GetLineText(caret.Line);
-        if (text.Length == 0)
-        {
-            return false;
-        }
-        int column = Math.Min(caret.Column, text.Length);
-        int anchor;
-        if (column < text.Length && IsWordChar(text[column]))
-        {
-            anchor = column;
-        }
-        else if (column > 0 && IsWordChar(text[column - 1]))
-        {
-            anchor = column - 1;
-        }
-        else
-        {
-            int single = column < text.Length ? column : column - 1;
-            start.Column = single;
-            end.Column = single + 1;
-            return true;
-        }
-        int from = anchor;
-        while (from > 0 && IsWordChar(text[from - 1]))
-        {
-            from--;
-        }
-        int to = anchor + 1;
-        while (to < text.Length && IsWordChar(text[to]))
-        {
-            to++;
-        }
-        start.Column = from;
-        end.Column = to;
-        return true;
+        return Navigator.TryGetWordBounds(caret, out start, out end);
     }
 
     protected virtual bool IsWordChar(char ch)
@@ -2046,188 +1991,14 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected virtual TextDocument.TextPosition ComputeMovedPosition(CaretMove caretMove, Keys keys, TextDocument.TextPosition textPosition, bool extendSelection = false)
     {
-        if (textPosition.Column < 0 || textPosition.Line < 0)
-        {
-            return default;
-        }
-        string text = _document.GetLineText(textPosition.Line);
-        switch (caretMove)
-        {
-            case CaretMove.Left:
-            case CaretMove.WordLeft:
-                if (textPosition.Column > 0)
-                {
-                    textPosition.Column--;
-                    if (caretMove == CaretMove.WordLeft)
-                    {
-                        while (textPosition.Column > 0 && IsWordChar(text[textPosition.Column - 1]) && IsWordChar(text[textPosition.Column]))
-                        {
-                            textPosition.Column--;
-                        }
-                    }
-                }
-                else
-                {
-                    if (textPosition.Line == 0)
-                    {
-                        OnMoveBeyondDocument(ref textPosition, -1);
-                    }
-                    if (textPosition.Line > 0)
-                    {
-                        textPosition.Line = GetPreviousRealLine(textPosition.Line);
-                        textPosition.Column = _document.GetLineText(textPosition.Line).Length;
-                    }
-                }
-                return textPosition;
-            case CaretMove.Right:
-            case CaretMove.WordRight:
-                if (textPosition.Column < text.Length)
-                {
-                    textPosition.Column++;
-                    if (caretMove == CaretMove.WordRight)
-                    {
-                        while (textPosition.Column > 0 && textPosition.Column < text.Length && IsWordChar(text[textPosition.Column - 1]) && IsWordChar(text[textPosition.Column]))
-                        {
-                            textPosition.Column++;
-                        }
-                    }
-                }
-                else
-                {
-                    if (textPosition.Line == _document.LineCount - 1)
-                    {
-                        OnMoveBeyondDocument(ref textPosition, 1);
-                    }
-                    if (textPosition.Line < _document.LineCount - 1)
-                    {
-                        textPosition.Line = GetNextRealLine(textPosition.Line);
-                        textPosition.Column = 0;
-                    }
-                }
-                return textPosition;
-            case CaretMove.Up:
-                if (IsWrapping)
-                {
-                    return MoveWrappedRow(textPosition, -1);
-                }
-                if (textPosition.Line == 0)
-                {
-                    OnMoveBeyondDocument(ref textPosition, -1);
-                }
-                if (textPosition.Line > 0)
-                {
-                    textPosition.Line = GetPreviousRealLine(textPosition.Line);
-                    int index = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(index, _document.GetLineText(textPosition.Line).Length);
-                }
-                return textPosition;
-            case CaretMove.Down:
-                if (IsWrapping)
-                {
-                    return MoveWrappedRow(textPosition, 1);
-                }
-                if (textPosition.Line == _document.LineCount - 1)
-                {
-                    OnMoveBeyondDocument(ref textPosition, 1);
-                }
-                if (textPosition.Line < _document.LineCount - 1)
-                {
-                    textPosition.Line = GetNextRealLine(textPosition.Line);
-                    int columnIndexAfterDown = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(columnIndexAfterDown, _document.GetLineText(textPosition.Line).Length);
-                }
-                return textPosition;
-            case CaretMove.Home:
-                if ((keys & Keys.Control) == Keys.Control)
-                {
-                    OnMoveBeyondDocument(ref textPosition, int.MinValue);
-                    textPosition.Column = 0;
-                    textPosition.Line = 0;
-                }
-                else
-                {
-                    string lineText = _document.GetLineText(textPosition.Line);
-                    int indentLength;
-                    for (indentLength = 0; indentLength < lineText.Length && (lineText[indentLength] == ' ' || lineText[indentLength] == '\t'); indentLength++)
-                    {
-                    }
-                    if (textPosition.Column == indentLength)
-                    {
-                        textPosition.Column = 0;
-                    }
-                    else
-                    {
-                        textPosition.Column = indentLength;
-                    }
-                }
-                return textPosition;
-            case CaretMove.End:
-                if ((keys & Keys.Control) == Keys.Control)
-                {
-                    OnMoveBeyondDocument(ref textPosition, int.MaxValue);
-                    textPosition.Line = _document.LineCount - 1;
-                }
-                textPosition.Column = _document.GetLineText(textPosition.Line).Length;
-                return textPosition;
-            case CaretMove.PageUp:
-                {
-                    if (IsWrapping)
-                    {
-                        return MoveWrappedRows(textPosition, -_visibleRows);
-                    }
-                    textPosition.Line -= this._visibleRows;
-                    if (textPosition.Line < 0)
-                    {
-                        OnMoveBeyondDocument(ref textPosition, -this._visibleRows);
-                    }
-                    if (textPosition.Line < 0)
-                    {
-                        textPosition.Line = 0;
-                    }
-                    int columnAfterPageUp = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(columnAfterPageUp, _document.GetLineText(textPosition.Line).Length);
-                    return textPosition;
-                }
-            case CaretMove.PageDown:
-                {
-                    if (IsWrapping)
-                    {
-                        return MoveWrappedRows(textPosition, _visibleRows);
-                    }
-                    textPosition.Line += this._visibleRows;
-                    if (textPosition.Line >= _document.LineCount)
-                    {
-                        OnMoveBeyondDocument(ref textPosition, this._visibleRows);
-                    }
-                    if (textPosition.Line >= _document.LineCount)
-                    {
-                        textPosition.Line = _document.LineCount - 1;
-                    }
-                    int columnAfterPageDown = _document.ColumnToIndex(textPosition.Line, _desiredColumn, TabSize);
-                    textPosition.Column = Math.Min(columnAfterPageDown, _document.GetLineText(textPosition.Line).Length);
-                    return textPosition;
-                }
-            default:
-                return textPosition;
-        }
+        return Navigator.Move(caretMove, (keys & Keys.Control) == Keys.Control, textPosition);
     }
 
     private bool TryGetNavigationTarget(KeyEventArgs e, bool extendSelection, out TextDocument.TextPosition textPosition, out CaretDirection caretDirection)
     {
         caretDirection = CaretDirection.Unspecified;
         Keys keyCode = e.KeyCode;
-        if ((uint)(keyCode - 33) <= 1u || keyCode == Keys.Up || keyCode == Keys.Down)
-        {
-            if (_desiredColumn == -1)
-            {
-                _desiredColumn = _document.IndexToColumn(CaretPosition.Line, CaretPosition.Column, TabSize);
-                _desiredWrapOffset = IsWrapping ? _desiredColumn - WrapSegmentStart(CaretPosition.Line, WrapSegmentOf(CaretPosition.Line, _desiredColumn)) : 0;
-            }
-        }
-        else
-        {
-            _desiredColumn = -1;
-        }
+        Navigator.BeginMove((uint)(keyCode - 33) <= 1u || keyCode == Keys.Up || keyCode == Keys.Down, CaretPosition);
         switch (e.KeyCode)
         {
             case Keys.Left:
@@ -3138,7 +2909,7 @@ public partial class ReadonlyTextBrowser : DpiAwareControl, ICaretHost
 
     protected virtual void OnTextReplaced()
     {
-        _wrapDirty = true;
+        WrapLayout.Invalidate();
         _maxLineWidth = -1;
         UpdateLayout();
         Redraw();

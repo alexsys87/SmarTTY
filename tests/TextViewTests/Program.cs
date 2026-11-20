@@ -19,7 +19,8 @@ using K = System.Windows.Forms.Keys;
 //   - the same with word wrap at 20 columns, and the wrap map (the breaks of every line, the line and the row of every row index, the row index
 //     of positions).
 // The view is sized until it shows exactly 8 rows (and wraps at 20 columns), so that the lines do not depend on the fonts.
-// TextViewGolden.txt is what the code wrote before the move; it is never written again.
+// TextViewGolden.txt is what the code wrote before the move; it is never written again. Since the move (3C-1) the accessors read the kept column
+// and the wrap map of the model (Navigator, WrapLayout) instead of the fields of the view.
 //   xvfb-run -a mono tests/TextViewTests/bin/Release/net48/TextViewTests.exe            compares with the golden file
 //   ... TextViewTests.exe --record <file>                                                writes the golden file (old code only)
 internal static class Program
@@ -93,18 +94,18 @@ internal static class Program
     private static string Target(TextDocument.TextPosition from, Keys key)
     {
         _editor.SetCaret(from);
-        SetField("_desiredColumn", -1);
+        _editor.Navigator.DesiredColumn = -1;
         object[] arguments = { new KeyEventArgs(key), false, null, null };
         bool found = (bool)View.GetMethod("TryGetNavigationTarget", Private).Invoke(_editor, arguments);
         return found ? P((TextDocument.TextPosition)arguments[2]) : "-";
     }
 
-    // CaretMove is a protected enum of the view.
+    // CaretMove was a protected enum of the view (CodeEditing/CaretNavigator since 3C).
     private static string Moved(TextDocument.TextPosition from, string move, Keys keys)
     {
         _editor.SetCaret(from);
-        SetField("_desiredColumn", -1);
-        object caretMove = Enum.Parse(View.GetNestedType("CaretMove", BindingFlags.NonPublic), move);
+        _editor.Navigator.DesiredColumn = -1;
+        object caretMove = Enum.Parse(typeof(SmarTTY.CodeEditing.CaretMove), move);
         try
         {
             return P((TextDocument.TextPosition)View.GetMethod("ComputeMovedPosition", Private).Invoke(_editor, new object[] { caretMove, keys, from, false }));
@@ -147,7 +148,7 @@ internal static class Program
     private static void Press(string title, TextDocument.TextPosition start, params Keys[] keys)
     {
         _editor.SetCaret(start);
-        SetField("_desiredColumn", -1);
+        _editor.Navigator.DesiredColumn = -1;
         List<string> steps = new List<string>();
         MethodInfo keyDown = View.GetMethod("OnKeyDown", Private);
         foreach (Keys key in keys)
@@ -175,8 +176,8 @@ internal static class Program
     private static void WrapMap()
     {
         Lines.Add("== wrap map");
-        int[][] breaks = Field<int[][]>("_wrapBreaks");
-        int[] firstRow = Field<int[]>("_wrapFirstRow");
+        int[][] breaks = _editor.WrapLayout.Breaks;
+        int[] firstRow = _editor.WrapLayout.FirstRows;
         for (int line = 0; line < DocumentLines.Length; line++)
         {
             Lines.Add("line " + line + " first row " + firstRow[line] + " breaks " + (breaks[line] == null ? "none" : string.Join(",", Array.ConvertAll(breaks[line], b => b.ToString(CultureInfo.InvariantCulture)))));
@@ -272,10 +273,10 @@ internal static class Program
     // The wrap map of a document of a few lines.
     private static void WrapMap2(int lineCount)
     {
-        int[][] breaks = Field<int[][]>("_wrapBreaks");
+        int[][] breaks = _editor.WrapLayout.Breaks;
         Call("EnsureWrapMap");
-        breaks = Field<int[][]>("_wrapBreaks");
-        int[] firstRow = Field<int[]>("_wrapFirstRow");
+        breaks = _editor.WrapLayout.Breaks;
+        int[] firstRow = _editor.WrapLayout.FirstRows;
         List<string> parts = new List<string>();
         for (int line = 0; line < lineCount; line++)
         {

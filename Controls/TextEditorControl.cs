@@ -1,4 +1,5 @@
-﻿using SmarTTY.Native;
+﻿using SmarTTY.CodeEditing;
+using SmarTTY.Native;
 using SmarTTY.TextEditing;
 using System;
 using System.Drawing;

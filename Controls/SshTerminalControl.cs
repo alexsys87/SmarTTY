@@ -1,3 +1,4 @@
+using SmarTTY.CodeEditing;
 using SmarTTY.Ssh;
 using SmarTTY.IO;
 using SmarTTY.Native;

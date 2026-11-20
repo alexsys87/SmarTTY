@@ -267,6 +267,9 @@ jobs:
       - name: Run hex view menu and data inspector checks (the items of the submenus, when they are enabled or checked, what they do)
         run: dotnet run --project tests/HexMenuInspectorTests -c Release
 
+      - name: Run caret navigation and wrap map checks (where the caret of the text view goes by a key, the column kept, the word under the caret, the breaks of wrapped lines)
+        run: dotnet run --project tests/CaretNavigatorTests -c Release
+
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
 
