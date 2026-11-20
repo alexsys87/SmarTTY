@@ -285,6 +285,7 @@ internal static class Program
         ReplaceRuns();
         SyntaxRuns();
         FoldRuns();
+        MessageRuns();
         _form.Dispose();
     }
 
@@ -1236,6 +1237,129 @@ internal static class Program
         code.SetCaret(At(3, 4));
         MarginClick(code, 3);
         Step("the caret on the header, before the line of the opening brace");
+        _form.Controls.Remove(code);
+        code.Dispose();
+    }
+
+    // ---- 3D-5: the inline messages of CodeEditorPP, written by the code before what the view decides about them moved to the model: the line and
+    // the column of a message added (counted from 1, a column of 0 for none, a line past the text on the last line, line 0 on the first, a second
+    // message of a line in its place), the messages dropped when word wrap is switched; and where the real row of a message (InlineMessageView)
+    // puts its band, drawn into a bitmap with colours of its own: under its column (after a tab, scrolled, scrolled past it) or in the middle, a
+    // text too long for the row, two row heights, and the colour of an error and of a warning. The band is found as the frame drawn around it; its
+    // width is written less the width the text is measured at (the font of the row, as the row measures it), so that the lines do not depend on
+    // the fonts.
+
+    private static void Messages(CodeEditorPP code, string what)
+    {
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        List<string> messages = new List<string>();
+        for (int line = 0; line < code.EditableDocument.LineCount; line++)
+        {
+            if (provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message))
+            {
+                messages.Add(line + ":" + message.Column + ":" + message.Severity + ":" + message.Text);
+            }
+        }
+        Lines.Add("messages " + what + ": " + string.Join(", ", messages));
+    }
+
+    private static readonly System.Drawing.Color BandColor = System.Drawing.Color.FromArgb(255, 200, 201, 202);
+
+    private static readonly System.Drawing.Color FrameColor = System.Drawing.Color.FromArgb(255, 10, 20, 30);
+
+    private static readonly System.Drawing.Color ErrorTextColor = System.Drawing.Color.FromArgb(255, 250, 0, 0);
+
+    private static readonly System.Drawing.Color WarningTextColor = System.Drawing.Color.FromArgb(255, 0, 0, 250);
+
+    private static void MessageBand(CodeEditorPP code, int line, int scrollColumn, int rowHeight, string what)
+    {
+        InlineMessageView view = (InlineMessageView)typeof(CodeEditorPP).GetField("_inlineMessageView", Private).GetValue(code);
+        List<ReadonlyTextBrowser.IVirtualLine> rows = new List<ReadonlyTextBrowser.IVirtualLine>();
+        view.GetVirtualLines(line, rows);
+        InlineMessageProvider provider = (InlineMessageProvider)typeof(CodeEditorPP).GetField("_inlineMessageProvider", Private).GetValue(code);
+        provider.TryGetMessage(line, out InlineMessageProvider.InlineMessage message);
+        const int width = 400;
+        using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(width, rowHeight + 2))
+        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+        using (System.Drawing.Font font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSerif, rowHeight * 5 / 8))
+        {
+            graphics.Clear(System.Drawing.Color.White);
+            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
+            int measured = (int)graphics.MeasureString(message.Text, font).Width + 3;
+            rows[0].Draw(graphics, code, 0, scrollColumn, line, new System.Drawing.Rectangle(0, 0, width, rowHeight), new System.Drawing.SizeF(8, rowHeight));
+            int left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
+            bool error = false, warning = false;
+            for (int y = 0; y < bitmap.Height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int argb = bitmap.GetPixel(x, y).ToArgb();
+                    if (argb == FrameColor.ToArgb())
+                    {
+                        left = Math.Min(left, x);
+                        top = Math.Min(top, y);
+                        right = Math.Max(right, x);
+                        bottom = Math.Max(bottom, y);
+                    }
+                    error |= argb == ErrorTextColor.ToArgb();
+                    warning |= argb == WarningTextColor.ToArgb();
+                }
+            }
+            int textWidth = Math.Min(measured, width - (4 + rowHeight + 3) * 2);
+            // In the middle the left edge depends on the width of the text: only its distance from where the middle puts the text is written.
+            string place = message.Column == -1 ? "from the middle=" + (left - (width - textWidth) / 2) : "left=" + left;
+            Lines.Add("message band " + what + ": " + place + " top=" + top + " width less the text=" + (right - left + 1 - textWidth)
+                + " height=" + (bottom - top + 1) + " clipped=" + Bool(measured > width - (4 + rowHeight + 3) * 2) + " text=" + (error ? "error" : "") + (warning ? "warning" : ""));
+        }
+    }
+
+    private static void MessageRuns()
+    {
+        Lines.Add("== messages");
+        CodeEditorPP code = new CodeEditorPP { Location = new System.Drawing.Point(0, 0), Size = new System.Drawing.Size(500, 300) };
+        _form.Controls.Add(code);
+        code.SetDocument(new EditableTextDocument(new[] { "alpha", "\tbeta", "gamma", "", "last" }, TextDocument.LineEnding.Lf));
+        Application.DoEvents();
+        InlineMessageProvider.MessageRequest Request(int line, InlineMessageProvider.MessageSeverity severity, string text, int column)
+        {
+            return new InlineMessageProvider.MessageRequest { Line = line, Severity = severity, Text = text, Column = column };
+        }
+        code.AddMessages(new[]
+        {
+            Request(1, InlineMessageProvider.MessageSeverity.Error, "first", 0),
+            Request(2, InlineMessageProvider.MessageSeverity.Warning, "second", 3),
+            Request(9, InlineMessageProvider.MessageSeverity.Error, "past the end", 2),
+            Request(0, InlineMessageProvider.MessageSeverity.Warning, "line zero", 1)
+        });
+        Messages(code, "a batch");
+        code.AddMessage(3, InlineMessageProvider.MessageSeverity.Error, "single", 4);
+        code.AddMessage(-5, InlineMessageProvider.MessageSeverity.Error, "negative", -2);
+        Messages(code, "one at a time, a line below 1");
+        code.WordWrap = true;
+        Messages(code, "word wrap on drops them");
+        code.AddMessage(2, InlineMessageProvider.MessageSeverity.Error, "while wrapped", 1);
+        Messages(code, "added while wrapped");
+        code.WordWrap = false;
+        Messages(code, "word wrap off drops them too");
+        code.ClearMessages();
+        code.ApplyMessageColors(BandColor, ErrorTextColor, WarningTextColor, FrameColor);
+        code.AddMessages(new[]
+        {
+            Request(1, InlineMessageProvider.MessageSeverity.Error, "short", 0),
+            Request(2, InlineMessageProvider.MessageSeverity.Warning, "after the tab", 3),
+            Request(3, InlineMessageProvider.MessageSeverity.Error, "x " + new string('w', 200), 0),
+            Request(4, InlineMessageProvider.MessageSeverity.Warning, "x " + new string('w', 200), 2)
+        });
+        Messages(code, "for the bands");
+        foreach (int rowHeight in new[] { 18, 24 })
+        {
+            MessageBand(code, 0, 0, rowHeight, "in the middle, row " + rowHeight);
+            MessageBand(code, 1, 0, rowHeight, "under its column after a tab, row " + rowHeight);
+            MessageBand(code, 1, 3, rowHeight, "scrolled, row " + rowHeight);
+            MessageBand(code, 1, 9, rowHeight, "scrolled past its column, row " + rowHeight);
+            MessageBand(code, 2, 0, rowHeight, "too long, in the middle, row " + rowHeight);
+            MessageBand(code, 3, 0, rowHeight, "too long, under its column, row " + rowHeight);
+        }
         _form.Controls.Remove(code);
         code.Dispose();
     }

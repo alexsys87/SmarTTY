@@ -1378,3 +1378,22 @@ fold a click while wrapping: folds=0,8 caret=12:0 rows=0 1 2 3 4 5 6 7 8 9 10 11
 fold word wrap off: folds=0,8 caret=12:0 rows=0=int f() {...}@9+3 8=int g() {...}@9+3 11 12
 fold the caret on the line of the closing brace: folds=8 caret=7:0 rows=0 1 2 3 4 5 6 7 8=int g() {...}@9+3 11 12
 fold the caret on the header, before the line of the opening brace: folds=3 caret=3:4 rows=0 1 2 3=  if (x) {...}@10+3 7 8 9 10 11 12
+== messages
+messages a batch: 0:0:Warning:line zero, 1:2:Warning:second, 4:1:Error:past the end
+messages one at a time, a line below 1: 0:-3:Error:negative, 1:2:Warning:second, 2:3:Error:single, 4:1:Error:past the end
+messages word wrap on drops them: 
+messages added while wrapped: 1:0:Error:while wrapped
+messages word wrap off drops them too: 
+messages for the bands: 0:-1:Error:short, 1:2:Warning:after the tab, 2:-1:Error:x wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww, 3:1:Warning:x wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww
+message band in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=F text=error
+message band under its column after a tab, row 18: left=37 top=0 width less the text=24 height=19 clipped=F text=warning
+message band scrolled, row 18: left=13 top=0 width less the text=24 height=19 clipped=F text=warning
+message band scrolled past its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=F text=warning
+message band too long, in the middle, row 18: from the middle=-22 top=0 width less the text=24 height=19 clipped=T text=error
+message band too long, under its column, row 18: left=0 top=0 width less the text=21 height=19 clipped=T text=warning
+message band in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=F text=error
+message band under its column after a tab, row 24: left=37 top=0 width less the text=30 height=25 clipped=F text=warning
+message band scrolled, row 24: left=13 top=0 width less the text=30 height=25 clipped=F text=warning
+message band scrolled past its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=F text=warning
+message band too long, in the middle, row 24: from the middle=-28 top=0 width less the text=30 height=25 clipped=T text=error
+message band too long, under its column, row 24: left=0 top=0 width less the text=27 height=25 clipped=T text=warning
