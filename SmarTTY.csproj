@@ -46,7 +46,7 @@
     <!-- SerialPort is not part of the .NET runtime (Native/SerialPortStream.cs, GUI/RawConnectionSettingsWindow.xaml.cs). -->
     <PackageReference Include="System.IO.Ports" Version="10.0.0" />
     <!-- ProtectedData (IO/DpapiDraftProtector.cs). -->
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="11.0.0" />
   </ItemGroup>
 
   <!--
