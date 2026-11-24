@@ -4,8 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-// Regression harness for the icon resources of the WinForms controls. Controls/Icons.cs loads an image by the name
-// "SmarTTY.Icons.<name>.png", and SmarTTY.csproj has to embed that name from icons/**. This checks the two sides
+// Regression harness for the icon resources of the WPF menus and tool bars. GUI/WpfMenus.cs loads an image by the name
+// "SmarTTY.Icons.<name>.png" (the WinForms Controls/Icons did the same until stage 4), and SmarTTY.csproj has to embed that name from icons/**. This checks the two sides
 // still agree, that the picture exists, and that no .resx (whose binary images the .NET SDK cannot compile for
 // net48, see README) came back. Run with: dotnet run --project tests/IconResourceTests
 internal static class Program
@@ -20,6 +20,48 @@ internal static class Program
         }
         _passed++;
         Console.WriteLine("PASS: " + name);
+    }
+
+    // The top-level arguments of a call whose text starts at start (after its opening parenthesis), with strings and nested
+    // parentheses skipped; what follows the closing parenthesis is not read.
+    private static List<string> Arguments(string source, int start)
+    {
+        var arguments = new List<string>();
+        int depth = 0;
+        int begin = start;
+        for (int i = start; i < source.Length; i++)
+        {
+            char ch = source[i];
+            if (ch == '"')
+            {
+                for (i++; i < source.Length && source[i] != '"'; i++)
+                {
+                    if (source[i] == '\\')
+                    {
+                        i++;
+                    }
+                }
+            }
+            else if (ch == '(' || ch == '{' || ch == '[')
+            {
+                depth++;
+            }
+            else if (ch == ')' || ch == '}' || ch == ']')
+            {
+                if (depth == 0)
+                {
+                    arguments.Add(source.Substring(begin, i - begin));
+                    return arguments;
+                }
+                depth--;
+            }
+            else if (ch == ',' && depth == 0)
+            {
+                arguments.Add(source.Substring(begin, i - begin));
+                begin = i + 1;
+            }
+        }
+        return arguments;
     }
 
     private static int Main()
@@ -39,9 +81,15 @@ internal static class Program
 
             string project = File.ReadAllText(Path.Combine(root, "SmarTTY.csproj"));
 
-            // The names Icons.Load/Icons.Apply ask for, from the code that runs at load time.
+            // The names the WPF menus and tool bars ask for (GUI/WpfMenus: SmarTTY.Icons.<name>.png): the argument that is the
+            // icon of each call that takes one. Both names of a "condition ? a : b" argument count.
+            var iconArguments = new (string Call, int Index)[]
+            {
+                ("WpfMenus.Icon(", 0), ("WpfMenus.LoadIcon(", 0), ("WpfMenus.Item(", 1), ("new DeviceMenuItem(", 1),
+                ("ImageButton(", 0), ("ImageAndText(", 0)
+            };
             var wanted = new SortedSet<string>(StringComparer.Ordinal);
-            foreach (string directory in new[] { "Controls", "GUI", "CodeEditing", "Forms", "VisualTTY", "Terminal" })
+            foreach (string directory in new[] { "Controls", "GUI", "CodeEditing", "VisualTTY", "Terminal" })
             {
                 string path = Path.Combine(root, directory);
                 if (!Directory.Exists(path))
@@ -55,13 +103,26 @@ internal static class Program
                     {
                         continue;
                     }
-                    foreach (Match match in Regex.Matches(File.ReadAllText(file), "Icons\\.(?:Load|Apply)\\([^,]*,?\\s*\"([a-z0-9-]+)\""))
+                    string source = File.ReadAllText(file);
+                    foreach ((string call, int index) in iconArguments)
                     {
-                        wanted.Add(match.Groups[1].Value);
+                        for (int at = source.IndexOf(call, StringComparison.Ordinal); at >= 0; at = source.IndexOf(call, at + 1, StringComparison.Ordinal))
+                        {
+                            // A declaration ("Button ImageButton(string icon, ...") is no call.
+                            List<string> arguments = Arguments(source, at + call.Length);
+                            if (arguments.Count <= index || arguments[index].Contains("string "))
+                            {
+                                continue;
+                            }
+                            foreach (Match name in Regex.Matches(arguments[index], "\"([a-z0-9-]+)\""))
+                            {
+                                wanted.Add(name.Groups[1].Value);
+                            }
+                        }
                     }
                 }
             }
-            Check(wanted.Count > 0, "the code asks Icons for named images");
+            Check(wanted.Count > 0, "the code asks for named icons");
 
             // A few names are pictures rather than toolbar/menu icons: they are shown in a PictureBox at a larger size,
             // and the "connection closed" card reuses the very same picture as the prompt of an SSH session. For those the
