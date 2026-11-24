@@ -11,7 +11,7 @@ namespace SmarTTY.Terminal.Rendering;
 /// </summary>
 public static class TerminalBenchmarkScripts
 {
-    /// <summary>The names of the scripts, in the order of the lab window.</summary>
+    /// <summary>The names of the scripts, in the order they were shown in (the lab window of stage 2A, removed in 5B).</summary>
     public static readonly string[] Names =
     {
         "Scrolling log (plain text)",

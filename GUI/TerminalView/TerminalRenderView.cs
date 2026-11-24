@@ -24,7 +24,7 @@ internal enum TerminalCursorShape
     Bar
 }
 
-/// <summary>What the last frames of a <see cref="TerminalRenderView"/> cost (for the diagnostics of the lab window).</summary>
+/// <summary>What the last frames of a <see cref="TerminalRenderView"/> cost (for diagnostics).</summary>
 internal sealed class TerminalFrameStats
 {
     /// <summary>Frames that painted something.</summary>
@@ -47,7 +47,7 @@ internal sealed class TerminalFrameStats
     /// <summary>Frames whose parsing stopped at the time budget, the rest of the output waiting for the next frame.</summary>
     public long BudgetHits;
 
-    /// <summary>Frames that threw (written to the debug output; the lab window shows the count).</summary>
+    /// <summary>Frames that threw (written to the debug output and counted).</summary>
     public long FrameErrors;
 
     /// <summary>The rows drawn and reused in the last frame.</summary>
@@ -79,7 +79,7 @@ internal sealed class TerminalFrameStats
 /// caret), Alt codes, AltGr and the xterm combinations.</item>
 /// </list>
 /// Under Remote Desktop and in virtual machines without a GPU WPF renders in software; the view keeps the changed area small there too
-/// (one row per changed row, the caret blinks by opacity), and the lab window can force the software mode on a local machine.
+/// (one row per changed row, the caret blinks by opacity).
 /// </summary>
 internal sealed class TerminalRenderView : FrameworkElement
 {
@@ -214,13 +214,13 @@ internal sealed class TerminalRenderView : FrameworkElement
     /// <summary>The number of columns or rows changed (the remote side is told the new size of its PTY).</summary>
     public event Action<int, int> TerminalSizeChanged;
 
-    /// <summary>A frame was painted (the lab window shows the statistics).</summary>
+    /// <summary>A frame was painted (the scroll bar of the panel follows it).</summary>
     public event Action FrameRendered;
 
     /// <summary>A key, before the terminal looks at it: a handler that sets <see cref="RoutedEventArgs.Handled"/> takes it (window shortcuts).</summary>
     public event KeyEventHandler PreviewTerminalKey;
 
-    /// <summary>The bytes of a key or a character, as they were sent (the key log of the lab window).</summary>
+    /// <summary>The bytes of a key or a character, as they were sent (for a key log).</summary>
     public event Action<string, string> InputLogged;
 
     /// <summary>
