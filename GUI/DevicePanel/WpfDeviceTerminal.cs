@@ -88,7 +88,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // own disconnect cancels it (_manualDisconnect); everything runs on the UI thread (WinForms timer).
     private bool _manualDisconnect;
 
-    private System.Windows.Forms.Timer _autoReconnectTimer;
+    private UiTimer _autoReconnectTimer;
 
     // Throttles automatic reconnects: a server that accepts a connection and closes it at once (session limit,
     // device restarting) would otherwise be reconnected in a tight loop, wiping the screen each time.
@@ -1045,7 +1045,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_autoReconnectTimer == null)
         {
-            _autoReconnectTimer = new System.Windows.Forms.Timer();
+            _autoReconnectTimer = new UiTimer();
             _autoReconnectTimer.Tick += OnAutoReconnectTimerTick;
         }
         _autoReconnectTimer.Interval = delayMs;
@@ -1059,7 +1059,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void OnAutoReconnectTimerTick(object sender, EventArgs e)
     {
-        ((System.Windows.Forms.Timer)sender).Stop();
+        ((UiTimer)sender).Stop();
         ReconnectIfAutoStillWanted();
     }
 

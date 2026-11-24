@@ -39,7 +39,7 @@ public partial class WpfDeviceTerminal
 
     private System.Windows.Controls.TextBlock _lblPortAlertText;
 
-    private System.Windows.Forms.Timer _lineStatusTimer;
+    private UiTimer _lineStatusTimer;
 
     private readonly SerialErrorCounters _lineErrors = new SerialErrorCounters();
 
@@ -96,7 +96,7 @@ public partial class WpfDeviceTerminal
         toolStrip1.Items.Insert(afterReplay, _linesButton);
         toolStrip1.Items.Insert(afterReplay + 1, _lblModemLines);
 
-        _lineStatusTimer = new System.Windows.Forms.Timer(components)
+        _lineStatusTimer = new UiTimer()
         {
             Interval = LineStatusIntervalMs
         };

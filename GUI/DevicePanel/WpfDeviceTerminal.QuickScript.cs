@@ -34,7 +34,7 @@ public partial class WpfDeviceTerminal
     // The command that is put into the command line when the prompt of the device is back after an upload, and what waits for it.
     private string _quickScriptInvocation;
 
-    private System.Windows.Forms.Timer _quickScriptPromptTimer;
+    private UiTimer _quickScriptPromptTimer;
 
     // How long the prompt is waited for after the upload (chmod and mv are quick, but a slow device may be busy).
     private const int QuickScriptPromptTimeoutMs = 20000;
@@ -184,7 +184,7 @@ public partial class WpfDeviceTerminal
         CancelQuickScriptInvocation();
         _quickScriptInvocation = invocation;
         _serialTerminalControl.InputLineStateChanged += OnQuickScriptPromptBack;
-        _quickScriptPromptTimer = new System.Windows.Forms.Timer { Interval = QuickScriptPromptTimeoutMs };
+        _quickScriptPromptTimer = new UiTimer { Interval = QuickScriptPromptTimeoutMs };
         _quickScriptPromptTimer.Tick += (object sender, EventArgs e) => CancelQuickScriptInvocation();
         _quickScriptPromptTimer.Start();
     }

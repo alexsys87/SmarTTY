@@ -2562,7 +2562,13 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     IUserPrompt IRemoteTextView.UserPrompt => UiDispatcherOfView;
 
-    System.Windows.Forms.IWin32Window IRemoteTextView.MessageOwner => null;
+    IDisposable IRemoteTextView.StartTimer(int intervalMs, Action tick)
+    {
+        UiTimer timer = new UiTimer { Interval = intervalMs };
+        timer.Tick += (sender, e) => tick();
+        timer.Start();
+        return timer;
+    }
 
     private WpfViewDispatcher UiDispatcherOfView => _uiDispatcher ?? (_uiDispatcher = new WpfViewDispatcher(this));
 }

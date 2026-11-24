@@ -19,7 +19,7 @@ namespace SmarTTY.GUI.DevicePanel;
 public partial class WpfDeviceTerminal : IDeviceListingHost
 {
     private DeviceListingSession _listing;
-    private Timer _listingTimer;
+    private UiTimer _listingTimer;
 
     private void InitializeDeviceListing()
     {
@@ -67,7 +67,7 @@ public partial class WpfDeviceTerminal : IDeviceListingHost
     {
         if (_listingTimer == null)
         {
-            _listingTimer = new Timer { Interval = 100 };
+            _listingTimer = new UiTimer { Interval = 100 };
             _listingTimer.Tick += (sender, args) => _listing.CheckTimeout();
         }
         _listingTimer.Start();
