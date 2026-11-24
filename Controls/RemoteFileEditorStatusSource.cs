@@ -5,8 +5,8 @@ using System;
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// <see cref="IEditorStatusSource"/> of a <see cref="RemoteFileEditor"/> inside its <see cref="RemoteFileEditorPanel"/>: every member is the member of the editor
-/// (or of its hex view) that the status bar read directly before. The panel tells when to read again.
+/// <see cref="IEditorStatusSource"/> of a <see cref="RemoteFileEditor"/> with its <see cref="RemoteFileEditorCommands"/>: every member is the member of the editor
+/// (or of its hex view) that the status bar read directly before. The commands tell when to read again.
 /// </summary>
 internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 {
@@ -16,8 +16,8 @@ internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 
     private readonly Action<EventHandler> _removeStateChanged;
 
-    public RemoteFileEditorStatusSource(RemoteFileEditor editor, RemoteFileEditorPanel panel)
-        : this(editor, (panel ?? throw new ArgumentNullException(nameof(panel))).AddStateChanged, panel.RemoveStateChanged)
+    public RemoteFileEditorStatusSource(RemoteFileEditor editor, RemoteFileEditorCommands commands)
+        : this(editor, (commands ?? throw new ArgumentNullException(nameof(commands))).AddStateChanged, commands.RemoveStateChanged)
     {
     }
 
@@ -65,7 +65,7 @@ internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 
     public bool IsNewFile => _editor.IsNewFile;
 
-    public bool ReadOnly => _editor.ReadOnly;
+    public bool ReadOnly => _editor.TextView.ReadOnly;
 
     public bool CanReopenWithEncoding => _editor.CanReopenWithEncoding;
 
@@ -73,25 +73,25 @@ internal sealed class RemoteFileEditorStatusSource : IEditorStatusSource
 
     public IHexViewStatus HexView => _editor.HexEditor;
 
-    public TextDocument.TextPosition CaretPosition => _editor.CaretPosition;
+    public TextDocument.TextPosition CaretPosition => _editor.TextView.CaretPosition;
 
-    public bool HasSelection => _editor.HasSelection;
+    public bool HasSelection => _editor.TextView.HasSelection;
 
-    public TextDocument.TextPosition SelectionStart => _editor.SelectionStart;
+    public TextDocument.TextPosition SelectionStart => _editor.TextView.SelectionStart;
 
-    public TextDocument.TextPosition SelectionEnd => _editor.SelectionEnd;
+    public TextDocument.TextPosition SelectionEnd => _editor.TextView.SelectionEnd;
 
     public string GetLineText(int line)
     {
-        return _editor.EditableDocument.GetLineText(line);
+        return _editor.TextView.Document.GetLineText(line);
     }
 
     public string GetEffectiveLineTerminator(int line)
     {
-        return _editor.EditableDocument.GetEffectiveLineTerminator(line);
+        return _editor.TextView.Document.GetEffectiveLineTerminator(line);
     }
 
-    public string FirstLine => _editor.EditableDocument?.GetLineText(0);
+    public string FirstLine => _editor.TextView.Document?.GetLineText(0);
 
     public TextFileEncoding FileEncoding => _editor.FileEncoding;
 

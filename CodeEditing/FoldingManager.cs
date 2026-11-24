@@ -9,7 +9,7 @@ namespace SmarTTY.CodeEditing;
 /// control: the rows, the margin and the painting are in <c>Controls/TextView/FoldingLineProvider.cs</c> and
 /// <c>FoldingMarginPainter.cs</c>.
 /// </summary>
-internal class FoldingManager
+internal class FoldingManager : ITextFolds
 {
     internal enum GutterState
     {
@@ -326,6 +326,27 @@ internal class FoldingManager
         return false;
     }
 
+    /// <summary>
+    /// A click on the mark of the fold margin at a line: nothing while the lines are wrapped (folding is not available then); otherwise the block
+    /// of the line is folded or unfolded, and when a block is folded with the caret between the line of its opening token and the line of its
+    /// closing one, <paramref name="caretTarget"/> is where the caret goes: the start of the line before the opening token (the header of a block
+    /// whose opening token is on the next line). It is what <c>Controls/TextView/FoldingMarginPainter.OnMouseDown</c> decided, moved here as it was
+    /// (stage 3D). True when a fold changed.
+    /// </summary>
+    internal bool ClickMark(int lineIndex, bool wrapping, TextDocument.TextPosition caret, out TextDocument.TextPosition? caretTarget)
+    {
+        caretTarget = null;
+        if (wrapping || !ToggleFold(lineIndex, out var endToken, collapseOnly: false))
+        {
+            return false;
+        }
+        if (endToken != null && caret.Line <= endToken.LineNumber && caret.Line >= endToken.Partner.LineNumber)
+        {
+            caretTarget = new TextDocument.TextPosition(0, endToken.Partner.LineNumber - 1);
+        }
+        return true;
+    }
+
     public int GetTotalHiddenLines()
     {
         // A folded block inside another folded block hides lines the outer one hides already: count each line once.
@@ -398,6 +419,19 @@ internal class FoldingManager
             _regions[region.HeaderLine] = region;
         }
         modified = toDelete.Count != 0 || relocated.Count != 0;
+    }
+
+    /// <summary>The text a folded header shows (the WPF text view asks it through <see cref="ITextFolds"/>); null for a line that is not one.</summary>
+    string ITextFolds.GetFoldedText(int line, string lineText, out int labelStart, out int labelLength)
+    {
+        FoldedRegion region = GetRegion(line);
+        if (region == null)
+        {
+            labelStart = 0;
+            labelLength = 0;
+            return null;
+        }
+        return region.Transform(lineText, out labelStart, out labelLength);
     }
 
     /// <summary>The folded block whose header is the line, or null.</summary>

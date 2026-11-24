@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../TextEditing/HexViewLayout.cs" Link="HexViewLayout.cs" />
+    <Compile Include="../../TextEditing/HexKeyMap.cs" Link="HexKeyMap.cs" />
+    <Compile Include="../../TextEditing/HexPointer.cs" Link="HexPointer.cs" />
+    <Compile Include="../../TextEditing/HexByteText.cs" Link="HexByteText.cs" />
+    <Compile Include="../../TextEditing/HexPasteText.cs" Link="HexPasteText.cs" />
+    <Compile Include="../../TextEditing/HexEditingModel.cs" Link="HexEditingModel.cs" />
+    <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
+    <Compile Include="../../TextEditing/HexValueFormats.cs" Link="HexValueFormats.cs" />
+    <Compile Include="../../TextEditing/HexChecksums.cs" Link="HexChecksums.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+  </ItemGroup>
+</Project>

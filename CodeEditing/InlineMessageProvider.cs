@@ -7,7 +7,7 @@ namespace SmarTTY.CodeEditing;
 /// lines go when the text changes. The rows, the painting, the font, the icons and the colours are in
 /// <c>Controls/TextView/InlineMessageView.cs</c>.
 /// </summary>
-public class InlineMessageProvider
+public class InlineMessageProvider : ILineMessages
 {
     public class InlineMessage
     {
@@ -103,6 +103,17 @@ public class InlineMessageProvider
         }
     }
 
+    /// <summary>
+    /// Adds a message as a check reports it: the line counted from 1 (a line past the text goes on the last of
+    /// <paramref name="lineCount"/> lines, where there is a row to show it, and one below 1 on the first), the column counted from 1 (0 when it
+    /// is not known: the message goes in the middle of its row). It is what <c>Controls/CodeEditorPP.AddMessage</c>, <c>AddMessages</c> and
+    /// <c>MessageLine</c> did before they called <see cref="AddMessage"/>, moved here as it was (stage 3D).
+    /// </summary>
+    public void AddReported(int line, MessageSeverity messageSeverity, string text, int column, int lineCount)
+    {
+        AddMessage(System.Math.Max(0, System.Math.Min(line - 1, lineCount - 1)), messageSeverity, text, column - 1);
+    }
+
     public void ShiftLines(int startLineIndex, int oldLineCount, int newLineCount)
     {
         int diff = newLineCount - oldLineCount;
@@ -184,6 +195,12 @@ public class InlineMessageProvider
             return 1;
         }
         return 0;
+    }
+
+    /// <summary>The line has a message under it (the WPF text view asks it through <see cref="ILineMessages"/>).</summary>
+    public bool HasMessage(int line)
+    {
+        return _messages.ContainsKey(line);
     }
 
     /// <summary>The message under the line, if there is one.</summary>
