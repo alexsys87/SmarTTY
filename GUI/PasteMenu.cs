@@ -155,7 +155,7 @@ internal static class PasteMenu
         catch
         {
         }
-        ThemedSnippetEditorResult added = SnippetEditWindow.Edit(owner, "", text ?? "", canDelete: false);
+        SnippetEditResult added = SnippetEditWindow.Edit(owner, "", text ?? "", canDelete: false);
         if (added == null)
         {
             return;
@@ -167,7 +167,7 @@ internal static class PasteMenu
 
     private static void EditSnippet(Window owner, GlobalSettings settings, PasteSettings options, PasteSnippet snippet)
     {
-        ThemedSnippetEditorResult edited = SnippetEditWindow.Edit(owner, snippet.Name, snippet.Text, canDelete: true);
+        SnippetEditResult edited = SnippetEditWindow.Edit(owner, snippet.Name, snippet.Text, canDelete: true);
         if (edited == null)
         {
             return;

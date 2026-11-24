@@ -1,7 +1,6 @@
 using SmarTTY.Terminal.Input;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Transport;
 using System;

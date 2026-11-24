@@ -3,7 +3,6 @@ using SmarTTY.Ssh;
 using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
 using SmarTTY.Controls;
-using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.IO;
 using SmarTTY.Terminal;

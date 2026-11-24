@@ -1,4 +1,6 @@
+using System;
 using System.Windows;
+using System.Windows.Interop;
 
 namespace SmarTTY.GUI;
 
@@ -8,6 +10,32 @@ namespace SmarTTY.GUI;
 /// </summary>
 internal static class WindowOwnership
 {
+    /// <summary>
+    /// The WPF window behind a Win32 handle (a terminal's anchor gives the handle of the window it is in), so a dialog is
+    /// owned by the window that asked for it; null for no handle or one that is not a WPF window, and the dialog then
+    /// takes the active window (<see cref="Attach"/>). Resolved on the UI thread, because a window belongs to the thread
+    /// that created it.
+    /// </summary>
+    internal static Window FromHandle(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return null;
+        }
+        Application application = Application.Current;
+        if (application != null && !application.Dispatcher.CheckAccess())
+        {
+            return application.Dispatcher.Invoke(() => HwndSource.FromHwnd(handle)?.RootVisual as Window);
+        }
+        return HwndSource.FromHwnd(handle)?.RootVisual as Window;
+    }
+
+    /// <summary>The WPF window of a Win32 owner (see <see cref="FromHandle"/>); null for none.</summary>
+    internal static Window Of(System.Windows.Forms.IWin32Window owner)
+    {
+        return owner != null ? FromHandle(owner.Handle) : null;
+    }
+
     /// <summary>
     /// The window the user is working in: the active visible one. While none of the windows is active (the user has
     /// switched to another program, which is likely during a connection that takes a while to fail) it is the

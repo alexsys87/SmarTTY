@@ -1841,7 +1841,7 @@ public sealed class WpfSmartTerminal : WpfTerminal, IFileListHost, IOutputLinkHo
             }
             LinePaste run = new LinePaste(commands, PasteGuard.OptionsOf(AppSettings).LineByLineStopOnError);
             _linePaste = run;
-            run.Progress = ThemedPasteProgress.Create("Paste line by line");
+            run.Progress = new PasteProgressWindow("Paste line by line");
             run.Progress.CancelRequested += (object sender, EventArgs e) => CancelActivePaste();
             run.Progress.ShowNear(PasteAnchor);
             RunNextPastedLine();

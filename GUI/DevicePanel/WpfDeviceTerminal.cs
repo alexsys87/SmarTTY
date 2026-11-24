@@ -2,7 +2,6 @@ using SmarTTY.Terminal.Input;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
 using System.ComponentModel;
-using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
 using SmarTTY.Terminal;

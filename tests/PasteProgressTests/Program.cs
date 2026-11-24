@@ -4,11 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-// Regression harness for the themed progress window that replaced the WinForms Forms/PasteProgressForm. The paste job
-// and the terminal live in Controls/, which the Mono test harness compiles and which cannot reference the WPF windows,
-// so they create the window through the ThemedPasteProgress facade; App wires that facade to GUI/PasteProgressWindow.
-// This harness guards two things: the rules the window is built on (Utilities/PasteProgressRules.cs, which has no UI
-// dependency) and the wiring (the migrated call sites, the facade, the adapter and the install).
+// Regression harness for the progress window of a paste (GUI/PasteProgressWindow, which replaced the WinForms
+// Forms/PasteProgressForm). It guards the rules the window is built on (Utilities/PasteProgressRules.cs, which has no UI
+// dependency) and the wiring: the paste job (GUI/PasteJob.cs since stage 4B) and the paste line by line of the Smart
+// Terminal create the WPF window themselves, and the facade, its adapter and the WinForms form are gone.
 // Run with: dotnet run --project tests/PasteProgressTests
 internal static class Program
 {
@@ -93,15 +92,14 @@ internal static class Program
             return;
         }
 
-        string pasteJob = File.ReadAllText(Path.Combine(root, "Controls", "PasteJob.cs"));
-        Check(pasteJob.Contains("ThemedPasteProgress.Create"), "the paste job creates the window through the facade");
+        string pasteJob = File.ReadAllText(Path.Combine(root, "GUI", "PasteJob.cs"));
+        Check(pasteJob.Contains("new PasteProgressWindow"), "the paste job creates the WPF progress window");
+        Check(!Regex.IsMatch(pasteJob, @"\bThemedPasteProgress\b"), "the paste job no longer goes through the facade");
         Check(!Regex.IsMatch(pasteJob, @"\bPasteProgressForm\b"), "the paste job no longer builds the WinForms form");
-        Check(!Regex.IsMatch(pasteJob, @"using SmarTTY\.Forms"), "the paste job no longer imports the Forms namespace");
 
         string terminal = File.ReadAllText(Path.Combine(root, "GUI", "TerminalView", "WpfSmartTerminal.cs"));
-        Check(terminal.Contains("ThemedPasteProgress.Create"), "the line-by-line paste creates the window through the facade");
-        Check(!Regex.IsMatch(terminal, @"\bPasteProgressForm\b"), "the line-by-line paste no longer builds the WinForms form");
-        Check(!Regex.IsMatch(terminal, @"using SmarTTY\.Forms"), "the line-by-line paste no longer imports the Forms namespace");
+        Check(terminal.Contains("new PasteProgressWindow"), "the line-by-line paste creates the WPF progress window");
+        Check(!Regex.IsMatch(terminal, @"\bThemedPasteProgress\b"), "the line-by-line paste no longer goes through the facade");
     }
 
     private static void TestFacade()
@@ -112,18 +110,12 @@ internal static class Program
             return;
         }
 
-        string facadePath = Path.Combine(root, "Controls", "ThemedPasteProgress.cs");
-        Check(File.Exists(facadePath), "the ThemedPasteProgress facade exists");
-        if (!File.Exists(facadePath))
+        // Stage 4B: the facade, its adapter and the WinForms form that stood in for the window are gone.
+        foreach (string gone in new[] { "Controls/ThemedPasteProgress.cs", "GUI/ThemedPasteProgressAdapter.cs", "Forms/PasteProgressForm.cs" })
         {
-            return;
+            Check(!File.Exists(Path.Combine(root, gone)), gone + " is gone");
         }
-        string facade = File.ReadAllText(facadePath);
-        Check(facade.Contains("CreateImpl"), "the facade exposes the injected CreateImpl hook");
-        Check(facade.Contains("static IPasteProgress Create"), "the facade offers a Create entry point");
-        Check(facade.Contains("interface IPasteProgress"), "the facade defines the window the controls talk to");
-        Check(Regex.IsMatch(facade, @"\bPasteProgressForm\b"),
-            "the facade falls back to the WinForms form when nothing is injected");
+        Check(!Directory.Exists(Path.Combine(root, "Forms")), "the Forms folder is gone");
     }
 
     private static void TestAdapterAndInstall()
@@ -134,27 +126,18 @@ internal static class Program
             return;
         }
 
-        string adapterPath = Path.Combine(root, "GUI", "ThemedPasteProgressAdapter.cs");
-        Check(File.Exists(adapterPath), "the adapter that points the facade at the themed window exists");
-        if (File.Exists(adapterPath))
-        {
-            string adapter = File.ReadAllText(adapterPath);
-            Check(adapter.Contains("ThemedPasteProgress.CreateImpl"), "the adapter installs the facade hook");
-            Check(adapter.Contains("new PasteProgressWindow"), "the adapter creates the themed progress window");
-        }
-
         string windowPath = Path.Combine(root, "GUI", "PasteProgressWindow.xaml.cs");
         Check(File.Exists(windowPath), "the themed progress window exists");
         Check(File.Exists(Path.Combine(root, "GUI", "PasteProgressWindow.xaml")), "the themed progress markup exists");
         if (File.Exists(windowPath))
         {
             string window = File.ReadAllText(windowPath);
-            Check(window.Contains("IPasteProgress"), "the window implements the interface the controls talk to");
+            Check(window.Contains("interface IPasteProgress"), "the window file defines the interface the paste talks to");
             Check(window.Contains("WS_EX_NOACTIVATE") || window.Contains("WsExNoActivate"),
                 "the window does not take the keyboard focus");
         }
 
         string app = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
-        Check(app.Contains("ThemedPasteProgressAdapter.Install()"), "App wires the progress adapter on startup");
+        Check(!app.Contains("ThemedPasteProgressAdapter"), "App installs no progress adapter");
     }
 }

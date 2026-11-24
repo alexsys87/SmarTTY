@@ -5,7 +5,7 @@ using System.Text;
 using System.Windows.Forms;
 using VisualTTY;
 
-namespace SmarTTY.Controls;
+namespace SmarTTY.GUI;
 
 /// <summary>
 /// A paste that is sent in several pieces without blocking the window: one piece at a time, the next one only after the
@@ -87,12 +87,7 @@ internal sealed class PasteJob
     /// Use the pauses and waits of <paramref name="settings"/>; without it the pieces follow each other as soon as they are
     /// written.
     /// </param>
-    public PasteJob(Control owner, string title, List<PasteStep> steps, SendPiece send, PasteSettings settings, bool slow, Action<Outcome, string> finished)
-        : this(PasteAnchor.For(owner), title, steps, send, settings, slow, finished)
-    {
-    }
-
-    /// <summary>A paste of a terminal that is not a WinForms control (the WPF terminal): <paramref name="owner"/> says where it runs and shows.</summary>
+    /// <param name="owner">The terminal: where the paste runs and where its progress window shows.</param>
     public PasteJob(PasteAnchor owner, string title, List<PasteStep> steps, SendPiece send, PasteSettings settings, bool slow, Action<Outcome, string> finished)
     {
         _owner = owner;
@@ -318,7 +313,7 @@ internal sealed class PasteJob
         }
         if (_form == null && unchecked(Environment.TickCount - _startTick) > ProgressDelayMs)
         {
-            _form = ThemedPasteProgress.Create(_title);
+            _form = new PasteProgressWindow(_title);
             _form.CancelRequested += (object sender, EventArgs e) => Cancel();
             _form.ShowNear(_owner);
         }

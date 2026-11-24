@@ -4,11 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-// Regression harness for the themed paste confirmation that replaced the WinForms Forms/PasteConfirmForm. The paste
-// guard lives in Controls/, which the Mono test harness compiles and which cannot reference the WPF windows, so it
-// asks through the ThemedPasteConfirm facade; App wires that facade to GUI/PasteConfirmWindow. This harness guards
-// two things: the rules the window is built on (Utilities/PasteConfirmRules.cs, which has no UI dependency) and the
-// wiring (the migrated call site, the facade, the adapter and the install).
+// Regression harness for the paste confirmation (GUI/PasteConfirmWindow, which replaced the WinForms Forms/PasteConfirmForm).
+// It guards two things: the rules the window is built on (Utilities/PasteConfirmRules.cs, which has no UI dependency) and the
+// wiring: the paste guard (GUI/PasteGuard.cs since stage 4B) opens the WPF window itself, and the facade, its adapter and the
+// WinForms form that stood in for the window are gone.
 // Run with: dotnet run --project tests/PasteConfirmTests
 internal static class Program
 {
@@ -90,10 +89,10 @@ internal static class Program
             return;
         }
 
-        string pasteGuard = File.ReadAllText(Path.Combine(root, "Controls", "PasteGuard.cs"));
-        Check(pasteGuard.Contains("ThemedPasteConfirm.Confirm"), "the paste guard confirms through the facade");
+        string pasteGuard = File.ReadAllText(Path.Combine(root, "GUI", "PasteGuard.cs"));
+        Check(pasteGuard.Contains("PasteConfirmWindow.Confirm"), "the paste guard opens the WPF paste confirmation");
+        Check(!Regex.IsMatch(pasteGuard, @"\bThemedPasteConfirm\b"), "the paste guard no longer goes through the facade");
         Check(!Regex.IsMatch(pasteGuard, @"\bPasteConfirmForm\b"), "the paste guard no longer builds the WinForms form");
-        Check(!Regex.IsMatch(pasteGuard, @"using SmarTTY\.Forms"), "the paste guard no longer imports the Forms namespace");
     }
 
     private static void TestFacade()
@@ -104,18 +103,12 @@ internal static class Program
             return;
         }
 
-        string facadePath = Path.Combine(root, "Controls", "ThemedPasteConfirm.cs");
-        Check(File.Exists(facadePath), "the ThemedPasteConfirm facade exists");
-        if (!File.Exists(facadePath))
+        // Stage 4B: the facade, its adapter and the WinForms form that stood in for the window are gone.
+        foreach (string gone in new[] { "Controls/ThemedPasteConfirm.cs", "GUI/ThemedPasteConfirmAdapter.cs", "Forms/PasteConfirmForm.cs" })
         {
-            return;
+            Check(!File.Exists(Path.Combine(root, gone)), gone + " is gone");
         }
-        string facade = File.ReadAllText(facadePath);
-        Check(facade.Contains("ConfirmImpl"), "the facade exposes the injected ConfirmImpl hook");
-        Check(facade.Contains("static ThemedPasteConfirmResult Confirm"),
-            "the facade offers a Confirm entry point");
-        Check(Regex.IsMatch(facade, @"\bPasteConfirmForm\b"),
-            "the facade falls back to the WinForms form when nothing is injected");
+        Check(!Directory.Exists(Path.Combine(root, "Forms")), "the Forms folder is gone");
     }
 
     private static void TestAdapterAndInstall()
@@ -126,20 +119,11 @@ internal static class Program
             return;
         }
 
-        string adapterPath = Path.Combine(root, "GUI", "ThemedPasteConfirmAdapter.cs");
-        Check(File.Exists(adapterPath), "the adapter that points the facade at the themed window exists");
-        if (File.Exists(adapterPath))
-        {
-            string adapter = File.ReadAllText(adapterPath);
-            Check(adapter.Contains("ThemedPasteConfirm.ConfirmImpl"), "the adapter installs the facade hook");
-            Check(adapter.Contains("PasteConfirmWindow.Confirm"), "the adapter opens the themed paste confirmation");
-        }
-
         string windowPath = Path.Combine(root, "GUI", "PasteConfirmWindow.xaml.cs");
         Check(File.Exists(windowPath), "the themed paste confirmation window exists");
         Check(File.Exists(Path.Combine(root, "GUI", "PasteConfirmWindow.xaml")), "the themed paste confirmation markup exists");
 
         string app = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
-        Check(app.Contains("ThemedPasteConfirmAdapter.Install()"), "App wires the paste confirmation adapter on startup");
+        Check(!app.Contains("ThemedPasteConfirmAdapter"), "App installs no paste confirmation adapter");
     }
 }

@@ -1,5 +1,4 @@
 ﻿using SmarTTY.Ssh;
-using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
 using SmarTTY.Transport;

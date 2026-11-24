@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -5,7 +6,7 @@ using System.Text;
 using System.Windows.Forms;
 using VisualTTY;
 
-namespace SmarTTY.Controls;
+namespace SmarTTY.GUI;
 
 /// <summary>
 /// What every terminal does with the text of the clipboard before it is pasted: cleaning (escape sequences, typographic
@@ -174,7 +175,7 @@ internal static class PasteGuard
         {
             summary.Append(" The text is large.");
         }
-        ThemedPasteConfirmResult confirmed = ThemedPasteConfirm.Confirm(owner, summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
+        PasteConfirmResult confirmed = PasteConfirmWindow.Confirm(WindowOwnership.Of(owner), summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
         if (confirmed == null)
         {
             return false;

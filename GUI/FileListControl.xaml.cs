@@ -1,5 +1,4 @@
-﻿using SmarTTY.Forms;
-using SmarTTY.GUI.Backend;
+﻿using SmarTTY.GUI.Backend;
 using SmarTTY.IO;
 using SmarTTY.LocalRepo;
 using System;

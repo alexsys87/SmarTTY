@@ -1,6 +1,5 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.CodeEditing;
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;

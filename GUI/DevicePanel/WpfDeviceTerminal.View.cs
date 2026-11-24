@@ -175,7 +175,7 @@ public partial class WpfDeviceTerminal
         if (key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None)
         {
             // Esc stops a paste that is being sent.
-            Controls.PasteJob job = _pasteJob;
+            PasteJob job = _pasteJob;
             if (job != null && job.IsActive)
             {
                 job.Cancel();
