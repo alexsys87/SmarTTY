@@ -29,7 +29,6 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
-using Control = System.Windows.Forms.Control;
 using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 using Point = System.Drawing.Point;

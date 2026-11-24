@@ -8,7 +8,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Windows;
-using System.Windows.Forms.Integration;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.GUI.Backend;

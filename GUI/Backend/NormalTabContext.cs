@@ -8,7 +8,6 @@ using System.ComponentModel;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Forms.Integration;
 
 namespace SmarTTY.GUI.Backend;
 
