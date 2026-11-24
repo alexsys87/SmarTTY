@@ -1,6 +1,5 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.CodeEditing;
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
 using SmarTTY.TextEditing;
@@ -11,7 +10,6 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using VisualTTY;
 
 namespace SmarTTY.Controls;
@@ -367,7 +365,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
         }
         else
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -418,7 +416,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             string expiryNotice = RemoteFileDrafts.TakeExpiryNotice();
             if (expiryNotice != null)
             {
-                ThemedMessageBox.Show(_text.MessageOwner, expiryNotice, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UserDialogs.Show(_text.MessageOwner, expiryNotice, "SmarTTY", DialogButtons.Ok, DialogIcon.Warning);
             }
             EditorDraft restoredDraft = null;
             if (_flow.IsReloading)
@@ -511,11 +509,11 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
             : "";
         string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        if (ThemedMessageBox.Show(_text.MessageOwner, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
+        if (UserDialogs.Show(_text.MessageOwner, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
             + changed
             + "Yes: restore the draft.\n"
             + "No: discard it and open the file from the server.\n\n"
-            + "A draft that is not written to for " + RemoteFileDrafts.MaxAge.Days + " days is removed automatically.", "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            + "A draft that is not written to for " + RemoteFileDrafts.MaxAge.Days + " days is removed automatically.", "SmarTTY", DialogButtons.YesNo, DialogIcon.Question) == DialogAnswer.Yes)
         {
             return draft;
         }
@@ -746,7 +744,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     bool IRemoteSaveSource.Confirm(string question)
     {
-        return ThemedMessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes;
+        return UserDialogs.Show(question, "SmarTTY", DialogButtons.YesNo, DialogIcon.Question) == DialogAnswer.Yes;
     }
 
     void IRemoteSaveSource.ClearMessages()
@@ -836,12 +834,12 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     void IRemoteFileContentHost.ShowError(string message)
     {
-        ThemedMessageBox.Show(_text.MessageOwner, message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+        UserDialogs.Show(_text.MessageOwner, message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
     }
 
     bool IRemoteFileContentHost.ConfirmWarning(string question)
     {
-        return ThemedMessageBox.Show(_text.MessageOwner, question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        return UserDialogs.Show(_text.MessageOwner, question, "SmarTTY", DialogButtons.YesNo, DialogIcon.Warning) == DialogAnswer.Yes;
     }
 
     // What the loading and the saves (RemoteFileFlow) need from the editor: the questions, the threads and the view.
@@ -852,15 +850,15 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     PromptAnswer IRemoteFileFlowHost.Ask(string text, PromptButtons buttons, PromptIcon icon)
     {
-        MessageBoxButtons boxButtons = buttons == PromptButtons.OkCancel ? MessageBoxButtons.OKCancel
-            : (buttons == PromptButtons.YesNo ? MessageBoxButtons.YesNo : MessageBoxButtons.YesNoCancel);
-        switch (ThemedMessageBox.Show(text, "SmarTTY", boxButtons, icon == PromptIcon.Warning ? MessageBoxIcon.Warning : MessageBoxIcon.Question))
+        DialogButtons boxButtons = buttons == PromptButtons.OkCancel ? DialogButtons.OkCancel
+            : (buttons == PromptButtons.YesNo ? DialogButtons.YesNo : DialogButtons.YesNoCancel);
+        switch (UserDialogs.Show(text, "SmarTTY", boxButtons, icon == PromptIcon.Warning ? DialogIcon.Warning : DialogIcon.Question))
         {
-            case DialogResult.OK:
+            case DialogAnswer.Ok:
                 return PromptAnswer.Ok;
-            case DialogResult.Yes:
+            case DialogAnswer.Yes:
                 return PromptAnswer.Yes;
-            case DialogResult.No:
+            case DialogAnswer.No:
                 return PromptAnswer.No;
             default:
                 return PromptAnswer.Cancel;
@@ -869,7 +867,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     void IRemoteFileFlowHost.Inform(string text)
     {
-        ThemedMessageBox.Show(text, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UserDialogs.Show(text, "SmarTTY", DialogButtons.Ok, DialogIcon.Information);
     }
 
     void IRemoteFileFlowHost.ReportError(Exception exception)

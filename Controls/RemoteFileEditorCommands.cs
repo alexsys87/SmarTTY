@@ -112,7 +112,7 @@ internal sealed class RemoteFileEditorCommands
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
         }
         _editor.FocusActiveView();
         RefreshState();
@@ -219,7 +219,7 @@ internal sealed class RemoteFileEditorCommands
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
         }
         if (focusEditor)
         {
@@ -276,7 +276,7 @@ internal sealed class RemoteFileEditorCommands
 
     private bool ConfirmDiscardChanges(string question)
     {
-        return !_editor.IsModified || ThemedMessageBox.Show(question, "SmarTTY", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        return !_editor.IsModified || UserDialogs.Show(question, "SmarTTY", DialogButtons.YesNo, DialogIcon.Warning) == DialogAnswer.Yes;
     }
 
     /// <summary>Reads the state of the commands again and tells the tool bar and the menus.</summary>

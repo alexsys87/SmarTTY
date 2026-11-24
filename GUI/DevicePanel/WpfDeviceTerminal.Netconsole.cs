@@ -1,14 +1,16 @@
 using SmarTTY.Terminal.Input;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
-using SmarTTY.Forms;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
+
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace SmarTTY.GUI.DevicePanel;
 
@@ -23,23 +25,24 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
 {
     private NetconsoleTransport _netconsoleTransport;
 
-    private ToolStrip _netconsoleBar;
+    // The bar of line input below the terminal (WPF since stage 4A): the label, the box that takes the width left, the button, the target.
+    private System.Windows.Controls.Border _netconsoleBar;
 
-    private ToolStripLabel _netconsoleBarLabel;
+    private System.Windows.Controls.TextBlock _netconsoleBarLabel;
 
-    private ToolStripTextBox _netconsoleInput;
+    private System.Windows.Controls.TextBox _netconsoleInput;
 
-    private ToolStripButton _netconsoleSendButton;
+    private System.Windows.Controls.Button _netconsoleSendButton;
 
-    private ToolStripLabel _netconsoleTargetLabel;
+    private System.Windows.Controls.TextBlock _netconsoleTargetLabel;
 
-    private ToolStripMenuItem _netconsoleMenu;
+    private MenuItem _netconsoleMenu;
 
-    private ToolStripMenuItem _netconsoleLineModeItem;
+    private MenuItem _netconsoleLineModeItem;
 
-    private ToolStripMenuItem _netconsoleCharacterModeItem;
+    private MenuItem _netconsoleCharacterModeItem;
 
-    private ToolStripMenuItem _netconsoleTargetItem;
+    private MenuItem _netconsoleTargetItem;
 
     // The history walk of the input box and what is typed into the terminal in line mode (VisualTTY/DeviceTerminal/NetconsoleLineInput.cs).
     private NetconsoleLineInput _netconsoleLine;
@@ -58,95 +61,60 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
     public bool NetconsoleLineInput => NetconsoleSettings?.Input == DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Line;
 
     /// <summary>The text box of line input (for tests and for focusing it).</summary>
-    internal ToolStripTextBox NetconsoleInputBox => _netconsoleInput;
+    internal System.Windows.Controls.TextBox NetconsoleInputBox => _netconsoleInput;
 
     private void InitializeNetconsoleSupport()
     {
-        _netconsoleBar = new ToolStrip
+        const string help = "Line input: the line is sent as one UDP datagram when Enter is pressed. Up/Down: history. Esc: clear. Ctrl+C with nothing selected: send Ctrl+C.";
+        _netconsoleBarLabel = new System.Windows.Controls.TextBlock
         {
-            Dock = DockStyle.Bottom,
-            GripStyle = ToolStripGripStyle.Hidden,
-            CanOverflow = false,
-            Visible = false,
-            Name = "netconsoleBar",
-            TabStop = true
+            Text = "Send:",
+            ToolTip = help,
+            Margin = new System.Windows.Thickness(2, 0, 4, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center
         };
-        _netconsoleBarLabel = new ToolStripLabel("Send:")
+        _netconsoleInput = new System.Windows.Controls.TextBox { ToolTip = help, MinWidth = 80, VerticalContentAlignment = System.Windows.VerticalAlignment.Center };
+        _netconsoleInput.PreviewKeyDown += OnNetconsoleInputKeyDown;
+        _netconsoleSendButton = new System.Windows.Controls.Button
         {
-            ToolTipText = "Line input: the line is sent as one UDP datagram when Enter is pressed. Up/Down: history. Esc: clear. Ctrl+C with nothing selected: send Ctrl+C."
+            Content = ImageAndText("upload", "Send"),
+            ToolTip = "Send the line (Enter)",
+            Margin = new System.Windows.Thickness(4, 0, 0, 0)
         };
-        _netconsoleInput = new ToolStripTextBox
-        {
-            AutoSize = false,
-            Width = 300,
-            BorderStyle = BorderStyle.FixedSingle,
-            ToolTipText = _netconsoleBarLabel.ToolTipText
-        };
-        _netconsoleInput.KeyDown += OnNetconsoleInputKeyDown;
-        _netconsoleInput.KeyPress += (sender, e) =>
-        {
-            // Enter and Esc are handled in KeyDown; without this the text box beeps.
-            if (e.KeyChar == '\r' || e.KeyChar == '\u001b')
-            {
-                e.Handled = true;
-            }
-        };
-        _netconsoleSendButton = new ToolStripButton("Send")
-        {
-            DisplayStyle = ToolStripItemDisplayStyle.ImageAndText,
-            ToolTipText = "Send the line (Enter)"
-        };
-        Icons.Apply(_netconsoleSendButton, "upload");
+        _netconsoleSendButton.SetResourceReference(System.Windows.FrameworkElement.StyleProperty, System.Windows.Controls.ToolBar.ButtonStyleKey);
         _netconsoleSendButton.Click += (sender, e) => SendNetconsoleLine();
-        _netconsoleTargetLabel = new ToolStripLabel
+        _netconsoleTargetLabel = new System.Windows.Controls.TextBlock
         {
-            Alignment = ToolStripItemAlignment.Right
+            Margin = new System.Windows.Thickness(8, 0, 2, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center
         };
-        _netconsoleBar.Items.AddRange(new ToolStripItem[] { _netconsoleBarLabel, _netconsoleInput, _netconsoleSendButton, _netconsoleTargetLabel });
-        _netconsoleBar.Resize += (sender, e) => LayoutNetconsoleBar();
-        _netconsoleBar.ItemAdded += (sender, e) => LayoutNetconsoleBar();
-        DpiAwareForm.ConfigureToolStrip(_netconsoleBar);
+        System.Windows.Controls.DockPanel row = new System.Windows.Controls.DockPanel { LastChildFill = true, Margin = new System.Windows.Thickness(4, 2, 4, 2) };
+        System.Windows.Controls.DockPanel.SetDock(_netconsoleBarLabel, System.Windows.Controls.Dock.Left);
+        System.Windows.Controls.DockPanel.SetDock(_netconsoleTargetLabel, System.Windows.Controls.Dock.Right);
+        System.Windows.Controls.DockPanel.SetDock(_netconsoleSendButton, System.Windows.Controls.Dock.Right);
+        row.Children.Add(_netconsoleBarLabel);
+        row.Children.Add(_netconsoleTargetLabel);
+        row.Children.Add(_netconsoleSendButton);
+        row.Children.Add(_netconsoleInput);
+        // The colours of a tool bar of the theme: its background, its text and the line between it and the terminal.
+        _netconsoleBar = new System.Windows.Controls.Border { Child = row, BorderThickness = new System.Windows.Thickness(0, 1, 0, 0) };
+        _netconsoleBar.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "Theme.SurfaceBackground");
+        _netconsoleBar.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "Theme.Divider");
+        _netconsoleBar.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "Theme.Text");
         AddNetconsoleBar(_netconsoleBar);
     }
 
-    /// <summary>The input box takes the width that the label, the button and the target leave.</summary>
-    private void LayoutNetconsoleBar()
+    private static object ImageAndText(string icon, string text)
     {
-        if (_netconsoleBar == null || _netconsoleInput == null)
+        System.Windows.Controls.StackPanel content = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        System.Windows.Controls.Image image = WpfMenus.Icon(icon);
+        if (image != null)
         {
-            return;
+            image.Margin = new System.Windows.Thickness(0, 0, 4, 0);
+            content.Children.Add(image);
         }
-        int others = 0;
-        foreach (ToolStripItem item in _netconsoleBar.Items)
-        {
-            if (item != _netconsoleInput && item.Available)
-            {
-                others += item.Width + item.Margin.Horizontal;
-            }
-        }
-        int width = _netconsoleBar.DisplayRectangle.Width - others - _netconsoleInput.Margin.Horizontal - 8;
-        _netconsoleInput.Width = Math.Max(80, width);
-    }
-
-    private void ApplyNetconsoleBarTheme()
-    {
-        if (_netconsoleBar == null || _toolbarPalette == null)
-        {
-            return;
-        }
-        _netconsoleBar.Renderer = _toolbarRenderer;
-        _netconsoleBar.BackColor = _toolbarPalette.Background;
-        _netconsoleBar.ForeColor = _toolbarPalette.Text;
-        foreach (ToolStripItem item in _netconsoleBar.Items)
-        {
-            item.ForeColor = _toolbarPalette.Text;
-        }
-        _netconsoleInput.BackColor = _toolbarPalette.Input;
-        _netconsoleInput.ForeColor = _toolbarPalette.Text;
-        if (_netconsoleMenu != null)
-        {
-            ApplyMenuTheme(_netconsoleMenu.DropDown);
-        }
+        content.Children.Add(new System.Windows.Controls.TextBlock { Text = text, VerticalAlignment = System.Windows.VerticalAlignment.Center });
+        return content;
     }
 
     /// <summary>Called from ApplySettings: the menu, the input mode and the echo of a netconsole receiver (or none of them).</summary>
@@ -184,7 +152,7 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         bool lineInput = settings.Input == DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Line;
         // In line mode the text is shown when it is sent; in character mode the terminal draws every key.
         _serialTerminalControl.EchoRawInput = !lineInput && _netconsoleEcho;
-        echoTypedCharactersToolStripMenuItem.Checked = _netconsoleEcho;
+        echoTypedCharactersToolStripMenuItem.IsChecked = _netconsoleEcho;
         NetconsoleTransport transport = _netconsoleTransport;
         if (transport != null)
         {
@@ -192,8 +160,8 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         }
         if (_netconsoleLineModeItem != null)
         {
-            _netconsoleLineModeItem.Checked = lineInput;
-            _netconsoleCharacterModeItem.Checked = !lineInput;
+            _netconsoleLineModeItem.IsChecked = lineInput;
+            _netconsoleCharacterModeItem.IsChecked = !lineInput;
         }
         UpdateNetconsoleBarVisibility();
         RefreshStatusIfChanged();
@@ -214,7 +182,6 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         if (visible)
         {
             UpdateNetconsoleTarget();
-            LayoutNetconsoleBar();
         }
     }
 
@@ -232,8 +199,7 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         {
             if (_netconsoleBarShown)
             {
-                _netconsoleBarHost?.Focus();
-                _netconsoleInput.Focus();
+                    System.Windows.Input.Keyboard.Focus(_netconsoleInput);
             }
         }
         else
@@ -314,10 +280,9 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         }
         string target = DescribeNetconsoleTarget();
         _netconsoleTargetLabel.Text = target != null ? "to " + target : "to the first sender";
-        _netconsoleTargetLabel.ToolTipText = target != null
+        _netconsoleTargetLabel.ToolTip = target != null
             ? "Typed input is sent to " + target + " (UDP)."
             : "No datagram has arrived yet. Input goes to the address the first one comes from, or set the device address in the connection settings.";
-        LayoutNetconsoleBar();
     }
 
     private string NetconsoleStatusText(string name)
@@ -333,43 +298,45 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         {
             if (_netconsoleMenu != null)
             {
-                _netconsoleMenu.Visible = false;
+                _netconsoleMenu.SetVisible(false);
             }
             return;
         }
         if (_netconsoleMenu == null)
         {
-            _netconsoleMenu = new ToolStripMenuItem("Netconsole");
-            Icons.Apply(_netconsoleMenu, "network");
-            _netconsoleLineModeItem = new ToolStripMenuItem("Line input (send each line on Enter)", null,
+            _netconsoleMenu = new DeviceMenuItem("Netconsole");
+            _netconsoleMenu.Icon = WpfMenus.Icon("network");
+            _netconsoleLineModeItem = new DeviceMenuItem("Line input (send each line on Enter)", null,
                 (sender, e) => SetNetconsoleInputMode(DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Line))
             {
-                ToolTipText = "The line is typed in the box below the terminal and sent as one UDP datagram when Enter is pressed."
+                ToolTip = "The line is typed in the box below the terminal and sent as one UDP datagram when Enter is pressed."
             };
-            _netconsoleCharacterModeItem = new ToolStripMenuItem("Character input (send every key at once)", null,
+            _netconsoleCharacterModeItem = new DeviceMenuItem("Character input (send every key at once)", null,
                 (sender, e) => SetNetconsoleInputMode(DeviceTerminalSettings.ConnectionSettings.Netconsole.InputMode.Character))
             {
-                ToolTipText = "Every key typed in the terminal is sent at once, as a UDP datagram of its own."
+                ToolTip = "Every key typed in the terminal is sent at once, as a UDP datagram of its own."
             };
-            ToolStripMenuItem sendCtrlC = new ToolStripMenuItem("Send Ctrl+C", null, (sender, e) => SendNetconsoleBytes(new byte[] { 3 }));
-            _netconsoleTargetItem = new ToolStripMenuItem { Enabled = false };
-            _netconsoleMenu.DropDownItems.AddRange(new ToolStripItem[]
+            MenuItem sendCtrlC = new DeviceMenuItem("Send Ctrl+C", null, (sender, e) => SendNetconsoleBytes(new byte[] { 3 }));
+            _netconsoleTargetItem = new MenuItem { IsEnabled = false };
+            foreach (System.Windows.Controls.Control item in new System.Windows.Controls.Control[]
             {
-                _netconsoleLineModeItem, _netconsoleCharacterModeItem, new ToolStripSeparator(), sendCtrlC, new ToolStripSeparator(), _netconsoleTargetItem
-            });
-            _netconsoleMenu.DropDownOpening += (sender, e) =>
+                _netconsoleLineModeItem, _netconsoleCharacterModeItem, new Separator(), sendCtrlC, new Separator(), _netconsoleTargetItem
+            })
+            {
+                _netconsoleMenu.Items.Add(item);
+            }
+            _netconsoleMenu.SubmenuOpened += (sender, e) =>
             {
                 bool connected = _connectionState == ConnectionStateEnum.Connected;
-                sendCtrlC.Enabled = connected;
+                sendCtrlC.IsEnabled = connected;
                 string target = DescribeNetconsoleTarget();
                 IPEndPoint last = _netconsoleTransport?.LastSender;
-                _netconsoleTargetItem.Text = (target != null ? "Input goes to " + target : "Input goes to the first sender (nothing received yet)")
-                    + (last != null ? "; last message from " + last.Address : "");
+                _netconsoleTargetItem.Header = WpfMenus.PlainText((target != null ? "Input goes to " + target : "Input goes to the first sender (nothing received yet)")
+                    + (last != null ? "; last message from " + last.Address : ""));
             };
             contextMenuStrip1.Items.Add(_netconsoleMenu);
         }
-        _netconsoleMenu.Visible = true;
-        ApplyMenuTheme(_netconsoleMenu.DropDown);
+        _netconsoleMenu.SetVisible(true);
     }
 
     /// <summary>Sends bytes to the device as they are (Ctrl+C from the menu or the input box).</summary>
@@ -424,24 +391,28 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
         _commandLists.Remember(line);
     }
 
-    private void OnNetconsoleInputKeyDown(object sender, KeyEventArgs e)
+    private void OnNetconsoleInputKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        switch (e.KeyCode)
+        System.Windows.Input.ModifierKeys modifiers = System.Windows.Input.Keyboard.Modifiers;
+        bool control = (modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+        bool alt = (modifiers & System.Windows.Input.ModifierKeys.Alt) != 0;
+        bool shift = (modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+        switch (e.Key == System.Windows.Input.Key.System ? e.SystemKey : e.Key)
         {
-            case Keys.Return when !e.Control && !e.Alt:
+            case System.Windows.Input.Key.Return when !control && !alt:
                 SendNetconsoleLine();
                 break;
-            case Keys.Escape:
+            case System.Windows.Input.Key.Escape:
                 _netconsoleInput.Text = "";
                 NetconsoleLine.Reset();
                 break;
-            case Keys.Up when !e.Control && !e.Alt:
+            case System.Windows.Input.Key.Up when !control && !alt:
                 NetconsoleLine.Older();
                 break;
-            case Keys.Down when !e.Control && !e.Alt:
+            case System.Windows.Input.Key.Down when !control && !alt:
                 NetconsoleLine.Newer();
                 break;
-            case Keys.C when e.Control && !e.Alt && !e.Shift && _netconsoleInput.SelectionLength == 0:
+            case System.Windows.Input.Key.C when control && !alt && !shift && _netconsoleInput.SelectionLength == 0:
                 // Nothing to copy: Ctrl+C goes to the device (U-Boot stops a running command with it).
                 SendNetconsoleBytes(new byte[] { 3 });
                 break;
@@ -449,7 +420,6 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
                 return;
         }
         e.Handled = true;
-        e.SuppressKeyPress = true;
     }
 
     private void SetNetconsoleInputText(string text)
@@ -475,10 +445,9 @@ public partial class WpfDeviceTerminal : INetconsoleLineHost
             return false;
         }
         NetconsoleLine.Process(_textEncoding.GetString(buffer));
-        if (_netconsoleBarShown && !_netconsoleInput.Focused)
+        if (_netconsoleBarShown && !_netconsoleInput.IsKeyboardFocused)
         {
-            _netconsoleBarHost?.Focus();
-            _netconsoleInput.Focus();
+            System.Windows.Input.Keyboard.Focus(_netconsoleInput);
             _netconsoleInput.SelectionStart = _netconsoleInput.Text.Length;
             _netconsoleInput.SelectionLength = 0;
         }

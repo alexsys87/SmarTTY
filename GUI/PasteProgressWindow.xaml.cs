@@ -1,4 +1,3 @@
-using SmarTTY.Controls;
 using SmarTTY.Utilities;
 using System;
 using System.Drawing;
@@ -12,7 +11,7 @@ namespace SmarTTY.GUI;
 /// <summary>
 /// The small window of a paste that takes time (a large paste, a slow paste, a paste line by line): what is done so
 /// far, a progress bar and Cancel. It does not take the keyboard focus, so the terminal keeps getting the keys (Esc
-/// cancels the paste there). The WPF counterpart of <c>Forms/PasteProgressForm</c>.
+/// cancels the paste there). (Until stage 4 the WinForms <c>Forms/PasteProgressForm</c> stood in for it where WPF was not there.)
 /// </summary>
 public partial class PasteProgressWindow : Window, IPasteProgress
 {
@@ -90,8 +89,8 @@ public partial class PasteProgressWindow : Window, IPasteProgress
     }
 
     /// <summary>
-    /// The WPF window that hosts <paramref name="anchor"/>, so the progress window is owned by it. The terminal control
-    /// is hosted in a WinForms host inside a WPF window, so the root of its Win32 handle is that WPF window.
+    /// The WPF window that holds <paramref name="anchor"/>, so the progress window is owned by it: the root of the
+    /// anchor's Win32 handle.
     /// </summary>
     private static Window OwnerOf(PasteAnchor anchor)
     {
@@ -165,4 +164,23 @@ public partial class PasteProgressWindow : Window, IPasteProgress
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr value);
+}
+
+/// <summary>
+/// The progress window of a paste that takes time as the paste sees it (<see cref="PasteJob"/>, the paste line by line of the
+/// Smart Terminal): <see cref="PasteProgressWindow"/>, whose <c>Close</c> of a window it hides.
+/// </summary>
+internal interface IPasteProgress : IDisposable
+{
+    /// <summary>The user pressed Cancel.</summary>
+    event EventHandler CancelRequested;
+
+    /// <summary>Shows <paramref name="done"/> of <paramref name="total"/> (the bar), with <paramref name="text"/> above it.</summary>
+    void SetProgress(long done, long total, string text);
+
+    /// <summary>Opens the window over the bottom edge of <paramref name="anchor"/> without taking the focus from it.</summary>
+    void ShowNear(PasteAnchor anchor);
+
+    /// <summary>Closes the window.</summary>
+    void Close();
 }

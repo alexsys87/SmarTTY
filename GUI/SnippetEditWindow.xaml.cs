@@ -6,7 +6,7 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Adds or edits a snippet of the paste menu: a name and the text. Delete (only when the snippet exists already)
-/// closes the window asking for the removal. The WPF counterpart of <c>Forms/SnippetEditForm</c>.
+/// closes the window asking for the removal. (The WinForms <c>Forms/SnippetEditForm</c> stood in for it until stage 4.)
 /// </summary>
 public partial class SnippetEditWindow : Window
 {
@@ -34,7 +34,7 @@ public partial class SnippetEditWindow : Window
     /// <summary>
     /// Shows the editor. Returns the result, or null when the user cancelled.
     /// </summary>
-    internal static ThemedSnippetEditorResult Edit(Window owner, string name, string text, bool canDelete)
+    internal static SnippetEditResult Edit(Window owner, string name, string text, bool canDelete)
     {
         SnippetEditWindow window = new SnippetEditWindow(name, text, canDelete);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
@@ -42,7 +42,7 @@ public partial class SnippetEditWindow : Window
         {
             return null;
         }
-        return new ThemedSnippetEditorResult
+        return new SnippetEditResult
         {
             Name = window.SnippetName,
             Text = window.SnippetText,
@@ -65,4 +65,17 @@ public partial class SnippetEditWindow : Window
         _delete = true;
         DialogResult = true;
     }
+}
+
+/// <summary>What the user did in the snippet editor: saved the name and text, or asked to delete the snippet.</summary>
+internal sealed class SnippetEditResult
+{
+    /// <summary>The name, trimmed; empty means "use the text as the menu label".</summary>
+    public string Name { get; set; }
+
+    /// <summary>The text to paste.</summary>
+    public string Text { get; set; }
+
+    /// <summary>True when the Delete button was pressed.</summary>
+    public bool Delete { get; set; }
 }

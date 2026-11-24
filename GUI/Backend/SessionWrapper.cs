@@ -1,7 +1,6 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
-using SmarTTY.Forms;
 using SmarTTY.IO;
 using SmarTTY.LocalRepo;
 using SmarTTY.Terminal;

@@ -3,10 +3,10 @@ using System.IO;
 using System.Text.RegularExpressions;
 
 // Regression harness for the themed folder chooser that replaced the WinForms FolderBrowserDialog in the COM/TCP
-// terminal. The controls live in Controls/, which the Mono test harness compiles and which cannot reference the WPF
-// windows, so they ask through the ThemedFolderBrowser facade; App wires that facade to GUI/LocalFolderBrowserWindow.
-// This harness guards the wiring: the three receive paths must not open the native dialog any more, and the facade
-// and the adapter that connects it to the themed browser must exist.
+// terminal. The code that cannot reference the WPF windows asks through the hooks of Controls/UserDialogs, which App
+// points at GUI/LocalFolderBrowserWindow (stage 4B: the ThemedFolderBrowser facade, its adapter and its fallback to the
+// native dialog are gone). This harness guards the wiring: the three receive paths must not open the native dialog, and
+// the hook must be set to the themed browser.
 // Run with: dotnet run --project tests/FolderBrowserTests
 internal static class Program
 {
@@ -69,7 +69,7 @@ internal static class Program
             string code = File.ReadAllText(path);
             string name = Path.GetFileName(path);
             Check(!Regex.IsMatch(code, @"\bFolderBrowserDialog\b"), $"the native FolderBrowserDialog is gone from {name}");
-            Check(code.Contains("ThemedFolderBrowser.Browse"), $"{name} asks the themed folder browser");
+            Check(code.Contains("UserDialogs.Browse"), $"{name} asks the themed folder browser");
         }
     }
 
@@ -81,16 +81,11 @@ internal static class Program
             return;
         }
 
-        string facadePath = Path.Combine(root, "Controls", "ThemedFolderBrowser.cs");
-        Check(File.Exists(facadePath), "the ThemedFolderBrowser facade exists");
-        if (!File.Exists(facadePath))
-        {
-            return;
-        }
-        string facade = File.ReadAllText(facadePath);
-        Check(facade.Contains("BrowseImpl"), "the facade exposes the injected BrowseImpl hook");
-        Check(facade.Contains("static string Browse"), "the facade keeps the Browse call shape of the native dialog");
-        Check(facade.Contains("FolderBrowserDialog"), "the facade falls back to the native dialog when nothing is injected");
+        string seam = File.ReadAllText(Path.Combine(root, "Controls", "UserDialogs.cs"));
+        Check(seam.Contains("FolderImpl"), "the dialogs seam exposes the folder hook");
+        Check(seam.Contains("static string Browse"), "the dialogs seam keeps the Browse call shape of the native dialog");
+        Check(!Regex.IsMatch(seam, @"new\s+FolderBrowserDialog\b"), "the dialogs seam has no native fallback");
+        Check(!File.Exists(Path.Combine(root, "Controls", "ThemedFolderBrowser.cs")), "the ThemedFolderBrowser facade is gone");
     }
 
     private static void TestAdapterAndInstall()
@@ -101,19 +96,9 @@ internal static class Program
             return;
         }
 
-        string adapterPath = Path.Combine(root, "GUI", "ThemedFolderBrowserAdapter.cs");
-        Check(File.Exists(adapterPath), "the adapter that points the facade at the themed browser exists");
-        if (File.Exists(adapterPath))
-        {
-            string adapter = File.ReadAllText(adapterPath);
-            Check(adapter.Contains("ThemedFolderBrowser.BrowseImpl"),
-                "the adapter installs the facade hook");
-            Check(adapter.Contains("LocalFolderBrowserWindow.Browse"),
-                "the adapter opens the themed local folder browser");
-        }
-
+        Check(!File.Exists(Path.Combine(root, "GUI", "ThemedFolderBrowserAdapter.cs")), "the folder browser adapter is gone");
         string app = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
-        Check(app.Contains("ThemedFolderBrowserAdapter.Install()"),
-            "App wires the folder browser adapter on startup");
+        Check(Regex.IsMatch(app, @"UserDialogs\.FolderImpl\s*=.*LocalFolderBrowserWindow\.Browse"),
+            "App points the folder hook at the themed local folder browser");
     }
 }

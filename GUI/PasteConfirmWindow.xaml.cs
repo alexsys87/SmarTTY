@@ -7,8 +7,8 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Asks whether text that is about to be pasted into a terminal should really go there: shows what it is (lines,
-/// characters, a final line break), a preview, and what is dangerous in it. The WPF counterpart of
-/// <c>Forms/PasteConfirmForm</c>.
+/// characters, a final line break), a preview, and what is dangerous in it. (The WinForms
+/// <c>Forms/PasteConfirmForm</c> stood in for it until stage 4.)
 /// </summary>
 public partial class PasteConfirmWindow : Window
 {
@@ -48,7 +48,7 @@ public partial class PasteConfirmWindow : Window
     /// <summary>
     /// Shows the confirmation. Returns the answer, or null when the user cancelled.
     /// </summary>
-    internal static ThemedPasteConfirmResult Confirm(Window owner, string summary, string preview, IList<string> dangers, bool offerDontAsk)
+    internal static PasteConfirmResult Confirm(Window owner, string summary, string preview, IList<string> dangers, bool offerDontAsk)
     {
         PasteConfirmWindow window = new PasteConfirmWindow(summary, preview, dangers, offerDontAsk);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
@@ -56,11 +56,18 @@ public partial class PasteConfirmWindow : Window
         {
             return null;
         }
-        return new ThemedPasteConfirmResult { DontAskAgain = window.DontAskAgain };
+        return new PasteConfirmResult { DontAskAgain = window.DontAskAgain };
     }
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
         DialogResult = true;
     }
+}
+
+/// <summary>What the user answered in the paste confirmation.</summary>
+internal sealed class PasteConfirmResult
+{
+    /// <summary>True when the user asked not to be asked about multi-line pastes again.</summary>
+    public bool DontAskAgain { get; set; }
 }

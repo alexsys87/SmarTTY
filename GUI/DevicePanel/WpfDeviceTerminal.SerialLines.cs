@@ -6,8 +6,11 @@ using SmarTTY.Transport;
 using System;
 using System.Drawing;
 using System.Threading;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
+
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace SmarTTY.GUI.DevicePanel;
 
@@ -19,19 +22,22 @@ public partial class WpfDeviceTerminal
 
     private const int BreakDurationMs = 250;
 
-    private ToolStripDropDownButton _linesButton;
+    private ToolBarMenuButton _linesButton;
 
-    private ToolStripMenuItem _dtrItem;
+    private MenuItem _dtrItem;
 
-    private ToolStripMenuItem _rtsItem;
+    private MenuItem _rtsItem;
 
-    private ToolStripMenuItem _breakItem;
+    private MenuItem _breakItem;
 
-    private ToolStripMenuItem _resetErrorsItem;
+    private MenuItem _resetErrorsItem;
 
-    private ToolStripLabel _lblModemLines;
+    private System.Windows.Controls.TextBlock _lblModemLines;
 
-    private ToolStripLabel _lblPortAlert;
+    // A link in the colour of errors; the text in it is the notice.
+    private System.Windows.Controls.Button _lblPortAlert;
+
+    private System.Windows.Controls.TextBlock _lblPortAlertText;
 
     private System.Windows.Forms.Timer _lineStatusTimer;
 
@@ -47,15 +53,15 @@ public partial class WpfDeviceTerminal
 
     private void InitializeSerialLineControls()
     {
-        _dtrItem = new ToolStripMenuItem("DTR (data terminal ready)") { CheckOnClick = false };
+        _dtrItem = new DeviceMenuItem("DTR (data terminal ready)") { IsCheckable = false };
         _dtrItem.Click += (sender, e) => ToggleLine(dtr: true);
-        _rtsItem = new ToolStripMenuItem("RTS (request to send)") { CheckOnClick = false };
+        _rtsItem = new DeviceMenuItem("RTS (request to send)") { IsCheckable = false };
         _rtsItem.Click += (sender, e) => ToggleLine(dtr: false);
-        _breakItem = new ToolStripMenuItem("Send break (" + BreakDurationMs + " ms)");
+        _breakItem = new DeviceMenuItem("Send break (" + BreakDurationMs + " ms)");
         _breakItem.Click += OnSendBreakClick;
-        Icons.Apply(_breakItem, "event");
-        _resetErrorsItem = new ToolStripMenuItem("Clear notices and error counters");
-        Icons.Apply(_resetErrorsItem, "delete");
+        _breakItem.Icon = WpfMenus.Icon("event");
+        _resetErrorsItem = new DeviceMenuItem("Clear notices and error counters");
+        _resetErrorsItem.Icon = WpfMenus.Icon("delete");
         _resetErrorsItem.Click += (sender, e) =>
         {
             _lineErrors.Reset();
@@ -63,29 +69,25 @@ public partial class WpfDeviceTerminal
             UpdatePortAlert();
         };
 
-        _linesButton = new ToolStripDropDownButton("Lines")
+        _linesButton = new ToolBarMenuButton("Lines", "Control lines of the serial port", split: false);
+        foreach (System.Windows.Controls.Control item in new System.Windows.Controls.Control[] { _dtrItem, _rtsItem, _breakItem, new Separator(), _resetErrorsItem })
         {
-            DisplayStyle = ToolStripItemDisplayStyle.Text,
-            ToolTipText = "Control lines of the serial port"
-        };
-        _linesButton.DropDownItems.AddRange(new ToolStripItem[] { _dtrItem, _rtsItem, _breakItem, new ToolStripSeparator(), _resetErrorsItem });
-        _linesButton.DropDownOpening += (sender, e) => UpdateSerialLineUi();
+            _linesButton.Items.Add(item);
+        }
+        _linesButton.Opening += (sender, e) => UpdateSerialLineUi();
 
-        _lblModemLines = new ToolStripLabel("CTS○ DSR○ DCD○ RI○")
+        _lblModemLines = new System.Windows.Controls.TextBlock
         {
-            ToolTipText = "Input lines of the port: a filled dot means the device raises the line.\r\n"
+            Text = "CTS○ DSR○ DCD○ RI○",
+            Margin = new System.Windows.Thickness(4, 0, 4, 0),
+            ToolTip = "Input lines of the port: a filled dot means the device raises the line.\r\n"
                 + "CTS: the device is ready to receive. DSR: the device is present and powered. DCD: carrier. RI: ring."
         };
 
-        _lblPortAlert = new ToolStripLabel
-        {
-            IsLink = true,
-            LinkColor = Color.Firebrick,
-            ActiveLinkColor = Color.Firebrick,
-            VisitedLinkColor = Color.Firebrick,
-            LinkBehavior = LinkBehavior.HoverUnderline,
-            Visible = false
-        };
+        _lblPortAlertText = new System.Windows.Controls.TextBlock();
+        _lblPortAlert = new System.Windows.Controls.Button { Content = _lblPortAlertText, Margin = new System.Windows.Thickness(4, 0, 4, 0), Visibility = System.Windows.Visibility.Collapsed };
+        _lblPortAlert.SetResourceReference(System.Windows.FrameworkElement.StyleProperty, "HyperlinkButton");
+        _lblPortAlert.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "Theme.Error");
         _lblPortAlert.Click += (sender, e) => ShowPortAlertDetails();
 
         int afterConnection = toolStrip1.Items.IndexOf(lblConnection) + 1;
@@ -116,24 +118,24 @@ public partial class WpfDeviceTerminal
         }
         DeviceTerminalSettings.ConnectionSettings.Serial serial = _deviceTerminalSettings?.Connection as DeviceTerminalSettings.ConnectionSettings.Serial;
         bool isSerial = serial != null;
-        _linesButton.Visible = isSerial;
-        _lblModemLines.Visible = isSerial;
+        _linesButton.SetVisible(isSerial);
+        _lblModemLines.SetVisible(isSerial);
         if (!isSerial)
         {
-            _lblPortAlert.Visible = false;
+            _lblPortAlert.SetVisible(false);
             _lineStatusTimer.Stop();
             return;
         }
 
         SerialPortStream stream = OpenSerialStream();
         bool open = stream != null;
-        _dtrItem.Enabled = open;
-        _dtrItem.Checked = open ? stream.DtrAsserted : (serial.AdvancedSettings?.DtrOnOpen ?? true);
+        _dtrItem.IsEnabled = open;
+        _dtrItem.IsChecked = open ? stream.DtrAsserted : (serial.AdvancedSettings?.DtrOnOpen ?? true);
         bool rtsAutomatic = open && stream.RtsIsAutomatic;
-        _rtsItem.Enabled = open && !rtsAutomatic;
-        _rtsItem.Text = rtsAutomatic ? "RTS (set by hardware flow control)" : "RTS (request to send)";
-        _rtsItem.Checked = open ? (rtsAutomatic || stream.RtsAsserted) : (serial.AdvancedSettings?.RtsOnOpen ?? true);
-        _breakItem.Enabled = open && !IsLineClaimed;
+        _rtsItem.IsEnabled = open && !rtsAutomatic;
+        _rtsItem.Header = rtsAutomatic ? "RTS (set by hardware flow control)" : "RTS (request to send)";
+        _rtsItem.IsChecked = open ? (rtsAutomatic || stream.RtsAsserted) : (serial.AdvancedSettings?.RtsOnOpen ?? true);
+        _breakItem.IsEnabled = open && !IsLineClaimed;
         if (open)
         {
             if (!_lineStatusTimer.Enabled)
@@ -284,7 +286,7 @@ public partial class WpfDeviceTerminal
         bool isSerial = _deviceTerminalSettings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
         if (!isSerial || (_portProblem == null && errors.Length == 0))
         {
-            _lblPortAlert.Visible = false;
+            _lblPortAlert.SetVisible(false);
             return;
         }
         string text;
@@ -297,9 +299,9 @@ public partial class WpfDeviceTerminal
         {
             text = "Line errors: " + errors;
         }
-        _lblPortAlert.Text = "⚠ " + text;
-        _lblPortAlert.ToolTipText = PortAlertDetails();
-        _lblPortAlert.Visible = true;
+        _lblPortAlertText.Text = "⚠ " + text;
+        _lblPortAlert.ToolTip = PortAlertDetails();
+        _lblPortAlert.SetVisible(true);
     }
 
     private void ShowPortAlertDetails()
@@ -307,7 +309,7 @@ public partial class WpfDeviceTerminal
         string details = PortAlertDetails();
         if (details.Length > 0)
         {
-            ThemedMessageBox.Show(Owner, details, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show(Owner, details, "Serial port", DialogButtons.Ok, DialogIcon.Warning);
         }
     }
 
@@ -343,7 +345,7 @@ public partial class WpfDeviceTerminal
         {
             return;
         }
-        _breakItem.Enabled = false;
+        _breakItem.IsEnabled = false;
         ThreadPool.QueueUserWorkItem(state =>
         {
             string error = null;
@@ -394,7 +396,7 @@ public partial class WpfDeviceTerminal
             }
             catch (Exception exception)
             {
-                ThemedMessageBox.Show(Owner, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UserDialogs.Show(Owner, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", DialogButtons.Ok, DialogIcon.Warning);
                 return false;
             }
             serial.AdvancedSettings = candidate;

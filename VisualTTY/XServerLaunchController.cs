@@ -237,7 +237,7 @@ public class XServerLaunchController : INotifyPropertyChanged
         string fn = null;
         if (type == XServerType.Custom)
         {
-            fn = ThemedFileDialog.OpenFile(null, "Select the X server executable", "Executable files|*.exe|All files (*.*)|*.*");
+            fn = UserDialogs.OpenFile(null, "Select the X server executable", "Executable files|*.exe|All files (*.*)|*.*");
             if (fn == null)
             {
                 return;

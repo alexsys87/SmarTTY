@@ -116,7 +116,7 @@ internal sealed class HexLabWindow : Window
             FileInfo info = new FileInfo(path);
             if (info.Length > MaxBytes)
             {
-                MessageDialog.Show(path + " is larger than " + MaxBytes / (1024 * 1024) + " MB: the lab does not read it.", "WPF hex editor lab", MessageDialogIcon.Warning, MessageDialogButtons.Ok, owner: this);
+                MessageDialog.Show(path + " is larger than " + MaxBytes / (1024 * 1024) + " MB: the lab does not read it.", "WPF hex editor lab", DialogIcon.Warning, DialogButtons.Ok, owner: this);
                 return;
             }
             byte[] bytes = File.ReadAllBytes(path);
@@ -128,7 +128,7 @@ internal sealed class HexLabWindow : Window
         }
         catch (Exception exception)
         {
-            MessageDialog.Show(exception.Message, "WPF hex editor lab", MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: this);
+            MessageDialog.Show(exception.Message, "WPF hex editor lab", DialogIcon.Error, DialogButtons.Ok, owner: this);
         }
     }
 

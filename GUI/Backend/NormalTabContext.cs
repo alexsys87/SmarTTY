@@ -8,7 +8,6 @@ using System.ComponentModel;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Forms.Integration;
 
 namespace SmarTTY.GUI.Backend;
 
@@ -169,16 +168,16 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         string what = files.Length == 1 ? "\"" + System.IO.Path.GetFileName(files[0]) + "\"" : files.Length + " files";
         string question = "The clipboard holds " + what + ".\n\nYes: upload to the server (like dropping the files on the terminal).\nNo: paste the local path" + (files.Length == 1 ? "" : "s") + " as text.";
-        System.Windows.Forms.DialogResult answer = terminal is System.Windows.Forms.IWin32Window owner
-            ? ThemedMessageBox.Show(owner, question, "Paste", System.Windows.Forms.MessageBoxButtons.YesNoCancel, System.Windows.Forms.MessageBoxIcon.Question)
-            : ThemedMessageBox.Show(question, "Paste", System.Windows.Forms.MessageBoxButtons.YesNoCancel, System.Windows.Forms.MessageBoxIcon.Question);
+        DialogAnswer answer = terminal is System.Windows.Forms.IWin32Window owner
+            ? UserDialogs.Show(owner, question, "Paste", DialogButtons.YesNoCancel, DialogIcon.Question)
+            : UserDialogs.Show(question, "Paste", DialogButtons.YesNoCancel, DialogIcon.Question);
         try
         {
-            if (answer == System.Windows.Forms.DialogResult.Yes)
+            if (answer == DialogAnswer.Yes)
             {
                 _Session.UploadFiles(files, this);
             }
-            else if (answer == System.Windows.Forms.DialogResult.No)
+            else if (answer == DialogAnswer.No)
             {
                 // A path with a space is quoted; several paths are separated by a space.
                 string paths = string.Join(" ", System.Linq.Enumerable.Select(files, file => file.IndexOf(' ') >= 0 ? "\"" + file + "\"" : file));

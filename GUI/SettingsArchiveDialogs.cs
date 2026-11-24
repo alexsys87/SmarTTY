@@ -60,12 +60,12 @@ internal static class SettingsArchiveDialogs
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageDialog.Show("Could not look up the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show("Could not look up the settings:\n" + ex.Message, Caption, DialogIcon.Error, DialogButtons.Ok, owner: owner);
             return;
         }
         if (available.Available == SettingsParts.None)
         {
-            MessageDialog.Show("There are no saved SmarTTY settings to export.", Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show("There are no saved SmarTTY settings to export.", Caption, DialogIcon.Information, DialogButtons.Ok, owner: owner);
             return;
         }
 
@@ -104,11 +104,11 @@ internal static class SettingsArchiveDialogs
             {
                 text += "\n\nThe archive holds saved passwords or private keys and is not encrypted: keep it secret and delete it when it is no longer needed.";
             }
-            MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show(text, Caption, DialogIcon.Information, DialogButtons.Ok, owner: owner);
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageDialog.Show("Could not export the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show("Could not export the settings:\n" + ex.Message, Caption, DialogIcon.Error, DialogButtons.Ok, owner: owner);
         }
     }
 
@@ -129,7 +129,7 @@ internal static class SettingsArchiveDialogs
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageDialog.Show("Could not read the settings archive:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show("Could not read the settings archive:\n" + ex.Message, Caption, DialogIcon.Error, DialogButtons.Ok, owner: owner);
             return null;
         }
 
@@ -150,7 +150,7 @@ internal static class SettingsArchiveDialogs
         {
             question += "\n\nThe backup also holds the current keys without encryption.";
         }
-        MessageBoxResult confirmation = MessageDialog.Show(question, Caption, MessageDialogIcon.Question, MessageDialogButtons.OkCancel, MessageBoxResult.Cancel, owner);
+        MessageBoxResult confirmation = MessageDialog.Show(question, Caption, DialogIcon.Question, DialogButtons.OkCancel, MessageBoxResult.Cancel, owner);
         if (confirmation != MessageBoxResult.OK)
         {
             return null;
@@ -163,7 +163,7 @@ internal static class SettingsArchiveDialogs
         }
         catch (Exception ex) when (IsExpected(ex))
         {
-            MessageDialog.Show("Could not import the settings:\n" + ex.Message, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: owner);
+            MessageDialog.Show("Could not import the settings:\n" + ex.Message, Caption, DialogIcon.Error, DialogButtons.Ok, owner: owner);
             return null;
         }
 
@@ -251,7 +251,7 @@ internal static class SettingsArchiveDialogs
         {
             text += "\n\nIgnored entries that are not SmarTTY settings files: " + result.Ignored.Count;
         }
-        MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok, owner: owner);
+        MessageDialog.Show(text, Caption, DialogIcon.Information, DialogButtons.Ok, owner: owner);
         return result;
     }
 }

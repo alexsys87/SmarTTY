@@ -68,10 +68,7 @@
     <!-- The built-in command completions (CommandCompletions.xml next to the exe takes priority), see CommandCompletionDatabase. -->
     <EmbeddedResource Include="VisualTTY\CommandCompletions.xml" LogicalName="VisualTTY.CommandCompletions.xml" />
     <EmbeddedResource Include="Completion\ApiSymbols.xml" LogicalName="SmarTTY.Completion.ApiSymbols.xml" />
-    <!-- Window icons of the WinForms dialogs, loaded by Forms/FormIcons.cs. -->
-    <EmbeddedResource Include="icons\forms\*.ico" LogicalName="SmarTTY.FormIcons.%(Filename).ico" />
-    <EmbeddedResource Include="app.ico" LogicalName="SmarTTY.FormIcons.app.ico" />
-    <!-- Images that the WinForms code uses (menu items, context menus, picture boxes, what the editors draw), loaded by Controls/Icons.cs. -->
+    <!-- Images of the WPF menus and tool bars of the tabs, loaded by GUI/WpfMenus.cs (the WinForms Controls/Icons.cs until stage 4). -->
     <EmbeddedResource Include="icons\MainWindow\upload.png" LogicalName="SmarTTY.Icons.upload.png" />
     <EmbeddedResource Include="icons\MainWindow\download.png" LogicalName="SmarTTY.Icons.download.png" />
     <EmbeddedResource Include="icons\term16.png" LogicalName="SmarTTY.Icons.terminal.png" />
@@ -108,98 +105,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Controls\ArgumentLabel.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\CodeEditorPP.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\DoubleBufferedListView.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Controls\DpiAwareControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\EditableTextBrowser.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\ReadonlySmartScrollBrowser.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\ReadonlyTextBrowser.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Update="Controls\RemoteFileEditor.cs">
       <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\SuggestionListView.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Controls\TextEditorControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Update="Controls\TextHintControl.cs">
-      <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="Forms\DpiAwareForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\SuggestionListForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="Forms\TextHintForm.cs">
-      <SubType>Form</SubType>
     </Compile>
     <Compile Update="Ssh\Connection\SshConnector.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Update="Terminal\TerminalEventDispatcher.cs">
       <SubType>Component</SubType>
-    </Compile>
-    <Compile Update="App.Designer.cs">
-      <DependentUpon>App.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\ArgumentLabel.Designer.cs">
-      <DependentUpon>ArgumentLabel.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\CodeEditorPP.Designer.cs">
-      <DependentUpon>CodeEditorPP.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\DoubleBufferedListView.Designer.cs">
-      <DependentUpon>DoubleBufferedListView.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\DpiAwareControl.Designer.cs">
-      <DependentUpon>DpiAwareControl.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\EditableTextBrowser.Designer.cs">
-      <DependentUpon>EditableTextBrowser.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\ReadonlySmartScrollBrowser.Designer.cs">
-      <DependentUpon>ReadonlySmartScrollBrowser.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\ReadonlyTextBrowser.Designer.cs">
-      <DependentUpon>ReadonlyTextBrowser.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\RemoteFileEditor.Designer.cs">
-      <DependentUpon>RemoteFileEditor.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\SuggestionListView.Designer.cs">
-      <DependentUpon>SuggestionListView.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\TextEditorControl.Designer.cs">
-      <DependentUpon>TextEditorControl.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Controls\TextHintControl.Designer.cs">
-      <DependentUpon>TextHintControl.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\DpiAwareForm.Designer.cs">
-      <DependentUpon>DpiAwareForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\SuggestionListForm.Designer.cs">
-      <DependentUpon>SuggestionListForm.cs</DependentUpon>
-    </Compile>
-    <Compile Update="Forms\TextHintForm.Designer.cs">
-      <DependentUpon>TextHintForm.cs</DependentUpon>
     </Compile>
     <Compile Update="Ssh\Connection\SshConnector.Designer.cs">
       <DependentUpon>SshConnector.cs</DependentUpon>

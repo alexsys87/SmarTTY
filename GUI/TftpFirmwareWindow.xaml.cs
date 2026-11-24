@@ -659,8 +659,8 @@ public partial class TftpFirmwareWindow : Window, ITftpFirmwareWindow
             text.Append("\r\nSome of them change what is stored on the board. A wrong address or offset can make it unable to start.");
         }
         return destructive
-            ? MessageDialog.Show(text.ToString(), "SmarTTY", MessageDialogIcon.Warning, MessageDialogButtons.OkCancel) == MessageBoxResult.OK
-            : MessageDialog.Show(text.ToString(), "SmarTTY", MessageDialogIcon.Question, MessageDialogButtons.OkCancel) == MessageBoxResult.OK;
+            ? MessageDialog.Show(text.ToString(), "SmarTTY", DialogIcon.Warning, DialogButtons.OkCancel) == MessageBoxResult.OK
+            : MessageDialog.Show(text.ToString(), "SmarTTY", DialogIcon.Question, DialogButtons.OkCancel) == MessageBoxResult.OK;
     }
 
     private static int TimeoutFor(UBootStep step, long fileLength)

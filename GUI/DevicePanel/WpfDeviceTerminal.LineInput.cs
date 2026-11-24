@@ -4,9 +4,12 @@ using SmarTTY.GUI.TerminalView;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
+
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace SmarTTY.GUI.DevicePanel;
 
@@ -21,37 +24,37 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
     // The saved history and the command lists (VisualTTY/DeviceTerminal/DeviceCommandLists.cs).
     private DeviceCommandLists _commandLists;
 
-    private ToolStripMenuItem _editDeviceCommandsMenuItem;
+    private MenuItem _editDeviceCommandsMenuItem;
 
     private void InitializeCommandLists()
     {
         _commandLists = new DeviceCommandLists(this);
         _serialTerminalControl.CommandSubmitted += OnCommandSubmitted;
 
-        _editDeviceCommandsMenuItem = new ToolStripMenuItem("Edit commands for this device...");
+        _editDeviceCommandsMenuItem = new DeviceMenuItem("Edit commands for this device...");
         _editDeviceCommandsMenuItem.Click += (sender, e) => EditCommandList(forThisDevice: true);
-        ToolStripMenuItem editCommon = new ToolStripMenuItem("Edit commands for all devices...");
+        MenuItem editCommon = new DeviceMenuItem("Edit commands for all devices...");
         editCommon.Click += (sender, e) => EditCommandList(forThisDevice: false);
-        ToolStripMenuItem clearHistory = new ToolStripMenuItem("Clear saved command history");
+        MenuItem clearHistory = new DeviceMenuItem("Clear saved command history");
         clearHistory.Click += (sender, e) => ClearSavedHistory();
-        ToolStripMenuItem showHistory = new ToolStripMenuItem("Command history...");
-        showHistory.ToolTipText = "Search the commands sent to this device, put one into the input line or delete some";
+        MenuItem showHistory = new DeviceMenuItem("Command history...");
+        showHistory.ToolTip = "Search the commands sent to this device, put one into the input line or delete some";
         showHistory.Click += (sender, e) => ShowCommandHistory();
-        Icons.Apply(_editDeviceCommandsMenuItem, "edit");
-        Icons.Apply(editCommon, "edit");
-        Icons.Apply(clearHistory, "delete");
-        Icons.Apply(showHistory, "find");
-        toolStripDropDownButton1.DropDownItems.Add(new ToolStripSeparator());
-        toolStripDropDownButton1.DropDownItems.Add(showHistory);
-        toolStripDropDownButton1.DropDownItems.Add(_editDeviceCommandsMenuItem);
-        toolStripDropDownButton1.DropDownItems.Add(editCommon);
-        toolStripDropDownButton1.DropDownItems.Add(clearHistory);
+        _editDeviceCommandsMenuItem.Icon = WpfMenus.Icon("edit");
+        editCommon.Icon = WpfMenus.Icon("edit");
+        clearHistory.Icon = WpfMenus.Icon("delete");
+        showHistory.Icon = WpfMenus.Icon("find");
+        toolStripDropDownButton1.Items.Add(new Separator());
+        toolStripDropDownButton1.Items.Add(showHistory);
+        toolStripDropDownButton1.Items.Add(_editDeviceCommandsMenuItem);
+        toolStripDropDownButton1.Items.Add(editCommon);
+        toolStripDropDownButton1.Items.Add(clearHistory);
         // Also in the menu of the terminal (right button), as in SSH tabs.
-        ToolStripMenuItem contextHistory = new ToolStripMenuItem("Command history...", null, (sender, e) => ShowCommandHistory())
+        MenuItem contextHistory = new DeviceMenuItem("Command history...", null, (sender, e) => ShowCommandHistory())
         {
-            ToolTipText = showHistory.ToolTipText
+            ToolTip = showHistory.ToolTip
         };
-        Icons.Apply(contextHistory, "find");
+        contextHistory.Icon = WpfMenus.Icon("find");
         contextMenuStrip1.Items.Add(contextHistory);
     }
 
@@ -96,7 +99,7 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
             _ => null,
         };
         _commandLists.Configure(commandKey, GlobalSettings.DataDirectory);
-        _editDeviceCommandsMenuItem.Enabled = commandKey != null;
+        _editDeviceCommandsMenuItem.IsEnabled = commandKey != null;
     }
 
     private void OnCommandSubmitted(object sender, WpfSerialTerminal.CommandSubmittedEventArgs e)
@@ -123,7 +126,7 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
         }
         if (!_commandLists.SaveList(forThisDevice, commands))
         {
-            ThemedMessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("The command list could not be saved.", "Error", DialogButtons.Ok, DialogIcon.Warning);
         }
         _commandLists.SetList(forThisDevice, commands);
     }
@@ -144,7 +147,7 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
         {
             return;
         }
-        if (ThemedMessageBox.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (UserDialogs.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", DialogButtons.YesNo, DialogIcon.Question) != DialogAnswer.Yes)
         {
             return;
         }

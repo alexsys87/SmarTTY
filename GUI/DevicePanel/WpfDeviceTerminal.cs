@@ -2,7 +2,6 @@ using SmarTTY.Terminal.Input;
 using SmarTTY.Controls;
 using SmarTTY.GUI.TerminalView;
 using System.ComponentModel;
-using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
@@ -18,6 +17,10 @@ using System.Windows.Forms;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
+
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
+using ContextMenu = System.Windows.Controls.ContextMenu;
 
 namespace SmarTTY.GUI.DevicePanel;
 
@@ -244,14 +247,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         bool showTextView = mode == DeviceTerminalSettings.CharacterDisplayMode.Both;
         hexTerminalControl1.Visibility = hexView ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         _serialTerminalControl.Visibility = hexView ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
-        cbASCII.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.ASCII;
-        cbHEX.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.HEX;
-        cbBoth.Checked = mode == DeviceTerminalSettings.CharacterDisplayMode.Both;
-        ToolStripLabel toolStripLabel = lblSend;
-        ToolStripTextBox toolStripTextBox = txtHexInput;
-        bool isVisible = (btnSend.Visible = hexView);
-        bool visible = (toolStripTextBox.Visible = isVisible);
-        toolStripLabel.Visible = visible;
+        cbASCII.IsChecked = mode == DeviceTerminalSettings.CharacterDisplayMode.ASCII;
+        cbHEX.IsChecked = mode == DeviceTerminalSettings.CharacterDisplayMode.HEX;
+        cbBoth.IsChecked = mode == DeviceTerminalSettings.CharacterDisplayMode.Both;
+        btnSend.SetVisible(hexView);
+        txtHexInput.SetVisible(hexView);
+        lblSend.SetVisible(hexView);
         UpdateNetconsoleBarVisibility();
 
         if (_deviceTerminalSettings != null)
@@ -285,31 +286,30 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // show their state with a check mark instead).
     private void ApplyMenuIcons()
     {
-        foreach (ToolStripMenuItem item in new[]
+        foreach (MenuItem item in new[]
         {
             sendBinaryFileToolStripMenuItem, sendFileViaXMODEMToolStripMenuItem, sendFileViaXMODEM1KToolStripMenuItem,
             sendFilesViaYMODEMToolStripMenuItem, sendFilesViaZModemToolStripMenuItem, sendFilesViaKermitToolStripMenuItem
         })
         {
-            Icons.Apply(item, "upload");
+            item.Icon = WpfMenus.Icon("upload");
         }
-        foreach (ToolStripMenuItem item in new[]
+        foreach (MenuItem item in new[]
         {
             receiveFileViaXMODEMToolStripMenuItem, receiveFilesViaYMODEMToolStripMenuItem, receiveFilesViaYMODEMGToolStripMenuItem,
             receiveFilesViaZModemToolStripMenuItem, receiveFilesViaKermitToolStripMenuItem
         })
         {
-            Icons.Apply(item, "download");
+            item.Icon = WpfMenus.Icon("download");
         }
-        Icons.Apply(terminalTypeToolStripMenuItem, "terminal");
-        Icons.Apply(changeSettingsToolStripMenuItem, "settings");
+        terminalTypeToolStripMenuItem.Icon = WpfMenus.Icon("terminal");
+        changeSettingsToolStripMenuItem.Icon = WpfMenus.Icon("settings");
     }
 
     public WpfDeviceTerminal()
     {
         InitializeComponent();
         ApplyMenuIcons();
-        DpiAwareForm.ConfigureToolStrip(toolStrip1);
         CreateConnectionPrompt();
         BuildLayout();
         CreateTerminals();
@@ -337,72 +337,20 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         InitializeNetconsoleSupport();
         InitializeFileDrop();
         SerialPortArrivalWatcher.Subscribe(OnSerialPortArrived);
-        ThemeManager.ThemeChanged += OnThemeChanged;
-        ApplyToolbarTheme();
-        // Some menus get their items later (the Telnet menu, for instance): they are themed again when they open.
-        contextMenuStrip1.Opening += (sender, e) => ApplyMenuTheme(contextMenuStrip1);
-        foreach (ToolStripItem item in toolStrip1.Items)
-        {
-            if (item is ToolStripDropDownItem dropDownItem)
-            {
-                dropDownItem.DropDownOpening += (sender, e) => ApplyMenuTheme(dropDownItem.DropDown);
-            }
-        }
+        // The bars and the menus are WPF: the theme colours them (DynamicResource), also when it changes.
     }
 
-    private ToolbarPalette _toolbarPalette;
-
-    private ToolStripRenderer _toolbarRenderer;
-
-    private void OnThemeChanged(object sender, EventArgs e)
+    /// <summary>"Stop log" is shown in the colour of errors while a log is being written.</summary>
+    private void ShowLogButtonRecording(bool recording)
     {
-        ApplyToolbarTheme();
-    }
-
-    /// <summary>
-    /// Paints the tool bar, its menus and the terminal context menu in the colours of the application theme.
-    /// </summary>
-    private void ApplyToolbarTheme()
-    {
-        _toolbarPalette = ToolbarPalette.FromCurrentTheme();
-        _toolbarRenderer = new ThemedToolStripRenderer(_toolbarPalette);
-        toolStrip1.Renderer = _toolbarRenderer;
-        toolStrip1.BackColor = _toolbarPalette.Background;
-        toolStrip1.ForeColor = _toolbarPalette.Text;
-        foreach (ToolStripItem item in toolStrip1.Items)
+        if (recording)
         {
-            switch (item)
-            {
-                case ToolStripComboBox comboBox:
-                    comboBox.ComboBox.FlatStyle = FlatStyle.Flat;
-                    comboBox.BackColor = _toolbarPalette.Input;
-                    comboBox.ForeColor = _toolbarPalette.Text;
-                    break;
-                case ToolStripTextBox textBox:
-                    textBox.BackColor = _toolbarPalette.Input;
-                    textBox.ForeColor = _toolbarPalette.Text;
-                    break;
-                case ToolStripDropDownItem dropDownItem:
-                    dropDownItem.ForeColor = _toolbarPalette.Text;
-                    ApplyMenuTheme(dropDownItem.DropDown);
-                    break;
-                default:
-                    item.ForeColor = _toolbarPalette.Text;
-                    break;
-            }
+            btnLog.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "Theme.Error");
         }
-        // The port alert is a link and "Stop log" is shown while recording: both use the error colour.
-        if (_lblPortAlert != null)
+        else
         {
-            _lblPortAlert.LinkColor = _lblPortAlert.ActiveLinkColor = _lblPortAlert.VisitedLinkColor = _toolbarPalette.Error;
+            btnLog.ClearValue(System.Windows.Controls.Control.ForegroundProperty);
         }
-        if (_logWriter != null)
-        {
-            btnLog.ForeColor = _toolbarPalette.Error;
-        }
-        ApplyMenuTheme(contextMenuStrip1);
-        ApplyNetconsoleBarTheme();
-        toolStrip1.Invalidate();
     }
 
     // The prompt is the very same ConnectionClosedPopup (WPF) that the SSH sessions show, hosted here, so that the two
@@ -417,51 +365,36 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             ignore: IgnoreConnectionPrompt);
     }
 
-    private void ApplyMenuTheme(ToolStripDropDown menu)
-    {
-        menu.Renderer = _toolbarRenderer;
-        menu.BackColor = _toolbarPalette.Popup;
-        menu.ForeColor = _toolbarPalette.Text;
-        foreach (ToolStripItem item in menu.Items)
-        {
-            item.ForeColor = _toolbarPalette.Text;
-            if (item is ToolStripDropDownItem { HasDropDownItems: true } subMenu)
-            {
-                ApplyMenuTheme(subMenu.DropDown);
-            }
-        }
-    }
-
     // The Clear button of the tool bar, also in the context menu of the terminal.
     private void AddClearCommand()
     {
-        contextMenuStrip1.Items.Add(new ToolStripMenuItem("Clear", toolStripButton1.Image, (sender, args) => ClearOutput()));
+        contextMenuStrip1.Items.Add(new DeviceMenuItem("Clear", "terminal-clear", (sender, args) => ClearOutput()));
     }
 
     // While a command runs, the keys go to the device as they are (mc, htop, vi ...) and the local input line is
     // hidden. The terminal brings the line back by itself when the program leaves; this command is for the cases
     // when it cannot tell: a program that was killed without restoring the terminal, or a prompt of an unusual shape.
-    private ToolStripMenuItem _returnToInputLineMenuItem;
+    private MenuItem _returnToInputLineMenuItem;
 
     private void AddReturnToInputLineCommand()
     {
-        _returnToInputLineMenuItem = new ToolStripMenuItem("Return to input line", null, (sender, args) => _serialTerminalControl.ReturnToInputLine())
+        _returnToInputLineMenuItem = new DeviceMenuItem("Return to input line", null, (sender, args) => _serialTerminalControl.ReturnToInputLine())
         {
-            ToolTipText = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
+            ToolTip = "Show the input line again if the keys keep going to a program that has already ended (mc, htop ...)"
         };
-        Icons.Apply(_returnToInputLineMenuItem, "go");
+        _returnToInputLineMenuItem.Icon = WpfMenus.Icon("go");
         contextMenuStrip1.Items.Add(_returnToInputLineMenuItem);
     }
 
     // Paste in other ways: as one line, and slowly (small pieces with pauses, waiting for the echo or the prompt).
     private void AddPasteSpecialCommands()
     {
-        ToolStripMenuItem menu = new ToolStripMenuItem("Paste special");
-        menu.DropDownItems.Add(new ToolStripMenuItem("Paste as one line (lines joined with a space)", null, (sender, args) => PasteSpecial(PasteMode.OneLineSpaces)));
-        menu.DropDownItems.Add(new ToolStripMenuItem("Paste as one line (lines joined with &&)", null, (sender, args) => PasteSpecial(PasteMode.OneLineAnd)));
-        menu.DropDownItems.Add(new ToolStripMenuItem("Paste slowly", null, (sender, args) => PasteSpecial(PasteMode.Slow))
+        MenuItem menu = new DeviceMenuItem("Paste special");
+        menu.Items.Add(new DeviceMenuItem("Paste as one line (lines joined with a space)", null, (sender, args) => PasteSpecial(PasteMode.OneLineSpaces)));
+        menu.Items.Add(new DeviceMenuItem("Paste as one line (lines joined with &&)", null, (sender, args) => PasteSpecial(PasteMode.OneLineAnd)));
+        menu.Items.Add(new DeviceMenuItem("Paste slowly", null, (sender, args) => PasteSpecial(PasteMode.Slow))
         {
-            ToolTipText = "Sends the text in small pieces with pauses, and can wait for the echo or the prompt of the device (Settings > Paste), so that a slow device does not lose characters."
+            ToolTip = "Sends the text in small pieces with pauses, and can wait for the echo or the prompt of the device (Settings > Paste), so that a slow device does not lose characters."
         });
         contextMenuStrip1.Items.Add(menu);
     }
@@ -495,29 +428,29 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // has another size than the one the device was told last. Telnet passes the size on by itself (NAWS), so
     // these commands are not shown for it. A program that is already running cannot be told: the new size is
     // applied by the next command typed in the input line.
-    private ToolStripMenuItem _syncRemoteSizeMenuItem;
+    private MenuItem _syncRemoteSizeMenuItem;
 
-    private ToolStripMenuItem _sendRemoteSizeMenuItem;
+    private MenuItem _sendRemoteSizeMenuItem;
 
     private void AddRemoteSizeCommands()
     {
-        _syncRemoteSizeMenuItem = new ToolStripMenuItem("Keep device terminal size in sync", null, (sender, args) => ToggleSyncRemoteSize())
+        _syncRemoteSizeMenuItem = new DeviceMenuItem("Keep device terminal size in sync", null, (sender, args) => ToggleSyncRemoteSize())
         {
-            ToolTipText = "For a Linux shell on the device: tell it the size of this window (COLUMNS, LINES, stty) before the next command, so mc, htop and the like fill the window. It acts only after the device has shown a shell prompt (\"# \" or \"$ \"); switch it off for a console that uses such a prompt but is not a Linux shell."
+            ToolTip = "For a Linux shell on the device: tell it the size of this window (COLUMNS, LINES, stty) before the next command, so mc, htop and the like fill the window. It acts only after the device has shown a shell prompt (\"# \" or \"$ \"); switch it off for a console that uses such a prompt but is not a Linux shell."
         };
-        _sendRemoteSizeMenuItem = new ToolStripMenuItem("Send terminal size now", null, (sender, args) => _serialTerminalControl.SendRemoteSizeNow())
+        _sendRemoteSizeMenuItem = new DeviceMenuItem("Send terminal size now", null, (sender, args) => _serialTerminalControl.SendRemoteSizeNow())
         {
-            ToolTipText = "Types \"export COLUMNS=N LINES=M; stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
+            ToolTip = "Types \"export COLUMNS=N LINES=M; stty cols N rows M\" for the shell on the device (available at the input line when nothing is typed in it)."
         };
-        Icons.Apply(_sendRemoteSizeMenuItem, "refresh");
+        _sendRemoteSizeMenuItem.Icon = WpfMenus.Icon("refresh");
         contextMenuStrip1.Items.Add(_syncRemoteSizeMenuItem);
         contextMenuStrip1.Items.Add(_sendRemoteSizeMenuItem);
     }
 
     private void ToggleSyncRemoteSize()
     {
-        bool sync = !_syncRemoteSizeMenuItem.Checked;
-        _syncRemoteSizeMenuItem.Checked = sync;
+        bool sync = !_syncRemoteSizeMenuItem.IsChecked;
+        _syncRemoteSizeMenuItem.IsChecked = sync;
         _serialTerminalControl.SyncRemoteSize = sync;
         if (_deviceTerminalSettings != null)
         {
@@ -529,21 +462,21 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // that prints something that only looks like a shell prompt makes the input line continue it, and the setting is
     // buried in a dialog. Turning it off here keeps the configured prompt. Like the other runtime toggles of this
     // menu it updates the profile object of the open tab; saving the profile stores the new value.
-    private ToolStripMenuItem _autoDetectPromptMenuItem;
+    private MenuItem _autoDetectPromptMenuItem;
 
     private void AddPromptDetectionCommand()
     {
-        _autoDetectPromptMenuItem = new ToolStripMenuItem("Detect the prompt of the device", null, (sender, args) => ToggleAutoDetectPrompt())
+        _autoDetectPromptMenuItem = new DeviceMenuItem("Detect the prompt of the device", null, (sender, args) => ToggleAutoDetectPrompt())
         {
-            ToolTipText = "Continue a prompt the device prints (\"# \", \"$ \", \"> \") in the input line. Switch it off when the device prints something that only looks like a prompt: the input line then always uses the configured prompt."
+            ToolTip = "Continue a prompt the device prints (\"# \", \"$ \", \"> \") in the input line. Switch it off when the device prints something that only looks like a prompt: the input line then always uses the configured prompt."
         };
         contextMenuStrip1.Items.Add(_autoDetectPromptMenuItem);
     }
 
     private void ToggleAutoDetectPrompt()
     {
-        bool detect = !_autoDetectPromptMenuItem.Checked;
-        _autoDetectPromptMenuItem.Checked = detect;
+        bool detect = !_autoDetectPromptMenuItem.IsChecked;
+        _autoDetectPromptMenuItem.IsChecked = detect;
         _serialTerminalControl.EnableAutoPromptDetection(detect);
         if (_deviceTerminalSettings != null)
         {
@@ -560,7 +493,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private TelnetTransport _telnetTransport;
 
-    private ToolStripMenuItem _telnetMenu;
+    private MenuItem _telnetMenu;
 
     // Whether the terminal shows what is typed itself (while no input line is shown; the input line shows its text
     // anyway). Not the terminal's LocalEcho property: in WpfSerialTerminal that one sends every typed character
@@ -571,7 +504,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         _telnetLocalEcho = echo;
         _serialTerminalControl.EchoRawInput = echo;
-        echoTypedCharactersToolStripMenuItem.Checked = echo;
+        echoTypedCharactersToolStripMenuItem.IsChecked = echo;
     }
 
     // Called for every new telnet connection (also when it is reconnected): applies the local echo mode and, in
@@ -627,37 +560,40 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             if (_telnetMenu != null)
             {
-                _telnetMenu.Visible = false;
+                _telnetMenu.SetVisible(false);
             }
             return;
         }
         if (_telnetMenu == null)
         {
-            _telnetMenu = new ToolStripMenuItem("Telnet");
-            Icons.Apply(_telnetMenu, "network");
+            _telnetMenu = new DeviceMenuItem("Telnet");
+            _telnetMenu.Icon = WpfMenus.Icon("network");
             AddTelnetCommand("Send Break", TelnetStream.Break);
             AddTelnetCommand("Send Interrupt Process (IP)", TelnetStream.InterruptProcess);
             AddTelnetCommand("Send Are You There (AYT)", TelnetStream.AreYouThere);
             AddTelnetCommand("Send Erase Line", TelnetStream.EraseLine);
             AddTelnetCommand("Send NOP", TelnetStream.NOP);
-            _telnetMenu.DropDownItems.Add(new ToolStripSeparator());
-            ToolStripMenuItem showOptions = new ToolStripMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions());
-            Icons.Apply(showOptions, "question");
-            _telnetMenu.DropDownItems.Add(showOptions);
-            ToolStripMenuItem askStatus = new ToolStripMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus());
-            Icons.Apply(askStatus, "refresh");
-            _telnetMenu.DropDownItems.Add(askStatus);
-            _telnetMenu.DropDownOpening += (sender, args) =>
+            _telnetMenu.Items.Add(new Separator());
+            MenuItem showOptions = new DeviceMenuItem("Show negotiated options", null, (sender, args) => ShowTelnetOptions());
+            showOptions.Icon = WpfMenus.Icon("question");
+            _telnetMenu.Items.Add(showOptions);
+            MenuItem askStatus = new DeviceMenuItem("Ask server for its option status (STATUS)", null, (sender, args) => RequestTelnetStatus());
+            askStatus.Icon = WpfMenus.Icon("refresh");
+            _telnetMenu.Items.Add(askStatus);
+            _telnetMenu.SubmenuOpened += (sender, args) =>
             {
                 bool connected = _connectionState == ConnectionStateEnum.Connected && _telnetTransport != null;
-                foreach (ToolStripItem item in _telnetMenu.DropDownItems)
+                foreach (object item in _telnetMenu.Items)
                 {
-                    item.Enabled = connected;
+                    if (item is MenuItem menuItem)
+                    {
+                        menuItem.IsEnabled = connected;
+                    }
                 }
             };
             contextMenuStrip1.Items.Add(_telnetMenu);
         }
-        _telnetMenu.Visible = true;
+        _telnetMenu.SetVisible(true);
     }
 
     private void ShowTelnetOptions()
@@ -667,7 +603,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             return;
         }
-        ThemedMessageBox.Show(transport.DescribeOptions(), "Telnet options", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UserDialogs.Show(transport.DescribeOptions(), "Telnet options", DialogButtons.Ok, DialogIcon.Information);
     }
 
     private void RequestTelnetStatus()
@@ -681,7 +617,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             if (!transport.RequestRemoteStatus())
             {
-                ThemedMessageBox.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                UserDialogs.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", DialogButtons.Ok, DialogIcon.Information);
             }
         }
         catch (Exception)
@@ -703,7 +639,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             {
                 if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
                 {
-                    ThemedMessageBox.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", DialogButtons.Ok, DialogIcon.Information);
                 }
             }));
         }
@@ -715,7 +651,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void AddTelnetCommand(string text, byte command)
     {
-        ToolStripMenuItem item = new ToolStripMenuItem(text, null, (sender, args) =>
+        MenuItem item = new DeviceMenuItem(text, null, (sender, args) =>
         {
             try
             {
@@ -726,8 +662,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 // The connection is gone; the status line says so.
             }
         });
-        Icons.Apply(item, "upload");
-        _telnetMenu.DropDownItems.Add(item);
+        item.Icon = WpfMenus.Icon("upload");
+        _telnetMenu.Items.Add(item);
     }
 
     private void CreateTerminals()
@@ -738,14 +674,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             BellMode = BeepMode.None,
             EnterSequence = null,
             CaretWhenUnfocused = false,
-            ContextMenuReference = contextMenuStrip1,
             OpensPasteMenu = false
         };
         _serialTerminalControl.Model.ScrollbackLimit = int.MaxValue;
         _serialTerminalControl.SetDefaultColors(Color.LightGray.ToRgb(), Color.Black.ToRgb());
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.ShortcutKey += OnWpfTerminalKey;
-        _serialTerminalControl.ContextMenuRequested += (sender, where) => ShowContextMenu(where);
+        _serialTerminalControl.ContextMenuRequested += (sender, where) => ShowContextMenu(sender);
         _serialTerminalControl.CompletionPopupRequested += OnSerialCompletionPopupRequested;
         _serialTerminalControl.OpenFileRequested += OnSerialOpenFileRequested;
         InitializeDeviceListing();
@@ -755,7 +690,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         hexTerminalControl1 = new WpfHexTerminal { Visibility = System.Windows.Visibility.Collapsed };
         hexTerminalControl1.CharacterTyped += OnHexCharacterTyped;
         hexTerminalControl1.ShortcutKey += OnWpfTerminalKey;
-        hexTerminalControl1.ContextMenuRequested += (sender, where) => ShowContextMenu(where);
+        hexTerminalControl1.ContextMenuRequested += (sender, where) => ShowContextMenu(sender);
         AddTerminalView(hexTerminalControl1);
         AddTerminalView(_serialTerminalControl);
     }
@@ -834,7 +769,6 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         _pasteJob?.Abort();
         // The watcher and the theme event are static: a closed tab must not stay reachable from them.
         SerialPortArrivalWatcher.Unsubscribe(OnSerialPortArrived);
-        ThemeManager.ThemeChanged -= OnThemeChanged;
         _manualDisconnect = true;
         StopAutoReconnectTimer();
         _autoReconnectTimer?.Dispose();
@@ -915,9 +849,9 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             _transportFactory = new CallbackTransportFactory(callback);
         }
-        ToolStripLabel toolStripLabel = lblBaudRate;
-        bool visible = (cbBaudRate.Visible = deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial);
-        toolStripLabel.Visible = visible;
+        bool serialPort = deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
+        cbBaudRate.SetVisible(serialPort);
+        lblBaudRate.SetVisible(serialPort);
         if (deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial { AdvancedSettings: { } advancedSettings })
         {
             cbBaudRate.Text = advancedSettings.BaudRate.ToString();
@@ -934,21 +868,21 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(
             _deviceTerminalSettings.DisplayMode, _deviceTerminalSettings.HexSettings);
         ApplyDisplayMode(displayMode, raiseChangedEvent: false);
-        echoTypedCharactersToolStripMenuItem.Checked = _deviceTerminalSettings.EchoTypedCharacters;
+        echoTypedCharactersToolStripMenuItem.IsChecked = _deviceTerminalSettings.EchoTypedCharacters;
         _serialTerminalControl.LocalEcho = _deviceTerminalSettings.EchoTypedCharacters;
         if (deviceTerminalSettings.HexSettings != null)
         {
-            sendAsHEXToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.SendAsHex;
-            sendImmediatelyToolStripMenuItem.Checked = deviceTerminalSettings.HexSettings.AutoSend;
+            sendAsHEXToolStripMenuItem.IsChecked = deviceTerminalSettings.HexSettings.SendAsHex;
+            sendImmediatelyToolStripMenuItem.IsChecked = deviceTerminalSettings.HexSettings.AutoSend;
         }
-        changeSettingsToolStripMenuItem.Visible = _deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial;
+        changeSettingsToolStripMenuItem.SetVisible(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial);
         // Telnet passes the size on by itself; a netconsole receiver has no shell to tell it to.
         bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet) && !IsNetconsole;
-        _syncRemoteSizeMenuItem.Visible = needsStty;
-        _sendRemoteSizeMenuItem.Visible = needsStty;
-        _syncRemoteSizeMenuItem.Checked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
-        _serialTerminalControl.SyncRemoteSize = _syncRemoteSizeMenuItem.Checked;
-        _autoDetectPromptMenuItem.Checked = _deviceTerminalSettings.AutoDetectPrompt;
+        _syncRemoteSizeMenuItem.SetVisible(needsStty);
+        _sendRemoteSizeMenuItem.SetVisible(needsStty);
+        _syncRemoteSizeMenuItem.IsChecked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
+        _serialTerminalControl.SyncRemoteSize = _syncRemoteSizeMenuItem.IsChecked;
+        _autoDetectPromptMenuItem.IsChecked = _deviceTerminalSettings.AutoDetectPrompt;
         UpdateSerialLineUi();
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         ConfigureNetconsole();
@@ -1230,8 +1164,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             SetConnectionPromptVisible(false);
             SetToolbarVisible(true);
-            btnReconnect.Visible = connectionStateEnum != ConnectionStateEnum.Connected;
-            btnDisconnect.Visible = connectionStateEnum == ConnectionStateEnum.Connected;
+            btnReconnect.SetVisible(connectionStateEnum != ConnectionStateEnum.Connected);
+            btnDisconnect.SetVisible(connectionStateEnum == ConnectionStateEnum.Connected);
         }
         switch (connectionStateEnum)
         {
@@ -1244,10 +1178,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                     hexTerminalControl1.HideCaret = true;
                     _serialTerminalControl.HideCaret = true;
                     SetTerminalColors(null, ((Color)_deviceTerminalSettings.Colors.Disconnected).ToRgb());
-                    ToolStripLabel toolStripLabel = lblConnection;
                     // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
-                    string text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
-                    toolStripLabel.Text = text;
+                    lblConnection.Text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
                     _connectionPrompt.Title = "Connection closed";
                     _connectionPrompt.Message = "The connection to " + (_transportDisplayName ?? ConnectionTitle) + " has been closed."
                         + (string.IsNullOrEmpty(value) ? "" : Environment.NewLine + value)
@@ -1504,13 +1436,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                     if (success)
                     {
                         string note = successNote?.Invoke();
-                        ThemedMessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
-                            title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UserDialogs.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
+                            title, DialogButtons.Ok, DialogIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        ThemedMessageBox.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        UserDialogs.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, DialogButtons.Ok, DialogIcon.Warning);
                     }
                 }));
             }
@@ -1538,12 +1470,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         if (_isXModemActive)
         {
-            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", DialogButtons.Ok, DialogIcon.Information);
             return true;
         }
         if (_isFileSendActive)
         {
-            ThemedMessageBox.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", DialogButtons.Ok, DialogIcon.Information);
             return true;
         }
         return false;
@@ -1569,11 +1501,11 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string fileName = ThemedFileDialog.OpenFile(Owner, "Select file to send via " + protocolName, "All files (*.*)|*.*");
+        string fileName = UserDialogs.OpenFile(Owner, "Select file to send via " + protocolName, "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1598,11 +1530,11 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string fileName = ThemedFileDialog.SaveFile(Owner, "Select destination file for XMODEM receive", "All files (*.*)|*.*");
+        string fileName = UserDialogs.SaveFile(Owner, "Select destination file for XMODEM receive", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1747,8 +1679,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         SetConnectionPromptVisible(false);
         SetToolbarVisible(true);
-        btnReconnect.Visible = true;
-        btnDisconnect.Visible = false;
+        btnReconnect.SetVisible(true);
+        btnDisconnect.SetVisible(false);
         FocusTerminal();
     }
 
@@ -1764,50 +1696,50 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void btnSend_ButtonClick(object sender, EventArgs e)
     {
-        if (!btnSend.Enabled || IsLineBusy())
+        if (!btnSend.IsEnabled || IsLineBusy())
         {
             return;
         }
         try
         {
-            byte[] items = ((!sendAsHEXToolStripMenuItem.Checked) ? _textEncoding.GetBytes(txtHexInput.Text) : DeviceInputText.ParseHex(txtHexInput.Text));
+            byte[] items = ((!sendAsHEXToolStripMenuItem.IsChecked) ? _textEncoding.GetBytes(txtHexInput.Text) : DeviceInputText.ParseHex(txtHexInput.Text));
             SendToDevice(items, items.Length);
             if (_deviceTerminalSettings.EchoTypedCharacters)
             {
                 hexTerminalControl1.AppendData(items, items.Length, isEcho: true);
             }
-            if ((Control.ModifierKeys & Keys.Alt) == 0)
+            if ((System.Windows.Input.Keyboard.Modifiers & System.Windows.Input.ModifierKeys.Alt) == 0)
             {
                 txtHexInput.Text = "";
             }
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
     private void sendAsHEXToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        sendAsHEXToolStripMenuItem.Checked = !sendAsHEXToolStripMenuItem.Checked;
+        sendAsHEXToolStripMenuItem.IsChecked = !sendAsHEXToolStripMenuItem.IsChecked;
     }
 
-    private void txtHexInput_KeyDown(object sender, KeyEventArgs e)
+    private void txtHexInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.KeyCode == Keys.Return)
+        if (e.Key == System.Windows.Input.Key.Return)
         {
             btnSend_ButtonClick(sender, e);
-            e.SuppressKeyPress = true;
+            e.Handled = true;
         }
     }
 
     private void txtHexInput_TextChanged(object sender, EventArgs e)
     {
-        if (!sendImmediatelyToolStripMenuItem.Checked)
+        if (!sendImmediatelyToolStripMenuItem.IsChecked)
         {
             return;
         }
-        if (sendAsHEXToolStripMenuItem.Checked)
+        if (sendAsHEXToolStripMenuItem.IsChecked)
         {
             // Sent once a byte is complete: two digits ("41", "0x41"), or one digit closed by a separator ("A ").
             if (DeviceInputText.IsHexReadyToSend(txtHexInput.Text))
@@ -1825,7 +1757,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     private void OnHexCharacterTyped(char ch)
     {
         // In character mode any printable character is accepted (Cyrillic included); it is encoded with the selected encoding on send.
-        if (!char.IsControl(ch) && (!sendAsHEXToolStripMenuItem.Checked || DeviceInputText.IsHexInputCharacter(ch)))
+        if (!char.IsControl(ch) && (!sendAsHEXToolStripMenuItem.IsChecked || DeviceInputText.IsHexInputCharacter(ch)))
         {
             txtHexInput.Text += ch;
             txtHexInput.SelectionStart = txtHexInput.Text.Length;
@@ -1837,21 +1769,24 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // The text box is in the WinForms tool bar: the host gets the keyboard focus first.
     private void FocusToolbarInput()
     {
-        _toolStripHost.Focus();
-        txtHexInput.Focus();
+        System.Windows.Input.Keyboard.Focus(txtHexInput);
     }
 
     private void sendImmediatelyToolStripMenuItem_Click(object sender, EventArgs e)
     {
-        sendImmediatelyToolStripMenuItem.Checked = !sendImmediatelyToolStripMenuItem.Checked;
+        sendImmediatelyToolStripMenuItem.IsChecked = !sendImmediatelyToolStripMenuItem.IsChecked;
     }
 
-    private void txtHexInput_KeyPress(object sender, KeyPressEventArgs e)
+    // The characters typed into the box (WPF text input; Backspace and the Ctrl keys of the text box are no text input).
+    private void txtHexInput_KeyPress(object sender, System.Windows.Input.TextCompositionEventArgs e)
     {
-        // Control characters stay allowed: Backspace, and Ctrl+V / Ctrl+C / Ctrl+A that the text box handles itself.
-        if (sendAsHEXToolStripMenuItem.Checked && !char.IsControl(e.KeyChar) && !DeviceInputText.IsHexInputCharacter(e.KeyChar))
+        foreach (char ch in e.Text ?? "")
         {
-            e.Handled = true;
+            if (sendAsHEXToolStripMenuItem.IsChecked && !char.IsControl(ch) && !DeviceInputText.IsHexInputCharacter(ch))
+            {
+                e.Handled = true;
+                return;
+            }
         }
     }
 
@@ -1869,7 +1804,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void toolStripButton2_Click(object sender, EventArgs e)
     {
-        string fileName = ThemedFileDialog.SaveFile(Owner, "Save output to a file", "All files (*.*)|*.*");
+        string fileName = UserDialogs.SaveFile(Owner, "Save output to a file", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1887,7 +1822,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -1899,10 +1834,10 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending a file.", "Send file", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
-        string fileName = ThemedFileDialog.OpenFile(Owner, "Send a binary file", "All files (*.*)|*.*");
+        string fileName = UserDialogs.OpenFile(Owner, "Send a binary file", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1942,14 +1877,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // The "Quick commands" sub menu (and the separator after it) on top of the context menu, removed and added again each time
     // the menu opens, from the list as it is saved now (Tools > Quick commands...). A command is put into the command line; a
     // script is typed into the shell of the device with cat, as a device has no SSH to upload it (DeviceTerminalControl.QuickScript.cs).
-    private readonly List<ToolStripItem> _quickCommandItems = new List<ToolStripItem>();
+    private readonly List<System.Windows.Controls.Control> _quickCommandItems = new List<System.Windows.Controls.Control>();
 
     private void RefreshQuickCommandItems()
     {
-        foreach (ToolStripItem old in _quickCommandItems)
+        foreach (System.Windows.Controls.Control old in _quickCommandItems)
         {
             contextMenuStrip1.Items.Remove(old);
-            old.Dispose();
         }
         _quickCommandItems.Clear();
         // The bytes of the HEX view are not a command line, and netconsole has a line input of its own.
@@ -1958,44 +1892,41 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             return;
         }
         bool busy = IsLineClaimed || (_pasteJob != null && _pasteJob.IsActive);
-        ToolStripMenuItem quickCommandsMenu = new ToolStripMenuItem("Quick commands")
+        MenuItem quickCommandsMenu = new DeviceMenuItem("Quick commands")
         {
-            ToolTipText = "Your commands and scripts (Tools > Quick commands...): a command is put into the command line, a script is typed into the shell of the device; Enter runs it"
+            ToolTip = "Your commands and scripts (Tools > Quick commands...): a command is put into the command line, a script is typed into the shell of the device; Enter runs it"
         };
-        Icons.Apply(quickCommandsMenu, "terminal");
-        quickCommandsMenu.DropDown.ShowItemToolTips = true;
+        quickCommandsMenu.Icon = WpfMenus.Icon("terminal");
         int commandCount = 0;
         foreach (QuickCommand item in QuickCommandRules.MenuItems(SmarTTY.GUI.Backend.QuickCommandStore.LoadForMenu(), scriptsPossible: true))
         {
             QuickCommand chosen = item;
-            ToolStripMenuItem menuItem = new ToolStripMenuItem(chosen.MenuText.Replace("&", "&&"), null, (sender, args) => InsertQuickCommand(chosen))
+            MenuItem menuItem = new DeviceMenuItem(WpfMenus.PlainText(chosen.MenuText), chosen.Kind == QuickCommandKind.Script ? "run" : "terminal", (sender, args) => InsertQuickCommand(chosen))
             {
-                Enabled = !busy,
-                ToolTipText = chosen.Kind == QuickCommandKind.Script
+                IsEnabled = !busy,
+                ToolTip = chosen.Kind == QuickCommandKind.Script
                     ? "Types the script " + chosen.FileName + " into the shell of the device with cat (the current folder, made executable; needs the prompt of a Linux shell), then puts ./" + chosen.FileName + " into the command line (press Enter to run it)"
                     : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
             };
-            Icons.Apply(menuItem, chosen.Kind == QuickCommandKind.Script ? "run" : "terminal");
-            quickCommandsMenu.DropDownItems.Add(menuItem);
+            quickCommandsMenu.Items.Add(menuItem);
             commandCount++;
         }
         if (commandCount > 0)
         {
-            quickCommandsMenu.DropDownItems.Add(new ToolStripSeparator());
+            quickCommandsMenu.Items.Add(new Separator());
         }
-        ToolStripMenuItem manage = new ToolStripMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", null, (sender, args) => QuickCommandsEditRequested?.Invoke(this, EventArgs.Empty))
+        MenuItem manage = new DeviceMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", null, (sender, args) => QuickCommandsEditRequested?.Invoke(this, EventArgs.Empty))
         {
-            ToolTipText = "Commands and scripts that this menu puts into the command line"
+            ToolTip = "Commands and scripts that this menu puts into the command line"
         };
-        Icons.Apply(manage, "edit");
-        quickCommandsMenu.DropDownItems.Add(manage);
+        manage.Icon = WpfMenus.Icon("edit");
+        quickCommandsMenu.Items.Add(manage);
         _quickCommandItems.Add(quickCommandsMenu);
-        _quickCommandItems.Add(new ToolStripSeparator());
+        _quickCommandItems.Add(new Separator());
         for (int i = 0; i < _quickCommandItems.Count; i++)
         {
             contextMenuStrip1.Items.Insert(i, _quickCommandItems[i]);
         }
-        contextMenuStrip1.ShowItemToolTips = true;
     }
 
     /// <summary>
@@ -2017,13 +1948,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         _serialTerminalControl.FocusTerminal();
     }
 
-    private void contextMenuStrip1_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+    // The state of the items of the context menu, before it opens.
+    private void RefreshContextMenu()
     {
-        // Before the menu is painted in the colours of the theme (that handler is added later).
         RefreshQuickCommandItems();
-        copyToolStripMenuItem.Enabled = HexMode ? hexTerminalControl1.HasSelection : _serialTerminalControl.HasSelection;
-        _returnToInputLineMenuItem.Enabled = !HexMode && !_serialTerminalControl.HasInputLine;
-        _sendRemoteSizeMenuItem.Enabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
+        copyToolStripMenuItem.IsEnabled = HexMode ? hexTerminalControl1.HasSelection : _serialTerminalControl.HasSelection;
+        _returnToInputLineMenuItem.IsEnabled = !HexMode && !_serialTerminalControl.HasInputLine;
+        _sendRemoteSizeMenuItem.IsEnabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
     }
 
     private void OnTerminalKeyDown(object sender, KeyEventArgs e)
@@ -2099,23 +2030,23 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         PasteToDevice(null, PasteKind.Auto);
     }
 
-    private ToolStripMenuItem _pasteAsHexMenuItem;
+    private MenuItem _pasteAsHexMenuItem;
 
-    private ToolStripMenuItem _pasteAsTextMenuItem;
+    private MenuItem _pasteAsTextMenuItem;
 
     private void AddPasteCommands()
     {
-        ToolStripMenuItem history = new ToolStripMenuItem("Paste from history and snippets...", null, (sender, args) => ShowPasteMenu())
+        MenuItem history = new DeviceMenuItem("Paste from history and snippets...", null, (sender, args) => ShowPasteMenu())
         {
-            ShortcutKeyDisplayString = "Ctrl+Shift+Insert"
+            InputGestureText = "Ctrl+Shift+Insert"
         };
-        _pasteAsHexMenuItem = new ToolStripMenuItem("Paste as HEX bytes", null, (sender, args) => PasteToDevice(null, PasteKind.HexBytes))
+        _pasteAsHexMenuItem = new DeviceMenuItem("Paste as HEX bytes", null, (sender, args) => PasteToDevice(null, PasteKind.HexBytes))
         {
-            ToolTipText = "The clipboard text such as DE AD BE EF is sent as bytes"
+            ToolTip = "The clipboard text such as DE AD BE EF is sent as bytes"
         };
-        _pasteAsTextMenuItem = new ToolStripMenuItem("Paste as text", null, (sender, args) => PasteToDevice(null, PasteKind.Text))
+        _pasteAsTextMenuItem = new DeviceMenuItem("Paste as text", null, (sender, args) => PasteToDevice(null, PasteKind.Text))
         {
-            ToolTipText = "Send the clipboard text as characters, even in the HEX view"
+            ToolTip = "Send the clipboard text as characters, even in the HEX view"
         };
         int index = contextMenuStrip1.Items.IndexOf(pasteToolStripMenuItem);
         index = index < 0 ? contextMenuStrip1.Items.Count : index + 1;
@@ -2127,7 +2058,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     /// <summary>The menu with the clipboard, the texts pasted lately and the snippets; the choice goes to the device.</summary>
     private void ShowPasteMenu()
     {
-        PasteMenu.Show(Anchor, contextMenuStrip1, _commonSettings, System.Windows.Forms.Cursor.Position, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
+        System.Windows.FrameworkElement target = HexMode ? hexTerminalControl1 : _serialTerminalControl;
+        SmarTTY.GUI.PasteMenu.Show(target, _commonSettings, () => PasteToDevice(null, PasteKind.Auto), text => PasteToDevice(text, PasteKind.Auto));
     }
 
     private void PasteToDevice(string clipboardText, PasteKind kind)
@@ -2150,7 +2082,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             {
                 if (!DeviceInputText.TryParsePastedHex(text, out byte[] hexBytes))
                 {
-                    ThemedMessageBox.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 PasteHistory.Add(text, options.EffectiveHistorySize);
@@ -2224,14 +2156,14 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                     _pasteJob = null;
                     if (outcome == PasteJob.Outcome.Failed)
                     {
-                        ThemedMessageBox.Show(message, "Paste", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        UserDialogs.Show(message, "Paste", DialogButtons.Ok, DialogIcon.Warning);
                     }
                 });
             _pasteJob.Start();
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -2239,10 +2171,10 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         if (_logWriter != null)
         {
-            ThemedMessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("Stop recording first, then replay.", "Replay log", DialogButtons.Ok, DialogIcon.Information);
             return;
         }
-        string chosen = ThemedFileDialog.OpenFile(Owner, "Play back a recorded log of received data",
+        string chosen = UserDialogs.OpenFile(Owner, "Play back a recorded log of received data",
             "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin");
         if (string.IsNullOrEmpty(chosen))
         {
@@ -2255,12 +2187,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
             return;
         }
         if (bytes.Length == 0)
         {
-            ThemedMessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("The file is empty.", "Replay log", DialogButtons.Ok, DialogIcon.Information);
             return;
         }
         LogReplayPrompt?.Invoke(bytes, this);
@@ -2281,7 +2213,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     private void StartLogging()
     {
         // The format follows the chosen file type; hex mode suggests the hex dump, text mode the text log.
-        ThemedFileDialogResult chosen = ThemedFileDialog.SaveFileEx(Owner, "Record received data (appended if the file already exists)",
+        FileDialogResult chosen = UserDialogs.SaveFileEx(Owner, "Record received data (appended if the file already exists)",
             "Text log (UTF-8) (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
             filterIndex: HexMode ? 2 : 1, fileName: SuggestLogFileName(), overwritePrompt: false, addExtension: true);
         if (chosen == null)
@@ -2302,7 +2234,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
             return;
         }
         UpdateLogButton();
@@ -2317,9 +2249,9 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             writer.Failed -= OnLogFailed;
             writer.Dispose();
         }
-        btnLog.Text = "Start log";
-        btnLog.ForeColor = _toolbarPalette.Text;
-        btnLog.ToolTipText = "Continuously record received data to a file";
+        btnLog.Content = "Start log";
+        ShowLogButtonRecording(false);
+        btnLog.ToolTip = "Continuously record received data to a file";
     }
 
     private void UpdateLogButton()
@@ -2335,9 +2267,9 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             TerminalLogFormat.RawBytes => "raw bytes",
             _ => "text (UTF-8)",
         };
-        btnLog.Text = "Stop log (" + FormatByteCount(writer.BytesWritten) + ")";
-        btnLog.ForeColor = _toolbarPalette.Error;
-        btnLog.ToolTipText = "Recording to " + writer.FilePath + " as " + format + ". Click to stop.";
+        btnLog.Content = "Stop log (" + FormatByteCount(writer.BytesWritten) + ")";
+        ShowLogButtonRecording(true);
+        btnLog.ToolTip = "Recording to " + writer.FilePath + " as " + format + ". Click to stop.";
     }
 
     private void OnLogFailed(Exception exception)
@@ -2351,7 +2283,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 if (_logWriter != null && !_logWriter.IsActive)
                 {
                     StopLogging();
-                    ThemedMessageBox.Show("Logging stopped: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    UserDialogs.Show("Logging stopped: " + exception.Message, "Error", DialogButtons.Ok, DialogIcon.Warning);
                 }
             }));
         }
@@ -2416,7 +2348,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             return;
         }
         DeviceTerminalSettings deviceTerminalSettings = _deviceTerminalSettings;
-        bool echoTypedCharacters = (echoTypedCharactersToolStripMenuItem.Checked = !echoTypedCharactersToolStripMenuItem.Checked);
+        bool echoTypedCharacters = (echoTypedCharactersToolStripMenuItem.IsChecked = !echoTypedCharactersToolStripMenuItem.IsChecked);
         deviceTerminalSettings.EchoTypedCharacters = echoTypedCharacters;
         _serialTerminalControl.LocalEcho = echoTypedCharacters;
     }
@@ -2455,17 +2387,18 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
     }
 
-    private void cbBaudRate_KeyDown(object sender, KeyEventArgs e)
+    private void cbBaudRate_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.KeyCode == Keys.Return)
+        if (e.Key == System.Windows.Input.Key.Return)
         {
             ApplyBaudRate(cbBaudRate.Text);
         }
     }
 
+    // A WPF combo box tells about the new item before its text follows it.
     private void cbBaudRate_SelectedIndexChanged(object sender, EventArgs e)
     {
-        ApplyBaudRate(cbBaudRate.Text);
+        ApplyBaudRate(cbBaudRate.SelectedItem as string ?? cbBaudRate.Text);
     }
 
     private void ApplyBaudRate(string text)
@@ -2519,6 +2452,11 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void cbBaudRate_Leave(object sender, EventArgs e)
     {
+        // The focus moves inside the box too (from its text to its list).
+        if (cbBaudRate.IsKeyboardFocusWithin)
+        {
+            return;
+        }
         ApplyBaudRate(cbBaudRate.Text);
     }
 }

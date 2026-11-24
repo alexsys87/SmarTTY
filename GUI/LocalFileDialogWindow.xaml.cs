@@ -19,7 +19,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class LocalFileDialogWindow : Window
 {
-    private readonly ThemedFileDialogRequest _request;
+    private readonly FileDialogRequest _request;
 
     private readonly List<FileDialogFilterEntry> _filterEntries;
 
@@ -33,15 +33,15 @@ public partial class LocalFileDialogWindow : Window
 
     private bool _loaded;
 
-    private ThemedFileDialogResult _result;
+    private FileDialogResult _result;
 
-    private LocalFileDialogWindow(ThemedFileDialogRequest request)
+    private LocalFileDialogWindow(FileDialogRequest request)
     {
         InitializeComponent();
         _request = request;
         _filterEntries = FileDialogFilter.Parse(request.Filter);
         Title = string.IsNullOrEmpty(request.Title) ? "Select a File" : request.Title;
-        AcceptButton.Content = (request.Mode == ThemedFileDialogMode.SaveFile) ? "_Save" : "_Open";
+        AcceptButton.Content = (request.Mode == FileDialogMode.SaveFile) ? "_Save" : "_Open";
         if (request.Multiselect)
         {
             FileList.SelectionMode = SelectionMode.Extended;
@@ -49,8 +49,17 @@ public partial class LocalFileDialogWindow : Window
         Loaded += (object sender, RoutedEventArgs e) => OnLoad();
     }
 
+    /// <summary>
+    /// The file dialog of <see cref="UserDialogs"/> (set by <c>App</c>): owned by the window behind the handle of the request, or by
+    /// the window the user is working in.
+    /// </summary>
+    internal static FileDialogResult Show(FileDialogRequest request)
+    {
+        return Browse(request, WindowOwnership.FromHandle(request.OwnerHandle));
+    }
+
     /// <summary>Shows the dialog over the given owner and returns what the user chose, or null when cancelled.</summary>
-    internal static ThemedFileDialogResult Browse(ThemedFileDialogRequest request, Window owner)
+    internal static FileDialogResult Browse(FileDialogRequest request, Window owner)
     {
         LocalFileDialogWindow window = new LocalFileDialogWindow(request);
         WindowOwnership.Attach(window, owner ?? WindowOwnership.ActiveWindow());
@@ -60,9 +69,9 @@ public partial class LocalFileDialogWindow : Window
     /// <summary>Asks for one existing file to open; returns the chosen path, or null when cancelled.</summary>
     internal static string OpenFile(Window owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
     {
-        return Browse(new ThemedFileDialogRequest
+        return Browse(new FileDialogRequest
         {
-            Mode = ThemedFileDialogMode.OpenFile,
+            Mode = FileDialogMode.OpenFile,
             Title = title,
             Filter = filter,
             FilterIndex = filterIndex,
@@ -73,9 +82,9 @@ public partial class LocalFileDialogWindow : Window
     /// <summary>Asks for one or more existing files to open; returns the chosen paths, or null when cancelled.</summary>
     internal static string[] OpenFiles(Window owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
     {
-        ThemedFileDialogResult result = Browse(new ThemedFileDialogRequest
+        FileDialogResult result = Browse(new FileDialogRequest
         {
-            Mode = ThemedFileDialogMode.OpenFile,
+            Mode = FileDialogMode.OpenFile,
             Multiselect = true,
             Title = title,
             Filter = filter,
@@ -88,9 +97,9 @@ public partial class LocalFileDialogWindow : Window
     /// <summary>Asks for the destination file to save to; returns the chosen path, or null when cancelled.</summary>
     internal static string SaveFile(Window owner, string title, string filter, int filterIndex = 1, string fileName = null, bool overwritePrompt = true, bool addExtension = false, string initialDirectory = null)
     {
-        return Browse(new ThemedFileDialogRequest
+        return Browse(new FileDialogRequest
         {
-            Mode = ThemedFileDialogMode.SaveFile,
+            Mode = FileDialogMode.SaveFile,
             Title = title,
             Filter = filter,
             FilterIndex = filterIndex,
@@ -322,7 +331,7 @@ public partial class LocalFileDialogWindow : Window
 
     private void Accept_Click(object sender, RoutedEventArgs e)
     {
-        if (_request.Mode == ThemedFileDialogMode.SaveFile)
+        if (_request.Mode == FileDialogMode.SaveFile)
         {
             AcceptSave();
         }
@@ -419,7 +428,7 @@ public partial class LocalFileDialogWindow : Window
 
     private void Finish(List<string> fileNames)
     {
-        ThemedFileDialogResult result = new ThemedFileDialogResult { FilterIndex = FilterCombo.SelectedIndex + 1 };
+        FileDialogResult result = new FileDialogResult { FilterIndex = FilterCombo.SelectedIndex + 1 };
         if (_request.Multiselect)
         {
             result.FileNames.AddRange(fileNames);

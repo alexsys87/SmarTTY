@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using System;
 using System.Windows;
 
@@ -18,31 +19,31 @@ internal static class MessageBoxes
 
     internal static bool Ask(string text)
     {
-        return MessageDialog.Show(text, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNo) == MessageBoxResult.Yes;
+        return MessageDialog.Show(text, Caption, DialogIcon.Question, DialogButtons.YesNo) == MessageBoxResult.Yes;
     }
 
     internal static void Info(string text)
     {
-        MessageDialog.Show(text, Caption, MessageDialogIcon.Information, MessageDialogButtons.Ok);
+        MessageDialog.Show(text, Caption, DialogIcon.Information, DialogButtons.Ok);
     }
 
     internal static bool AskWarn(string message)
     {
-        return MessageDialog.Show(message, Caption, MessageDialogIcon.Warning, MessageDialogButtons.YesNo) == MessageBoxResult.Yes;
+        return MessageDialog.Show(message, Caption, DialogIcon.Warning, DialogButtons.YesNo) == MessageBoxResult.Yes;
     }
 
     internal static void Warning(string text)
     {
-        MessageDialog.Show(text, Caption, MessageDialogIcon.Warning, MessageDialogButtons.Ok);
+        MessageDialog.Show(text, Caption, DialogIcon.Warning, DialogButtons.Ok);
     }
 
     internal static void Error(string text)
     {
-        MessageDialog.Show(text, Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok);
+        MessageDialog.Show(text, Caption, DialogIcon.Error, DialogButtons.Ok);
     }
 
     internal static MessageBoxResult YesNoCancel(string text)
     {
-        return MessageDialog.Show(text, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel);
+        return MessageDialog.Show(text, Caption, DialogIcon.Question, DialogButtons.YesNoCancel);
     }
 }

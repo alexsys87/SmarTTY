@@ -17,7 +17,7 @@ using VisualTTY;
 /// <summary>
 /// Runs the real remote file editor (Controls/RemoteFileEditor.cs) against the test SSH servers of tests/SshNetIntegrationTests (OpenSSH, and
 /// Dropbear with BusyBox ash, as on OpenWRT): the file is loaded, changed in the editor, saved, and read back from the server, byte by byte.
-/// The questions the editor asks the user are caught (ThemedMessageBox.ShowImpl) and answered by the checks. It is a .NET Framework 4.8
+/// The questions the editor asks the user are caught (UserDialogs.MessageImpl) and answered by the checks. It is a .NET Framework 4.8
 /// WinForms program: on Linux it is built with the .NET SDK and run by Mono under a virtual X display, see the project file.
 ///
 /// It is the safety net of the move of the logic of the editor out of the control (stage 1, step A4, and stage 3, step 3A: the "hex-view" and
@@ -100,7 +100,7 @@ internal static class Program
         public readonly List<string> Prompts = new List<string>();
 
         // The answer to the next question, by the words in it; null: the question was not expected.
-        public Func<string, MessageBoxButtons, DialogResult?> Answer;
+        public Func<string, DialogButtons, DialogAnswer?> Answer;
     }
 
     private static SshSession Connect(string host, int port, string user, string password)
@@ -282,7 +282,7 @@ internal static class Program
         opened.Editor.View().ReplaceText(new TextDocument.TextPosition(index, line), new TextDocument.TextPosition(index + oldText.Length, line), select: false, newText);
     }
 
-    private static void Prompted(Server server, string name, Func<string, MessageBoxButtons, DialogResult?> answer, Action action)
+    private static void Prompted(Server server, string name, Func<string, DialogButtons, DialogAnswer?> answer, Action action)
     {
         server.Prompts.Clear();
         server.Answer = answer;
@@ -553,7 +553,7 @@ internal static class Program
         Opened o = Open(server, "mixed.sh");
         Equal(o.Editor.LineEndings, LineEndingKind.Mixed, "a file with LF and CRLF has mixed line endings");
         Replace(o, 2, "c", "C");
-        Prompted(server, "crlf question", (text, buttons) => text.Contains("CRLF") ? DialogResult.Yes : (DialogResult?)null, () => Save(o));
+        Prompted(server, "crlf question", (text, buttons) => text.Contains("CRLF") ? DialogAnswer.Yes : (DialogAnswer?)null, () => Save(o));
         Check(OnlyPrompt(server, "mixed line endings").Contains("Convert them to LF"), "the editor asks whether to convert the CRLF line endings");
         SameBytes(ReadRemote(server, "mixed.sh"), Bytes("a\nb\nC\n"), "answered Yes: the line endings are LF in the file");
         o.Close();
@@ -561,7 +561,7 @@ internal static class Program
         WriteRemote(server, "mixed2.sh", Bytes("a\r\nb\nc\n"));
         o = Open(server, "mixed2.sh");
         Replace(o, 2, "c", "C");
-        Prompted(server, "crlf question no", (text, buttons) => text.Contains("CRLF") ? DialogResult.No : (DialogResult?)null, () => Save(o));
+        Prompted(server, "crlf question no", (text, buttons) => text.Contains("CRLF") ? DialogAnswer.No : (DialogAnswer?)null, () => Save(o));
         SameBytes(ReadRemote(server, "mixed2.sh"), Bytes("a\r\nb\nC\n"), "answered No: the line endings are kept as they were");
         o.Close();
 
@@ -569,7 +569,7 @@ internal static class Program
         WriteRemote(server, "script.sh", Concat(bom, Bytes("#!/bin/sh\necho 1\n")));
         o = Open(server, "script.sh");
         Replace(o, 1, "1", "2");
-        Prompted(server, "bom question", (text, buttons) => text.Contains("#!") ? DialogResult.Yes : (DialogResult?)null, () => Save(o));
+        Prompted(server, "bom question", (text, buttons) => text.Contains("#!") ? DialogAnswer.Yes : (DialogAnswer?)null, () => Save(o));
         Check(OnlyPrompt(server, "a script with a byte order mark").Contains("without the mark"), "a script with a byte order mark: the editor asks whether to save it without the mark");
         SameBytes(ReadRemote(server, "script.sh"), Bytes("#!/bin/sh\necho 2\n"), "answered Yes: the file is saved without the mark");
         o.Close();
@@ -577,7 +577,7 @@ internal static class Program
         WriteRemote(server, "script2.sh", Concat(bom, Bytes("#!/bin/sh\necho 1\n")));
         o = Open(server, "script2.sh");
         Replace(o, 1, "1", "3");
-        Prompted(server, "bom question no", (text, buttons) => text.Contains("#!") ? DialogResult.No : (DialogResult?)null, () => Save(o));
+        Prompted(server, "bom question no", (text, buttons) => text.Contains("#!") ? DialogAnswer.No : (DialogAnswer?)null, () => Save(o));
         SameBytes(ReadRemote(server, "script2.sh"), Concat(bom, Bytes("#!/bin/sh\necho 3\n")), "answered No: the mark is kept");
         o.Close();
     }
@@ -629,7 +629,7 @@ internal static class Program
         Thread.Sleep(1100);
         WriteRemote(server, "conflict.txt", Bytes("theirs, and longer\n"));
         Replace(o, 0, "mine", "MINE");
-        Prompted(server, "conflict no", (text, buttons) => text.Contains("Overwrite") ? DialogResult.No : (DialogResult?)null, () =>
+        Prompted(server, "conflict no", (text, buttons) => text.Contains("Overwrite") ? DialogAnswer.No : (DialogAnswer?)null, () =>
         {
             try
             {
@@ -644,7 +644,7 @@ internal static class Program
         Check(OnlyPrompt(server, "conflict").Contains("Overwrite it with your version?"), "the editor asks whether to overwrite the changed file");
         SameBytes(ReadRemote(server, "conflict.txt"), Bytes("theirs, and longer\n"), "answered No: the file on the server is not touched");
         Check(o.Editor.IsModified, "the editor keeps its changes");
-        Prompted(server, "conflict yes", (text, buttons) => text.Contains("Overwrite") ? DialogResult.Yes : (DialogResult?)null, () => Save(o));
+        Prompted(server, "conflict yes", (text, buttons) => text.Contains("Overwrite") ? DialogAnswer.Yes : (DialogAnswer?)null, () => Save(o));
         SameBytes(ReadRemote(server, "conflict.txt"), Bytes("MINE\n"), "answered Yes: the file is overwritten");
         o.Close();
 
@@ -654,11 +654,11 @@ internal static class Program
         Thread.Sleep(1100);
         WriteRemote(server, "bg.txt", Bytes("theirs, and longer\n"));
         Replace(o, 0, "mine", "MINE");
-        Prompted(server, "bg conflict cancel", (text, buttons) => buttons == MessageBoxButtons.YesNoCancel ? DialogResult.Cancel : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "bg conflict cancel", (text, buttons) => buttons == DialogButtons.YesNoCancel ? DialogAnswer.Cancel : (DialogAnswer?)null, () => SaveAndWait(o));
         Check(OnlyPrompt(server, "background conflict").Contains("Cancel: do not save."), "a background save asks: overwrite, load the server's version, or cancel");
         SameBytes(ReadRemote(server, "bg.txt"), Bytes("theirs, and longer\n"), "answered Cancel: the file is not touched");
         Check(o.Editor.IsModified, "answered Cancel: the changes stay in the editor");
-        Prompted(server, "bg conflict yes", (text, buttons) => buttons == MessageBoxButtons.YesNoCancel ? DialogResult.Yes : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "bg conflict yes", (text, buttons) => buttons == DialogButtons.YesNoCancel ? DialogAnswer.Yes : (DialogAnswer?)null, () => SaveAndWait(o));
         Pump(() => !o.Editor.IsModified, "the overwrite that was answered Yes");
         SameBytes(ReadRemote(server, "bg.txt"), Bytes("MINE\n"), "answered Yes: the save runs again and overwrites the file");
         o.Close();
@@ -668,7 +668,7 @@ internal static class Program
         Thread.Sleep(1100);
         WriteRemote(server, "bg2.txt", Bytes("theirs, and longer\n"));
         Replace(o, 0, "mine", "MINE");
-        Prompted(server, "bg conflict no", (text, buttons) => buttons == MessageBoxButtons.YesNoCancel ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "bg conflict no", (text, buttons) => buttons == DialogButtons.YesNoCancel ? DialogAnswer.No : (DialogAnswer?)null, () => SaveAndWait(o));
         Pump(() => Text(o) == "theirs, and longer\n", "the version of the server to be loaded");
         Check(!o.Editor.IsModified, "answered No: the server's version is loaded and the changes are given up");
         SameBytes(ReadRemote(server, "bg2.txt"), Bytes("theirs, and longer\n"), "answered No: the file on the server is the other version");
@@ -728,14 +728,14 @@ internal static class Program
         SameBytes(ReadRemote(server, "ok.sh"), Bytes("#!/bin/sh\necho finish\n"), "a script that passes the check is saved");
 
         Replace(o, 1, "echo finish", "if true; then");
-        Prompted(server, "broken script no", (text, buttons) => text.Contains("The check (") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "broken script no", (text, buttons) => text.Contains("The check (") ? DialogAnswer.No : (DialogAnswer?)null, () => SaveAndWait(o));
         string question = OnlyPrompt(server, "a script with a syntax error");
         Check(question.Contains("found 1 problem") && question.Contains("The file on the server has not been changed."), "the editor tells what the check found and that the file was not changed");
         Check(question.Contains("Yes: save it anyway.") && question.Contains("No: do not save, go to line "), "the editor offers to save anyway, or to go to the line of the problem");
         SameBytes(ReadRemote(server, "ok.sh"), Bytes("#!/bin/sh\necho finish\n"), "answered No: the file on the server is the one it was");
         Check(o.Editor.IsModified, "answered No: the changes stay in the editor");
 
-        Prompted(server, "broken script yes", (text, buttons) => text.Contains("The check (") ? DialogResult.Yes : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "broken script yes", (text, buttons) => text.Contains("The check (") ? DialogAnswer.Yes : (DialogAnswer?)null, () => SaveAndWait(o));
         Pump(() => !o.Editor.IsModified && !o.Editor.IsSaving, "the save that was answered Yes");
         SameBytes(ReadRemote(server, "ok.sh"), Bytes("#!/bin/sh\nif true; then\n"), "answered Yes: the file is saved with the problem");
         Settle(server);
@@ -758,7 +758,7 @@ internal static class Program
         WriteRemote(server, "etc/nginx/app.conf", Bytes("# one\n"));
         Opened o = Open(server, "etc/nginx/app.conf", settings => settings.Editor.DisableConfigCheck = true);
         Replace(o, 0, "one", "two");
-        Prompted(server, "reload", (text, buttons) => text.Contains("Reload nginx") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "reload", (text, buttons) => text.Contains("Reload nginx") ? DialogAnswer.No : (DialogAnswer?)null, () => SaveAndWait(o));
         string offer = OnlyPrompt(server, "a file of /etc/nginx");
         Check(offer.Contains("was saved.") && offer.Contains("Reload nginx now so that the change takes effect?"), "after the save the editor offers to reload nginx");
         SameBytes(ReadRemote(server, "etc/nginx/app.conf"), Bytes("# two\n"), "the file is saved before the offer");
@@ -797,7 +797,7 @@ internal static class Program
         SameBytes(ReadRemote(server, "draft.txt"), Bytes("base\nline\n"), "the file on the server is not changed by the draft");
 
         o = null;
-        Prompted(server, "draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogResult.Yes : (DialogResult?)null, () => o = Open(server, "draft.txt"));
+        Prompted(server, "draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogAnswer.Yes : (DialogAnswer?)null, () => o = Open(server, "draft.txt"));
         string question = OnlyPrompt(server, "a file with a draft");
         Check(question.Contains("Yes: restore the draft.") && question.Contains("No: discard it and open the file from the server."), "the editor offers the draft of the changes that were not saved");
         Equal(Text(o), "BASE edited\nline\n", "answered Yes: the text of the draft is in the editor");
@@ -890,11 +890,11 @@ internal static class Program
         e.ToggleHexMode();
         Check(ReferenceEquals(e.HexEditor.Document, shown), "the hex view of the text made from it is that document again");
         e.HexEditor.Document.ReplaceByte(0, 0xFF);
-        Prompted(server, "lossy no", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.No : (DialogResult?)null, () => e.ToggleHexMode());
+        Prompted(server, "lossy no", (text, buttons) => text.Contains("Not all bytes") ? DialogAnswer.No : (DialogAnswer?)null, () => e.ToggleHexMode());
         string lossy = OnlyPrompt(server, "bytes that are not UTF-8");
         Check(lossy.Contains("Not all bytes can be shown as text in UTF-8") && lossy.Contains("Show the bytes as text anyway?"), "the editor says that the bytes cannot be shown as text and asks");
         Check(e.IsHexMode && HexShown(e), "answered No: the hex view stays");
-        Prompted(server, "lossy yes", (text, buttons) => text.Contains("Not all bytes") ? DialogResult.Yes : (DialogResult?)null, () => e.ToggleHexMode());
+        Prompted(server, "lossy yes", (text, buttons) => text.Contains("Not all bytes") ? DialogAnswer.Yes : (DialogAnswer?)null, () => e.ToggleHexMode());
         Check(!e.IsHexMode, "answered Yes: the text is shown");
         Equal(Text(o), "\uFFFDBC\nD\r\n", "the byte that is not UTF-8 is shown as U+FFFD");
         // Saved before it is edited, the text is written as the bytes of the hex view, and no question about the CRLF is asked.
@@ -1079,7 +1079,7 @@ internal static class Program
         o.Close();
         Thread.Sleep(500);
         o = null;
-        Prompted(server, "hex draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogResult.Yes : (DialogResult?)null, () => o = Open(server, "hexdraft.bin"));
+        Prompted(server, "hex draft yes", (text, buttons) => text.Contains("Unsaved changes of") ? DialogAnswer.Yes : (DialogAnswer?)null, () => o = Open(server, "hexdraft.bin"));
         OnlyPrompt(server, "a file with a draft of the hex view");
         Check(o.Editor.IsHexMode && HexShown(o.Editor), "answered Yes: the draft of the bytes is shown in the hex view");
         SameBytes(o.Editor.HexEditor.Document.ToArray(), new byte[] { (byte)'0', 0x80, (byte)'2', (byte)'3', (byte)'\n' }, "with the bytes of the draft");
@@ -1141,7 +1141,7 @@ internal static class Program
         {
             Check(exception.Message == "The file " + path + " is being reloaded. Try again when it has been loaded.", "a save during a reload says that the file is being reloaded");
         }
-        Prompted(server, "close during reload", (text, buttons) => text.Contains("is being reloaded") ? DialogResult.OK : (DialogResult?)null, () => Check(!e.TrySave(), "closing the tab during a reload: the tab stays"));
+        Prompted(server, "close during reload", (text, buttons) => text.Contains("is being reloaded") ? DialogAnswer.Ok : (DialogAnswer?)null, () => Check(!e.TrySave(), "closing the tab during a reload: the tab stays"));
         Check(OnlyPrompt(server, "a save on close during a reload").Contains("is being reloaded"), "and the error is shown");
         e.SaveInBackground();
         Check(!e.IsSaving, "a background save during a reload does not start");
@@ -1156,7 +1156,7 @@ internal static class Program
         Replace(o, 0, "one", "ONE");
         Remote(server, "chmod 000 '" + path + "'");
         events.Clear();
-        Prompted(server, "failed reload", (text, buttons) => buttons == MessageBoxButtons.OK ? DialogResult.OK : (DialogResult?)null, () =>
+        Prompted(server, "failed reload", (text, buttons) => buttons == DialogButtons.Ok ? DialogAnswer.Ok : (DialogAnswer?)null, () =>
         {
             e.Reload();
             Pump(() => !e.View().ReadOnly, "the reload to fail");
@@ -1170,7 +1170,7 @@ internal static class Program
 
         // A file the user may not write: the replacement is refused and the editor asks about sudo.
         Remote(server, "chmod 444 '" + path + "'");
-        Prompted(server, "sudo no", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () =>
+        Prompted(server, "sudo no", (text, buttons) => text.Contains("Try again with sudo?") ? DialogAnswer.No : (DialogAnswer?)null, () =>
         {
             try
             {
@@ -1184,9 +1184,9 @@ internal static class Program
         });
         Equal(OnlyPrompt(server, "a refused write"), "Failed to overwrite " + path + ". Try again with sudo?", "the editor asks whether to try again with sudo");
         Check(e.IsModified, "the changes stay in the editor");
-        Prompted(server, "sudo no on close", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () => Check(!e.TrySave(), "closing the tab with the question answered No: the tab stays"));
+        Prompted(server, "sudo no on close", (text, buttons) => text.Contains("Try again with sudo?") ? DialogAnswer.No : (DialogAnswer?)null, () => Check(!e.TrySave(), "closing the tab with the question answered No: the tab stays"));
         OnlyPrompt(server, "a refused write on close");
-        Prompted(server, "sudo no in the background", (text, buttons) => text.Contains("Try again with sudo?") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "sudo no in the background", (text, buttons) => text.Contains("Try again with sudo?") ? DialogAnswer.No : (DialogAnswer?)null, () => SaveAndWait(o));
         OnlyPrompt(server, "a refused write in the background");
         Check(e.IsModified && !e.IsSaving, "a background save answered No: still modified, not saving");
         Remote(server, "chmod 644 '" + path + "'");
@@ -1197,7 +1197,7 @@ internal static class Program
         WriteRemote(server, "flowcheck.sh", Bytes("#!/bin/sh\necho 1\necho 2\n"));
         o = Open(server, "flowcheck.sh");
         Replace(o, 2, "echo 2", "if true; then");
-        Prompted(server, "check no", (text, buttons) => text.Contains("The check (") ? DialogResult.No : (DialogResult?)null, () => SaveAndWait(o));
+        Prompted(server, "check no", (text, buttons) => text.Contains("The check (") ? DialogAnswer.No : (DialogAnswer?)null, () => SaveAndWait(o));
         OnlyPrompt(server, "a script with a problem");
         Equal(o.Editor.View().CaretPosition.Line, 3, "answered No: the caret is on the line the check named");
         o.Close();
@@ -1207,7 +1207,7 @@ internal static class Program
         WriteRemote(server, "etc/nginx/flow.conf", Bytes("# one\n"));
         o = Open(server, "etc/nginx/flow.conf", s => s.Editor.DisableConfigCheck = true);
         Replace(o, 0, "one", "two");
-        Prompted(server, "service reload yes", (text, buttons) => text.Contains("Reload nginx now") ? DialogResult.Yes : (text.Contains("Could not reload nginx") ? DialogResult.No : (DialogResult?)null), () =>
+        Prompted(server, "service reload yes", (text, buttons) => text.Contains("Reload nginx now") ? DialogAnswer.Yes : (text.Contains("Could not reload nginx") ? DialogAnswer.No : (DialogAnswer?)null), () =>
         {
             SaveAndWait(o);
             Pump(() => server.Prompts.Count >= 2, "the answer of the service reload");
@@ -1373,14 +1373,14 @@ internal static class Program
             commands.RunCommand(EditorToolbarCommand.ToggleHex);
             Check(!e.IsHexMode && !commands.CommandState.HexMode, "Hex View again closes it");
 
-            Prompted(server, "reload", (text, buttons) => DialogResult.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Prompted(server, "reload", (text, buttons) => DialogAnswer.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
             Check(server.Prompts.Count == 1 && server.Prompts[0].Contains("load " + o.Path + " from the server again"), "Reload with a change asks first");
             Equal(Text(o), "a\nb\nc\n", "answered No it keeps the text");
-            Prompted(server, "reload", (text, buttons) => DialogResult.Yes, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Prompted(server, "reload", (text, buttons) => DialogAnswer.Yes, () => commands.RunCommand(EditorToolbarCommand.Reload));
             Pump(() => e.CanSave && Text(o) == "b\na\nc\n", "the file to load again");
             Check(!e.IsModified, "answered Yes it loads the file from the server again");
             WriteRemote(server, "commands.txt", Bytes("c\nb\na\n"));
-            Prompted(server, "reload", (text, buttons) => DialogResult.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
+            Prompted(server, "reload", (text, buttons) => DialogAnswer.No, () => commands.RunCommand(EditorToolbarCommand.Reload));
             Pump(() => e.CanSave && Text(o) == "c\nb\na\n", "the file to load again");
             Equal(server.Prompts.Count, 0, "Reload without a change asks nothing and loads the file again");
         }
@@ -1441,17 +1441,19 @@ internal static class Program
             string home = Remote(server, "echo $HOME").Last().Trim();
             server.Root = home + "/rfe-" + Guid.NewGuid().ToString("N").Substring(0, 8);
             Remote(server, "mkdir -p '" + server.Root + "'");
-            ThemedMessageBox.ShowImpl = (text, caption, buttons, icon, owner) =>
+            UserDialogs.MessageImpl = request =>
             {
+                string text = request.Text;
+                DialogButtons buttons = request.Buttons;
                 lock (server.Prompts)
                 {
                     server.Prompts.Add(text);
                 }
-                DialogResult? answer = server.Answer?.Invoke(text, buttons);
+                DialogAnswer? answer = server.Answer?.Invoke(text, buttons);
                 if (answer == null)
                 {
                     Console.WriteLine("  (unexpected question) " + text.Replace("\n", " "));
-                    return buttons == MessageBoxButtons.OK ? DialogResult.OK : DialogResult.Cancel;
+                    return buttons == DialogButtons.Ok ? DialogAnswer.Ok : DialogAnswer.Cancel;
                 }
                 return answer.Value;
             };
@@ -1462,7 +1464,7 @@ internal static class Program
             }
             finally
             {
-                ThemedMessageBox.ShowImpl = null;
+                UserDialogs.MessageImpl = null;
                 try
                 {
                     Remote(server, "rm -rf '" + server.Root + "'");

@@ -3,7 +3,6 @@ using SmarTTY.Ssh;
 using SmarTTY.CodeEditing;
 using SmarTTY.Completion;
 using SmarTTY.Controls;
-using SmarTTY.Forms;
 using SmarTTY.GUI.Styles;
 using SmarTTY.IO;
 using SmarTTY.Terminal;
@@ -30,10 +29,12 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
-using Control = System.Windows.Forms.Control;
 using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
 using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 using Point = System.Drawing.Point;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
+using Separator = System.Windows.Controls.Separator;
 
 namespace SmarTTY.GUI.Backend;
 
@@ -1226,7 +1227,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     public readonly Dispatcher Dispatcher;
 
-    private ContextMenuStrip _TerminalContextMenu;
+    private ContextMenu _TerminalContextMenu;
 
     private Dock _SessionHeaderLocation;
 
@@ -1743,80 +1744,7 @@ public class MainWindowController : INotifyPropertyChanged
         MenuCommandHandlers = new MenuCommandHandlersImpl(this);
         ToolStrip = new ToolStripImpl(this, ((DispatcherObject)wnd).Dispatcher);
         Dispatcher = ((DispatcherObject)wnd).Dispatcher;
-        _TerminalContextMenu = new ContextMenuStrip();
-        _TerminalContextMenu.Items.Add("Copy", Icons.Load("copy"), (object sender, EventArgs e) =>
-        {
-            if (MenuTerminal != null)
-            {
-                MenuTerminal.CopySelection();
-            }
-            else
-            {
-                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.CopySelection();
-            }
-        });
-        _TerminalContextMenu.Items.Add("Paste", Icons.Load("paste"), (object _, EventArgs e) =>
-        {
-            if (MenuTerminal != null)
-            {
-                MenuTerminal.Paste();
-            }
-            else
-            {
-                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.Paste();
-            }
-        });
-        ToolStripMenuItem pasteSpecialMenu = new ToolStripMenuItem("Paste special");
-        pasteSpecialMenu.DropDownItems.Add("Paste as one line (lines joined with a space)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.OneLineSpaces));
-        pasteSpecialMenu.DropDownItems.Add("Paste as one line (lines joined with &&)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.OneLineAnd));
-        ToolStripItem pasteLineByLineItem = pasteSpecialMenu.DropDownItems.Add("Paste line by line (wait for each command)", null, (object _, EventArgs e) => PasteSpecial(PasteMode.LineByLine));
-        pasteLineByLineItem.ToolTipText = "Smart Terminal: runs the pasted commands one after another, each when the previous one has ended; stops at a failed command.";
-        _TerminalContextMenu.Items.Add(pasteSpecialMenu);
-        ToolStripMenuItem commandHistoryItem = new ToolStripMenuItem("Command history...", Icons.Load("find"), (object _, EventArgs e) => ShowCommandHistory())
-        {
-            ToolTipText = "Search the commands of this tab and put one into the command line (Enter runs it); a Smart Terminal tab can also delete them"
-        };
-        _TerminalContextMenu.Items.Add(commandHistoryItem);
-        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
-        {
-            // Opened by a WinForms terminal (its SourceControl), not by the WPF one that opened it the last time.
-            if (!_MenuOpeningFromWpf)
-            {
-                _MenuOpenedBy = null;
-            }
-            _MenuOpeningFromWpf = false;
-        };
-        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
-        {
-            ITerminalSurface target = ContextMenuTerminal(out SessionWrapper targetSession);
-            // A classic tab reads the history file of the shell, which a Windows server does not have.
-            commandHistoryItem.Enabled = target is WpfSmartTerminal || (target != null && targetSession?.Session != null && !targetSession.IsWindowsHost);
-        };
-        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) =>
-        {
-            // Only the Smart Terminal knows when a command has ended.
-            pasteLineByLineItem.Enabled = MenuTerminal is WpfSmartTerminal;
-        };
-        // The "Quick commands" sub menu goes on top of the menu; it is rebuilt each time the menu opens, from the list as it is saved now.
-        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => AddQuickCommandItems();
-        // Painted when it opens, so that it follows the theme chosen in the settings like the other menus.
-        _TerminalContextMenu.Opening += (object _, System.ComponentModel.CancelEventArgs e) => ThemedMenu.Apply(_TerminalContextMenu);
-        _TerminalContextMenu.Items.Add("Copy All", Icons.Load("copy"), (object _, EventArgs e) =>
-        {
-            CopyAll();
-        });
-        _TerminalContextMenu.Items.Add("Clear", Icons.Load("clear"), (object _, EventArgs e) =>
-        {
-            MenuTerminal?.ClearOutput();
-        });
-        _TerminalContextMenu.Items.Add("New Tab", Icons.Load("add"), (object _, EventArgs e) =>
-        {
-            ActiveSession?.CreateNewTerminalPage();
-        });
-        _TerminalContextMenu.Items.Add("Close Tab", Icons.Load("delete"), (object _, EventArgs e) =>
-        {
-            CloseActivePage();
-        });
+        _TerminalContextMenu = CreateTerminalContextMenu();
         AllSessions.Add(new SessionWrapper(this, null, null));
         CommonGUIPreferences commonGUIPreferences = GuiPreferencesStore.Current;
         if (commonGUIPreferences != null)
@@ -1827,13 +1755,76 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyGlobalVisualSettings();
     }
 
-    // The WPF terminal that opened the menu (a WinForms terminal is its SourceControl); cleared when a WinForms control opens it.
+    // The terminal that opened the menu.
     private ITerminalSurface _MenuOpenedBy;
 
-    private bool _MenuOpeningFromWpf;
-
     // The terminal the menu was opened on, or the one of the active tab.
-    private ITerminalSurface MenuTerminal => _MenuOpenedBy ?? (_TerminalContextMenu.SourceControl as ITerminalSurface) ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+    private ITerminalSurface MenuTerminal => _MenuOpenedBy ?? (ActiveSession?.ActiveTab as NormalTabContext)?.Terminal;
+
+    // The items of the terminal menu whose state is worked out when it opens.
+    private MenuItem _PasteLineByLineItem;
+
+    private MenuItem _CommandHistoryItem;
+
+    /// <summary>
+    /// The context menu of the terminals of the tabs (WPF since stage 4A; it was a WinForms <c>ContextMenuStrip</c>): Quick commands (made again
+    /// each time it opens), Copy, Paste, Paste special, Command history, Copy All, Clear, New Tab, Close Tab.
+    /// </summary>
+    private ContextMenu CreateTerminalContextMenu()
+    {
+        ContextMenu menu = new ContextMenu();
+        menu.Items.Add(WpfMenus.Item("Copy", "copy", () =>
+        {
+            if (MenuTerminal != null)
+            {
+                MenuTerminal.CopySelection();
+            }
+            else
+            {
+                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.CopySelection();
+            }
+        }));
+        menu.Items.Add(WpfMenus.Item("Paste", "paste", () =>
+        {
+            if (MenuTerminal != null)
+            {
+                MenuTerminal.Paste();
+            }
+            else
+            {
+                (ActiveSession?.ActiveTab as EditorTabContext)?.Editor.Paste();
+            }
+        }));
+        MenuItem pasteSpecialMenu = WpfMenus.Item("Paste special", null, null);
+        pasteSpecialMenu.Items.Add(WpfMenus.Item("Paste as one line (lines joined with a space)", null, () => PasteSpecial(PasteMode.OneLineSpaces)));
+        pasteSpecialMenu.Items.Add(WpfMenus.Item("Paste as one line (lines joined with &&)", null, () => PasteSpecial(PasteMode.OneLineAnd)));
+        _PasteLineByLineItem = WpfMenus.Item("Paste line by line (wait for each command)", null, () => PasteSpecial(PasteMode.LineByLine),
+            "Smart Terminal: runs the pasted commands one after another, each when the previous one has ended; stops at a failed command.");
+        pasteSpecialMenu.Items.Add(_PasteLineByLineItem);
+        menu.Items.Add(pasteSpecialMenu);
+        _CommandHistoryItem = WpfMenus.Item("Command history...", "find", ShowCommandHistory,
+            "Search the commands of this tab and put one into the command line (Enter runs it); a Smart Terminal tab can also delete them");
+        menu.Items.Add(_CommandHistoryItem);
+        menu.Items.Add(WpfMenus.Item("Copy All", "copy", CopyAll));
+        menu.Items.Add(WpfMenus.Item("Clear", "clear", () => MenuTerminal?.ClearOutput()));
+        menu.Items.Add(WpfMenus.Item("New Tab", "add", () => ActiveSession?.CreateNewTerminalPage()));
+        menu.Items.Add(WpfMenus.Item("Close Tab", "delete", CloseActivePage));
+        return menu;
+    }
+
+    /// <summary>Opens the menu of the terminals on <paramref name="terminal"/>, at the mouse.</summary>
+    private void ShowTerminalContextMenu(WpfTerminal terminal)
+    {
+        _MenuOpenedBy = terminal;
+        ITerminalSurface target = ContextMenuTerminal(out SessionWrapper targetSession);
+        // A classic tab reads the history file of the shell, which a Windows server does not have.
+        _CommandHistoryItem.IsEnabled = target is WpfSmartTerminal || (target != null && targetSession?.Session != null && !targetSession.IsWindowsHost);
+        // Only the Smart Terminal knows when a command has ended.
+        _PasteLineByLineItem.IsEnabled = target is WpfSmartTerminal;
+        // The "Quick commands" sub menu goes on top of the menu; it is made again each time the menu opens, from the list as it is saved now.
+        AddQuickCommandItems();
+        WpfMenus.OpenAtMouse(_TerminalContextMenu, terminal);
+    }
 
     // The terminal the menu was opened on (or the one of the active tab) and its session.
     private ITerminalSurface ContextMenuTerminal(out SessionWrapper session)
@@ -1927,14 +1918,13 @@ public class MainWindowController : INotifyPropertyChanged
     }
 
     // The "Quick commands" sub menu (and the separator after it) in the menu of the terminal, removed and added again each time it opens.
-    private readonly List<ToolStripItem> _QuickCommandItems = new List<ToolStripItem>();
+    private readonly List<System.Windows.Controls.Control> _QuickCommandItems = new List<System.Windows.Controls.Control>();
 
     private void AddQuickCommandItems()
     {
-        foreach (ToolStripItem old in _QuickCommandItems)
+        foreach (System.Windows.Controls.Control old in _QuickCommandItems)
         {
             _TerminalContextMenu.Items.Remove(old);
-            old.Dispose();
         }
         _QuickCommandItems.Clear();
         ITerminalSurface terminal = MenuTerminal;
@@ -1947,40 +1937,31 @@ public class MainWindowController : INotifyPropertyChanged
         }
         bool scriptsPossible = session.Session != null && !session.IsWindowsHost;
         // The commands are not put into the menu itself (a long list pushes Copy, Paste... away): they are in one sub menu.
-        ToolStripMenuItem quickCommandsMenu = new ToolStripMenuItem("Quick commands", Icons.Load("terminal"))
-        {
-            ToolTipText = "Your commands and scripts (Tools > Quick commands...): chosen one is put into the command line, Enter runs it"
-        };
-        quickCommandsMenu.DropDown.ShowItemToolTips = true;
+        MenuItem quickCommandsMenu = WpfMenus.Item("Quick commands", "terminal", null,
+            "Your commands and scripts (Tools > Quick commands...): chosen one is put into the command line, Enter runs it");
         int commandCount = 0;
         foreach (QuickCommand item in QuickCommandRules.MenuItems(QuickCommandStore.LoadForMenu(), scriptsPossible))
         {
             QuickCommand chosen = item;
-            ToolStripMenuItem menuItem = new ToolStripMenuItem(chosen.MenuText.Replace("&", "&&"), Icons.Load(chosen.Kind == QuickCommandKind.Script ? "run" : "terminal"), (object sender, EventArgs e) => session.InsertQuickCommand(chosen, terminal))
-            {
-                ToolTipText = chosen.Kind == QuickCommandKind.Script
+            quickCommandsMenu.Items.Add(WpfMenus.Item(WpfMenus.PlainText(chosen.MenuText), chosen.Kind == QuickCommandKind.Script ? "run" : "terminal",
+                () => session.InsertQuickCommand(chosen, terminal),
+                chosen.Kind == QuickCommandKind.Script
                     ? "Puts the script " + chosen.FileName + " into the current folder, makes it executable and types ./" + chosen.FileName + " (press Enter to run it)"
-                    : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"
-            };
-            quickCommandsMenu.DropDownItems.Add(menuItem);
+                    : QuickCommandRules.ToCommandLine(chosen.Text) + Environment.NewLine + "(press Enter to run it)"));
             commandCount++;
         }
         if (commandCount > 0)
         {
-            quickCommandsMenu.DropDownItems.Add(new ToolStripSeparator());
+            quickCommandsMenu.Items.Add(new Separator());
         }
-        ToolStripMenuItem manage = new ToolStripMenuItem(commandCount == 0 ? "Add quick commands..." : "Quick commands...", Icons.Load("edit"), (object sender, EventArgs e) => ShowQuickCommands())
-        {
-            ToolTipText = "Commands and scripts that this menu puts into the command line"
-        };
-        quickCommandsMenu.DropDownItems.Add(manage);
+        quickCommandsMenu.Items.Add(WpfMenus.Item(commandCount == 0 ? "Add quick commands..." : "Quick commands...", "edit", ShowQuickCommands,
+            "Commands and scripts that this menu puts into the command line"));
         _QuickCommandItems.Add(quickCommandsMenu);
-        _QuickCommandItems.Add(new ToolStripSeparator());
+        _QuickCommandItems.Add(new Separator());
         for (int i = 0; i < _QuickCommandItems.Count; i++)
         {
             _TerminalContextMenu.Items.Insert(i, _QuickCommandItems[i]);
         }
-        _TerminalContextMenu.ShowItemToolTips = true;
     }
 
     /// <summary>Tools > Quick commands: the window that edits the commands and scripts of the menu of the terminal.</summary>
@@ -2206,7 +2187,6 @@ public class MainWindowController : INotifyPropertyChanged
         terminal.CaretWhenUnfocused = false;
         // Pasted line breaks reach the remote program as Enter (CR), as in other terminal emulators.
         terminal.PasteLineBreak = "\r";
-        terminal.ContextMenuReference = _TerminalContextMenu;
         terminal.AutoWrap = Settings.AutoWrapLines;
         // The font of the settings, or the default of the WinForms terminal (Courier New, 12 points) when none is set; EffectiveFont is both.
         Font configuredFont = null;
@@ -2220,12 +2200,7 @@ public class MainWindowController : INotifyPropertyChanged
         ApplyTerminalSettings(terminal, configuredFont);
         // A very large paste can be sent as a file instead of being typed into the terminal.
         terminal.LargePasteUploadRequested += (WpfTerminal source, string text) => session.UploadPastedText(text, source);
-        terminal.ContextMenuRequested += (WpfTerminal source, System.Drawing.Point screen) =>
-        {
-            _MenuOpenedBy = source;
-            _MenuOpeningFromWpf = true;
-            _TerminalContextMenu.Show(screen);
-        };
+        terminal.ContextMenuRequested += (WpfTerminal source, System.Drawing.Point screen) => ShowTerminalContextMenu(source);
         terminal.ShortcutKey += WpfTerminal_ShortcutKey;
         terminal.CtrlTabPressed += (WpfTerminal source, bool shift) => ActiveSession?.OnCtrlTabPressed(shift);
         terminal.KeyUp += (object sender, System.Windows.Input.KeyEventArgs e) =>
@@ -2540,9 +2515,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     /// <summary>
     /// Hides the menu and the tab headers while the mouse is away from the window edges, and brings them back
-    /// when it is near the edge they are docked to. The same rules drive SSH and device (COM/TCP) terminals;
-    /// only the source of the mouse events is different, because a WinForms control hosted in a
-    /// WindowsFormsHost does not pass its MouseMove events up to the WPF window.
+    /// when it is near the edge they are docked to. The same rules drive SSH and device (COM/TCP) terminals.
     /// </summary>
     private void UpdateMinimalisticModeVisibility(ScreenEdgeUtils.EdgeFlags edgeFlags)
     {
@@ -2560,13 +2533,6 @@ public class MainWindowController : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// Subscribes <see cref="UpdateMinimalisticModeVisibility"/> to the mouse events of a device (COM/TCP)
-    /// terminal. The terminal itself and every child that can appear under the pointer are handled, because a
-    /// child control does not pass its MouseMove events to its parent. Coordinates are converted to the
-    /// terminal's client area, so a control that does not fill the window (a label of the "connecting" panel,
-    /// for example) cannot make a window edge look nearer than it is.
-    /// </summary>
     private static Visibility BoolToVisibility(bool v)
     {
         if (v)

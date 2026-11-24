@@ -9,8 +9,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Image = System.Windows.Controls.Image;
-using MessageBoxButtons = System.Windows.Forms.MessageBoxButtons;
-using MessageBoxIcon = System.Windows.Forms.MessageBoxIcon;
 
 namespace SmarTTY.GUI.HexView;
 
@@ -40,7 +38,7 @@ internal sealed class HexViewContextMenu : ContextMenu
         }
         afterCommand = afterCommand ?? (() => { });
         HexMenuModel model = new HexMenuModel(view, requestDialog,
-            error => ThemedMessageBox.Show(error, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Asterisk));
+            error => UserDialogs.Show(error, "SmarTTY", DialogButtons.Ok, DialogIcon.Information));
         foreach (EditorToolbarCommand? command in EditorCommandCatalog.ContextMenuLayout)
         {
             if (!command.HasValue)
@@ -117,7 +115,7 @@ internal sealed class HexViewContextMenu : ContextMenu
                 }
                 catch (Exception exception)
                 {
-                    ThemedMessageBox.Show(exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+                    UserDialogs.Show(exception.Message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
                 }
                 afterCommand();
             };

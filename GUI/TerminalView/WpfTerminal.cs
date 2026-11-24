@@ -1,5 +1,6 @@
 using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
+using SmarTTY.GUI;
 using SmarTTY.IO;
 using SmarTTY.Native;
 using SmarTTY.Terminal;
@@ -558,10 +559,10 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         }
         switch (PasteGuard.AskUpload(text.Length, _anchor))
         {
-            case System.Windows.Forms.DialogResult.Yes:
+            case DialogAnswer.Yes:
                 LargePasteUploadRequested(this, text);
                 return true;
-            case System.Windows.Forms.DialogResult.No:
+            case DialogAnswer.No:
                 return false;
             default:
                 return true;
@@ -620,21 +621,10 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         return true;
     }
 
-    /// <summary>Shows the menu with the clipboard, the texts pasted lately and the snippets, at the mouse or at the caret.</summary>
-    public void ShowPasteMenu(System.Drawing.Point? screenLocation = null)
+    /// <summary>Shows the menu with the clipboard, the texts pasted lately and the snippets, at the mouse (or near the corner of the terminal).</summary>
+    public void ShowPasteMenu()
     {
-        System.Drawing.Point where = screenLocation ?? MousePointOnScreen();
-        PasteMenu.Show(_anchor, ContextMenuReference, _appSettings, where, Paste, PasteText);
-    }
-
-    /// <summary>A WinForms menu whose look the paste menu takes (the context menu of the terminals of the window).</summary>
-    public System.Windows.Forms.ContextMenuStrip ContextMenuReference { get; set; }
-
-    private System.Drawing.Point MousePointOnScreen()
-    {
-        System.Drawing.Point mouse = System.Windows.Forms.Cursor.Position;
-        System.Drawing.Rectangle bounds = _anchor.ScreenBounds;
-        return bounds.Contains(mouse) ? mouse : new System.Drawing.Point(bounds.Left + 12, bounds.Top + 12);
+        PasteMenu.Show(this, _appSettings, Paste, PasteText);
     }
 
     private void OnContextMenuRequested(Point screen)

@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -5,7 +6,7 @@ using System.Text;
 using System.Windows.Forms;
 using VisualTTY;
 
-namespace SmarTTY.Controls;
+namespace SmarTTY.GUI;
 
 /// <summary>
 /// What every terminal does with the text of the clipboard before it is pasted: cleaning (escape sequences, typographic
@@ -60,11 +61,11 @@ internal static class PasteGuard
     /// Asks what to do with a paste that is too large to be typed into a terminal: upload it as a file (Yes), paste it anyway
     /// (No) or do nothing (Cancel).
     /// </summary>
-    public static DialogResult AskUpload(int characters, IWin32Window owner)
+    public static DialogAnswer AskUpload(int characters, IWin32Window owner)
     {
         string text = "The text is " + FormatSize(characters) + ". Typing so much into a terminal takes long, and a remote shell may lose or mangle it." +
             "\n\nYes: upload it as a file (scp) to the current directory.\nNo: paste it anyway.\nCancel: paste nothing.";
-        return ThemedMessageBox.Show(owner, text, "Large paste", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+        return UserDialogs.Show(owner, text, "Large paste", DialogButtons.YesNoCancel, DialogIcon.Question);
     }
 
     /// <summary>The text cleaned as the settings say, with LF line breaks.</summary>
@@ -134,8 +135,8 @@ internal static class PasteGuard
             + " of the text cannot be represented in " + name + " and would be sent as \"?\":\n\n"
             + PasteEncoding.Describe(result.Unmappable, 12)
             + "\n\nSend the text anyway? Choose another encoding in the terminal toolbar to keep these characters.";
-        DialogResult answer = ThemedMessageBox.Show(owner, message, "Paste", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-        return answer == DialogResult.Yes ? result.Text : null;
+        DialogAnswer answer = UserDialogs.Show(owner, message, "Paste", DialogButtons.YesNo, DialogIcon.Warning);
+        return answer == DialogAnswer.Yes ? result.Text : null;
     }
 
     private static bool Confirm(string text, PasteSettings options, GlobalSettings settings, bool linesRunAtOnce, IWin32Window owner)
@@ -174,7 +175,7 @@ internal static class PasteGuard
         {
             summary.Append(" The text is large.");
         }
-        ThemedPasteConfirmResult confirmed = ThemedPasteConfirm.Confirm(owner, summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
+        PasteConfirmResult confirmed = PasteConfirmWindow.Confirm(WindowOwnership.Of(owner), summary.ToString(), PasteSanitizer.BuildPreview(text, 30, 300), dangers, multiline);
         if (confirmed == null)
         {
             return false;
