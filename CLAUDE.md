@@ -13,14 +13,13 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 141 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
-  remote editor on OpenSSH and Dropbear), `HexEditorControlTests` (the real hex editor control against a golden file), `TextViewTests` (the real text
-  view and code editor against a golden file: the caret, the selection, the edits, the syntax colours, the folds, the messages, the
-  completion) and `ModelInteropTests` (`VirtualKey` against the real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see
-  "Done in 2E"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
+  remote editor on OpenSSH and Dropbear, on views of the test built on the models since 3E-5) and `ModelInteropTests` (`VirtualKey` against the
+  real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see "Done in 2E"), those of the WinForms editor and hex control
+  in 3E-5 (see "Done in 3E-5"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
   Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
@@ -36,8 +35,8 @@ PR that changes them.
 - Tests: plain console apps with `Check`/`Equal` helpers printing `PASS:`/`FAIL:`, sources linked with
   `<Compile Include="../../X/Y.cs" Link="Y.cs" />` (model: `tests/MultiCursorTests`). No xUnit/NUnit.
   A new test project needs its own step in `build.yml`.
-- Pattern for UI-free logic: model class in a logic folder + thin partial in `Controls/` that wires it to the control
-  (example: `CodeEditing/MultiCursor.cs` + `Controls/CodeEditorPP.MultiCursor.cs` via `IMultiCursorText`).
+- Pattern for UI-free logic: model class in a logic folder + a view that wires it to its window through an interface of the
+  calls it makes (example: `CodeEditing/MultiCursorSession.cs` + `GUI/TextView/WpfTextEditor` via `IMultiCursorHost`).
 - Settings types in `VisualTTY/` are serialized to XML: do not change their member types or names.
 - `CsiRepeatLimitTests` and `PrivateModeTableTests` read the source text of `Terminal/Emulation/TerminalEmulator.cs`,
   `TerminalModes.cs` and `Terminal/Rendering/TerminalDisplayModel.cs` (`AssemblyMetadata`); `FileDialogTests`, `FolderBrowserTests` and
@@ -55,8 +54,8 @@ PR that changes them.
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar and menus are still WinForms, hosted) | WPF |
-| `Controls/` | WinForms custom-drawn controls: terminals, editors, hex editor; themed adapters | WinForms |
-| `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`), popups (`SuggestionListForm`, `TextHintForm`) | WinForms |
+| `Controls/` | What is left on WinForms: the remote file editor (not a control since 3E-4) and the commands of its tab, the themed message boxes, dialogs and adapters, the paste helpers, the interop of the model types; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5 | WinForms |
+| `Forms/` | WinForms forms and DPI support (`DpiAwareForm`, `DpiScaling`); the popups of the WinForms completion went in 3E-5 | WinForms |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
 | `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
@@ -69,25 +68,23 @@ PR that changes them.
 | `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points | no |
 | `Utilities/` | Shared helpers | no |
 
-## Control hierarchy (Controls/)
+## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
 
 ```
-DpiAwareControl (WinForms UserControl)
-└─ ReadonlyTextBrowser            (+ .Wrap, .DragScroll, .Navigation): document view, caret, selection, highlights, scrolling; the caret moves and the navigation keys, the wrap map and the selection are CodeEditing/CaretNavigator, WrapMap and TextSelection, the search and the matches of its highlight CodeEditing/TextSearch, the marks of the blanks CodeEditing/BlankMarks
-   └─ ReadonlySmartScrollBrowser
-      └─ EditableTextBrowser      the edits: what an edit becomes and Replace All are CodeEditing/TextReplace, the commands TextEditCommands, their undo history UndoHistory
-         └─ TextEditorControl     (+ .Typing): the clipboard and the events; typing and the edit keys are CodeEditing/TextTyping
-            ├─ CodeEditorPP       (+ .LineEditing, .MultiCursor, .Completion): folding, inline messages; the lines an edit changed and the colour of a token are CodeEditing/SyntaxColoring, the rules of the word list and the parameter hint CodeEditing/EditorCompletion, the line commands, the moves to a bracket and the zoom steps CodeEditing/LineCommands, TokenMoves and EditorZoom, the pair of a bracket at the caret CodeEditing/BracketPair, what several cursors do CodeEditing/MultiCursorSession
-            │  └─ RemoteTextView  the WinForms text view of a RemoteFileEditor (the Mono stands; the tab gives the editor the WPF one): what the editor
-            │                     overrode of its base when it was one, and the host of the editor's own HexEditorControl
-            └─ (the WinForms terminals TerminalEmulatorBase, TerminalEmulatorControl, SshTerminalControl, SerialTerminalControl:
-                removed in stage 2, see "Done in 2E")
-HexEditorControl : Control                hex editing inside RemoteFileEditor (the Mono stands; the tab shows GUI/HexView/WpfHexEditor)
-RemoteFileEditor (+ .Syntax)              not a control since 3E-4: load/save over SSH, drafts, sudo, encodings and the questions, on a text view it is given
-                                          (IRemoteTextView: GUI/TextView/WpfTextEditor in the tab, RemoteTextView when it is given none) and a hex view
-                                          (IHexEditorView, shown through IHexViewPlace); the commands of its tab are RemoteFileEditorCommands, the WinForms
-                                          panel with its context menu RemoteFileEditorPanel (the Mono stands)
+RemoteFileEditor (+ .Syntax)   Controls/, not a control: load/save over SSH, drafts, sudo, encodings and the questions (the models of
+                               CodeEditing/RemoteFile*), on a text view and a hex view it is given:
+├─ IRemoteTextView             GUI/TextView/WpfTextEditor: the text view on the models (CaretNavigator, WrapMap, TextSelection, UndoHistory,
+│                              TextEditCommands, TextReplace, TextTyping, TextViewLayout, TextPointer, SyntaxColoring, FoldingManager,
+│                              InlineMessageProvider, EditorCompletion, LineCommands, TokenMoves, EditorZoom, TextSearch, BracketPair,
+│                              BlankMarks, MultiCursorSession)
+└─ IHexEditorView              GUI/HexView/WpfHexEditor: the hex view on HexEditingModel, HexViewLayout, HexKeyMap, HexPointer, HexByteText,
+                               HexMenuModel, HexInspectorModel; shown in place of the text through IHexViewPlace (the tab)
+RemoteFileEditorCommands       Controls/: the commands of the tab and their state (the WPF tool bar, the context menus, the keys)
+EditorTabContext               GUI/Backend/: the tab: the two views in one grid, the commands, the tool bar, the status bar, the search bar
 ```
+
+The WinForms controls this replaced (`ReadonlyTextBrowser` and its subclasses up to `CodeEditorPP`, `RemoteTextView`, `RemoteFileEditorPanel`,
+`HexEditorControl` with its menu and inspector, the WinForms terminals of stage 2) are gone; the notes below still name them, as they were.
 
 The terminals are WPF (`GUI/TerminalView/`): `WpfTerminal` (a `Border` with `TerminalPanel`: `TerminalRenderView` and a scroll bar) shows
 a `Terminal/Rendering/TerminalDisplayModel`, which holds the emulator and the screen of `Terminal/Emulation/` (a screen is an
@@ -106,7 +103,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 1B | Terminal emulator core out of WinForms | Done in alexsys87/SmarTTY#527–#537 (B1–B5, see the "Done in B…" notes below); what is left in the controls is the view, the byte mode, the keys, the paste, the mouse events and the output queue |
 | 1C | SSH/serial/device session controls out of WinForms | Done for what has logic that needs no window, in alexsys87/SmarTTY#538–#552 (C1–C15, see the "Done in C…" notes below); what is left is view orchestration: the input line of `SerialTerminalControl`, the command channel and the key handling of `SshTerminalControl`, and the `DeviceTerminalControl` partials ZModem, YModem, Kermit, Tftp, GzipBase64, FileSend, FileDrop, QuickScript and SerialLines (threads, timers, dialogs and the progress windows around the protocols of `IO/`, which have their own tests). Z1: see "Stage 1 result" |
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: the device panel's tool bar and menus are WinForms (hosted, they go with stage 4) |
-| 3 | Editor on AvalonEdit, hex editor on WPF | In progress: 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) in progress: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) done; next 3E-5 (the WinForms editor removed) |
+| 3 | Editor on AvalonEdit, hex editor on WPF | Done in alexsys87/SmarTTY#557 (the text view is a WPF view of our own on the model, not AvalonEdit): 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) done: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) and 3E-5 (the WinForms editor, hex control and their Mono stands removed; the hex golden replayed on the models, the remote editor stand on views of the test) done |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Planned |
 | 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned |
 
@@ -1115,3 +1112,31 @@ messages in the text and the caret on the problem, the offer to reload a service
 and the line ends from the status bar, Show Changes, Run (F5) and Follow Log, Ctrl+F, Ctrl+H, F3 and Shift+F3 with the search bar, Ctrl+G, Ctrl+W
 with unsaved changes, Ctrl+Tab between tabs, the context menu (each item, the Text submenu), the hex view and back (Ctrl+S, Ctrl+F, Ctrl+G and F3 in it),
 the zoom shared by the tabs, the theme switched while a tab is open, the settings window applied to an open tab, and the minimalistic mode at the edges.
+
+Done in 3E-5 (the WinForms editor removed), in three parts. 3E-5b (first, so that the hex view it makes could serve 3E-5a): `tests/HexEditorModelSnapshots`
+(net8.0, in CI) runs the script of the Mono stand of the hex control (`HexEditorControlTests`: six seeded runs of keys and calls; the layout, the mouse,
+the wheel, the tool tip and the colours of the shown view; the submenus; the data inspector) on the models of the hex editor through `HexReplayView` and
+`HexReplayInspector`, which do what the control and its inspector did around them without a window (the code of the control with the painting, the
+timers, the tool tip and the clipboard of the system left out, and a focus that a shown window gives and takes), and compares every line with the golden
+file the control wrote, copied as it was: all 3771 lines match. Two things are not compared word for word: `states=` in the two runs that showed the
+control in a form (it counted the focus events of the window too), and a floating point value of the inspector, which Mono writes with 15 or 17 digits
+and .NET 8 as the shortest text that reads back the same (5 lines, compared as numbers). Of 6 mutations of the hex models 5 make it fail; the sixth (the
+first row chosen when the inspector gets the focus) cannot be seen from the script, which always chose a row first. 3E-5a: the Mono stand of the remote
+editor (`RemoteFileEditorIntegrationTests`) gives the editor views of its own instead of the WinForms ones: `TestTextView` (the document, the undo history
+and the edit commands, the line commands, the selection, the search, the folds and the messages of the models; the posts and the questions of the loading
+reach the UI thread through a control that only marshals) and `HexReplayView`; every editor gets a place, whose state stands for the `Visible` of the
+editor's old hex control. The two checks that named the WinForms controls became one (the text view is the one given): 552 checks on both servers.
+3E-5c: gone are `ReadonlyTextBrowser` (with `.Wrap`, `.DragScroll`, `.Navigation`), `ReadonlySmartScrollBrowser`, `EditableTextBrowser` (with `.Edits`),
+`TextEditorControl` (with `.Typing`), `CodeEditorPP` (with `.Completion`, `.LineEditing`, `.MultiCursor`), `RemoteTextView`, `RemoteFileEditorPanel`,
+`HexEditorControl`, `HexEditorMenu`, `HexDataInspector`, `ControlUiDispatcher`, `ControlUserPrompt`, `VirtualRowLayout`, `KeyShortcutText`,
+`DpiAwareControl`, the whole of `Controls/TextView/` (the carets, the margins, the fold painter, the message view, the brushes of the highlights, the
+WinForms popups of the completion and their factories), `SuggestionListView`, `TextHintControl`, `ArgumentLabel`, `Forms/SuggestionListForm`,
+`Forms/TextHintForm` and `GUI/Backend/WPFScrollBar` (the scroll bars of the WinForms editor in the tab) with its style; and the stands that drove them:
+`TextViewTests` (its logic is checked on the models by `CaretNavigatorTests`, `TextViewLayoutTests`, `LineCommandTests`, `TextSearchTests`,
+`MultiCursorSessionTests`, `EditorCompletionModelTests` and `FoldingTests`; it is not replayed: the middle way chosen for 3E-5), `HexEditorControlTests` (replayed, above)
+and `VirtualRowTests` (the row layout of the WinForms view; the rows of the WPF view are `TextViewLayoutTests`); `ModelInteropTests` lost the checks of
+the brushes and of the key names of a shortcut (and `KeyShortcutGolden.txt`). `RemoteFileEditor` takes both views and makes none (`TextControl` and
+`HexEditorControl` are gone); `HexSearchEventArgs` is in `GUI/HexView`, `HexDialogRequestedEventArgs` in `Controls/`; `DpiScaling` no longer looks for
+text views to scale. `EditorTextTests` reads the WPF view and its menu where it read the WinForms view, panel and code editor. The number of test
+projects in the first section is 139 now. What only the removed stands checked (the keys, the mouse, the painting and the focus of the WinForms views)
+has no stand: the WPF views are checked by hand (the lists of 3B-2 to 3E-4).
