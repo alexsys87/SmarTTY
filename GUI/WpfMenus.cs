@@ -11,14 +11,14 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// Pieces of the WPF menus that replace the WinForms ones (stage 4): the images of the items, from the same embedded files the WinForms
-/// menus used (<c>SmarTTY.Icons.&lt;name&gt;.png</c>, see <c>Controls/Icons</c>), items made in one call, and a menu opened at the mouse.
+/// menus used (<c>SmarTTY.Icons.&lt;name&gt;.png</c>, embedded by <c>SmarTTY.csproj</c>), items made in one call, and a menu opened at the mouse.
 /// The look is the theme's: <c>GUI/Styles/Controls.xaml</c> styles every <see cref="ContextMenu"/> and <see cref="MenuItem"/>.
 /// </summary>
 internal static class WpfMenus
 {
     private static readonly Dictionary<string, ImageSource> _icons = new Dictionary<string, ImageSource>();
 
-    /// <summary>The image of a name (as <c>Icons.Load</c> knows it), or null when there is none. Frozen and shared.</summary>
+    /// <summary>The image of a name (<c>SmarTTY.Icons.&lt;name&gt;.png</c>), or null when there is none. Frozen and shared.</summary>
     public static ImageSource LoadIcon(string name)
     {
         if (string.IsNullOrEmpty(name))

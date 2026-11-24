@@ -33,8 +33,6 @@
     <!-- The hex view the stand gives the editor: the one the replay of the hex control stand runs on (the WinForms control is gone, 3E-5). -->
     <Compile Include="../HexEditorModelSnapshots/HexReplayView.cs" Link="HexReplayView.cs" />
     <Compile Include="../HexEditorModelSnapshots/HexReplayInspector.cs" Link="HexReplayInspector.cs" />
-    <!-- Used by the themed controls (ThemedToolStripRenderer); plain code, unlike the rest of GUI/. -->
-    <Compile Include="../../GUI/Styles/ThemeManager.cs" />
     <!-- Used by VisualTTY/AppEnvironment.cs; plain code, unlike the rest of GUI/. -->
     <Compile Include="../../GUI/Backend/IFileListHost.cs" />
     <Compile Include="../../**/*.cs" Exclude="../../GUI/**;../../App.xaml.cs;../../tests/**;../../obj/**;../../bin/**;../../Properties/AssemblyInfo.cs" />

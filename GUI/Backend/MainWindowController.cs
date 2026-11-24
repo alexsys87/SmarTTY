@@ -2517,9 +2517,7 @@ public class MainWindowController : INotifyPropertyChanged
 
     /// <summary>
     /// Hides the menu and the tab headers while the mouse is away from the window edges, and brings them back
-    /// when it is near the edge they are docked to. The same rules drive SSH and device (COM/TCP) terminals;
-    /// only the source of the mouse events is different, because a WinForms control hosted in a
-    /// WindowsFormsHost does not pass its MouseMove events up to the WPF window.
+    /// when it is near the edge they are docked to. The same rules drive SSH and device (COM/TCP) terminals.
     /// </summary>
     private void UpdateMinimalisticModeVisibility(ScreenEdgeUtils.EdgeFlags edgeFlags)
     {
@@ -2537,13 +2535,6 @@ public class MainWindowController : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// Subscribes <see cref="UpdateMinimalisticModeVisibility"/> to the mouse events of a device (COM/TCP)
-    /// terminal. The terminal itself and every child that can appear under the pointer are handled, because a
-    /// child control does not pass its MouseMove events to its parent. Coordinates are converted to the
-    /// terminal's client area, so a control that does not fill the window (a label of the "connecting" panel,
-    /// for example) cannot make a window edge look nearer than it is.
-    /// </summary>
     private static Visibility BoolToVisibility(bool v)
     {
         if (v)
