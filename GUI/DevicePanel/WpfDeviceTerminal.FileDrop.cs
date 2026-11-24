@@ -59,7 +59,7 @@ public partial class WpfDeviceTerminal
         string[] files = dropped.Where(File.Exists).ToArray();
         if (files.Length == 0)
         {
-            ThemedMessageBox.Show("Only files can be sent. Folders are not supported by the serial file transfer protocols.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("Only files can be sent. Folders are not supported by the serial file transfer protocols.", "Send file", DialogButtons.Ok, DialogIcon.Information);
             return;
         }
         if (IsLineBusy())
@@ -68,7 +68,7 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending a file.", "Send file", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
         Func<string[], DeviceFileDropProtocol?> prompt = FileDropProtocolPrompt;
@@ -97,7 +97,7 @@ public partial class WpfDeviceTerminal
             case DeviceFileDropProtocol.XModem1K:
                 if (files.Length != 1)
                 {
-                    ThemedMessageBox.Show("XMODEM sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "XMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("XMODEM sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "XMODEM Send", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 StartXModemSend(files[0], useLargeBlocks: protocol == DeviceFileDropProtocol.XModem1K);
@@ -114,7 +114,7 @@ public partial class WpfDeviceTerminal
             case DeviceFileDropProtocol.GzipBase64:
                 if (files.Length != 1)
                 {
-                    ThemedMessageBox.Show("The gzip + base64 transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + base64 Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The gzip + base64 transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + base64 Send", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 StartGzipBase64Transfer(sending: true, droppedFile: files[0]);
@@ -122,7 +122,7 @@ public partial class WpfDeviceTerminal
             case DeviceFileDropProtocol.GzipCat:
                 if (files.Length != 1)
                 {
-                    ThemedMessageBox.Show("The gzip + cat transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + cat Send", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The gzip + cat transfer sends one file at a time. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "gzip + cat Send", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 StartGzipBase64Transfer(sending: true, droppedFile: files[0], raw: true);
@@ -130,7 +130,7 @@ public partial class WpfDeviceTerminal
             case DeviceFileDropProtocol.RawSend:
                 if (files.Length != 1)
                 {
-                    ThemedMessageBox.Show("A raw send writes one file to the line. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("A raw send writes one file to the line. Drop a single file, or choose YMODEM, ZMODEM or Kermit.", "Send file", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 StartFileSend(files[0]);

@@ -209,7 +209,7 @@ internal sealed class TextLabWindow : Window
             FileInfo info = new FileInfo(path);
             if (info.Length > MaxBytes)
             {
-                MessageDialog.Show(path + " is larger than " + MaxBytes / (1024 * 1024) + " MB: the lab does not read it.", "WPF text editor lab", MessageDialogIcon.Warning, MessageDialogButtons.Ok, owner: this);
+                MessageDialog.Show(path + " is larger than " + MaxBytes / (1024 * 1024) + " MB: the lab does not read it.", "WPF text editor lab", DialogIcon.Warning, DialogButtons.Ok, owner: this);
                 return;
             }
             // UTF-8 unless the file starts with the mark of another Unicode encoding.
@@ -226,7 +226,7 @@ internal sealed class TextLabWindow : Window
         }
         catch (Exception exception)
         {
-            MessageDialog.Show(exception.Message, "WPF text editor lab", MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: this);
+            MessageDialog.Show(exception.Message, "WPF text editor lab", DialogIcon.Error, DialogButtons.Ok, owner: this);
         }
     }
 

@@ -127,7 +127,7 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
         }
         if (!_commandLists.SaveList(forThisDevice, commands))
         {
-            ThemedMessageBox.Show("The command list could not be saved.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("The command list could not be saved.", "Error", DialogButtons.Ok, DialogIcon.Warning);
         }
         _commandLists.SetList(forThisDevice, commands);
     }
@@ -148,7 +148,7 @@ public partial class WpfDeviceTerminal : IDeviceCommandHost
         {
             return;
         }
-        if (ThemedMessageBox.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (UserDialogs.Show("Delete the saved command history of " + ConnectionTitle + "?", "Command history", DialogButtons.YesNo, DialogIcon.Question) != DialogAnswer.Yes)
         {
             return;
         }

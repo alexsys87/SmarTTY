@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -346,7 +347,7 @@ public partial class FontPickerWindow : Window
         if (!IsMonospace(FontList.SelectedItem as FontEntry))
         {
             MessageDialog.Show("The font you have selected is not a monospace font. The console window requires a monospace font, e.g. Courier New.",
-                "SmarTTY", MessageDialogIcon.Warning, MessageDialogButtons.Ok, owner: this);
+                "SmarTTY", DialogIcon.Warning, DialogButtons.Ok, owner: this);
             return;
         }
         DialogResult = true;

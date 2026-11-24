@@ -190,7 +190,7 @@ public partial class WpfDeviceTerminal
             string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
             start = Directory.Exists(downloads) ? downloads : null;
         }
-        string chosen = ThemedFolderBrowser.Browse(Owner, description, start);
+        string chosen = UserDialogs.Browse(Owner, description, start);
         if (string.IsNullOrEmpty(chosen))
         {
             return null;
@@ -243,7 +243,7 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before receiving files via ZMODEM.", "ZMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before receiving files via ZMODEM.", "ZMODEM Receive", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
         string folder = ChooseZModemFolder("Choose the folder to save the received files in." + Environment.NewLine
@@ -312,7 +312,7 @@ public partial class WpfDeviceTerminal
                     string title = "ZMODEM Receive";
                     if (success)
                     {
-                        ThemedMessageBox.Show(DescribeSavedFiles(saved, folder), title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UserDialogs.Show(DescribeSavedFiles(saved, folder), title, DialogButtons.Ok, DialogIcon.Information);
                     }
                     else if (!cancelled)
                     {
@@ -322,7 +322,7 @@ public partial class WpfDeviceTerminal
                         {
                             text += "\r\n\r\nFiles received completely before the failure:\r\n" + string.Join("\r\n", saved);
                         }
-                        ThemedMessageBox.Show(text, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        UserDialogs.Show(text, title, DialogButtons.Ok, DialogIcon.Warning);
                     }
                 }));
             }
@@ -429,11 +429,11 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending files via ZMODEM.", "ZMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending files via ZMODEM.", "ZMODEM Send", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string[] fileNames = ThemedFileDialog.OpenFiles(Owner, "Select files to send via ZMODEM (at a shell prompt the device's rz is started automatically)", "All files (*.*)|*.*");
+        string[] fileNames = UserDialogs.OpenFiles(Owner, "Select files to send via ZMODEM (at a shell prompt the device's rz is started automatically)", "All files (*.*)|*.*");
         if (fileNames == null)
         {
             return;
@@ -509,14 +509,14 @@ public partial class WpfDeviceTerminal
                     string title = "ZMODEM Send";
                     if (success)
                     {
-                        ThemedMessageBox.Show(fileNames.Length == 1 ? "ZMODEM send completed successfully." : "ZMODEM send of " + fileNames.Length + " files completed successfully.",
-                            title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UserDialogs.Show(fileNames.Length == 1 ? "ZMODEM send completed successfully." : "ZMODEM send of " + fileNames.Length + " files completed successfully.",
+                            title, DialogButtons.Ok, DialogIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        ThemedMessageBox.Show("ZMODEM send failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason),
-                            title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        UserDialogs.Show("ZMODEM send failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason),
+                            title, DialogButtons.Ok, DialogIcon.Warning);
                     }
                 }));
             }

@@ -77,7 +77,7 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before using " + form + " transfer.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before using " + form + " transfer.", caption, DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
         // A dropped file is already chosen: the window asks only for the rest (the path on the device and the options).
@@ -87,7 +87,7 @@ public partial class WpfDeviceTerminal
             : raw ? GzipCatRequestPrompt : GzipBase64RequestPrompt;
         if (prompt == null)
         {
-            ThemedMessageBox.Show("The " + form + " transfer window is not available.", caption, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("The " + form + " transfer window is not available.", caption, DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
         GzipBase64Transfer.Request request = prompt(sending);

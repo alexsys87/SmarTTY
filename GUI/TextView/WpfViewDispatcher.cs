@@ -2,9 +2,6 @@ using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using System;
 using System.Windows.Threading;
-using MessageBoxButtons = System.Windows.Forms.MessageBoxButtons;
-using MessageBoxIcon = System.Windows.Forms.MessageBoxIcon;
-using DialogResult = System.Windows.Forms.DialogResult;
 
 namespace SmarTTY.GUI.TextView;
 
@@ -55,20 +52,20 @@ internal sealed class WpfViewDispatcher : IUiDispatcher, IUserPrompt
         {
             return PromptAnswer.Cancel;
         }
-        MessageBoxButtons boxButtons = buttons == PromptButtons.OkCancel ? MessageBoxButtons.OKCancel
-            : (buttons == PromptButtons.YesNo ? MessageBoxButtons.YesNo : MessageBoxButtons.YesNoCancel);
+        DialogButtons boxButtons = buttons == PromptButtons.OkCancel ? DialogButtons.OkCancel
+            : (buttons == PromptButtons.YesNo ? DialogButtons.YesNo : DialogButtons.YesNoCancel);
         try
         {
-            DialogResult result = _view.Dispatcher.Invoke(() => _view.IsClosed
-                ? DialogResult.Cancel
-                : ThemedMessageBox.Show(text, "SmarTTY", boxButtons, MessageBoxIcon.Warning));
+            DialogAnswer result = _view.Dispatcher.Invoke(() => _view.IsClosed
+                ? DialogAnswer.Cancel
+                : UserDialogs.Show(text, "SmarTTY", boxButtons, DialogIcon.Warning));
             switch (result)
             {
-                case DialogResult.OK:
+                case DialogAnswer.Ok:
                     return PromptAnswer.Ok;
-                case DialogResult.Yes:
+                case DialogAnswer.Yes:
                     return PromptAnswer.Yes;
-                case DialogResult.No:
+                case DialogAnswer.No:
                     return PromptAnswer.No;
                 default:
                     return PromptAnswer.Cancel;

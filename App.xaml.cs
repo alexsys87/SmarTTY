@@ -29,14 +29,11 @@ public partial class App : Application
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
         ThemeManager.Apply(GlobalSettings.Load());
 
-        // The message boxes of the harness-compiled controls become the themed WPF dialogs.
-        ThemedMessageBoxAdapter.Install();
-
-        // The folder choosers of the harness-compiled controls become the themed WPF local folder browser.
-        ThemedFolderBrowserAdapter.Install();
-
-        // The file choosers of the harness-compiled controls become the themed WPF local file dialog.
-        ThemedFileDialogAdapter.Install();
+        // The message boxes, file choosers and folder chooser of the code that cannot reference GUI/ (and of the rest) are the WPF windows.
+        UserDialogs.MessageImpl = MessageDialog.Ask;
+        UserDialogs.FileImpl = LocalFileDialogWindow.Show;
+        // The code asks on the UI thread, so showing a modal window is safe.
+        UserDialogs.FolderImpl = (description, initialPath) => LocalFolderBrowserWindow.Browse(initialPath, title: null, description: description);
 
         // The proxy prompt is raised from the harness-compiled connection controller, which cannot reference the WPF
         // dialog; the window is wired in here instead.

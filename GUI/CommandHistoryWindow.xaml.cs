@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
@@ -199,7 +200,7 @@ public partial class CommandHistoryWindow : Window
         {
             question += "\n\n" + _source.DeleteWarning;
         }
-        if (MessageDialog.Show(question, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
+        if (MessageDialog.Show(question, Caption, DialogIcon.Question, DialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
         {
             return;
         }

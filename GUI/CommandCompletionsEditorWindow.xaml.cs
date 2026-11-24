@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SmarTTY.Controls;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -58,7 +59,7 @@ public partial class CommandCompletionsEditorWindow : Window
         {
             // Load() answers a damaged file with an empty database: saving that would destroy what the user may still repair by hand.
             MessageBoxResult answer = MessageDialog.Show(database.LoadWarning + "\n\nOpen an empty list instead? Saving it replaces the damaged file.",
-                Caption, MessageDialogIcon.Warning, MessageDialogButtons.YesNo, MessageBoxResult.No, owner ?? this);
+                Caption, DialogIcon.Warning, DialogButtons.YesNo, MessageBoxResult.No, owner ?? this);
             if (answer != MessageBoxResult.Yes)
             {
                 return false;
@@ -252,7 +253,7 @@ public partial class CommandCompletionsEditorWindow : Window
             return;
         }
         string text = "Delete the command '" + entry.DisplayName + "'" + (entry.Options.Count > 0 ? " with its " + entry.Options.Count + " option(s)" : "") + "?";
-        if (MessageDialog.Show(text, Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
+        if (MessageDialog.Show(text, Caption, DialogIcon.Question, DialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
         {
             return;
         }
@@ -380,7 +381,7 @@ public partial class CommandCompletionsEditorWindow : Window
         if (errors.Count > 0)
         {
             string text = "Fix these problems before saving:\n\n" + string.Join("\n", errors.Take(12)) + (errors.Count > 12 ? "\n... and " + (errors.Count - 12) + " more" : "");
-            MessageDialog.Show(text, Caption, MessageDialogIcon.Warning, MessageDialogButtons.Ok, owner: this);
+            MessageDialog.Show(text, Caption, DialogIcon.Warning, DialogButtons.Ok, owner: this);
             return false;
         }
 
@@ -394,7 +395,7 @@ public partial class CommandCompletionsEditorWindow : Window
         {
             MessageDialog.Show("Could not save the command completions to:\n" + _path + (compressed ? ".gz" : "") + "\n\n" + ex.Message +
                                "\n\nThe file is saved next to SmarTTY.exe, or in %APPDATA%\\SmarTTY when that folder is protected; neither could be written.",
-                Caption, MessageDialogIcon.Error, MessageDialogButtons.Ok, owner: this);
+                Caption, DialogIcon.Error, DialogButtons.Ok, owner: this);
             return false;
         }
 
@@ -407,7 +408,7 @@ public partial class CommandCompletionsEditorWindow : Window
 
     private void Reload_Click(object sender, RoutedEventArgs e)
     {
-        if (_dirty && MessageDialog.Show("Discard the changes and read the file again?", Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
+        if (_dirty && MessageDialog.Show("Discard the changes and read the file again?", Caption, DialogIcon.Question, DialogButtons.YesNo, MessageBoxResult.No, this) != MessageBoxResult.Yes)
         {
             return;
         }
@@ -420,7 +421,7 @@ public partial class CommandCompletionsEditorWindow : Window
         {
             return;
         }
-        MessageBoxResult answer = MessageDialog.Show("Save the changes to the command completions?", Caption, MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel, MessageBoxResult.Yes, this);
+        MessageBoxResult answer = MessageDialog.Show("Save the changes to the command completions?", Caption, DialogIcon.Question, DialogButtons.YesNoCancel, MessageBoxResult.Yes, this);
         if (answer == MessageBoxResult.Cancel || (answer == MessageBoxResult.Yes && !Save()))
         {
             e.Cancel = true;

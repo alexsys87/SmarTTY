@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-// Regression harness for the themed file dialog that replaced the WinForms OpenFileDialog/SaveFileDialog. The
-// controls live in Controls/ and VisualTTY/, which the Mono test harness compiles and which cannot reference the WPF
-// windows, so they ask through the ThemedFileDialog facade; App wires that facade to GUI/LocalFileDialogWindow.
-// This harness guards two things: the rules the window is built on (the filter strings and the folder listing, which
-// have no UI dependency) and the wiring (the migrated call sites, the facade and the adapter).
+// Regression harness for the themed file dialog that replaced the WinForms OpenFileDialog/SaveFileDialog. The code
+// that cannot reference the WPF windows (Controls/, VisualTTY/) asks through the hooks of Controls/UserDialogs, which App
+// points at GUI/LocalFileDialogWindow (stage 4B: the ThemedFileDialog facade, its adapter and its fallback to the native
+// dialogs are gone). This harness guards two things: the rules the window is built on (the filter strings and the folder
+// listing, which have no UI dependency) and the wiring (the migrated call sites, the seam and the hook).
 // Run with: dotnet run --project tests/FileDialogTests
 internal static class Program
 {
@@ -203,9 +203,9 @@ internal static class Program
         }
 
         string device = File.ReadAllText(Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.cs"));
-        Check(device.Contains("ThemedFileDialog.OpenFile"), "the device terminal opens files through the themed dialog");
-        Check(device.Contains("ThemedFileDialog.SaveFile"), "the device terminal saves files through the themed dialog");
-        Check(File.ReadAllText(Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.ZModem.cs")).Contains("ThemedFileDialog.OpenFiles"),
+        Check(device.Contains("UserDialogs.OpenFile"), "the device terminal opens files through the themed dialog");
+        Check(device.Contains("UserDialogs.SaveFile"), "the device terminal saves files through the themed dialog");
+        Check(File.ReadAllText(Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.ZModem.cs")).Contains("UserDialogs.OpenFiles"),
             "the ZMODEM send path uses the themed multiselect dialog");
 
         // The WPF callers that own a Window use the LocalFileDialogWindow helpers directly.
@@ -235,20 +235,14 @@ internal static class Program
             return;
         }
 
-        string facadePath = Path.Combine(root, "Controls", "ThemedFileDialog.cs");
-        Check(File.Exists(facadePath), "the ThemedFileDialog facade exists");
-        if (!File.Exists(facadePath))
-        {
-            return;
-        }
-        string facade = File.ReadAllText(facadePath);
-        Check(facade.Contains("ShowImpl"), "the facade exposes the injected ShowImpl hook");
-        Check(facade.Contains("static string OpenFile"), "the facade offers an OpenFile entry point");
-        Check(facade.Contains("static string[] OpenFiles"), "the facade offers a multiselect OpenFiles entry point");
-        Check(facade.Contains("static string SaveFile"), "the facade offers a SaveFile entry point");
-        Check(facade.Contains("SaveFileEx"), "the facade reports the chosen filter index for the log-format callers");
-        Check(Regex.IsMatch(facade, @"\bOpenFileDialog\b") && Regex.IsMatch(facade, @"\bSaveFileDialog\b"),
-            "the facade falls back to the native dialogs when nothing is injected");
+        string seam = File.ReadAllText(Path.Combine(root, "Controls", "UserDialogs.cs"));
+        Check(seam.Contains("FileImpl"), "the dialogs seam exposes the file hook");
+        Check(seam.Contains("static string OpenFile"), "the dialogs seam offers an OpenFile entry point");
+        Check(seam.Contains("static string[] OpenFiles"), "the dialogs seam offers a multiselect OpenFiles entry point");
+        Check(seam.Contains("static string SaveFile"), "the dialogs seam offers a SaveFile entry point");
+        Check(seam.Contains("SaveFileEx"), "the dialogs seam reports the chosen filter index for the log-format callers");
+        Check(!Regex.IsMatch(seam, @"new\s+(OpenFileDialog|SaveFileDialog)\b"), "the dialogs seam has no native fallback");
+        Check(!File.Exists(Path.Combine(root, "Controls", "ThemedFileDialog.cs")), "the ThemedFileDialog facade is gone");
     }
 
     private static void TestAdapterAndInstall()
@@ -259,20 +253,13 @@ internal static class Program
             return;
         }
 
-        string adapterPath = Path.Combine(root, "GUI", "ThemedFileDialogAdapter.cs");
-        Check(File.Exists(adapterPath), "the adapter that points the facade at the themed dialog exists");
-        if (File.Exists(adapterPath))
-        {
-            string adapter = File.ReadAllText(adapterPath);
-            Check(adapter.Contains("ThemedFileDialog.ShowImpl"), "the adapter installs the facade hook");
-            Check(adapter.Contains("LocalFileDialogWindow.Browse"), "the adapter opens the themed local file dialog");
-        }
+        Check(!File.Exists(Path.Combine(root, "GUI", "ThemedFileDialogAdapter.cs")), "the file dialog adapter is gone");
 
         string windowPath = Path.Combine(root, "GUI", "LocalFileDialogWindow.xaml.cs");
         Check(File.Exists(windowPath), "the themed file dialog window exists");
         Check(File.Exists(Path.Combine(root, "GUI", "LocalFileDialogWindow.xaml")), "the themed file dialog markup exists");
 
         string app = File.ReadAllText(Path.Combine(root, "App.xaml.cs"));
-        Check(app.Contains("ThemedFileDialogAdapter.Install()"), "App wires the file dialog adapter on startup");
+        Check(app.Contains("UserDialogs.FileImpl = LocalFileDialogWindow.Show"), "App points the file hook at the themed file dialog");
     }
 }

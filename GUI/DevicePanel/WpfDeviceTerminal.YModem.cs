@@ -51,11 +51,11 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending files via YMODEM.", "YMODEM Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending files via YMODEM.", "YMODEM Send", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string[] fileNames = ThemedFileDialog.OpenFiles(Owner, "Select file(s) to send via YMODEM", "All files (*.*)|*.*");
+        string[] fileNames = UserDialogs.OpenFiles(Owner, "Select file(s) to send via YMODEM", "All files (*.*)|*.*");
         if (fileNames == null)
         {
             return;
@@ -105,11 +105,11 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before receiving files via " + protocolName + ".", protocolName + " Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before receiving files via " + protocolName + ".", protocolName + " Receive", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string folder = ThemedFolderBrowser.Browse(Owner,
+        string folder = UserDialogs.Browse(Owner,
             "Select the folder to save the received file(s) to. The names come from the sender; an existing file is never overwritten.");
         if (string.IsNullOrEmpty(folder))
         {

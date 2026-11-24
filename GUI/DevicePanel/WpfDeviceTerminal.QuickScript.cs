@@ -54,7 +54,7 @@ public partial class WpfDeviceTerminal
         string problem = QuickCommandRules.ValidateForSerial(item);
         if (problem != null)
         {
-            ThemedMessageBox.Show(item.MenuText + ": " + problem, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UserDialogs.Show(item.MenuText + ": " + problem, caption, DialogButtons.Ok, DialogIcon.Error);
             return;
         }
         if (!QuickScriptPossibleNow(caption))
@@ -72,7 +72,7 @@ public partial class WpfDeviceTerminal
         }
         string question = "Type the script " + item.FileName + " (" + lines + (lines == 1 ? " line, " : " lines, ") + data.Length + " bytes) into the shell of the device?" + Environment.NewLine + Environment.NewLine
             + "It is saved in the current folder of the device with cat, and a file with this name there is replaced. Esc cancels the upload. The shell of the device needs cat, chmod and mv (BusyBox has them).";
-        if (ThemedMessageBox.Show(question, caption, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (UserDialogs.Show(question, caption, DialogButtons.YesNo, DialogIcon.Question) != DialogAnswer.Yes)
         {
             return;
         }
@@ -105,7 +105,7 @@ public partial class WpfDeviceTerminal
         }
         if (!_serialTerminalControl.SubmitCommandNow(command, enter))
         {
-            ThemedMessageBox.Show("The command could not be sent: the shell of the device is not at its prompt.", caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("The command could not be sent: the shell of the device is not at its prompt.", caption, DialogButtons.Ok, DialogIcon.Information);
             return;
         }
         CancelQuickScriptInvocation();
@@ -131,12 +131,12 @@ public partial class WpfDeviceTerminal
     {
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("The device is not connected.", caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("The device is not connected.", caption, DialogButtons.Ok, DialogIcon.Information);
             return false;
         }
         if (!_serialTerminalControl.CanSubmitCommandNow)
         {
-            ThemedMessageBox.Show("A script can be typed into the device only while its shell shows the prompt and nothing is typed in the command line. Wait for the prompt (or clear the line) and choose the script again.", caption, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("A script can be typed into the device only while its shell shows the prompt and nothing is typed in the command line. Wait for the prompt (or clear the line) and choose the script again.", caption, DialogButtons.Ok, DialogIcon.Information);
             return false;
         }
         return true;
@@ -159,7 +159,7 @@ public partial class WpfDeviceTerminal
         _serialTerminalControl.InputLineDisabled = false;
         if (outcome == PasteJob.Outcome.Failed)
         {
-            ThemedMessageBox.Show(message, caption, MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+            UserDialogs.Show(message, caption, DialogButtons.Ok, DialogIcon.Warning);
         }
     }
 

@@ -35,11 +35,11 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending files via Kermit.", "Kermit Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending files via Kermit.", "Kermit Send", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string[] fileNames = ThemedFileDialog.OpenFiles(Owner, "Select files to send via Kermit (start the Kermit receiver on the device first, e.g. \"kermit -r\")", "All files (*.*)|*.*");
+        string[] fileNames = UserDialogs.OpenFiles(Owner, "Select files to send via Kermit (start the Kermit receiver on the device first, e.g. \"kermit -r\")", "All files (*.*)|*.*");
         if (fileNames == null)
         {
             return;
@@ -70,11 +70,11 @@ public partial class WpfDeviceTerminal
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before receiving files via Kermit.", "Kermit Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before receiving files via Kermit.", "Kermit Receive", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string folder = ThemedFolderBrowser.Browse(Owner,
+        string folder = UserDialogs.Browse(Owner,
             "Select the folder for the files received via Kermit (then start the sender on the device, e.g. \"kermit -s file\")");
         if (string.IsNullOrEmpty(folder))
         {

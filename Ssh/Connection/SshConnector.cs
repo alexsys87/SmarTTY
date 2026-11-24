@@ -248,7 +248,7 @@ public partial class SshConnector : Component
         }
         else
         {
-            confirmed = ThemedMessageBox.Show(message, appName, MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes;
+            confirmed = UserDialogs.Show(message, appName, DialogButtons.YesNo, DialogIcon.Warning) == DialogAnswer.Yes;
         }
     }
 

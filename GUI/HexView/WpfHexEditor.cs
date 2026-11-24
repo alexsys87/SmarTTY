@@ -459,7 +459,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
             }
             byte[] bytes = HexPasteText.ToBytes(text, _model.Area, question =>
             {
-                MessageBoxResult answer = MessageDialog.Show(question, "Paste", MessageDialogIcon.Question, MessageDialogButtons.YesNoCancel, defaultResult: null, owner: Window.GetWindow(this));
+                MessageBoxResult answer = MessageDialog.Show(question, "Paste", DialogIcon.Question, DialogButtons.YesNoCancel, defaultResult: null, owner: Window.GetWindow(this));
                 return answer == MessageBoxResult.Yes ? HexPasteChoice.Bytes : (answer == MessageBoxResult.No ? HexPasteChoice.Text : HexPasteChoice.Cancel);
             });
             if (bytes == null)
@@ -595,7 +595,7 @@ internal sealed class WpfHexEditor : FrameworkElement, IHexEditorView, IHexLayou
 
     private void ShowError(Exception exception)
     {
-        MessageDialog.Show(exception.Message, "Error", MessageDialogIcon.Error, MessageDialogButtons.Ok, defaultResult: null, owner: Window.GetWindow(this));
+        MessageDialog.Show(exception.Message, "Error", DialogIcon.Error, DialogButtons.Ok, defaultResult: null, owner: Window.GetWindow(this));
     }
 
     // ---- keyboard

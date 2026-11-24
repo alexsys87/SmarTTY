@@ -6,25 +6,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
+using SmarTTY.Controls;
+
 namespace SmarTTY.GUI;
-
-/// <summary>Which buttons a <see cref="MessageDialog"/> offers.</summary>
-internal enum MessageDialogButtons
-{
-    Ok,
-    OkCancel,
-    YesNo,
-    YesNoCancel
-}
-
-/// <summary>The picture shown next to the text of a <see cref="MessageDialog"/>.</summary>
-internal enum MessageDialogIcon
-{
-    Error,
-    Warning,
-    Question,
-    Information
-}
 
 /// <summary>
 /// A themed message box: unlike the WinForms <c>MessageBox</c> it takes its colours and its buttons from the
@@ -38,7 +22,7 @@ internal sealed class MessageDialog : Window
 
     private const double MaxTextHeight = 320.0;
 
-    private readonly MessageDialogButtons _Buttons;
+    private readonly DialogButtons _Buttons;
 
     // The button Enter picks. Null means the first button, the one WinForms marks as default for the button set.
     private readonly MessageBoxResult? _DefaultResult;
@@ -47,7 +31,7 @@ internal sealed class MessageDialog : Window
 
     private MessageBoxResult _Result;
 
-    private MessageDialog(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult)
+    private MessageDialog(string text, string caption, DialogIcon icon, DialogButtons buttons, MessageBoxResult? defaultResult)
     {
         _Buttons = buttons;
         _DefaultResult = defaultResult;
@@ -77,7 +61,33 @@ internal sealed class MessageDialog : Window
     /// <param name="owner">
     /// The window to own the dialog. When it is null the dialog is owned by the active window.
     /// </param>
-    public static MessageBoxResult Show(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult = null, Window owner = null)
+    /// <summary>
+    /// The message box of <see cref="UserDialogs"/> (set by <c>App</c>): owned by the window behind the handle of the request, or
+    /// by the window the user is working in; a box closed without a button is <see cref="DialogAnswer.Cancel"/>.
+    /// </summary>
+    internal static DialogAnswer Ask(MessageRequest request)
+    {
+        MessageBoxResult result = Show(
+            request.Text,
+            string.IsNullOrEmpty(request.Caption) ? "SmarTTY" : request.Caption,
+            request.Icon,
+            request.Buttons,
+            defaultResult: null,
+            owner: WindowOwnership.FromHandle(request.OwnerHandle));
+        switch (result)
+        {
+            case MessageBoxResult.Yes:
+                return DialogAnswer.Yes;
+            case MessageBoxResult.No:
+                return DialogAnswer.No;
+            case MessageBoxResult.OK:
+                return DialogAnswer.Ok;
+            default:
+                return DialogAnswer.Cancel;
+        }
+    }
+
+    public static MessageBoxResult Show(string text, string caption, DialogIcon icon, DialogButtons buttons, MessageBoxResult? defaultResult = null, Window owner = null)
     {
         Application application = Application.Current;
         if (application != null && !application.Dispatcher.CheckAccess())
@@ -87,7 +97,7 @@ internal sealed class MessageDialog : Window
         return ShowOnUiThread(text, caption, icon, buttons, defaultResult, owner);
     }
 
-    private static MessageBoxResult ShowOnUiThread(string text, string caption, MessageDialogIcon icon, MessageDialogButtons buttons, MessageBoxResult? defaultResult, Window owner)
+    private static MessageBoxResult ShowOnUiThread(string text, string caption, DialogIcon icon, DialogButtons buttons, MessageBoxResult? defaultResult, Window owner)
     {
         MessageDialog dialog = new MessageDialog(text, caption, icon, buttons, defaultResult);
         // Owned by the window the user is working in, so the prompt stays above it and is centered on it.
@@ -100,10 +110,10 @@ internal sealed class MessageDialog : Window
         return dialog._Result;
     }
 
-    private static MessageBoxResult DismissalResult(MessageDialogButtons buttons)
+    private static MessageBoxResult DismissalResult(DialogButtons buttons)
     {
-        return (buttons == MessageDialogButtons.Ok) ? MessageBoxResult.OK
-            : (buttons == MessageDialogButtons.YesNo) ? MessageBoxResult.No
+        return (buttons == DialogButtons.Ok) ? MessageBoxResult.OK
+            : (buttons == DialogButtons.YesNo) ? MessageBoxResult.No
             : MessageBoxResult.Cancel;
     }
 
@@ -146,7 +156,7 @@ internal sealed class MessageDialog : Window
         return (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n');
     }
 
-    private Grid BuildContent(string text, MessageDialogIcon icon, MessageDialogButtons buttons)
+    private Grid BuildContent(string text, DialogIcon icon, DialogButtons buttons)
     {
         Grid root = new Grid
         {
@@ -196,14 +206,14 @@ internal sealed class MessageDialog : Window
         };
         switch (buttons)
         {
-            case MessageDialogButtons.Ok:
+            case DialogButtons.Ok:
                 bar.Children.Add(CreateButton(bar, "OK", MessageBoxResult.OK));
                 break;
-            case MessageDialogButtons.OkCancel:
+            case DialogButtons.OkCancel:
                 bar.Children.Add(CreateButton(bar, "OK", MessageBoxResult.OK));
                 bar.Children.Add(CreateButton(bar, "Cancel", MessageBoxResult.Cancel));
                 break;
-            case MessageDialogButtons.YesNo:
+            case DialogButtons.YesNo:
                 bar.Children.Add(CreateButton(bar, "Yes", MessageBoxResult.Yes));
                 bar.Children.Add(CreateButton(bar, "No", MessageBoxResult.No));
                 break;
@@ -241,11 +251,11 @@ internal sealed class MessageDialog : Window
         return button;
     }
 
-    private static ImageSource LoadIcon(MessageDialogIcon icon)
+    private static ImageSource LoadIcon(DialogIcon icon)
     {
-        string name = (icon == MessageDialogIcon.Error) ? "err16"
-            : (icon == MessageDialogIcon.Warning) ? "editor/message-warning"
-            : (icon == MessageDialogIcon.Question) ? "question16"
+        string name = (icon == DialogIcon.Error) ? "err16"
+            : (icon == DialogIcon.Warning) ? "editor/message-warning"
+            : (icon == DialogIcon.Question) ? "question16"
             : "info16";
         return new BitmapImage(new Uri("pack://application:,,,/icons/" + name + ".png", UriKind.Absolute));
     }

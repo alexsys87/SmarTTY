@@ -28,7 +28,7 @@ internal static class UrlOpener
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show("Cannot open " + url + ": " + exception.Message, "SmarTTY", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show("Cannot open " + url + ": " + exception.Message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 }

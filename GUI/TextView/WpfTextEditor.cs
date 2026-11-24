@@ -1088,7 +1088,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     private void ShowError(Exception exception)
     {
-        MessageDialog.Show(exception.Message, "Error", MessageDialogIcon.Error, MessageDialogButtons.Ok, defaultResult: null, owner: Window.GetWindow(this));
+        MessageDialog.Show(exception.Message, "Error", DialogIcon.Error, DialogButtons.Ok, defaultResult: null, owner: Window.GetWindow(this));
     }
 
     private ContextMenu BuildContextMenu()

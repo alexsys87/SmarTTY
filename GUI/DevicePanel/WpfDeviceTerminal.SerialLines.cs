@@ -310,7 +310,7 @@ public partial class WpfDeviceTerminal
         string details = PortAlertDetails();
         if (details.Length > 0)
         {
-            ThemedMessageBox.Show(Owner, details, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show(Owner, details, "Serial port", DialogButtons.Ok, DialogIcon.Warning);
         }
     }
 
@@ -397,7 +397,7 @@ public partial class WpfDeviceTerminal
             }
             catch (Exception exception)
             {
-                ThemedMessageBox.Show(Owner, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UserDialogs.Show(Owner, "The port settings were not changed.\r\n\r\n" + exception.Message, "Serial port", DialogButtons.Ok, DialogIcon.Warning);
                 return false;
             }
             serial.AdvancedSettings = candidate;

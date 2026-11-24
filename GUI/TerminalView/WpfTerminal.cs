@@ -559,10 +559,10 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         }
         switch (PasteGuard.AskUpload(text.Length, _anchor))
         {
-            case System.Windows.Forms.DialogResult.Yes:
+            case DialogAnswer.Yes:
                 LargePasteUploadRequested(this, text);
                 return true;
-            case System.Windows.Forms.DialogResult.No:
+            case DialogAnswer.No:
                 return false;
             default:
                 return true;

@@ -603,7 +603,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             return;
         }
-        ThemedMessageBox.Show(transport.DescribeOptions(), "Telnet options", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UserDialogs.Show(transport.DescribeOptions(), "Telnet options", DialogButtons.Ok, DialogIcon.Information);
     }
 
     private void RequestTelnetStatus()
@@ -617,7 +617,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             if (!transport.RequestRemoteStatus())
             {
-                ThemedMessageBox.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                UserDialogs.Show("The server did not offer to report its option status (the STATUS option).", "Telnet STATUS", DialogButtons.Ok, DialogIcon.Information);
             }
         }
         catch (Exception)
@@ -639,7 +639,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             {
                 if (!IsDisposed && ReferenceEquals(transport, _telnetTransport))
                 {
-                    ThemedMessageBox.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The server reports these options:\r\n\r\n" + transport.RemoteStatus, "Telnet STATUS", DialogButtons.Ok, DialogIcon.Information);
                 }
             }));
         }
@@ -1436,13 +1436,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                     if (success)
                     {
                         string note = successNote?.Invoke();
-                        ThemedMessageBox.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
-                            title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UserDialogs.Show(protocolName + " " + verb + " completed successfully." + (string.IsNullOrEmpty(note) ? string.Empty : "\r\n\r\n" + note),
+                            title, DialogButtons.Ok, DialogIcon.Information);
                     }
                     else if (!cancelled)
                     {
                         string reason = error ?? lastStatus;
-                        ThemedMessageBox.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        UserDialogs.Show(protocolName + " " + verb + " failed." + (string.IsNullOrEmpty(reason) ? string.Empty : "\r\n\r\n" + reason), title, DialogButtons.Ok, DialogIcon.Warning);
                     }
                 }));
             }
@@ -1470,12 +1470,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         if (_isXModemActive)
         {
-            ThemedMessageBox.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("A file transfer (XMODEM, YMODEM, ZMODEM, Kermit or gzip + base64) is in progress. Wait for it to finish or cancel it first.", "File transfer", DialogButtons.Ok, DialogIcon.Information);
             return true;
         }
         if (_isFileSendActive)
         {
-            ThemedMessageBox.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("A file is being sent. Wait for it to finish or cancel it first.", "Send file", DialogButtons.Ok, DialogIcon.Information);
             return true;
         }
         return false;
@@ -1501,11 +1501,11 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending a file via " + protocolName + ".", protocolName + " Send", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string fileName = ThemedFileDialog.OpenFile(Owner, "Select file to send via " + protocolName, "All files (*.*)|*.*");
+        string fileName = UserDialogs.OpenFile(Owner, "Select file to send via " + protocolName, "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1530,11 +1530,11 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before receiving a file via XMODEM.", "XMODEM Receive", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
 
-        string fileName = ThemedFileDialog.SaveFile(Owner, "Select destination file for XMODEM receive", "All files (*.*)|*.*");
+        string fileName = UserDialogs.SaveFile(Owner, "Select destination file for XMODEM receive", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1715,7 +1715,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -1804,7 +1804,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void toolStripButton2_Click(object sender, EventArgs e)
     {
-        string fileName = ThemedFileDialog.SaveFile(Owner, "Save output to a file", "All files (*.*)|*.*");
+        string fileName = UserDialogs.SaveFile(Owner, "Save output to a file", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -1822,7 +1822,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -1834,10 +1834,10 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_connectionState != ConnectionStateEnum.Connected || _asyncTransportConnection == null)
         {
-            ThemedMessageBox.Show("Please connect first before sending a file.", "Send file", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UserDialogs.Show("Please connect first before sending a file.", "Send file", DialogButtons.Ok, DialogIcon.Warning);
             return;
         }
-        string fileName = ThemedFileDialog.OpenFile(Owner, "Send a binary file", "All files (*.*)|*.*");
+        string fileName = UserDialogs.OpenFile(Owner, "Send a binary file", "All files (*.*)|*.*");
         if (string.IsNullOrEmpty(fileName))
         {
             return;
@@ -2082,7 +2082,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             {
                 if (!DeviceInputText.TryParsePastedHex(text, out byte[] hexBytes))
                 {
-                    ThemedMessageBox.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    UserDialogs.Show("The clipboard does not hold a string of HEX bytes such as DE AD BE EF, 0xDE,0xAD or \\xDE\\xAD.", "Paste as HEX bytes", DialogButtons.Ok, DialogIcon.Information);
                     return;
                 }
                 PasteHistory.Add(text, options.EffectiveHistorySize);
@@ -2156,14 +2156,14 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                     _pasteJob = null;
                     if (outcome == PasteJob.Outcome.Failed)
                     {
-                        ThemedMessageBox.Show(message, "Paste", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        UserDialogs.Show(message, "Paste", DialogButtons.Ok, DialogIcon.Warning);
                     }
                 });
             _pasteJob.Start();
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
         }
     }
 
@@ -2171,10 +2171,10 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     {
         if (_logWriter != null)
         {
-            ThemedMessageBox.Show("Stop recording first, then replay.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("Stop recording first, then replay.", "Replay log", DialogButtons.Ok, DialogIcon.Information);
             return;
         }
-        string chosen = ThemedFileDialog.OpenFile(Owner, "Play back a recorded log of received data",
+        string chosen = UserDialogs.OpenFile(Owner, "Play back a recorded log of received data",
             "All files (*.*)|*.*|Text log (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin");
         if (string.IsNullOrEmpty(chosen))
         {
@@ -2187,12 +2187,12 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
             return;
         }
         if (bytes.Length == 0)
         {
-            ThemedMessageBox.Show("The file is empty.", "Replay log", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UserDialogs.Show("The file is empty.", "Replay log", DialogButtons.Ok, DialogIcon.Information);
             return;
         }
         LogReplayPrompt?.Invoke(bytes, this);
@@ -2213,7 +2213,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     private void StartLogging()
     {
         // The format follows the chosen file type; hex mode suggests the hex dump, text mode the text log.
-        ThemedFileDialogResult chosen = ThemedFileDialog.SaveFileEx(Owner, "Record received data (appended if the file already exists)",
+        FileDialogResult chosen = UserDialogs.SaveFileEx(Owner, "Record received data (appended if the file already exists)",
             "Text log (UTF-8) (*.log)|*.log|Hex dump (*.txt)|*.txt|Raw bytes (*.bin)|*.bin",
             filterIndex: HexMode ? 2 : 1, fileName: SuggestLogFileName(), overwritePrompt: false, addExtension: true);
         if (chosen == null)
@@ -2234,7 +2234,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         catch (Exception exception)
         {
-            ThemedMessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+            UserDialogs.Show(exception.Message, "Error", DialogButtons.Ok, DialogIcon.Error);
             return;
         }
         UpdateLogButton();
@@ -2283,7 +2283,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 if (_logWriter != null && !_logWriter.IsActive)
                 {
                     StopLogging();
-                    ThemedMessageBox.Show("Logging stopped: " + exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    UserDialogs.Show("Logging stopped: " + exception.Message, "Error", DialogButtons.Ok, DialogIcon.Warning);
                 }
             }));
         }
