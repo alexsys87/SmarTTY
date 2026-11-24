@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
 using MenuItem = System.Windows.Controls.MenuItem;

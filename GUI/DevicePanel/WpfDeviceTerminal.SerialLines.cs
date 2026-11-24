@@ -6,7 +6,6 @@ using SmarTTY.Transport;
 using System;
 using System.Drawing;
 using System.Threading;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
 using MenuItem = System.Windows.Controls.MenuItem;

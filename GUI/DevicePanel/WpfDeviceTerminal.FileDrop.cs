@@ -5,7 +5,6 @@ using SmarTTY.IO;
 using System;
 using System.IO;
 using System.Linq;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
 using MenuItem = System.Windows.Controls.MenuItem;

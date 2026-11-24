@@ -5,7 +5,6 @@ using SmarTTY.Transport;
 using System;
 using System.IO;
 using System.Threading;
-using System.Windows.Forms;
 
 using MenuItem = System.Windows.Controls.MenuItem;
 using Separator = System.Windows.Controls.Separator;

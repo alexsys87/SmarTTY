@@ -4,7 +4,6 @@ using SmarTTY.GUI.TerminalView;
 using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
 
