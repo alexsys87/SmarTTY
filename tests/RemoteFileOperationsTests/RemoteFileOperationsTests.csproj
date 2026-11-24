@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IO/RemoteFileOperations.cs" Link="RemoteFileOperations.cs" />
+    <Compile Include="../../Utilities/IconPaths.cs" Link="IconPaths.cs" />
     <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
     <Compile Include="../../IO/RemotePermissions.cs" Link="RemotePermissions.cs" />
     <Compile Include="../../IO/RemoteScript.cs" Link="RemoteScript.cs" />

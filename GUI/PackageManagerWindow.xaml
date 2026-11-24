@@ -59,10 +59,10 @@
                         <Style TargetType="{x:Type Image}">
                           <Style.Triggers>
                             <DataTrigger Value="Install" Binding="{Binding Action}">
-                              <Setter Property="Source" Value="../icons/MainWindow/download.png" />
+                              <Setter Property="Source" Value="{local:Icon MainWindow/download.png}" />
                             </DataTrigger>
                             <DataTrigger Value="Remove" Binding="{Binding Action}">
-                              <Setter Property="Source" Value="../icons/delete16.png" />
+                              <Setter Property="Source" Value="{local:Icon delete16.png}" />
                             </DataTrigger>
                             <DataTrigger Value="None" Binding="{Binding Action}">
                               <Setter Property="Visibility" Value="Collapsed" />

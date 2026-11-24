@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.QuickCommandsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Quick commands" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="820" Height="680" MinWidth="560" MinHeight="460" ShowInTaskbar="False" Style="{DynamicResource SecondaryWindowStyle}" FocusManager.FocusedElement="{Binding ElementName=ItemList}">
+<Window x:Class="SmarTTY.GUI.QuickCommandsWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Quick commands" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="820" Height="680" MinWidth="560" MinHeight="460" ShowInTaskbar="False" Style="{DynamicResource SecondaryWindowStyle}" FocusManager.FocusedElement="{Binding ElementName=ItemList}">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
   </Window.Resources>
@@ -58,31 +58,31 @@
     <WrapPanel Grid.Row="2" Margin="0 6 0 0">
       <Button Name="AddCommandButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="AddCommand_Click" ToolTip="A command line, such as cat /proc/mtd or sudo make install">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/terminal.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon terminal.png}" />
           <TextBlock Margin="4 0 0 0" Text="Add command" />
         </StackPanel>
       </Button>
       <Button Name="AddScriptButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="AddScript_Click" ToolTip="A shell script written here">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon MainWindow/new16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Add script" />
         </StackPanel>
       </Button>
       <Button Name="ImportScriptButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="ImportScript_Click" ToolTip="A shell script from a file of this computer (.sh)">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/open16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon open16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Add script from file..." />
         </StackPanel>
       </Button>
       <Button Name="DuplicateButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="Duplicate_Click" IsEnabled="False">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/MainWindow/copy.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon MainWindow/copy.png}" />
           <TextBlock Margin="4 0 0 0" Text="Duplicate" />
         </StackPanel>
       </Button>
       <Button Name="DeleteButton" Padding="8 2 8 2" Margin="0 0 6 4" Click="Delete_Click" IsEnabled="False" ToolTip="Delete the selected item (Del)">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/delete16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon delete16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Delete" />
         </StackPanel>
       </Button>

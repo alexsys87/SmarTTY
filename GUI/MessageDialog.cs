@@ -4,7 +4,6 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 using SmarTTY.Controls;
 
@@ -253,10 +252,10 @@ internal sealed class MessageDialog : Window
 
     private static ImageSource LoadIcon(DialogIcon icon)
     {
-        string name = (icon == DialogIcon.Error) ? "err16"
-            : (icon == DialogIcon.Warning) ? "editor/message-warning"
-            : (icon == DialogIcon.Question) ? "question16"
-            : "info16";
-        return new BitmapImage(new Uri("pack://application:,,,/icons/" + name + ".png", UriKind.Absolute));
+        string name = (icon == DialogIcon.Error) ? "err16.png"
+            : (icon == DialogIcon.Warning) ? "editor/message-warning.png"
+            : (icon == DialogIcon.Question) ? "question16.png"
+            : "info16.png";
+        return IconImages.Get(name);
     }
 }

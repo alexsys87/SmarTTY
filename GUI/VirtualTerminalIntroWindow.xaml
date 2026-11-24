@@ -5,13 +5,13 @@
     <TextBlock Text="Please select the type of a terminal to create for the new session:" Margin="0 5 0 0" />
     <Button Padding="5" Margin="5" Click="Smart_Click">
       <StackPanel Orientation="Horizontal">
-        <Image Width="16" Height="16" Source="../icons/event16.png" Margin="0 0 5 0" />
+        <Image Width="16" Height="16" Source="{local:Icon event16.png}" Margin="0 0 5 0" />
         <TextBlock Text="Start with a Smart Terminal" />
       </StackPanel>
     </Button>
     <Button Padding="5" Margin="5" Click="Normal_Click">
       <StackPanel Orientation="Horizontal">
-        <Image Width="16" Height="16" Source="../icons/term16.png" Margin="0 0 5 0" />
+        <Image Width="16" Height="16" Source="{local:Icon term16.png}" Margin="0 0 5 0" />
         <TextBlock Text="Start with a regular Terminal" />
       </StackPanel>
     </Button>

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using SmarTTY.IO;
 using SmarTTY.LocalRepo;
+using SmarTTY.Utilities;
 
 // Regression harness for the file list operations (IO/RemoteFileOperations.cs): name rules, copy names and the
 // shell commands, which are run by /bin/sh on a temporary directory (busybox sh as well when it is installed, the
@@ -414,19 +415,15 @@ internal static class Program
             string trigger = $"<DataTrigger Value=\"{icon}\" Binding=\"{{Binding Path=Icon}}\">";
             int at = xaml.IndexOf(trigger, StringComparison.Ordinal);
             Check(at >= 0, $"the file list has a trigger for the {icon} icon");
-            int sourceAt = xaml.IndexOf("Value=\"../icons/", at, StringComparison.Ordinal);
-            int end = xaml.IndexOf('"', sourceAt + 7);
-            string relative = xaml.Substring(sourceAt + 7, end - sourceAt - 7).Replace("../", "");
-            string path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
-            Check(File.Exists(path), $"the picture of the {icon} icon exists ({relative})");
-            byte[] header = new byte[24];
-            using (FileStream stream = File.OpenRead(path))
-            {
-                stream.Read(header, 0, header.Length);
-            }
-            int width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
-            int height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
-            Check(header[1] == (byte)'P' && header[2] == (byte)'N' && header[3] == (byte)'G' && width == 16 && height == 16, $"the picture of the {icon} icon is a 16x16 PNG");
+            // The icon is a vector image since stage 5A: {local:Icon <path>} names a DrawingImage of GUI/Icons/ (IconPaths).
+            int sourceAt = xaml.IndexOf(":Icon ", at, StringComparison.Ordinal);
+            int end = xaml.IndexOf('}', sourceAt);
+            string relative = xaml.Substring(sourceAt + 6, end - sourceAt - 6).Trim();
+            bool parsed = IconPaths.TryParse(relative, out string folder, out string name);
+            Check(parsed, $"the {icon} icon has an icon path ({relative})");
+            string dictionary = File.ReadAllText(Path.Combine(root, "GUI", "Icons", IconPaths.DictionaryOf(folder) + ".xaml"));
+            Check(dictionary.Contains("<DrawingImage x:Key=\"" + IconPaths.KeyOf(name) + "\""), $"the image of the {icon} icon exists ({relative})");
+            Check(IconPaths.SizeOf(folder, name) == 16, $"the {icon} icon is shown at 16 x 16");
         }
     }
 

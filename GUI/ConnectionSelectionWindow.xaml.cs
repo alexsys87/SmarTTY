@@ -21,7 +21,6 @@ using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.Backend;
@@ -192,7 +191,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
     public interface IConnectionSettingsWrapper
     {
-        Uri Image { get; }
+        /// <summary>The icon of the connection: an icon name ("router.png") or a picture file of this computer.</summary>
+        string ImagePath { get; }
+
+        ImageSource Image { get; }
 
         SubtypeImage TypeImage { get; }
 
@@ -248,7 +250,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             private bool _IsInactive;
 
-            public Uri Image => MakeIconURI(Connection.Icon);
+            public string ImagePath => IconPathOf(Connection.Icon);
+
+            public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
 
             public SubtypeImage TypeImage
             {
@@ -438,7 +442,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             // A USB device may have no serial number, and is still a USB device.
             private readonly bool _IsUsb;
 
-            public Uri Image => MakeIconURI(Settings.Icon ?? "SerialPort.png");
+            public string ImagePath => IconPathOf(Settings.Icon ?? "SerialPort.png");
+
+            public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
 
             public long LastUseTime => 0L;
 
@@ -545,7 +551,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
-            public Uri Image => MakeIconURI(Settings.Icon);
+            public string ImagePath => IconPathOf(Settings.Icon);
+
+            public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
 
             public SubtypeImage TypeImage => SubtypeImage.Terminal;
 
@@ -645,7 +653,9 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
-            public Uri Image => MakeIconURI(IsTelnet ? "terminal.png" : "computer.png");
+            public string ImagePath => IconPathOf(IsTelnet ? "terminal.png" : "computer.png");
+
+            public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
 
             public SubtypeImage TypeImage => IsTelnet ? SubtypeImage.Terminal : SubtypeImage.Lock;
 
@@ -797,7 +807,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private bool _ProbeConnections;
 
-        private BitmapImage[] _CachedIcons;
+        private ConnectionIcon[] _CachedIcons;
 
         // The computers found by the network scan; kept apart from the saved connections and never written anywhere.
         private readonly List<SettingsWrappers.Discovered> _DiscoveredItems = new List<SettingsWrappers.Discovered>();
@@ -985,13 +995,13 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
         }
 
-        public BitmapImage[] AllIcons
+        public ConnectionIcon[] AllIcons
         {
             get
             {
                 if (_CachedIcons == null)
                 {
-                    List<BitmapImage> list = new List<BitmapImage>();
+                    List<ConnectionIcon> list = new List<ConnectionIcon>();
                     string[] embeddedIcons = new string[]
                     {
                         "computer.png", "computer-laptop.png", "server.png", "vds.png", "cloud.png", "router.png",
@@ -1000,16 +1010,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     };
                     foreach (string iconName in embeddedIcons)
                     {
-                        try
+                        ImageSource image = IconImages.Get(iconName);
+                        if (image != null)
                         {
-                            BitmapImage bitmapImage = new BitmapImage();
-                            bitmapImage.BeginInit();
-                            bitmapImage.UriSource = new Uri("pack://application:,,,/icons/" + iconName, UriKind.Absolute);
-                            bitmapImage.EndInit();
-                            list.Add(bitmapImage);
-                        }
-                        catch
-                        {
+                            list.Add(new ConnectionIcon(iconName, image));
                         }
                     }
                     _CachedIcons = list.ToArray();
@@ -2276,23 +2280,15 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         try
         {
             ((Selector)lstIcons).SelectedItem = null;
-            Uri imageUri = (((FrameworkElement)_ActiveIconPicker).DataContext as IConnectionSettingsWrapper)?.Image;
-            if (imageUri != null)
+            string imagePath = (((FrameworkElement)_ActiveIconPicker).DataContext as IConnectionSettingsWrapper)?.ImagePath;
+            if (imagePath != null)
             {
-                string text = Path.GetFileName(imageUri.OriginalString ?? imageUri.ToString()).ToLower();
-                BitmapImage[] allIcons = Controller.AllIcons;
-                foreach (BitmapImage bitmapImage in allIcons)
+                string text = Path.GetFileName(imagePath).ToLower();
+                foreach (ConnectionIcon icon in Controller.AllIcons)
                 {
-                    try
+                    if (icon.FileName.ToLower() == text)
                     {
-                        string currentName = Path.GetFileName(bitmapImage.UriSource?.OriginalString ?? bitmapImage.UriSource?.ToString())?.ToLower();
-                        if (currentName == text)
-                        {
-                            ((Selector)lstIcons).SelectedItem = bitmapImage;
-                        }
-                    }
-                    catch
-                    {
+                        ((Selector)lstIcons).SelectedItem = icon;
                     }
                 }
             }
@@ -2314,25 +2310,25 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
     }
 
-    private static Uri MakeIconURI(string path)
+    // What the icon of a connection is: a picture file of this computer that is there, or else the name of one of the icons
+    // (only the file name counts, as when it was a PNG of icons/; "computer.png" when there is none or the path is not valid).
+    private static string IconPathOf(string path)
     {
         if (string.IsNullOrEmpty(path))
         {
-            path = "computer.png";
+            return "computer.png";
         }
         try
         {
             if (Path.IsPathRooted(path) && File.Exists(path))
             {
-                return new Uri(path);
+                return path;
             }
-
-            string fileName = Path.GetFileName(path);
-            return new Uri("pack://application:,,,/icons/" + fileName, UriKind.Absolute);
+            return Path.GetFileName(path);
         }
         catch
         {
-            return new Uri("pack://application:,,,/icons/computer.png", UriKind.Absolute);
+            return "computer.png";
         }
     }
 
@@ -2345,12 +2341,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         ToggleButton activeIconPicker = _ActiveIconPicker;
         if (((activeIconPicker != null) ? ((FrameworkElement)activeIconPicker).DataContext : null) is IConnectionSettingsWrapper connectionSettingsWrapper)
         {
-            ImageSource imageSource = e.AddedItems.OfType<ImageSource>().FirstOrDefault();
-            BitmapImage bitmapImage = imageSource as BitmapImage;
-            if (bitmapImage != null && bitmapImage.UriSource != null)
+            ConnectionIcon icon = e.AddedItems.OfType<ConnectionIcon>().FirstOrDefault();
+            if (icon != null)
             {
-                string fileName = Path.GetFileName(bitmapImage.UriSource.OriginalString ?? bitmapImage.UriSource.ToString());
-                connectionSettingsWrapper.SetIcon(fileName);
+                connectionSettingsWrapper.SetIcon(icon.FileName);
                 iconPopup.IsOpen = false;
             }
         }
@@ -2383,4 +2377,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     {
         Controller.ToggleNetworkScan();
     }
+}
+
+/// <summary>An icon the user can choose for a connection: its name (what the settings keep) and its image.</summary>
+public sealed class ConnectionIcon
+{
+    public ConnectionIcon(string fileName, ImageSource image)
+    {
+        FileName = fileName;
+        Image = image;
+    }
+
+    /// <summary>The name the settings keep ("router.png").</summary>
+    public string FileName { get; }
+
+    public ImageSource Image { get; }
 }

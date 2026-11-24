@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
@@ -18,9 +17,9 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class DirectoryTransferWindow : Window
 {
-    private const string DownloadImage = "pack://application:,,,/icons/dialog-scp-download.png";
+    private const string DownloadImage = "dialog-scp-download.png";
 
-    private const string UploadImage = "pack://application:,,,/icons/dialog-scp-upload.png";
+    private const string UploadImage = "dialog-scp-upload.png";
 
     private readonly SshSession _session;
 
@@ -86,7 +85,7 @@ public partial class DirectoryTransferWindow : Window
         if (isUpload)
         {
             // The upload window asks for the local directory first: the rows swap.
-            TransferImage.Source = new BitmapImage(new Uri(UploadImage));
+            TransferImage.Source = IconImages.Get(UploadImage);
             TopLabel.Text = "Local directory:";
             BottomLabel.Text = "Remote directory:";
             StartButton.Content = "_Upload";
@@ -94,7 +93,7 @@ public partial class DirectoryTransferWindow : Window
         }
         else
         {
-            TransferImage.Source = new BitmapImage(new Uri(DownloadImage));
+            TransferImage.Source = IconImages.Get(DownloadImage);
         }
     }
 

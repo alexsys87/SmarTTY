@@ -42,14 +42,16 @@ PR that changes them.
 - `CsiRepeatLimitTests` and `PrivateModeTableTests` read the source text of `Terminal/Emulation/TerminalEmulator.cs`,
   `TerminalModes.cs` and `Terminal/Rendering/TerminalDisplayModel.cs` (`AssemblyMetadata`); `FileDialogTests`, `FolderBrowserTests` and
   `PasteProgressTests` read files of `GUI/DevicePanel/` and `GUI/TerminalView/`, and with `PasteConfirmTests` and `SnippetEditorTests` also
-  `GUI/PasteGuard.cs`, `GUI/PasteJob.cs`, `GUI/PasteMenu.cs`, `Controls/UserDialogs.cs` and `App.xaml.cs`: update the paths if that code moves.
+  `GUI/PasteGuard.cs`, `GUI/PasteJob.cs`, `GUI/PasteMenu.cs`, `Controls/UserDialogs.cs` and `App.xaml.cs`; `IconResourceTests` reads the XAML and the
+  code of `GUI/` and `Controls/`, `GUI/WpfMenus.cs` and the dictionaries of `GUI/Icons/`: update the paths if that code moves.
 
 ## Folder map
 
 | Folder | What is there | UI? |
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
-| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
+| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
+| `GUI/Icons/` | Stage 5A: the icons as vector images, one resource dictionary of `DrawingImage`s for each folder the PNG files were in (`Root`, `MainWindow`, `Editor`, `Menu`, `Keys`, `Transfers`, `FileTypes`; converted from SVG outside the repository) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
 | `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4, and Tools > WPF text editor lab (`TextLabWindow`) | WPF |
@@ -67,7 +69,7 @@ PR that changes them.
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
 | `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points | no |
-| `Utilities/` | Shared helpers | no |
+| `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
 
@@ -106,7 +108,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: nothing (the tool bar and menus of the device panel, which stayed WinForms, went to WPF in 4A) |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Done in alexsys87/SmarTTY#557 (the text view is a WPF view of our own on the model, not AvalonEdit): 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) done: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) and 3E-5 (the WinForms editor, hex control and their Mono stands removed; the hex golden replayed on the models, the remote editor stand on views of the test) done |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Done: 4A (the menus and bars of the terminal tabs and the device tab) in alexsys87/SmarTTY#558, 4B (the WinForms helpers nothing used, the paste and snippet dialogs without facades and `Forms/`, one dialogs seam `UserDialogs` for the message boxes and file choosers) after it, see "Stage 4" |
-| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | Planned; what is left of WinForms is listed in "Done in 4B" |
+| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | In progress: 5A (the icons as vector images, the PNG files removed) done, see "Stage 5"; next 5B (what is left of WinForms, listed in "Done in 4B") and 5C (`System.Drawing`) |
 
 ### Stage 1 rules
 
@@ -572,6 +574,32 @@ with `Control.ModifierKeys`), `Screen` (`MainWindowController`, `CommonGUIPrefer
 `WpfTextEditor` and `NormalTabContext`, `NativeWindow` of `Native/SerialPortArrivalWatcher`, `Utilities/ScreenEdgeUtils`, and
 `Application.EnableVisualStyles`/`SetDefaultFont` in `App`. The embedded PNGs of `SmarTTY.csproj` that no menu asks for any more (most were the
 editor's) stay until the vector icons of stage 5.
+
+### Stage 5 (no WinForms, no System.Drawing, vector icons)
+
+Done in 5A (the icons): the 187 PNG files of `icons/` are gone; the icons are the `DrawingImage`s of `GUI/Icons/*.xaml` (converted from the
+SVG versions of the PNGs outside the repository and taken as they came: one dictionary for each folder, `Root` for `icons/` itself; the
+dictionary of the window icons of the WinForms forms was not needed, they went in 4B). An icon is still named by the path its PNG had:
+`Utilities/IconPaths` (UI-free) takes `"MainWindow/refresh16.png"`, `"../icons/net16.png"`, `"pack://application:,,,/icons/keys/locked.png"`
+(back slashes, another case, no extension) to the folder and the name, the folder to its dictionary and the name to the key
+(`refresh16DrawingImage`: what is not a letter, a digit or an underscore is an underscore). `GUI/IconImages.Get` loads the dictionary once
+(`Application.LoadComponent`) and gives the image frozen, scaled to the size WPF showed its PNG at (the pixels at the DPI the file declared:
+most 16 x 16, a 16-pixel PNG of 72 DPI 21.33, the dialog pictures 48 to 128; `IconPaths.SizeOf`, a table made from the PNG headers before they
+were removed), with a transparent square of that size under it, so no layout moved; `FromIconOrFile` is the same or a picture file of this
+computer (a connection may show one the user chose). The XAML says `Source="{gui:Icon MainWindow/refresh16.png}"` (`IconExtension`, with the
+prefix of `SmarTTY.GUI` each file had or `gui`), in attributes, setters and triggers; the code passes the paths to `IconImages.Get` (the icon
+helpers of the windows, the tool bar and the menus of the editor tab, `MessageDialog`, the file and folder windows, the transfer windows);
+`WpfMenus.LoadIcon` maps the names the menus asked the embedded files for ("copy", "terminal-send") through a table (`PathOf`; the editor's
+own icons by their names under `editor/`); the connection window keeps the name of an icon as before (`ImagePath`, "router.png", which the
+settings hold) and shows `Image` (the picker lists `ConnectionIcon`s); the editor draws its message icons as the vector images (no colour
+key now). `SmarTTY.csproj` embeds no PNG. `IconResourceTests` (1016 checks, links `IconPaths`) checks the rules, that every `{...:Icon ...}`
+of the XAML, every icon path in a string of `GUI/` and `Controls/` and every name the menus ask for has its key in its dictionary, that no XAML
+names a PNG, no code a pack URI of `icons/`, and that no PNG and no `.resx` is left; `RemoteFileOperationsTests` checks the image of each
+file-list icon and `EditorTextTests` that of Show All Characters in the dictionaries. The view is compile-checked on Linux only. Manual check
+on Windows, at 100 %, 150 % and 200 % and on a 4K screen: the main window (tool bar, tabs, session list, menus), the file list and its
+file-type icons, the connection list and the icon picker of a connection (and a picture file chosen for one), the dialogs with pictures
+(host key, credentials, public key, transfers, about), the message boxes, the editor tab (tool bar, context menus, the icons of the inline
+messages), the device tab; every icon as large as before and sharp; light and dark theme.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20

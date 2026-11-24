@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.MemoryWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Memory (devmem)" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="1180" Height="800" MinWidth="760" MinHeight="560" Style="{DynamicResource SecondaryWindowStyle}">
+<Window x:Class="SmarTTY.GUI.MemoryWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Memory (devmem)" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="1180" Height="800" MinWidth="760" MinHeight="560" Style="{DynamicResource SecondaryWindowStyle}">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <SolidColorBrush x:Key="ChangedBrush" Color="#66FFC107" />
@@ -46,20 +46,20 @@
       <ComboBox Name="WidthBox" Width="80" Margin="0 2 8 2" ToolTip="The access width: devmem reads and writes 8, 16, 32 or 64 bits at once (devmem2: 8, 16, 32)" />
       <Button Name="ShowRegionButton" Padding="8 2 8 2" Margin="0 2 6 2" Click="ShowRegion_Click" ToolTip="Replace the list with these registers and read them once">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/MainWindow/go16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon MainWindow/go16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Show" />
         </StackPanel>
       </Button>
       <Button Name="AppendButton" Padding="8 2 8 2" Margin="0 2 14 2" Click="Append_Click" ToolTip="Add these registers to the end of the list and read them once">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/MainWindow/add16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon MainWindow/add16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Add to list" />
         </StackPanel>
       </Button>
       <TextBlock Text="Region:" VerticalAlignment="Center" Margin="0 0 4 0" />
       <ComboBox Name="RegionBox" Width="380" Margin="0 2 4 2" SelectionChanged="Region_SelectionChanged" ToolTip="Puts the start of a region into the address field (nothing is read): the regions of /proc/iomem of the server (the devices of the device tree, /amba_pl for the PL) and the address map of the Zynq-7000" />
       <Button Name="IomemButton" Padding="6 2 6 2" Margin="0 2 0 2" Click="Iomem_Click" ToolTip="Read /proc/iomem of the server again">
-        <Image Width="16" Height="16" Source="../icons/MainWindow/refresh16.png" />
+        <Image Width="16" Height="16" Source="{gui:Icon MainWindow/refresh16.png}" />
       </Button>
     </WrapPanel>
 
@@ -67,7 +67,7 @@
     <WrapPanel Grid.Row="2" Margin="0 0 0 6">
       <Button Name="ReadButton" Padding="8 2 8 2" Margin="0 2 8 2" Click="Read_Click" ToolTip="Read every register of the list now (F5)">
         <StackPanel Orientation="Horizontal">
-          <Image Width="16" Height="16" Source="../icons/MainWindow/refresh16.png" />
+          <Image Width="16" Height="16" Source="{gui:Icon MainWindow/refresh16.png}" />
           <TextBlock Margin="4 0 0 0" Text="Read all" />
         </StackPanel>
       </Button>

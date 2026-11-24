@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.PublicKeyManagerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Manage Public Key" Width="660" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="SmarTTY.GUI.PublicKeyManagerWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Manage Public Key" Width="660" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="12">
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
@@ -18,7 +18,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Image Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Source="pack://application:,,,/icons/dialog-public-key.png" Width="128" Height="128" VerticalAlignment="Top" />
+        <Image Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Source="{gui:Icon dialog-public-key.png}" Width="128" Height="128" VerticalAlignment="Top" />
         <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 4" TextWrapping="Wrap" Text="SmarTTY has generated a keypair to automatically logon to SSH servers. Here is the public key in OpenSSH format:" />
         <TextBox Grid.Row="1" Grid.Column="1" Name="PublicKeyText" Margin="8 4 0 4" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" />
         <TextBlock Grid.Row="2" Grid.Column="1" Margin="8 4 0 0" TextWrapping="Wrap" Text="The key is stored in the following key container or file under your user profile:" />
@@ -43,7 +43,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Image Grid.Row="0" Grid.RowSpan="4" Grid.Column="0" Name="RemoteSettingsImage" Source="pack://application:,,,/icons/keys/locked.png" Width="128" Height="128" VerticalAlignment="Top" Cursor="Hand" MouseLeftButtonDown="RemoteSettings_Click" />
+        <Image Grid.Row="0" Grid.RowSpan="4" Grid.Column="0" Name="RemoteSettingsImage" Source="{gui:Icon keys/locked.png}" Width="128" Height="128" VerticalAlignment="Top" Cursor="Hand" MouseLeftButtonDown="RemoteSettings_Click" />
         <TextBlock Grid.Row="0" Grid.Column="1" Margin="8 0 0 0" TextWrapping="Wrap" Text="SmarTTY can automatically configure your remote computer to authenticate you with your public key instead of the usual password. Note that anyone with access to your Windows account will be able to logon with your public key." />
         <Grid Grid.Row="1" Grid.Column="1" Margin="8 6 0 0">
           <Grid.ColumnDefinitions>

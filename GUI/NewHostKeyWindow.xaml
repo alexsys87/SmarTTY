@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.NewHostKeyWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Save Host Key" SizeToContent="Height" Width="510" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="SmarTTY.GUI.NewHostKeyWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Save Host Key" SizeToContent="Height" Width="510" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Grid Margin="12">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
@@ -13,7 +13,7 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
     <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Name="HeadingText" Text="Save host key" FontSize="18" Margin="0 0 0 8" />
-    <Image Grid.Row="1" Grid.RowSpan="3" Grid.Column="0" Source="pack://application:,,,/icons/dialog-host-key.png" Width="80" Height="80" VerticalAlignment="Top" Margin="0 0 16 0" />
+    <Image Grid.Row="1" Grid.RowSpan="3" Grid.Column="0" Source="{gui:Icon dialog-host-key.png}" Width="80" Height="80" VerticalAlignment="Top" Margin="0 0 16 0" />
     <TextBlock Grid.Row="1" Grid.Column="1" Name="IntroText" TextWrapping="Wrap" Margin="0 0 0 6" Text="SmarTTY is connecting to this host for the first time. It is recommended to save the host key locally to detect if the host is compromised in the future." />
     <Grid Grid.Row="2" Grid.Column="1" Margin="0 0 0 4">
       <Grid.ColumnDefinitions>

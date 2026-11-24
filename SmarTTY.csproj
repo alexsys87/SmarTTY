@@ -68,40 +68,9 @@
     <!-- The built-in command completions (CommandCompletions.xml next to the exe takes priority), see CommandCompletionDatabase. -->
     <EmbeddedResource Include="VisualTTY\CommandCompletions.xml" LogicalName="VisualTTY.CommandCompletions.xml" />
     <EmbeddedResource Include="Completion\ApiSymbols.xml" LogicalName="SmarTTY.Completion.ApiSymbols.xml" />
-    <!-- Images of the WPF menus and tool bars of the tabs, loaded by GUI/WpfMenus.cs (the WinForms Controls/Icons.cs until stage 4). -->
-    <EmbeddedResource Include="icons\MainWindow\upload.png" LogicalName="SmarTTY.Icons.upload.png" />
-    <EmbeddedResource Include="icons\MainWindow\download.png" LogicalName="SmarTTY.Icons.download.png" />
-    <EmbeddedResource Include="icons\term16.png" LogicalName="SmarTTY.Icons.terminal.png" />
-    <EmbeddedResource Include="icons\gear16.png" LogicalName="SmarTTY.Icons.settings.png" />
-    <EmbeddedResource Include="icons\edit16.png" LogicalName="SmarTTY.Icons.edit.png" />
-    <EmbeddedResource Include="icons\delete16.png" LogicalName="SmarTTY.Icons.delete.png" />
-    <EmbeddedResource Include="icons\net16.png" LogicalName="SmarTTY.Icons.network.png" />
-    <EmbeddedResource Include="icons\MainWindow\refresh16.png" LogicalName="SmarTTY.Icons.refresh.png" />
-    <EmbeddedResource Include="icons\question16.png" LogicalName="SmarTTY.Icons.question.png" />
-    <EmbeddedResource Include="icons\MainWindow\go16.png" LogicalName="SmarTTY.Icons.go.png" />
-    <EmbeddedResource Include="icons\event16.png" LogicalName="SmarTTY.Icons.event.png" />
-    <EmbeddedResource Include="icons\MainWindow\copy.png" LogicalName="SmarTTY.Icons.copy.png" />
-    <EmbeddedResource Include="icons\MainWindow\paste.png" LogicalName="SmarTTY.Icons.paste.png" />
-    <EmbeddedResource Include="icons\MainWindow\add16.png" LogicalName="SmarTTY.Icons.add.png" />
-    <EmbeddedResource Include="icons\transfers\removeall.png" LogicalName="SmarTTY.Icons.clear.png" />
     <!-- Existing images that the file editor tool bar and context menu reuse. -->
-    <EmbeddedResource Include="icons\MainWindow\save16.png" LogicalName="SmarTTY.Icons.save.png" />
-    <EmbeddedResource Include="icons\menu\cut.png" LogicalName="SmarTTY.Icons.cut.png" />
-    <EmbeddedResource Include="icons\MainWindow\FindHS.png" LogicalName="SmarTTY.Icons.find.png" />
-    <EmbeddedResource Include="icons\editor\*.png" LogicalName="SmarTTY.Icons.%(Filename).png" />
-    <EmbeddedResource Include="icons\keys\locked.png" LogicalName="SmarTTY.Icons.key-locked.png" />
-    <EmbeddedResource Include="icons\keys\unlocked.png" LogicalName="SmarTTY.Icons.key-unlocked.png" />
     <!-- Images of the device terminal tool bar. -->
-    <EmbeddedResource Include="icons\terminal-disconnect.png" LogicalName="SmarTTY.Icons.terminal-disconnect.png" />
-    <EmbeddedResource Include="icons\terminal-reconnect.png" LogicalName="SmarTTY.Icons.terminal-reconnect.png" />
-    <EmbeddedResource Include="icons\terminal-send.png" LogicalName="SmarTTY.Icons.terminal-send.png" />
-    <EmbeddedResource Include="icons\terminal-clear.png" LogicalName="SmarTTY.Icons.terminal-clear.png" />
-    <EmbeddedResource Include="icons\terminal-transfer.png" LogicalName="SmarTTY.Icons.terminal-transfer.png" />
-    <EmbeddedResource Include="icons\terminal-save.png" LogicalName="SmarTTY.Icons.terminal-save.png" />
-    <EmbeddedResource Include="icons\terminal-settings.png" LogicalName="SmarTTY.Icons.terminal-settings.png" />
     <!-- The picture of the "connection closed" prompt, the same one as in the prompt of an SSH session. -->
-    <EmbeddedResource Include="icons\MainWindow\busy.png" LogicalName="SmarTTY.Icons.busy.png" />
-    <Resource Include="icons\**\*.png" />
   </ItemGroup>
 
   <ItemGroup>

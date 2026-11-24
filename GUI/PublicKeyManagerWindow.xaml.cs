@@ -53,7 +53,7 @@ public partial class PublicKeyManagerWindow : Window
     {
         KeyStatusText.Text = text;
         KeyStatusText.SetResourceReference(TextBlock.ForegroundProperty, colorKey);
-        RemoteSettingsImage.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(authorized ? "pack://application:,,,/icons/keys/unlocked.png" : "pack://application:,,,/icons/keys/locked.png"));
+        RemoteSettingsImage.Source = IconImages.Get(authorized ? "keys/unlocked.png" : "keys/locked.png");
         AcceptButton.IsEnabled = !authorized;
         StopAcceptingButton.IsEnabled = authorized;
     }
