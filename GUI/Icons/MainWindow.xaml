@@ -1,0 +1,1587 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Geometry x:Key="qdownloadGeometry1">F1 M48,48z M0,0z M17,5L31,5</Geometry>
+  <Geometry x:Key="qdownloadGeometry2">F1 M48,48z M0,0z M20,10L31,10</Geometry>
+  <Geometry x:Key="qdownloadGeometry3">F1 M48,48z M0,0z M23,15L31,15</Geometry>
+  <Geometry x:Key="qdownloadGeometry4">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <Geometry x:Key="qdownloadGeometry5">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <DrawingGroup x:Key="qdownloadDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <DrawingGroup Opacity="1">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource qdownloadGeometry1}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF78C878" Thickness="3.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource qdownloadGeometry2}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF78C878" Thickness="3.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource qdownloadGeometry3}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF78C878" Thickness="3.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+    <DrawingGroup Opacity="1" Transform="0.88,0,0,0.88,1,10">
+      <GeometryDrawing Brush="#FF56B860" Geometry="{StaticResource qdownloadGeometry4}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF1C6826" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Geometry="{StaticResource qdownloadGeometry5}">
+        <GeometryDrawing.Pen>
+          <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+            <Pen.Brush>
+              <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+            </Pen.Brush>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="qdownloadDrawingImage" Drawing="{StaticResource qdownloadDrawingGroup}" />
+  <Geometry x:Key="new16Geometry1">F1 M48,48z M0,0z M24,3L27.24,11.93 34.5,5.81 32.84,15.16 42.19,13.5 36.07,20.76 45,24 36.07,27.24 42.19,34.5 32.84,32.84 34.5,42.19 27.24,36.07 24,45 20.76,36.07 13.5,42.19 15.16,32.84 5.81,34.5 11.93,27.24 3,24 11.93,20.76 5.81,13.5 15.16,15.16 13.5,5.81 20.76,11.93z</Geometry>
+  <Geometry x:Key="new16Geometry2">F1 M48,48z M0,0z M24,6L28,18 24,21 20,18z</Geometry>
+  <DrawingGroup x:Key="new16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFF8D838" Geometry="{StaticResource new16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFB88A08" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource new16Geometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFFFF4A0" Opacity="0.8" />
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFF8E878" Opacity="0.8" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="8" RadiusY="8" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="new16DrawingImage" Drawing="{StaticResource new16DrawingGroup}" />
+  <Geometry x:Key="go_up_searchGeometry1">F1 M48,48z M0,0z M24,44L24,24</Geometry>
+  <Geometry x:Key="go_up_searchGeometry2">F1 M48,48z M0,0z M24,44L24,24</Geometry>
+  <Geometry x:Key="go_up_searchGeometry3">F1 M48,48z M0,0z M8,26C13,18 18,14 24,11 30,14 35,18 40,26L33,28C29,23 27,21 24,21 21,21 19,23 15,28z</Geometry>
+  <DrawingGroup x:Key="go_up_searchDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource go_up_searchGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF183E82" Thickness="8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource go_up_searchGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF468CDC" Thickness="5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF468CDC" Geometry="{StaticResource go_up_searchGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF183E82" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFB8BCC8" Opacity="0.85" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="13,39,22,4" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="go_up_searchDrawingImage" Drawing="{StaticResource go_up_searchDrawingGroup}" />
+  <Geometry x:Key="close8redGeometry1">F1 M48,48z M0,0z M12,12L37,37 M37,12L12,37</Geometry>
+  <Geometry x:Key="close8redGeometry2">F1 M48,48z M0,0z M12,12L37,37 M37,12L12,37</Geometry>
+  <DrawingGroup x:Key="close8redDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource close8redGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8A1410" Thickness="8.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource close8redGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFE04038" Thickness="5.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="close8redDrawingImage" Drawing="{StaticResource close8redDrawingGroup}" />
+  <Geometry x:Key="package_apkGeometry1">F1 M48,48z M0,0z M24,5L42,13 24,21 6,13z</Geometry>
+  <Geometry x:Key="package_apkGeometry2">F1 M48,48z M0,0z M6,13L24,21 24,44 6,36z</Geometry>
+  <Geometry x:Key="package_apkGeometry3">F1 M48,48z M0,0z M42,13L24,21 24,44 42,36z</Geometry>
+  <Geometry x:Key="package_apkGeometry4">F1 M48,48z M0,0z M6,13L14,9 24,13 16,17z</Geometry>
+  <Geometry x:Key="package_apkGeometry5">F1 M48,48z M0,0z M42,13L34,9 24,13 32,17z</Geometry>
+  <Geometry x:Key="package_apkGeometry6">F1 M48,48z M0,0z M12,17L24,22 24,40</Geometry>
+  <Geometry x:Key="package_apkGeometry7">F1 M48,48z M0,0z M24,8.5L30,11.5 24,14.5 18,11.5z</Geometry>
+  <Geometry x:Key="package_apkGeometry8">F1 M48,48z M0,0z M18.5,15.5L24,18.3 29.5,15.5</Geometry>
+  <DrawingGroup x:Key="package_apkDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF8CB8F0" Geometry="{StaticResource package_apkGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF143C78" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A7CC8" Geometry="{StaticResource package_apkGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF143C78" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF2E5AA8" Geometry="{StaticResource package_apkGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF143C78" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_apkGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFA8CCF4" Opacity="0.95" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF143C78" Opacity="0.95" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_apkGeometry5}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFA8CCF4" Opacity="0.95" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF143C78" Opacity="0.95" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_apkGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.35" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFC8E6FC" Geometry="{StaticResource package_apkGeometry7}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2A5AA0" Thickness="0.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_apkGeometry8}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFD8ECFC" Opacity="0.8" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="package_apkDrawingImage" Drawing="{StaticResource package_apkDrawingGroup}" />
+  <Geometry x:Key="open_flatGeometry1">F1 M48,48z M0,0z M3,20L16,20 19,24 45,24 45,44 3,44z</Geometry>
+  <Geometry x:Key="open_flatGeometry2">F1 M48,48z M0,0z M5,27L43,27 43,44 5,44z</Geometry>
+  <Geometry x:Key="open_flatGeometry3">F1 M48,48z M0,0z M7,27L41,27</Geometry>
+  <Geometry x:Key="open_flatGeometry4">F1 M48,48z M0,0z M19,17C19,9,28,6,35,9</Geometry>
+  <Geometry x:Key="open_flatGeometry5">F1 M48,48z M0,0z M19,17C19,9,28,6,35,9</Geometry>
+  <Geometry x:Key="open_flatGeometry6">F1 M48,48z M0,0z M31,3L41,10 31,17z</Geometry>
+  <DrawingGroup x:Key="open_flatDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE8C88C" Geometry="{StaticResource open_flatGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF9A7434" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFF6E4BC" Geometry="{StaticResource open_flatGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF9A7434" Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open_flatGeometry3}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.6" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFF4D8" Opacity="0.6" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open_flatGeometry4}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1B4A8A" Thickness="6.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open_flatGeometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF4A90E0" Thickness="3.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A90E0" Geometry="{StaticResource open_flatGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1B4A8A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="open_flatDrawingImage" Drawing="{StaticResource open_flatDrawingGroup}" />
+  <Geometry x:Key="closetabGeometry1">F1 M48,48z M0,0z M8,3L30,3 41,14 41,45 8,45z</Geometry>
+  <Geometry x:Key="closetabGeometry2">F1 M48,48z M0,0z M30,3L30,14 41,14z</Geometry>
+  <Geometry x:Key="closetabGeometry3">F1 M48,48z M0,0z M12,12L37,37 M37,12L12,37</Geometry>
+  <Geometry x:Key="closetabGeometry4">F1 M48,48z M0,0z M12,12L37,37 M37,12L12,37</Geometry>
+  <DrawingGroup x:Key="closetabDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFF0F2F7" Geometry="{StaticResource closetabGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8C92A0" Thickness="2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFCED4DE" Geometry="{StaticResource closetabGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8C92A0" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1" Transform="0.72,0,0,0.72,4,11">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource closetabGeometry3}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF8A1410" Thickness="8.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource closetabGeometry4}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FFE04038" Thickness="5.5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="closetabDrawingImage" Drawing="{StaticResource closetabDrawingGroup}" />
+  <Geometry x:Key="x11Geometry1">F1 M48,48z M0,0z M7,9L41,9 41,13C33,11,18,12,7,16z</Geometry>
+  <Geometry x:Key="x11Geometry2">F1 M48,48z M0,0z M16,14L32,29 M32,14L16,29</Geometry>
+  <Geometry x:Key="x11Geometry3">F1 M48,48z M0,0z M20,35L20,40 M28,35L28,40 M16,41L32,41</Geometry>
+  <DrawingGroup x:Key="x11DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF3A404C">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1A1E28" Thickness="1.6" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="4,6,40,29" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF3E7CC8">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="7,9,34,23" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource x11Geometry1}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF80B0E8" Opacity="0.8" />
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource x11Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFFFFFFF" Thickness="4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource x11Geometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A404C" Thickness="2.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="x11DrawingImage" Drawing="{StaticResource x11DrawingGroup}" />
+  <DrawingGroup x:Key="FindHSDrawingGroup" ClipGeometry="M0,0 V70 H70 V0 H0 Z">
+    <GeometryDrawing Brush="#FF2A4878">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="29,26,12,12" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFDFE9F4">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="2.5" RadiusY="2.5" Center="35,31.5" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="11,4,14,16" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFDFE9F4">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="15,7,6,7" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="7,18,22,22" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFFFFFFF" Opacity="0.85" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="9,21,18,7" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="4" RadiusY="4" Rect="4,38,27,27" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFEEF4FB" Offset="0" />
+          <GradientStop Color="#FF9AB4D4" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="10,41,15,21" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="45,4,14,16" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFDFE9F4">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="49,7,6,7" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="41,18,22,22" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFFFFFFF" Opacity="0.85" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="43,21,18,7" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FF7A97C0" Offset="0" />
+          <GradientStop Color="#FF3C5C90" Offset="0.45" />
+          <GradientStop Color="#FF2A4878" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="4" RadiusY="4" Rect="38,38,27,27" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFEEF4FB" Offset="0" />
+          <GradientStop Color="#FF9AB4D4" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2" RadiusY="2" Rect="44,41,15,21" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="FindHSDrawingImage" Drawing="{StaticResource FindHSDrawingGroup}" />
+  <Geometry x:Key="go_down_searchGeometry1">F1 M48,48z M0,0z M24,4L24,24</Geometry>
+  <Geometry x:Key="go_down_searchGeometry2">F1 M48,48z M0,0z M24,4L24,24</Geometry>
+  <Geometry x:Key="go_down_searchGeometry3">F1 M48,48z M0,0z M8,22C13,30 18,34 24,37 30,34 35,30 40,22L33,20C29,25 27,27 24,27 21,27 19,25 15,20z</Geometry>
+  <DrawingGroup x:Key="go_down_searchDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource go_down_searchGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF183E82" Thickness="8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource go_down_searchGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF468CDC" Thickness="5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF468CDC" Geometry="{StaticResource go_down_searchGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF183E82" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFB8BCC8" Opacity="0.85" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="13,40,22,4" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="go_down_searchDrawingImage" Drawing="{StaticResource go_down_searchDrawingGroup}" />
+  <Geometry x:Key="transfersGeometry1">F1 M48,48z M0,0z M8,3L30,3 41,14 41,45 8,45z</Geometry>
+  <Geometry x:Key="transfersGeometry2">F1 M48,48z M0,0z M30,3L30,14 41,14z</Geometry>
+  <Geometry x:Key="transfersGeometry3">F1 M48,48z M0,0z M13,16L30,16</Geometry>
+  <Geometry x:Key="transfersGeometry4">F1 M48,48z M0,0z M13,22L30,22</Geometry>
+  <Geometry x:Key="transfersGeometry5">F1 M48,48z M0,0z M13,28L26,28</Geometry>
+  <Geometry x:Key="transfersGeometry6">F1 M48,48z M0,0z M27,25L27,32C27,38,30,41,35,41L36,41</Geometry>
+  <Geometry x:Key="transfersGeometry7">F1 M48,48z M0,0z M27,25L27,32C27,38,30,41,35,41L36,41</Geometry>
+  <Geometry x:Key="transfersGeometry8">F1 M48,48z M0,0z M34,33L44,40 34,47z</Geometry>
+  <DrawingGroup x:Key="transfersDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFF4F6FC" Geometry="{StaticResource transfersGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF283040" Thickness="2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFB8C0D2" Geometry="{StaticResource transfersGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF283040" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource transfersGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFB8BCC8" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource transfersGeometry4}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFB8BCC8" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource transfersGeometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFB8BCC8" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource transfersGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF173E78" Thickness="8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource transfersGeometry7}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF4A88D8" Thickness="4.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A88D8" Geometry="{StaticResource transfersGeometry8}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF173E78" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="transfersDrawingImage" Drawing="{StaticResource transfersDrawingGroup}" />
+  <Geometry x:Key="getdirGeometry1">F1 M48,48z M0,0z M3,8L17,8 20,13 45,13 45,42 3,42z</Geometry>
+  <Geometry x:Key="getdirGeometry2">F1 M48,48z M0,0z M5,13L45,13</Geometry>
+  <Geometry x:Key="getdirGeometry3">F1 M48,48z M0,0z M5,16L43,16 43,42 5,42z</Geometry>
+  <Geometry x:Key="getdirGeometry4">F1 M48,48z M0,0z M5,16L43,16</Geometry>
+  <Geometry x:Key="getdirGeometry5">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <Geometry x:Key="getdirGeometry6">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <DrawingGroup x:Key="getdirDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE2B874" Geometry="{StaticResource getdirGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource getdirGeometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.65" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.65" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE5C185" Geometry="{StaticResource getdirGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource getdirGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.75" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.75" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1" Transform="0.4,0,0,0.4,26,24">
+      <GeometryDrawing Brush="#FF46AF4B" Geometry="{StaticResource getdirGeometry5}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF186020" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Geometry="{StaticResource getdirGeometry6}">
+        <GeometryDrawing.Pen>
+          <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+            <Pen.Brush>
+              <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+            </Pen.Brush>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="getdirDrawingImage" Drawing="{StaticResource getdirDrawingGroup}" />
+  <Geometry x:Key="settingsGeometry1">F1 M48,48z M0,0z M14,8L34,8</Geometry>
+  <Geometry x:Key="settingsGeometry2">F1 M48,48z M0,0z M23,18L23,41</Geometry>
+  <DrawingGroup x:Key="settingsDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <DrawingGroup Opacity="1" Transform="0.707106781186548,0.707106781186547,-0.707106781186547,0.707106781186548,24,-9.94112549695429">
+      <GeometryDrawing Brush="#FFA8AEBC">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF3A3E48" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+        <GeometryDrawing.Geometry>
+          <RectangleGeometry RadiusX="1.5" RadiusY="1.5" Rect="14,6,20,10" />
+        </GeometryDrawing.Geometry>
+      </GeometryDrawing>
+      <GeometryDrawing Geometry="{StaticResource settingsGeometry1}">
+        <GeometryDrawing.Brush>
+          <SolidColorBrush Color="#FF000000" Opacity="0.7" />
+        </GeometryDrawing.Brush>
+        <GeometryDrawing.Pen>
+          <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+            <Pen.Brush>
+              <SolidColorBrush Color="#FFE8ECF4" Opacity="0.7" />
+            </Pen.Brush>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FFE8B84A">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7A5210" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+        <GeometryDrawing.Geometry>
+          <RectangleGeometry RadiusX="2" RadiusY="2" Rect="21,15,6,29" />
+        </GeometryDrawing.Geometry>
+      </GeometryDrawing>
+      <GeometryDrawing Geometry="{StaticResource settingsGeometry2}">
+        <GeometryDrawing.Brush>
+          <SolidColorBrush Color="#FF000000" Opacity="0.7" />
+        </GeometryDrawing.Brush>
+        <GeometryDrawing.Pen>
+          <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+            <Pen.Brush>
+              <SolidColorBrush Color="#FFFFF0B8" Opacity="0.7" />
+            </Pen.Brush>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="settingsDrawingImage" Drawing="{StaticResource settingsDrawingGroup}" />
+  <Geometry x:Key="folder_flatGeometry1">F1 M48,48z M0,0z M3,8L17,8 20,13 45,13 45,42 3,42z</Geometry>
+  <Geometry x:Key="folder_flatGeometry2">F1 M48,48z M0,0z M5,13L45,13</Geometry>
+  <Geometry x:Key="folder_flatGeometry3">F1 M48,48z M0,0z M5,16L43,16 43,42 5,42z</Geometry>
+  <Geometry x:Key="folder_flatGeometry4">F1 M48,48z M0,0z M5,16L43,16</Geometry>
+  <DrawingGroup x:Key="folder_flatDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE2B874" Geometry="{StaticResource folder_flatGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource folder_flatGeometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.65" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.65" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE5C185" Geometry="{StaticResource folder_flatGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource folder_flatGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.75" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.75" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="folder_flatDrawingImage" Drawing="{StaticResource folder_flatDrawingGroup}" />
+  <Geometry x:Key="close8Geometry">F1 M48,48z M0,0z M13,13L35,35 M35,13L13,35</Geometry>
+  <DrawingGroup x:Key="close8DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource close8Geometry}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFFFFFFF" Thickness="8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="close8DrawingImage" Drawing="{StaticResource close8DrawingGroup}" />
+  <Geometry x:Key="archive16Geometry1">F1 M48,48z M0,0z M4,16L21,16 24,21 4,21z</Geometry>
+  <Geometry x:Key="archive16Geometry2">F1 M48,48z M0,0z M44,16L27,16 24,21 44,21z</Geometry>
+  <Geometry x:Key="archive16Geometry3">F1 M48,48z M0,0z M24,21L24,44</Geometry>
+  <Geometry x:Key="archive16Geometry4">F1 M48,48z M0,0z M24,22L24,30 M24,33L24,44</Geometry>
+  <Geometry x:Key="archive16Geometry5">F1 M48,48z M0,0z M22,29L22,32 M26,29L26,32</Geometry>
+  <DrawingGroup x:Key="archive16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFC8A46A">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A4A20" Thickness="1.6" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="4,16,40,28" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE0C08C" Geometry="{StaticResource archive16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A4A20" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE0C08C" Geometry="{StaticResource archive16Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A4A20" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource archive16Geometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF9A7A48" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource archive16Geometry4}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FFD8DCE6" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" DashCap="Flat" LineJoin="Miter">
+            <Pen.DashStyle>
+              <DashStyle Offset="0" Dashes="1.66666666666667 1.16666666666667" />
+            </Pen.DashStyle>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+    <GeometryDrawing Brush="#FFD8DCE6">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A6E78" Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="20,27,8,7" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource archive16Geometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A6E78" Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFD8DCE6" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="1.8" RadiusY="1.8" Center="24,36" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="archive16DrawingImage" Drawing="{StaticResource archive16DrawingGroup}" />
+  <Geometry x:Key="pasteGeometry1">F1 M48,48z M0,0z M3,8L17,8 20,13 45,13 45,42 3,42z</Geometry>
+  <Geometry x:Key="pasteGeometry2">F1 M48,48z M0,0z M5,13L45,13</Geometry>
+  <Geometry x:Key="pasteGeometry3">F1 M48,48z M0,0z M5,16L43,16 43,42 5,42z</Geometry>
+  <Geometry x:Key="pasteGeometry4">F1 M48,48z M0,0z M5,16L43,16</Geometry>
+  <Geometry x:Key="pasteGeometry5">F1 M48,48z M0,0z M17,24L41,24</Geometry>
+  <Geometry x:Key="pasteGeometry6">F1 M48,48z M0,0z M21,29L37,29 M21,33L37,33 M21,37L32,37</Geometry>
+  <DrawingGroup x:Key="pasteDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE2B874" Geometry="{StaticResource pasteGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource pasteGeometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.65" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.65" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE5C185" Geometry="{StaticResource pasteGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource pasteGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.75" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.75" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE8ECF4">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A4050" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="17,19,24,25" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource pasteGeometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8A94A8" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource pasteGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A7A98" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="pasteDrawingImage" Drawing="{StaticResource pasteDrawingGroup}" />
+  <Geometry x:Key="save16Geometry1">F1 M48,48z M0,0z M20,29L28,29 M20,32L28,32 M20,35L25,35</Geometry>
+  <Geometry x:Key="save16Geometry2">F1 M48,48z M0,0z M10,9L15,9</Geometry>
+  <DrawingGroup x:Key="save16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF7A66C8">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A2A78" Thickness="1.7" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="2.5" RadiusY="2.5" Rect="7,6,34,36" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE8E8F4">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A2A78" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="13,7,21,13" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFB8B8D8">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="17,8,13,8" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFD8D8E8">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A2A78" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="12,23,24,17" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF7A66C8">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A2A78" Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="17,26,14,11" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource save16Geometry1}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.8" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFE8E8F4" Opacity="0.8" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource save16Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFB8A8F0" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="save16DrawingImage" Drawing="{StaticResource save16DrawingGroup}" />
+  <Geometry x:Key="copyGeometry1">F1 M48,48z M0,0z M7,9L27,9 37,19 37,42 7,42z</Geometry>
+  <Geometry x:Key="copyGeometry2">F1 M48,48z M0,0z M27,9L27,19 37,19z</Geometry>
+  <Geometry x:Key="copyGeometry3">F1 M48,48z M0,0z M11,14L22,14</Geometry>
+  <Geometry x:Key="copyGeometry4">F1 M48,48z M0,0z M11,20L22,20</Geometry>
+  <Geometry x:Key="copyGeometry5">F1 M48,48z M0,0z M11,26L20,26</Geometry>
+  <Geometry x:Key="copyGeometry6">F1 M48,48z M0,0z M14,5L31,5 41,15 41,38 14,38z</Geometry>
+  <Geometry x:Key="copyGeometry7">F1 M48,48z M0,0z M31,5L31,15 41,15z</Geometry>
+  <Geometry x:Key="copyGeometry8">F1 M48,48z M0,0z M20,20L36,20</Geometry>
+  <Geometry x:Key="copyGeometry9">F1 M48,48z M0,0z M20,26L36,26</Geometry>
+  <Geometry x:Key="copyGeometry10">F1 M48,48z M0,0z M20,32L31,32</Geometry>
+  <DrawingGroup x:Key="copyDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF6A9AD8" Geometry="{StaticResource copyGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1E3A6A" Thickness="1.6" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFA8C8F0" Geometry="{StaticResource copyGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1E3A6A" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry3}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FFC0DCF8" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry4}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FFC0DCF8" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry5}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FFC0DCF8" Thickness="2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+    <GeometryDrawing Brush="#FFF4F8FF" Geometry="{StaticResource copyGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1E3A6A" Thickness="1.7" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFC8DCF8" Geometry="{StaticResource copyGeometry7}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1E3A6A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry8}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF4A7CC0" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry9}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF4A7CC0" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource copyGeometry10}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF4A7CC0" Thickness="2.2" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="copyDrawingImage" Drawing="{StaticResource copyDrawingGroup}" />
+  <Geometry x:Key="history_lightGeometry1">F1 M48,48z M0,0z M24,24L24,12.5 M24,24L34.5,24</Geometry>
+  <Geometry x:Key="history_lightGeometry2">F1 M48,48z M0,0z M24,9.5L24,11.4 M24,36.6L24,38.5 M9.5,24L11.4,24 M36.6,24L38.5,24</Geometry>
+  <Geometry x:Key="history_lightGeometry3">F1 M48,48z M0,0z M10,17C12,11,18,7.5,24,7.5</Geometry>
+  <DrawingGroup x:Key="history_lightDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF4A4E5E">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2A2E38" Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="19.5" RadiusY="19.5" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF898C96">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF383A46" Thickness="0.9" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="17" RadiusY="17" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFF8F9FD">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFA1A2A4" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="14.8" RadiusY="14.8" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource history_lightGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2A2C36" Thickness="3.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF2A2C36">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="2.2" RadiusY="2.2" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource history_lightGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF787C8A" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource history_lightGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.6" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="history_lightDrawingImage" Drawing="{StaticResource history_lightDrawingGroup}" />
+  <Geometry x:Key="open16Geometry1">F1 M48,48z M0,0z M3,18L16,18 19,22 45,22 45,43 3,43z</Geometry>
+  <Geometry x:Key="open16Geometry2">F1 M48,48z M0,0z M5,25L43,25 43,43 5,43z</Geometry>
+  <Geometry x:Key="open16Geometry3">F1 M48,48z M0,0z M7,25.5L41,25.5</Geometry>
+  <Geometry x:Key="open16Geometry4">F1 M48,48z M0,0z M19,17C19,9,28,6,35,9</Geometry>
+  <Geometry x:Key="open16Geometry5">F1 M48,48z M0,0z M19,17C19,9,28,6,35,9</Geometry>
+  <Geometry x:Key="open16Geometry6">F1 M48,48z M0,0z M31,3L41,10 31,17z</Geometry>
+  <DrawingGroup x:Key="open16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE8B860" Geometry="{StaticResource open16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8A5E18" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFF4CC7C" Geometry="{StaticResource open16Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF8A5E18" Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open16Geometry3}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.6" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFE8A8" Opacity="0.6" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open16Geometry4}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1B4A8A" Thickness="6.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource open16Geometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF4A90E0" Thickness="3.6" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A90E0" Geometry="{StaticResource open16Geometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1B4A8A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="open16DrawingImage" Drawing="{StaticResource open16DrawingGroup}" />
+  <Geometry x:Key="downloadGeometry1">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <Geometry x:Key="downloadGeometry2">F1 M48,48z M0,0z M18,6L30,6 30,24 38,24 24,42 10,24 18,24z</Geometry>
+  <DrawingGroup x:Key="downloadDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF48AC52" Geometry="{StaticResource downloadGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1A6024" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource downloadGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="downloadDrawingImage" Drawing="{StaticResource downloadDrawingGroup}" />
+  <Geometry x:Key="history_darkGeometry1">F1 M48,48z M0,0z M24,24L24,12.5 M24,24L34.5,24</Geometry>
+  <Geometry x:Key="history_darkGeometry2">F1 M48,48z M0,0z M24,9.5L24,11.4 M24,36.6L24,38.5 M9.5,24L11.4,24 M36.6,24L38.5,24</Geometry>
+  <Geometry x:Key="history_darkGeometry3">F1 M48,48z M0,0z M10,17C12,11,18,7.5,24,7.5</Geometry>
+  <DrawingGroup x:Key="history_darkDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFAAAEBA">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2A2E38" Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="19.5" RadiusY="19.5" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFC8CAD2">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF80828C" Thickness="0.9" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="17" RadiusY="17" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF2C2E38">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1D1E24" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="14.8" RadiusY="14.8" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource history_darkGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFF6F8FC" Thickness="3.4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFF6F8FC">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="2.2" RadiusY="2.2" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource history_darkGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF787C8A" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource history_darkGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="history_darkDrawingImage" Drawing="{StaticResource history_darkDrawingGroup}" />
+  <Geometry x:Key="package_ipkGeometry1">F1 M48,48z M0,0z M24,5L42,13 24,21 6,13z</Geometry>
+  <Geometry x:Key="package_ipkGeometry2">F1 M48,48z M0,0z M6,13L24,21 24,44 6,36z</Geometry>
+  <Geometry x:Key="package_ipkGeometry3">F1 M48,48z M0,0z M42,13L24,21 24,44 42,36z</Geometry>
+  <Geometry x:Key="package_ipkGeometry4">F1 M48,48z M0,0z M6,13L14,9 24,13 16,17z</Geometry>
+  <Geometry x:Key="package_ipkGeometry5">F1 M48,48z M0,0z M42,13L34,9 24,13 32,17z</Geometry>
+  <Geometry x:Key="package_ipkGeometry6">F1 M48,48z M0,0z M12,17L24,22 24,40</Geometry>
+  <DrawingGroup x:Key="package_ipkDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE0B878" Geometry="{StaticResource package_ipkGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF5A3A10" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFB8843C" Geometry="{StaticResource package_ipkGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF5A3A10" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF8A5E24" Geometry="{StaticResource package_ipkGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF5A3A10" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_ipkGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFF0D0A0" Opacity="0.95" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF5A3A10" Opacity="0.95" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_ipkGeometry5}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFF0D0A0" Opacity="0.95" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF5A3A10" Opacity="0.95" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource package_ipkGeometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.35" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="package_ipkDrawingImage" Drawing="{StaticResource package_ipkDrawingGroup}" />
+  <Geometry x:Key="editorGeometry1">F1 M48,48z M0,0z M7,4L28,4 38,14 38,43 7,43z</Geometry>
+  <Geometry x:Key="editorGeometry2">F1 M48,48z M0,0z M28,4L28,14 38,14z</Geometry>
+  <Geometry x:Key="editorGeometry3">F1 M48,48z M0,0z M12,18C16,16 20,20 24,18 28,16 30,18 31,18</Geometry>
+  <Geometry x:Key="editorGeometry4">F1 M48,48z M0,0z M12,23C16,21 20,25 24,23 28,21 30,23 31,23</Geometry>
+  <Geometry x:Key="editorGeometry5">F1 M48,48z M0,0z M12,28C16,26 20,30 24,28 28,26 30,28 31,28</Geometry>
+  <Geometry x:Key="editorGeometry6">F1 M48,48z M0,0z M12,33C16,31,20,35,24,33L29,33</Geometry>
+  <Geometry x:Key="editorGeometry7">F1 M48,48z M0,0z M0,13L4.6,13 2.3,20z</Geometry>
+  <DrawingGroup x:Key="editorDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFFBFDFF" Geometry="{StaticResource editorGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A3E48" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFC8DAF0" Geometry="{StaticResource editorGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF3A3E48" Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1">
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource editorGeometry3}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7CA8E0" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource editorGeometry4}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7CA8E0" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource editorGeometry5}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7CA8E0" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource editorGeometry6}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7CA8E0" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+    <DrawingGroup Opacity="1" Transform="0.951056516295154,0.309016994374947,-0.309016994374947,0.951056516295154,34,21">
+      <GeometryDrawing Brush="#FF202020">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF000000" Thickness="0.7" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+        <GeometryDrawing.Geometry>
+          <RectangleGeometry RadiusX="0.8" RadiusY="0.8" Rect="0,0,4.6,15" />
+        </GeometryDrawing.Geometry>
+      </GeometryDrawing>
+      <GeometryDrawing Brush="#FFE8C24A" Geometry="{StaticResource editorGeometry7}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF7A5A08" Thickness="0.7" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="editorDrawingImage" Drawing="{StaticResource editorDrawingGroup}" />
+  <Geometry x:Key="document_flatGeometry1">F1 M48,48z M0,0z M8,3L30,3 41,14 41,45 8,45z</Geometry>
+  <Geometry x:Key="document_flatGeometry2">F1 M48,48z M0,0z M30,3L30,14 41,14z</Geometry>
+  <Geometry x:Key="document_flatGeometry3">F1 M48,48z M0,0z M10.5,7L10.5,42</Geometry>
+  <DrawingGroup x:Key="document_flatDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFFAFBFD" Geometry="{StaticResource document_flatGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2C303A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFD0D4DC" Geometry="{StaticResource document_flatGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF2C303A" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource document_flatGeometry3}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.6" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.6" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="document_flatDrawingImage" Drawing="{StaticResource document_flatDrawingGroup}" />
+  <Geometry x:Key="updirGeometry1">F1 M48,48z M0,0z M3,8L17,8 20,13 45,13 45,42 3,42z</Geometry>
+  <Geometry x:Key="updirGeometry2">F1 M48,48z M0,0z M5,13L45,13</Geometry>
+  <Geometry x:Key="updirGeometry3">F1 M48,48z M0,0z M5,16L43,16 43,42 5,42z</Geometry>
+  <Geometry x:Key="updirGeometry4">F1 M48,48z M0,0z M5,16L43,16</Geometry>
+  <Geometry x:Key="updirGeometry5">F1 M48,48z M0,0z M18,42L30,42 30,24 38,24 24,6 10,24 18,24z</Geometry>
+  <Geometry x:Key="updirGeometry6">F1 M48,48z M0,0z M18,42L30,42 30,24 38,24 24,6 10,24 18,24z</Geometry>
+  <DrawingGroup x:Key="updirDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFE2B874" Geometry="{StaticResource updirGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.5" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource updirGeometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.65" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.65" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE5C185" Geometry="{StaticResource updirGeometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF764C1A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource updirGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.75" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEED4AC" Opacity="0.75" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <DrawingGroup Opacity="1" Transform="0.4,0,0,0.4,26,18">
+      <GeometryDrawing Brush="#FF468CDC" Geometry="{StaticResource updirGeometry5}">
+        <GeometryDrawing.Pen>
+          <Pen Brush="#FF163A78" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+      <GeometryDrawing Geometry="{StaticResource updirGeometry6}">
+        <GeometryDrawing.Pen>
+          <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+            <Pen.Brush>
+              <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+            </Pen.Brush>
+          </Pen>
+        </GeometryDrawing.Pen>
+      </GeometryDrawing>
+    </DrawingGroup>
+  </DrawingGroup>
+  <DrawingImage x:Key="updirDrawingImage" Drawing="{StaticResource updirDrawingGroup}" />
+  <Geometry x:Key="add16Geometry1">F1 M48,48z M0,0z M19.25,8L28.75,8 28.75,19.25 40,19.25 40,28.75 28.75,28.75 28.75,40 19.25,40 19.25,28.75 8,28.75 8,19.25 19.25,19.25z</Geometry>
+  <Geometry x:Key="add16Geometry2">F1 M48,48z M0,0z M22.5,10L22.5,22 M10,22.5L22,22.5</Geometry>
+  <DrawingGroup x:Key="add16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF46AF4B" Geometry="{StaticResource add16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF186020" Thickness="1.6" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource add16Geometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.45" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.45" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="add16DrawingImage" Drawing="{StaticResource add16DrawingGroup}" />
+  <Geometry x:Key="err9Geometry1">F1 M48,48z M0,0z M10,16C13,9 21,6 28,7 19,9 13,15 11,23z</Geometry>
+  <Geometry x:Key="err9Geometry2">F1 M48,48z M0,0z M16,16L32,32 M32,16L16,32</Geometry>
+  <DrawingGroup x:Key="err9DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFB83A10">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF7A1E06" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="20" RadiusY="20" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFE85A20">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="17" RadiusY="17" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource err9Geometry1}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFF8A878" Opacity="0.6" />
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF000000" Geometry="{StaticResource err9Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FFFFFFFF" Thickness="5" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="err9DrawingImage" Drawing="{StaticResource err9DrawingGroup}" />
+  <Geometry x:Key="pubkeyGeometry1">F1 M70,70z M0,0z M46,13A16,16,0,0,1,46,35</Geometry>
+  <Geometry x:Key="pubkeyGeometry2">F1 M70,70z M0,0z M24,15A14,14,0,0,1,38,9.5</Geometry>
+  <Geometry x:Key="pubkeyGeometry3">F1 M70,70z M0,0z M31,37L39,37 37.5,44 32.5,44z</Geometry>
+  <Geometry x:Key="pubkeyGeometry4">F1 M70,70z M0,0z M32.5,68L38,68 35.2,69.8z</Geometry>
+  <DrawingGroup x:Key="pubkeyDrawingGroup" ClipGeometry="M0,0 V70 H70 V0 H0 Z">
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <RadialGradientBrush Center="0.35,0.3" RadiusX="0.95" RadiusY="0.95" GradientOrigin="0.5,0.5" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFFAF0C0" Offset="0" />
+          <GradientStop Color="#FFE8C860" Offset="0.5" />
+          <GradientStop Color="#FFA88020" Offset="1" />
+        </RadialGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="16" RadiusY="16" Center="35,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource pubkeyGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF8A6410" Opacity="0.45" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource pubkeyGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="3" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFF8D8" Opacity="0.8" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFFFFFFF">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="4.5" RadiusY="4.5" Rect="26,18,18,9" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF6B4E0E" Opacity="0.85" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1.7" RadiusY="1.7" Rect="28.5,19,13,3.5" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource pubkeyGeometry3}">
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFF6E498" Offset="0" />
+          <GradientStop Color="#FFD8B448" Offset="0.5" />
+          <GradientStop Color="#FF9A7418" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFF6E498" Offset="0" />
+          <GradientStop Color="#FFD8B448" Offset="0.5" />
+          <GradientStop Color="#FF9A7418" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="32.5,42,5.5,26" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFFFF4C0" Opacity="0.7" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="33.3,42,1.4,26" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFF6E498" Offset="0" />
+          <GradientStop Color="#FFD8B448" Offset="0.5" />
+          <GradientStop Color="#FF9A7418" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="38,49,5,4" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFF6E498" Offset="0" />
+          <GradientStop Color="#FFD8B448" Offset="0.5" />
+          <GradientStop Color="#FF9A7418" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="38,56,6.5,4" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFF6E498" Offset="0" />
+          <GradientStop Color="#FFD8B448" Offset="0.5" />
+          <GradientStop Color="#FF9A7418" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="1" RadiusY="1" Rect="38,62.5,4.5,3.5" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFB08828" Geometry="{StaticResource pubkeyGeometry4}" />
+  </DrawingGroup>
+  <DrawingImage x:Key="pubkeyDrawingImage" Drawing="{StaticResource pubkeyDrawingGroup}" />
+  <Geometry x:Key="go16Geometry1">F1 M48,48z M0,0z M6,18L6,30 23,30 23,38 42,24 23,10 23,18z</Geometry>
+  <Geometry x:Key="go16Geometry2">F1 M48,48z M0,0z M10,20L22,20</Geometry>
+  <DrawingGroup x:Key="go16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF3A3E48">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="25,27,17,16" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A88D8" Geometry="{StaticResource go16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF1A3E78" Thickness="1.6" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource go16Geometry2}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.7" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.4" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFA8CCF4" Opacity="0.7" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="go16DrawingImage" Drawing="{StaticResource go16DrawingGroup}" />
+  <Geometry x:Key="helpGeometry1">F1 M48,48z M0,0z M9,15C12,8 20,5 27,6 18,8 12,14 10,22z</Geometry>
+  <Geometry x:Key="helpGeometry2">F1 M48,48z M0,0z M25.654541015625,29.0166015625L22.292724609375,29.0166015625Q22.279541015625,28.29150390625 22.279541015625,28.13330078125 22.279541015625,26.49853515625 22.820068359375,25.44384765625 23.360595703125,24.38916015625 24.982177734375,23.07080078125 26.603759765625,21.75244140625 26.920166015625,21.34375 27.407958984375,20.69775390625 27.407958984375,19.919921875 27.407958984375,18.8388671875 26.54443359375,18.067626953125 25.680908203125,17.29638671875 24.217529296875,17.29638671875 22.806884765625,17.29638671875 21.857666015625,18.1005859375 20.908447265625,18.90478515625 20.552490234375,20.552734375L17.151123046875,20.130859375Q17.296142578125,17.77099609375 19.16162109375,16.123046875 21.027099609375,14.47509765625 24.059326171875,14.47509765625 27.249755859375,14.47509765625 29.135009765625,16.142822265625 31.020263671875,17.810546875 31.020263671875,20.025390625 31.020263671875,21.25146484375 30.328125,22.345703125 29.635986328125,23.43994140625 27.368408203125,25.3251953125 26.195068359375,26.30078125 25.91162109375,26.89404296875 25.628173828125,27.4873046875 25.654541015625,29.0166015625z M22.292724609375,34L22.292724609375,30.29541015625 25.997314453125,30.29541015625 25.997314453125,34z</Geometry>
+  <DrawingGroup x:Key="helpDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF2A5EA8">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF123A6A" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="19" RadiusY="19" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4A88D0">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="16" RadiusY="16" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource helpGeometry1}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFA8CCF0" Opacity="0.55" />
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFFFFFFF" Geometry="{StaticResource helpGeometry2}" />
+  </DrawingGroup>
+  <DrawingImage x:Key="helpDrawingImage" Drawing="{StaticResource helpDrawingGroup}" />
+  <Geometry x:Key="refresh16Geometry1">F1 M48,48z M0,0z M10,24A14,14,0,0,1,33,11</Geometry>
+  <Geometry x:Key="refresh16Geometry2">F1 M48,48z M0,0z M38,24A14,14,0,0,1,15,37</Geometry>
+  <Geometry x:Key="refresh16Geometry3">F1 M48,48z M0,0z M10,24A14,14,0,0,1,33,11</Geometry>
+  <Geometry x:Key="refresh16Geometry4">F1 M48,48z M0,0z M38,24A14,14,0,0,1,15,37</Geometry>
+  <Geometry x:Key="refresh16Geometry5">F1 M48,48z M0,0z M30,4L40,10 33,19z</Geometry>
+  <Geometry x:Key="refresh16Geometry6">F1 M48,48z M0,0z M18,44L8,38 15,29z</Geometry>
+  <DrawingGroup x:Key="refresh16DrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Geometry="{StaticResource refresh16Geometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF186622" Thickness="7" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource refresh16Geometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF186622" Thickness="7" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource refresh16Geometry3}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF4CB450" Thickness="4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource refresh16Geometry4}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF4CB450" Thickness="4" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4CB450" Geometry="{StaticResource refresh16Geometry5}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF186622" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FF4CB450" Geometry="{StaticResource refresh16Geometry6}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF186622" Thickness="1.3" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="refresh16DrawingImage" Drawing="{StaticResource refresh16DrawingGroup}" />
+  <Geometry x:Key="uploadGeometry1">F1 M48,48z M0,0z M18,42L30,42 30,24 38,24 24,6 10,24 18,24z</Geometry>
+  <Geometry x:Key="uploadGeometry2">F1 M48,48z M0,0z M18,42L30,42 30,24 38,24 24,6 10,24 18,24z</Geometry>
+  <DrawingGroup x:Key="uploadDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FF4A96DC" Geometry="{StaticResource uploadGeometry1}">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF163A78" Thickness="1.8" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Round" />
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource uploadGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.25" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="uploadDrawingImage" Drawing="{StaticResource uploadDrawingGroup}" />
+  <Geometry x:Key="busyGeometry">F1 M48,48z M0,0z M9,15C12,8 20,5 27,6 18,8 12,14 10,22z</Geometry>
+  <DrawingGroup x:Key="busyDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <GeometryDrawing Brush="#FFB01810">
+      <GeometryDrawing.Pen>
+        <Pen Brush="#FF6A0A08" Thickness="1.2" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter" />
+      </GeometryDrawing.Pen>
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="19" RadiusY="19" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFD82820">
+      <GeometryDrawing.Geometry>
+        <EllipseGeometry RadiusX="16" RadiusY="16" Center="24,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource busyGeometry}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FFF08078" Opacity="0.55" />
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Brush="#FFFFFFFF">
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="3" RadiusY="3" Rect="15,21,18,6" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="busyDrawingImage" Drawing="{StaticResource busyDrawingGroup}" />
+</ResourceDictionary>

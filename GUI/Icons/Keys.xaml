@@ -1,0 +1,288 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Geometry x:Key="unlockedGeometry1">F1 M48,48z M0,0z M12,21.2L12,13.5A12,12,0,0,1,36,13.5L36,13.35 31.5,13.35 31.5,13.5A7.5,7.5,0,0,0,16.5,13.5L16.5,21.2z</Geometry>
+  <Geometry x:Key="unlockedGeometry2">F1 M48,48z M0,0z M13.55,13.5A10.45,10.45,0,0,1,34.45,13.5</Geometry>
+  <Geometry x:Key="unlockedGeometry3">F1 M48,48z M0,0z M31.5,13.45L36,13.45</Geometry>
+  <Geometry x:Key="unlockedGeometry4">F1 M48,48z M0,0z M31.6,13.2L35.9,13.2</Geometry>
+  <DrawingGroup x:Key="unlockedDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <DrawingGroup>
+      <DrawingGroup.ClipGeometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="0,45,48,3" />
+      </DrawingGroup.ClipGeometry>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <RectangleGeometry RadiusX="0" RadiusY="0" Rect="0,45,48,3" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <RadialGradientBrush Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5" GradientOrigin="0.5,0.5" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+              <GradientStop Color="#57000000" Offset="0" />
+              <GradientStop Color="#4C000000" Offset="0.3" />
+              <GradientStop Color="#33000000" Offset="0.55" />
+              <GradientStop Color="#0F000000" Offset="0.8" />
+              <GradientStop Color="#00000000" Offset="1" />
+            </RadialGradientBrush>
+          </GeometryDrawing.Brush>
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry RadiusX="23" RadiusY="2" Center="24,46.05" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingGroup>
+    <GeometryDrawing Geometry="{StaticResource unlockedGeometry1}">
+      <GeometryDrawing.Brush>
+        <RadialGradientBrush Center="24,13.5" RadiusX="12" RadiusY="12" GradientOrigin="24,13.5" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFA1A1A1" Offset="0.625" />
+          <GradientStop Color="#FF9E9E9E" Offset="0.65599999999999992" />
+          <GradientStop Color="#FFA2A2A2" Offset="0.6875" />
+          <GradientStop Color="#FFACACAC" Offset="0.71900000000000008" />
+          <GradientStop Color="#FFAEAEAE" Offset="0.75" />
+          <GradientStop Color="#FF888888" Offset="0.78099999999999992" />
+          <GradientStop Color="#FF696969" Offset="0.8125" />
+          <GradientStop Color="#FFB5B5B5" Offset="0.84400000000000008" />
+          <GradientStop Color="#FFD9D9D9" Offset="0.875" />
+          <GradientStop Color="#FFD9D9D9" Offset="0.90599999999999992" />
+          <GradientStop Color="#FFD8D8D8" Offset="0.9375" />
+          <GradientStop Color="#FF9E9E9E" Offset="0.96900000000000008" />
+          <GradientStop Color="#FF9E9E9E" Offset="1" />
+        </RadialGradientBrush>
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource unlockedGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.3" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEDEDEF" Opacity="0.85" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource unlockedGeometry3}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.9" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="0.42" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FF6E727A" Opacity="0.9" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource unlockedGeometry4}">
+      <GeometryDrawing.Brush>
+        <SolidColorBrush Color="#FF000000" Opacity="0.5" />
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Pen>
+        <Pen Thickness="0.28" StartLineCap="Flat" EndLineCap="Flat" LineJoin="Miter">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFF2F2F4" Opacity="0.5" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="9,0" EndPoint="39,0" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFA0804F" Offset="0" />
+          <GradientStop Color="#FFB3925C" Offset="0.006" />
+          <GradientStop Color="#FFCFB15F" Offset="0.019" />
+          <GradientStop Color="#FFE5CD56" Offset="0.031" />
+          <GradientStop Color="#FFF5DC5B" Offset="0.044000000000000004" />
+          <GradientStop Color="#FFFCEC55" Offset="0.055999999999999994" />
+          <GradientStop Color="#FFFBE845" Offset="0.065" />
+          <GradientStop Color="#FFF5D52F" Offset="0.1" />
+          <GradientStop Color="#FFF0C412" Offset="0.15" />
+          <GradientStop Color="#FFEABD07" Offset="0.2" />
+          <GradientStop Color="#FFDAAE07" Offset="0.25" />
+          <GradientStop Color="#FFCA9907" Offset="0.35" />
+          <GradientStop Color="#FFC39506" Offset="0.4" />
+          <GradientStop Color="#FFC49406" Offset="0.45" />
+          <GradientStop Color="#FFCA9806" Offset="0.5" />
+          <GradientStop Color="#FFCF9D07" Offset="0.55" />
+          <GradientStop Color="#FFD5A009" Offset="0.6" />
+          <GradientStop Color="#FFD9A509" Offset="0.65" />
+          <GradientStop Color="#FFDDAA09" Offset="0.7" />
+          <GradientStop Color="#FFE8BD08" Offset="0.75" />
+          <GradientStop Color="#FFF4CF06" Offset="0.8" />
+          <GradientStop Color="#FFFBE22D" Offset="0.85" />
+          <GradientStop Color="#FFFCEF62" Offset="0.875" />
+          <GradientStop Color="#FFFDF68B" Offset="0.9" />
+          <GradientStop Color="#FFF9F794" Offset="0.925" />
+          <GradientStop Color="#FFE2DA7F" Offset="0.95" />
+          <GradientStop Color="#FFB9A358" Offset="0.975" />
+          <GradientStop Color="#FF8E7444" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="9,21,30,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="9,0" EndPoint="39,0" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFB3925C" Offset="0" />
+          <GradientStop Color="#FFE5CD56" Offset="0.025" />
+          <GradientStop Color="#FFFCEC55" Offset="0.05" />
+          <GradientStop Color="#FFFBE245" Offset="0.075" />
+          <GradientStop Color="#FFE5C355" Offset="0.1" />
+          <GradientStop Color="#FFD0AD73" Offset="0.125" />
+          <GradientStop Color="#FFCBA770" Offset="0.15" />
+          <GradientStop Color="#FFC19E67" Offset="0.2" />
+          <GradientStop Color="#FFB8955E" Offset="0.25" />
+          <GradientStop Color="#FFB08C54" Offset="0.3" />
+          <GradientStop Color="#FFA7834B" Offset="0.35" />
+          <GradientStop Color="#FF9E7A42" Offset="0.4" />
+          <GradientStop Color="#FF956F39" Offset="0.45" />
+          <GradientStop Color="#FF8E6A31" Offset="0.5" />
+          <GradientStop Color="#FF956F38" Offset="0.55" />
+          <GradientStop Color="#FF9B773E" Offset="0.6" />
+          <GradientStop Color="#FFA48148" Offset="0.65" />
+          <GradientStop Color="#FFAD8A51" Offset="0.7" />
+          <GradientStop Color="#FFB5935B" Offset="0.75" />
+          <GradientStop Color="#FFBF9D65" Offset="0.8" />
+          <GradientStop Color="#FFCAA770" Offset="0.85" />
+          <GradientStop Color="#FFD8BA71" Offset="0.875" />
+          <GradientStop Color="#FFF1E685" Offset="0.9" />
+          <GradientStop Color="#FFF9F793" Offset="0.925" />
+          <GradientStop Color="#FFE3DB7E" Offset="0.95" />
+          <GradientStop Color="#FFB9A358" Offset="0.975" />
+          <GradientStop Color="#FF8E7444" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="9,21,30,1.75" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="unlockedDrawingImage" Drawing="{StaticResource unlockedDrawingGroup}" />
+  <Geometry x:Key="lockedGeometry1">F1 M48,48z M0,0z M12,21.2L12,13.5A12,12,0,0,1,36,13.5L36,21.2 31.5,21.2 31.5,13.5A7.5,7.5,0,0,0,16.5,13.5L16.5,21.2z</Geometry>
+  <Geometry x:Key="lockedGeometry2">F1 M48,48z M0,0z M13.55,13.5A10.45,10.45,0,0,1,34.45,13.5</Geometry>
+  <DrawingGroup x:Key="lockedDrawingGroup" ClipGeometry="M0,0 V48 H48 V0 H0 Z">
+    <DrawingGroup>
+      <DrawingGroup.ClipGeometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="0,45,48,3" />
+      </DrawingGroup.ClipGeometry>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <RectangleGeometry RadiusX="0" RadiusY="0" Rect="0,45,48,3" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing>
+          <GeometryDrawing.Brush>
+            <RadialGradientBrush Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5" GradientOrigin="0.5,0.5" MappingMode="RelativeToBoundingBox" SpreadMethod="Pad" Opacity="1">
+              <GradientStop Color="#57000000" Offset="0" />
+              <GradientStop Color="#4C000000" Offset="0.3" />
+              <GradientStop Color="#33000000" Offset="0.55" />
+              <GradientStop Color="#0F000000" Offset="0.8" />
+              <GradientStop Color="#00000000" Offset="1" />
+            </RadialGradientBrush>
+          </GeometryDrawing.Brush>
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry RadiusX="23" RadiusY="2" Center="24,46.05" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingGroup>
+    <GeometryDrawing Geometry="{StaticResource lockedGeometry1}">
+      <GeometryDrawing.Brush>
+        <RadialGradientBrush Center="24,13.5" RadiusX="12" RadiusY="12" GradientOrigin="24,13.5" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFA1A1A1" Offset="0.625" />
+          <GradientStop Color="#FF9E9E9E" Offset="0.65599999999999992" />
+          <GradientStop Color="#FFA2A2A2" Offset="0.6875" />
+          <GradientStop Color="#FFACACAC" Offset="0.71900000000000008" />
+          <GradientStop Color="#FFAEAEAE" Offset="0.75" />
+          <GradientStop Color="#FF888888" Offset="0.78099999999999992" />
+          <GradientStop Color="#FF696969" Offset="0.8125" />
+          <GradientStop Color="#FFB5B5B5" Offset="0.84400000000000008" />
+          <GradientStop Color="#FFD9D9D9" Offset="0.875" />
+          <GradientStop Color="#FFD9D9D9" Offset="0.90599999999999992" />
+          <GradientStop Color="#FFD8D8D8" Offset="0.9375" />
+          <GradientStop Color="#FF9E9E9E" Offset="0.96900000000000008" />
+          <GradientStop Color="#FF9E9E9E" Offset="1" />
+        </RadialGradientBrush>
+      </GeometryDrawing.Brush>
+    </GeometryDrawing>
+    <GeometryDrawing Geometry="{StaticResource lockedGeometry2}">
+      <GeometryDrawing.Pen>
+        <Pen Thickness="1.3" StartLineCap="Round" EndLineCap="Round" LineJoin="Miter" MiterLimit="1">
+          <Pen.Brush>
+            <SolidColorBrush Color="#FFEDEDEF" Opacity="0.85" />
+          </Pen.Brush>
+        </Pen>
+      </GeometryDrawing.Pen>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="9,0" EndPoint="39,0" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFA0804F" Offset="0" />
+          <GradientStop Color="#FFB3925C" Offset="0.006" />
+          <GradientStop Color="#FFCFB15F" Offset="0.019" />
+          <GradientStop Color="#FFE5CD56" Offset="0.031" />
+          <GradientStop Color="#FFF5DC5B" Offset="0.044000000000000004" />
+          <GradientStop Color="#FFFCEC55" Offset="0.055999999999999994" />
+          <GradientStop Color="#FFFBE845" Offset="0.065" />
+          <GradientStop Color="#FFF5D52F" Offset="0.1" />
+          <GradientStop Color="#FFF0C412" Offset="0.15" />
+          <GradientStop Color="#FFEABD07" Offset="0.2" />
+          <GradientStop Color="#FFDAAE07" Offset="0.25" />
+          <GradientStop Color="#FFCA9907" Offset="0.35" />
+          <GradientStop Color="#FFC39506" Offset="0.4" />
+          <GradientStop Color="#FFC49406" Offset="0.45" />
+          <GradientStop Color="#FFCA9806" Offset="0.5" />
+          <GradientStop Color="#FFCF9D07" Offset="0.55" />
+          <GradientStop Color="#FFD5A009" Offset="0.6" />
+          <GradientStop Color="#FFD9A509" Offset="0.65" />
+          <GradientStop Color="#FFDDAA09" Offset="0.7" />
+          <GradientStop Color="#FFE8BD08" Offset="0.75" />
+          <GradientStop Color="#FFF4CF06" Offset="0.8" />
+          <GradientStop Color="#FFFBE22D" Offset="0.85" />
+          <GradientStop Color="#FFFCEF62" Offset="0.875" />
+          <GradientStop Color="#FFFDF68B" Offset="0.9" />
+          <GradientStop Color="#FFF9F794" Offset="0.925" />
+          <GradientStop Color="#FFE2DA7F" Offset="0.95" />
+          <GradientStop Color="#FFB9A358" Offset="0.975" />
+          <GradientStop Color="#FF8E7444" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="9,21,30,24" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+    <GeometryDrawing>
+      <GeometryDrawing.Brush>
+        <LinearGradientBrush StartPoint="9,0" EndPoint="39,0" MappingMode="Absolute" SpreadMethod="Pad" Opacity="1">
+          <GradientStop Color="#FFB3925C" Offset="0" />
+          <GradientStop Color="#FFE5CD56" Offset="0.025" />
+          <GradientStop Color="#FFFCEC55" Offset="0.05" />
+          <GradientStop Color="#FFFBE245" Offset="0.075" />
+          <GradientStop Color="#FFE5C355" Offset="0.1" />
+          <GradientStop Color="#FFD0AD73" Offset="0.125" />
+          <GradientStop Color="#FFCBA770" Offset="0.15" />
+          <GradientStop Color="#FFC19E67" Offset="0.2" />
+          <GradientStop Color="#FFB8955E" Offset="0.25" />
+          <GradientStop Color="#FFB08C54" Offset="0.3" />
+          <GradientStop Color="#FFA7834B" Offset="0.35" />
+          <GradientStop Color="#FF9E7A42" Offset="0.4" />
+          <GradientStop Color="#FF956F39" Offset="0.45" />
+          <GradientStop Color="#FF8E6A31" Offset="0.5" />
+          <GradientStop Color="#FF956F38" Offset="0.55" />
+          <GradientStop Color="#FF9B773E" Offset="0.6" />
+          <GradientStop Color="#FFA48148" Offset="0.65" />
+          <GradientStop Color="#FFAD8A51" Offset="0.7" />
+          <GradientStop Color="#FFB5935B" Offset="0.75" />
+          <GradientStop Color="#FFBF9D65" Offset="0.8" />
+          <GradientStop Color="#FFCAA770" Offset="0.85" />
+          <GradientStop Color="#FFD8BA71" Offset="0.875" />
+          <GradientStop Color="#FFF1E685" Offset="0.9" />
+          <GradientStop Color="#FFF9F793" Offset="0.925" />
+          <GradientStop Color="#FFE3DB7E" Offset="0.95" />
+          <GradientStop Color="#FFB9A358" Offset="0.975" />
+          <GradientStop Color="#FF8E7444" Offset="1" />
+        </LinearGradientBrush>
+      </GeometryDrawing.Brush>
+      <GeometryDrawing.Geometry>
+        <RectangleGeometry RadiusX="0" RadiusY="0" Rect="9,21,30,1.75" />
+      </GeometryDrawing.Geometry>
+    </GeometryDrawing>
+  </DrawingGroup>
+  <DrawingImage x:Key="lockedDrawingImage" Drawing="{StaticResource lockedDrawingGroup}" />
+</ResourceDictionary>
