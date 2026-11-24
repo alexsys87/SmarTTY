@@ -11,7 +11,7 @@ using Image = System.Windows.Controls.Image;
 namespace SmarTTY.GUI.TextView;
 
 /// <summary>
-/// The context menu of the WPF text view in the editor tab (stage 3E-4): what the WinForms context menu of <see cref="RemoteFileEditorPanel"/> shows in
+/// The context menu of the WPF text view in the editor tab (stage 3E-4): what the WinForms context menu of the remote file editor panel (removed in 3E-5) showed in
 /// the text view, on WPF. The commands of the editor are those of <see cref="EditorCommandCatalog.ContextMenuLayout"/>, run through
 /// <see cref="RemoteFileEditorCommands.RunCommand"/>, enabled, checked and shown by <see cref="RemoteFileEditorCommands.CommandState"/>; the Text submenu
 /// after Word Wrap runs <see cref="RemoteFileEditorCommands.RunTransform"/>. The submenus of the hex view are not here: the hex view has its own menu.

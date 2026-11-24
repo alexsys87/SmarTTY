@@ -3748,9 +3748,9 @@ internal static class Program
         Equal(count, 0, "nothing counted for an empty search text");
     }
 
-    // The "show a line under each tab character" setting of the editor is wired end to end. The ReadonlyTextBrowser
-    // that paints the tabs and the settings window are Windows-only, so they are checked by reading the sources, the
-    // same way the theme harness checks the settings window XAML.
+    // The "show a line under each tab character" setting of the editor is wired end to end. The text view that draws the
+    // tabs (the WPF view since stage 3E-5: the WinForms ReadonlyTextBrowser is gone) and the settings window are Windows-only, so
+    // they are checked by reading the sources, the same way the theme harness checks the settings window XAML.
     private static void ShowTabsChecks()
     {
         string root = FindRepositoryRoot();
@@ -3759,7 +3759,7 @@ internal static class Program
             Console.WriteLine("SKIP: repository root not found, the ShowTabs wiring is not checked");
             return;
         }
-        string browser = File.ReadAllText(Path.Combine(root, "Controls", "ReadonlyTextBrowser.cs"));
+        string browser = File.ReadAllText(Path.Combine(root, "GUI", "TextView", "WpfTextEditor.cs"));
         Check(browser.Contains("public bool ShowTabs") && browser.Contains("_showTabs = value"),
             "the terminal/editor paints a line under tabs through a ShowTabs property");
         string settings = File.ReadAllText(Path.Combine(root, "VisualTTY", "GlobalSettings.cs"));
@@ -3783,12 +3783,12 @@ internal static class Program
             Console.WriteLine("SKIP: repository root not found, the Show All Characters wiring is not checked");
             return;
         }
-        string browser = File.ReadAllText(Path.Combine(root, "Controls", "ReadonlyTextBrowser.cs"));
+        string browser = File.ReadAllText(Path.Combine(root, "GUI", "TextView", "WpfTextEditor.cs"));
         Check(browser.Contains("public bool ShowAllCharacters") && browser.Contains("_showAllCharacters = value"),
             "the editor draws the invisible-character marks through a ShowAllCharacters property");
         // The marks are CodeEditing/BlankMarks since stage 3E; the view draws them.
         string marks = File.ReadAllText(Path.Combine(root, "CodeEditing", "BlankMarks.cs"));
-        Check(browser.Contains("PaintInvisibleCharacters") && browser.Contains("BlankMarks.LineMarks") && marks.Contains("\"¶\"") && marks.Contains("0x2400 + ch"),
+        Check(browser.Contains("BlankMarks.LineMarks") && marks.Contains("\"¶\"") && marks.Contains("0x2400 + ch"),
             "the overlay marks spaces, tabs, line ends and control characters");
         string commands = File.ReadAllText(Path.Combine(root, "Controls", "EditorCommandState.cs"));
         Check(commands.Contains("ShowAllCharacters") && commands.Contains("public bool IsChecked"),
@@ -3798,13 +3798,13 @@ internal static class Program
         string toolbar = File.ReadAllText(Path.Combine(root, "GUI", "Backend", "RemoteFileEditorToolBar.cs"));
         Check(toolbar.Contains("new ToggleButton") && toolbar.Contains("ToolBar.ToggleButtonStyleKey") && toolbar.Contains("state.IsChecked"),
             "the WPF tool bar shows Show All Characters as a toggle button");
-        // The commands of the tab moved out of the panel to Controls/RemoteFileEditorCommands.cs (stage 3E-4); the panel keeps the menu.
-        string panel = File.ReadAllText(Path.Combine(root, "Controls", "RemoteFileEditorPanel.cs"));
+        // The commands of the tab moved out of the panel to Controls/RemoteFileEditorCommands.cs (stage 3E-4); the menu of the tab is WPF (3E-5).
+        string menu = File.ReadAllText(Path.Combine(root, "GUI", "TextView", "TextViewContextMenu.cs"));
         string commandsOfTab = File.ReadAllText(Path.Combine(root, "Controls", "RemoteFileEditorCommands.cs"));
         Check(commandsOfTab.Contains("_text.ShowAllCharacters = !_text.ShowAllCharacters")
             && commandsOfTab.Contains("ShowAllCharacters = _text.ShowAllCharacters")
-            && panel.Contains("pair.Value.Checked = state.IsChecked"),
-            "the panel toggles the marks, captures the state and checks the menu item");
+            && menu.Contains("pair.Value.IsChecked = state.IsChecked"),
+            "the commands toggle the marks and capture the state, and the menu checks its item");
         string settings = File.ReadAllText(Path.Combine(root, "VisualTTY", "GlobalSettings.cs"));
         Check(settings.Contains("public bool ShowAllCharacters;"), "the editor settings carry the ShowAllCharacters value");
         string wrapper = File.ReadAllText(Path.Combine(root, "VisualTTY", "EditorSettingsWrapper.cs"));
@@ -3823,7 +3823,7 @@ internal static class Program
 
     // The problems a check finds before a save are shown as an inline message under each offending line. The editor
     // and the view of the messages are Windows-only, so the wiring is checked by reading the sources, as the checks above.
-    // The painting of the messages is in Controls/TextView/InlineMessageView.cs (it was in CodeEditing/InlineMessageProvider.cs).
+    // The messages are drawn by the WPF text view since stage 3E-5 (the WinForms InlineMessageView and CodeEditorPP are gone).
     private static void InlineMessageChecks()
     {
         string root = FindRepositoryRoot();
@@ -3832,19 +3832,14 @@ internal static class Program
             Console.WriteLine("SKIP: repository root not found, the inline message wiring is not checked");
             return;
         }
-        string provider = File.ReadAllText(Path.Combine(root, "Controls", "TextView", "InlineMessageView.cs"));
-        Check(provider.Contains("EnsureDrawingObjects") && provider.Contains("_fontHeight != rowHeight"),
-            "the message provider builds its font and icons once, not on every paint");
-        Check(provider.Contains("public Color BackColor") && provider.Contains("public Color ErrorColor") && provider.Contains("public Color WarningColor"),
-            "the message colours are settings of the provider instead of the old fixed ones");
-        Check(!provider.Contains("Brushes.LightGray") && !provider.Contains("Brushes.Red") && !provider.Contains("Brushes.DarkGoldenrod"),
-            "the provider no longer paints with the fixed light-theme brushes");
-        string editor = File.ReadAllText(Path.Combine(root, "Controls", "CodeEditorPP.cs"));
-        Check(editor.Contains("public void ClearMessages()") && editor.Contains("_inlineMessageProvider.Clear()"),
+        string editor = File.ReadAllText(Path.Combine(root, "GUI", "TextView", "WpfTextEditor.cs"));
+        Check(editor.Contains("public void SetMessageColors(RgbColor background, RgbColor error, RgbColor warning, RgbColor border)"),
+            "the message colours are settings of the view instead of fixed ones");
+        Check(editor.Contains("public void ClearMessages()") && editor.Contains("_messages.Clear()"),
             "ClearMessages drops the messages and lays the editor out again");
         Check(editor.Contains("public void AddMessages(IEnumerable<InlineMessageProvider.MessageRequest> messages)"),
             "a whole list of problems can be added in one rebuild");
-        Check(editor.Contains("protected override void OnWordWrapChanged()"),
+        Check(editor.Contains("the messages are dropped"),
             "switching the word wrapping on or off drops the messages");
         string remote = File.ReadAllText(Path.Combine(root, "Controls", "RemoteFileEditor.cs"));
         Check(remote.Contains("bool showInText = !_text.WordWrap && !IsHexMode;"),

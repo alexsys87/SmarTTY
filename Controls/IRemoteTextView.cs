@@ -8,7 +8,7 @@ namespace SmarTTY.Controls;
 
 /// <summary>
 /// The text view of a <see cref="RemoteFileEditor"/>: the calls the editor made on its base class, <c>CodeEditorPP</c>, when it was one (stage 3E-4).
-/// The WinForms view is <see cref="RemoteTextView"/>; the WPF view of the editor tab implements it too.
+/// The WPF view of the editor tab implements it (the WinForms one, <c>RemoteTextView</c>, went with the WinForms editor in stage 3E-5).
 /// </summary>
 public interface IRemoteTextView
 {

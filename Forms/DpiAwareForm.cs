@@ -205,10 +205,6 @@ public partial class DpiAwareForm : Form
 
     internal static void ScaleDpiChildren(Control parentControl)
     {
-        if (parentControl is DpiAwareControl)
-        {
-            (parentControl as DpiAwareControl).MarkScaled();
-        }
         if (!parentControl.HasChildren)
         {
             return;

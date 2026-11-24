@@ -18,24 +18,20 @@ namespace SmarTTY.Controls;
 
 /// <summary>
 /// The editor of a file on the server: the loading, the saves, the drafts, the encodings, the hex view and the questions. Until stage 3E-4 it was the
-/// text view itself (a <c>CodeEditorPP</c>); now it is given its text view (<see cref="IRemoteTextView"/>: the WPF view of the editor tab, or
-/// <see cref="RemoteTextView"/>, the WinForms one it makes when it is given none) and does through it what it did on its base class.
+/// text view itself (a <c>CodeEditorPP</c>); now it is given its text view (<see cref="IRemoteTextView"/>: the WPF view of the editor tab) and its hex
+/// view (<see cref="IHexEditorView"/>, shown through <see cref="HexViewPlace"/>) and does through them what it did on its base class and its own hex
+/// control, which went with the WinForms editor in stage 3E-5.
 /// </summary>
 public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemoteSaveSource, IRemoteFileContentHost, IRemoteFileFlowHost
 {
-    // The text view: the one given to the constructor, or the WinForms one made by it (_textControl).
+    // The text view given to the constructor.
     private readonly IRemoteTextView _text;
-
-    private readonly RemoteTextView _textControl;
 
     /// <summary>The text view of the file.</summary>
     public IRemoteTextView TextView => _text;
 
     /// <summary>What the owner of the editor keeps with it (the main window: the tab of the editor), as the <c>Tag</c> of a control.</summary>
     public object Tag { get; set; }
-
-    /// <summary>The text view as the WinForms control the editor made (for the panel and the tab); null when the view was given.</summary>
-    public RemoteTextView TextControl => _textControl;
 
     private ITerminalSessionContext _context;
 
@@ -75,19 +71,13 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
     // Made by the constructor that opens a file: the base classes may ask for IsModified before that.
     private RemoteFileContent _content;
 
-    // The hex view of the file: the WinForms control of this editor (hosted by its WinForms text view), or a view given by the constructor (the WPF
-    // view of the tab), which is shown through _hexPlace.
-    private IHexEditorView _hexEditor;
-
-    private HexEditorControl _hexControl;
+    // The hex view of the file given by the constructor (the WPF view of the tab), which is shown through _hexPlace.
+    private readonly IHexEditorView _hexEditor;
 
     private IHexViewPlace _hexPlace;
 
     /// <summary>The hex view of the file.</summary>
     public IHexEditorView HexEditor => _hexEditor;
-
-    /// <summary>The hex view as a WinForms control of this editor (for the context menu of the panel); null when the view was given.</summary>
-    internal HexEditorControl HexEditorControl => _hexControl;
 
     /// <summary>
     /// Where a hex view given to the constructor is shown, and what takes the colours and the font of the text (the tab). Until it is set such a
@@ -185,50 +175,11 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
     /// <summary>Raised on the UI thread once the whole file has been downloaded and the editor became editable.</summary>
     public event EventHandler LoadCompleted;
 
-    public RemoteFileEditor()
-        : this(null, null)
-    {
-    }
-
-    // A null text view: the editor makes its own WinForms one. A null hex view: the editor makes its own WinForms one, which that text view hosts.
     private RemoteFileEditor(IRemoteTextView textView, IHexEditorView hexView)
     {
-        if (textView != null)
-        {
-            _text = textView;
-        }
-        else
-        {
-            _textControl = new RemoteTextView();
-            _text = _textControl;
-        }
+        _text = textView ?? throw new ArgumentNullException(nameof(textView));
+        _hexEditor = hexView ?? throw new ArgumentNullException(nameof(hexView));
         _text.AppearanceChanged += (object sender, EventArgs e) => UpdateHexAppearance();
-        if (hexView != null)
-        {
-            _hexEditor = hexView;
-        }
-        else
-        {
-            if (_textControl == null)
-            {
-                throw new ArgumentException("A text view that is given needs a hex view that is given.", nameof(hexView));
-            }
-            _hexControl = new HexEditorControl
-            {
-                Dock = DockStyle.Fill,
-                Visible = false,
-                Font = _textControl.Font,
-                BackColor = _textControl.BackColor,
-                ForeColor = _textControl.ForeColor
-            };
-            _hexEditor = _hexControl;
-            _textControl.Controls.Add(_hexControl);
-            _textControl.HexControl = _hexControl;
-        }
-        if (_textControl != null)
-        {
-            _textControl.Owner = this;
-        }
     }
 
     /// <summary>Closes the editor: its text view is closed (disposed), which stops the loading and the drafts.</summary>
@@ -373,8 +324,8 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
     }
 
     /// <param name="initialColumnUnit">What the column of <paramref name="textPosition"/> counts: the caret is put at the character it points at once the text is loaded.</param>
-    /// <param name="hexView">The hex view of the file (the WPF view of the tab, shown through <see cref="HexViewPlace"/>); null: the editor makes its own WinForms one.</param>
-    /// <param name="textView">The text view of the file (the WPF view of the tab); null: the editor makes its own WinForms one (then the hex view may be null too).</param>
+    /// <param name="hexView">The hex view of the file (the WPF view of the tab, shown through <see cref="HexViewPlace"/>).</param>
+    /// <param name="textView">The text view of the file (the WPF view of the tab).</param>
     public RemoteFileEditor(ITerminalSessionContext terminalSessionContext, string text, GlobalSettings globalSettings, TextDocument.TextPosition textPosition, Action<Exception> action = null, ColumnUnit initialColumnUnit = ColumnUnit.Characters, IHexEditorView hexView = null, IRemoteTextView textView = null)
         : this(textView, hexView)
     {
@@ -875,20 +826,11 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     void IRemoteFileContentHost.ShowHexView()
     {
-        if (_hexControl != null)
-        {
-            _hexControl.Visible = true;
-            _hexControl.BringToFront();
-        }
         _hexPlace?.ShowHexView();
     }
 
     void IRemoteFileContentHost.HideHexView()
     {
-        if (_hexControl != null)
-        {
-            _hexControl.Visible = false;
-        }
         _hexPlace?.HideHexView();
     }
 

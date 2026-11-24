@@ -9,8 +9,8 @@ namespace SmarTTY.Controls;
 /// <see cref="RunTransform"/>), what is enabled, checked and shown (<see cref="CommandState"/>), and when it is read again
 /// (<see cref="ScheduleRefresh"/>, <see cref="StateChanged"/>). The commands that need the main window (saving, the search bar, the Go to Line
 /// dialog) are raised as events; the others act on the editor, its text view and its hex view. Moved as it was from
-/// <see cref="RemoteFileEditorPanel"/> (stage 3E-4), so that the WPF tab runs the same commands without the WinForms panel; the panel keeps its
-/// WinForms context menu, which runs them.
+/// the WinForms <c>RemoteFileEditorPanel</c> (stage 3E-4), so that the WPF tab runs the same commands; the panel went with the WinForms editor in
+/// stage 3E-5.
 /// </summary>
 internal sealed class RemoteFileEditorCommands
 {

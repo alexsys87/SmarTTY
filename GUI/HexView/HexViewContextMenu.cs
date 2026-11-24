@@ -15,7 +15,7 @@ using MessageBoxIcon = System.Windows.Forms.MessageBoxIcon;
 namespace SmarTTY.GUI.HexView;
 
 /// <summary>
-/// The context menu of the WPF hex view in the editor tab (stage 3B-3): what the WinForms context menu of <see cref="RemoteFileEditorPanel"/> shows
+/// The context menu of the WPF hex view in the editor tab (stage 3B-3): what the WinForms context menu of the remote file editor panel (removed in 3E-5) showed
 /// in the hex view, on WPF. The commands of the editor are the panel's (<see cref="EditorCommandCatalog.ContextMenuLayout"/>, run through
 /// <see cref="RemoteFileEditorCommands.RunCommand"/>, enabled, checked and shown by <see cref="RemoteFileEditorCommands.CommandState"/>); the Text submenu
 /// is there and off, as it is in the hex view; the submenus of the hex view are <see cref="HexMenuModel"/>, after Hex Editor.
