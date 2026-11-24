@@ -13,7 +13,6 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
@@ -1957,64 +1956,56 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         _sendRemoteSizeMenuItem.IsEnabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
     }
 
-    private void OnTerminalKeyDown(object sender, KeyEventArgs e)
+    // The keys of the terminals that the panel takes; true when it took the key.
+    private bool OnTerminalKeyDown(KeyStroke e)
     {
         GlobalSettings common = _commonSettings;
-        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.W)
+        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == VirtualKey.W)
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // Ctrl+D closes the terminal window (same as Ctrl+W). It is not gated by the "Ctrl shortcuts"
         // option so the classic serial-terminal shortcut works out of the box, and the key is not
         // forwarded to the device.
-        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.D)
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == VirtualKey.D)
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // The menu with the history and the snippets: Ctrl+Shift+Insert, and Ctrl+Shift+V when the settings say so.
         if (e.Control && e.Shift && !e.Alt
-            && (e.KeyCode == Keys.Insert || (e.KeyCode == Keys.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
+            && (e.KeyCode == VirtualKey.Insert || (e.KeyCode == VirtualKey.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             ShowPasteMenu();
-            return;
+            return true;
         }
-        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
+        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == VirtualKey.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             FullScreenToggleRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // By default Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
         // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals. When the shared option
         // "Ctrl-C/Ctrl-X/Ctrl-V = Copy/Cut/Paste" is on, plain Ctrl+C / Ctrl+V work on the clipboard (as in SSH tabs).
         // The HEX view never sends Ctrl+C to the device, so plain Ctrl+C copies there as well.
         bool interceptClipboard = common != null && common.InterceptCtrlClipboardShortcuts;
-        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode || interceptClipboard);
-        bool paste = e.Control && !e.Alt && e.KeyCode == Keys.V && (e.Shift || interceptClipboard);
+        bool copy = e.Control && !e.Alt && e.KeyCode == VirtualKey.C && (e.Shift || HexMode || interceptClipboard);
+        bool paste = e.Control && !e.Alt && e.KeyCode == VirtualKey.V && (e.Shift || interceptClipboard);
         if (copy)
         {
             CopySelection();
         }
         else if (paste)
         {
-            pasteToolStripMenuItem_Click(sender, e);
+            PasteToDevice(null, PasteKind.Auto);
         }
         else
         {
-            return;
+            return false;
         }
-        e.Handled = true;
-        e.SuppressKeyPress = true;
+        return true;
     }
 
     private enum PasteKind

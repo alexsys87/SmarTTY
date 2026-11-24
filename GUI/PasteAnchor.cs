@@ -1,6 +1,6 @@
 using System;
 using System.Drawing;
-using System.Windows.Forms;
+using SmarTTY.Controls;
 
 namespace SmarTTY.GUI;
 
@@ -9,7 +9,7 @@ namespace SmarTTY.GUI;
 /// its steps run on, whether the terminal is still there, and where on the screen it is (the progress window and the paste menu appear
 /// there). It used to be the WinForms control itself; each WPF terminal gives an anchor of its own.
 /// </summary>
-public abstract class PasteAnchor : IWin32Window
+public abstract class PasteAnchor : IDialogOwner
 {
     /// <summary>A window handle of the terminal (or of the window it is in).</summary>
     public abstract IntPtr Handle { get; }

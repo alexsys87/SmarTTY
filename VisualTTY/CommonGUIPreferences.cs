@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Linq;
 using System.Windows;
-using System.Windows.Forms;
 using System.Xml.Serialization;
 
 namespace VisualTTY;
@@ -17,7 +16,7 @@ public class CommonGUIPreferences
 
         public void Apply(Window wnd)
         {
-            Rectangle[] first = Screen.AllScreens.Select((Screen s) => s.Bounds).ToArray();
+            Rectangle[] first = SmarTTY.Native.DisplayMonitors.AllBounds();
             if (ScreenRectanglesWhenWindowRectangleRemembered != null && first.SequenceEqual(ScreenRectanglesWhenWindowRectangleRemembered))
             {
                 wnd.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -37,7 +36,7 @@ public class CommonGUIPreferences
                 Width = (int)((FrameworkElement)wnd).Width,
                 Height = (int)((FrameworkElement)wnd).Height
             };
-            ScreenRectanglesWhenWindowRectangleRemembered = Screen.AllScreens.Select((Screen s) => s.Bounds).ToArray();
+            ScreenRectanglesWhenWindowRectangleRemembered = SmarTTY.Native.DisplayMonitors.AllBounds();
         }
     }
 

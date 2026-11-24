@@ -168,9 +168,7 @@ public class NormalTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         }
         string what = files.Length == 1 ? "\"" + System.IO.Path.GetFileName(files[0]) + "\"" : files.Length + " files";
         string question = "The clipboard holds " + what + ".\n\nYes: upload to the server (like dropping the files on the terminal).\nNo: paste the local path" + (files.Length == 1 ? "" : "s") + " as text.";
-        DialogAnswer answer = terminal is System.Windows.Forms.IWin32Window owner
-            ? UserDialogs.Show(owner, question, "Paste", DialogButtons.YesNoCancel, DialogIcon.Question)
-            : UserDialogs.Show(question, "Paste", DialogButtons.YesNoCancel, DialogIcon.Question);
+        DialogAnswer answer = UserDialogs.Show(question, "Paste", DialogButtons.YesNoCancel, DialogIcon.Question);
         try
         {
             if (answer == DialogAnswer.Yes)

@@ -1,6 +1,5 @@
 using System;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
 
 namespace SmarTTY.Native;
 
@@ -20,19 +19,75 @@ public static class SerialPortArrivalWatcher
     // DEV_BROADCAST_PORT: dbcp_size, dbcp_devicetype, dbcp_reserved, then the port name.
     private const int PortNameOffset = 12;
 
-    private sealed class ListenerWindow : NativeWindow
+    // A plain top-level window of a class of its own that is never shown (a message-only window would not get the broadcast). It was a
+    // WinForms NativeWindow until stage 5B; the WPF dispatcher of the UI thread pumps its messages as it did those of the NativeWindow.
+    private sealed class ListenerWindow
     {
-        public ListenerWindow()
+        private const string ClassName = "SmarTTY.SerialPortArrivalWatcher";
+
+        private delegate IntPtr WindowProc(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct WindowClass
         {
-            // A plain top-level window that is never shown; a message-only window would not get the broadcast.
-            CreateHandle(new CreateParams());
+            public uint Size;
+            public uint Style;
+            public WindowProc Procedure;
+            public int ClassExtra;
+            public int WindowExtra;
+            public IntPtr Instance;
+            public IntPtr Icon;
+            public IntPtr Cursor;
+            public IntPtr Background;
+            public string MenuName;
+            public string Name;
+            public IntPtr SmallIcon;
         }
 
-        protected override void WndProc(ref Message m)
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern ushort RegisterClassEx(ref WindowClass windowClass);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateWindowEx(uint exStyle, string className, string windowName, uint style, int x, int y, int width, int height,
+            IntPtr parent, IntPtr menu, IntPtr instance, IntPtr parameter);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr DefWindowProc(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr GetModuleHandle(string moduleName);
+
+        // Kept alive for the life of the window: Windows calls it.
+        private readonly WindowProc _procedure;
+
+        private readonly IntPtr _handle;
+
+        public ListenerWindow()
         {
-            if (m.Msg == WmDeviceChange && m.WParam.ToInt64() == DbtDeviceArrival && m.LParam != IntPtr.Zero)
+            _procedure = Procedure;
+            WindowClass windowClass = new WindowClass
             {
-                string portName = TryReadPortName(m.LParam);
+                Size = (uint)Marshal.SizeOf(typeof(WindowClass)),
+                Procedure = _procedure,
+                Instance = GetModuleHandle(null),
+                Name = ClassName
+            };
+            if (RegisterClassEx(ref windowClass) == 0)
+            {
+                throw new InvalidOperationException("The window class of the COM port watcher was not registered (" + Marshal.GetLastWin32Error() + ").");
+            }
+            _handle = CreateWindowEx(0, ClassName, "", 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, windowClass.Instance, IntPtr.Zero);
+            if (_handle == IntPtr.Zero)
+            {
+                throw new InvalidOperationException("The window of the COM port watcher was not made (" + Marshal.GetLastWin32Error() + ").");
+            }
+        }
+
+        private IntPtr Procedure(IntPtr window, uint message, IntPtr wParam, IntPtr lParam)
+        {
+            if (message == WmDeviceChange && wParam.ToInt64() == DbtDeviceArrival && lParam != IntPtr.Zero)
+            {
+                string portName = TryReadPortName(lParam);
                 if (portName != null)
                 {
                     try
@@ -45,7 +100,7 @@ public static class SerialPortArrivalWatcher
                     }
                 }
             }
-            base.WndProc(ref m);
+            return DefWindowProc(window, message, wParam, lParam);
         }
     }
 
@@ -86,7 +141,7 @@ public static class SerialPortArrivalWatcher
             {
                 return null;
             }
-            // NativeWindow is a Unicode window, so the name arrives as UTF-16.
+            // The window class is a Unicode one, so the name arrives as UTF-16.
             string name = Marshal.PtrToStringUni(IntPtr.Add(header, PortNameOffset), (size - PortNameOffset) / 2);
             int end = name.IndexOf('\0');
             if (end >= 0)

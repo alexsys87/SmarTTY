@@ -8,7 +8,8 @@ using SmarTTY.CodeEditing;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 
-// Checks of Controls/ModelInterop.cs against the real WinForms and GDI+ types, which the logic folders no longer use.
+// Checks of Controls/ModelInterop.cs against the real GDI+ types, and of VirtualKey against the real WinForms keys, which the logic
+// folders and (since stage 5B) the application no longer use.
 internal static class Program
 {
     private static int _passed;
@@ -158,5 +159,25 @@ internal static class Program
         PointChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " model interop checks passed.");
+    }
+}
+
+// The conversions between the WinForms keys and VirtualKey (they were in Controls/ModelInterop.cs until stage 5B; the application no
+// longer has the WinForms keys, the test keeps them to check that VirtualKey is still an exact copy).
+internal static class KeyInterop
+{
+    public static VirtualKey ToVirtualKey(this Keys keys)
+    {
+        return (VirtualKey)(int)keys;
+    }
+
+    public static Keys ToKeys(this VirtualKey key)
+    {
+        return (Keys)(int)key;
+    }
+
+    public static KeyStroke ToKeyStroke(this KeyEventArgs e)
+    {
+        return new KeyStroke(e.KeyData.ToVirtualKey());
     }
 }

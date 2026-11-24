@@ -1,12 +1,12 @@
 using System.Drawing;
-using System.Windows.Forms;
 using SmarTTY.TextEditing;
 
 namespace SmarTTY.Controls;
 
 /// <summary>
-/// The only place where the types of the logic folders (<see cref="RgbColor"/>, <see cref="GridPoint"/>,
-/// <see cref="VirtualKey"/>, <see cref="KeyStroke"/>) meet the WinForms and GDI+ types of the same meaning.
+/// The only place where the types of the logic folders (<see cref="RgbColor"/>, <see cref="GridPoint"/>) meet the GDI+ types of the
+/// same meaning. The conversions of <see cref="VirtualKey"/> to and from the WinForms keys went to <c>tests/ModelInteropTests</c> in stage
+/// 5B, which still checks the two against each other; nothing of the application uses the WinForms keys.
 /// </summary>
 public static class ModelInterop
 {
@@ -38,23 +38,5 @@ public static class ModelInterop
     public static GridPoint ToGridPoint(this Point point)
     {
         return new GridPoint(point.X, point.Y);
-    }
-
-    /// <summary>Converts the keys to the model type; the members of both have the same names and values.</summary>
-    public static VirtualKey ToVirtualKey(this Keys keys)
-    {
-        return (VirtualKey)(int)keys;
-    }
-
-    /// <summary>Converts the model key type back to the keys.</summary>
-    public static Keys ToKeys(this VirtualKey key)
-    {
-        return (Keys)(int)key;
-    }
-
-    /// <summary>Converts a key event to a key press without a character (a key-down event has none).</summary>
-    public static KeyStroke ToKeyStroke(this KeyEventArgs e)
-    {
-        return new KeyStroke(e.KeyData.ToVirtualKey());
     }
 }

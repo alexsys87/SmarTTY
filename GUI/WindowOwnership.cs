@@ -1,3 +1,4 @@
+using SmarTTY.Controls;
 using System;
 using System.Windows;
 using System.Windows.Interop;
@@ -31,7 +32,7 @@ internal static class WindowOwnership
     }
 
     /// <summary>The WPF window of a Win32 owner (see <see cref="FromHandle"/>); null for none.</summary>
-    internal static Window Of(System.Windows.Forms.IWin32Window owner)
+    internal static Window Of(IDialogOwner owner)
     {
         return owner != null ? FromHandle(owner.Handle) : null;
     }

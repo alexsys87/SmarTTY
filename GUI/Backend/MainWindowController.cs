@@ -24,13 +24,10 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
-using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
-using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
 using Point = System.Drawing.Point;
 using ContextMenu = System.Windows.Controls.ContextMenu;
 using MenuItem = System.Windows.Controls.MenuItem;
@@ -1471,7 +1468,7 @@ public class MainWindowController : INotifyPropertyChanged
             if (value)
             {
                 _PreFullScreenRect = Bounds;
-                Rectangle bounds = Screen.FromPoint(new Point((int)_Window.Left, (int)_Window.Top)).Bounds;
+                Rectangle bounds = SmarTTY.Native.DisplayMonitors.BoundsAt((int)_Window.Left, (int)_Window.Top);
                 _Window.WindowState = WindowState.Normal;
                 _Window.WindowStyle = WindowStyle.None;
                 Bounds = new Rect((double)bounds.Left, (double)bounds.Top, (double)bounds.Width, (double)bounds.Height);

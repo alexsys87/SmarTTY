@@ -4,7 +4,6 @@ using SmarTTY.GUI.TerminalView;
 using System;
 using System.Collections.Generic;
 using SmarTTY.Transport;
-using System.Windows.Forms;
 using VisualTTY.DeviceTerminal;
 
 using MenuItem = System.Windows.Controls.MenuItem;

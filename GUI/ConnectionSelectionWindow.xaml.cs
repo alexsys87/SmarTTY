@@ -17,7 +17,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Media;
@@ -26,7 +25,6 @@ using VisualTTY;
 using VisualTTY.Backend;
 using VisualTTY.DeviceTerminal;
 using Button = System.Windows.Controls.Button;
-using Control = System.Windows.Forms.Control;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
 namespace SmarTTY.GUI;
@@ -2106,7 +2104,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             return;
         }
         // A found computer is not saved: it is only taken off the list, and needs no confirmation.
-        if (!connectionSettingsWrapper.IsDiscovered && (Control.ModifierKeys & Keys.Shift) != Keys.Shift && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message."))
+        if (!connectionSettingsWrapper.IsDiscovered && (Keyboard.Modifiers & ModifierKeys.Shift) == 0 && !MessageBoxes.Ask("Delete " + connectionSettingsWrapper.Title + "?\nTip: hold 'shift' to suppress this message."))
         {
             return;
         }
