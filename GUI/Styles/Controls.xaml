@@ -596,11 +596,6 @@
     </Style.Triggers>
   </Style>
 
-  <!-- The terminal scroll bars (WPFScrollBar) sit next to the terminal and take its content background. -->
-  <Style x:Key="MainWindowScrollBar" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource {x:Type ScrollBar}}">
-    <Setter Property="Background" Value="{DynamicResource Theme.ContentBackground}" />
-  </Style>
-
   <!-- ============================================================ Lists -->
 
   <Style TargetType="{x:Type ListBoxItem}">

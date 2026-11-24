@@ -192,9 +192,6 @@ jobs:
       - name: Run editor Text menu (line transform) checks
         run: dotnet run --project tests/LineTransformTests -c Release
 
-      - name: Run text view row layout (inline messages and folds) checks
-        run: dotnet run --project tests/VirtualRowTests -c Release
-
       - name: Run compiler message column (tabs, bytes) checks
         run: dotnet run --project tests/CompilerColumnTests -c Release
 
@@ -252,8 +249,41 @@ jobs:
       - name: Run remote file session checks (taking the bytes to save, the CRLF and BOM questions, bytes kept from the hex view, backup, check of the file; fake editor)
         run: dotnet run --project tests/RemoteFileSessionTests -c Release
 
+      - name: Run remote file content checks (the bytes on the server, encoding, line breaks, the switching between the text and the hex view; fake editor and hex view)
+        run: dotnet run --project tests/RemoteFileContentTests -c Release
+
+      - name: Run remote file flow checks (the loading and the saves; before the load, during a reload, conflicts, sudo, the check of the file, the service reload offer; fake editor and server)
+        run: dotnet run --project tests/RemoteFileFlowTests -c Release
+
       - name: Run hex editing model checks (caret, selection, typing in both columns, search; what the view is told after each operation)
         run: dotnet run --project tests/HexEditingModelTests -c Release
+
+      - name: Run hex view layout checks (columns, the byte under a point, scrolling to the caret, scroll bars, keys, mouse selection, tool tip and colours)
+        run: dotnet run --project tests/HexViewLayoutTests -c Release
+
+      - name: Run hex view menu and data inspector checks (the items of the submenus, when they are enabled or checked, what they do)
+        run: dotnet run --project tests/HexMenuInspectorTests -c Release
+
+      - name: Run the hex editor script on the models (the script and the golden file of the removed WinForms hex control, replayed on the hex models)
+        run: dotnet run --project tests/HexEditorModelSnapshots -c Release
+
+      - name: Run caret navigation and wrap map checks (where the caret of the text view goes by a key, the column kept, the word under the caret, the breaks of wrapped lines)
+        run: dotnet run --project tests/CaretNavigatorTests -c Release
+
+      - name: Run text view layout checks (the rows, the margin, the point of a position and the position under a point, scrolling, the scroll bars, the selection by the mouse of the WPF text view)
+        run: dotnet run --project tests/TextViewLayoutTests -c Release
+
+      - name: Run editor completion checks (when the word list of a code editor opens, what it selects and accepts, and the parameter hint of a call; what the list selects and puts on top, and its keys)
+        run: dotnet run --project tests/EditorCompletionModelTests -c Release
+
+      - name: Run line command checks (duplicate, move, delete and comment lines, the transforms of the Text menu, the moves to a bracket, the zoom steps)
+        run: dotnet run --project tests/LineCommandTests -c Release
+
+      - name: Run text search checks (the search of a text view, the highlight of the matches, the pair of a bracket, the marks of the blanks)
+        run: dotnet run --project tests/TextSearchTests -c Release
+
+      - name: Run cursor session checks (what a code editor does with several cursors - the commands, typing, the keys, copy, cut, paste, Alt+click)
+        run: dotnet run --project tests/MultiCursorSessionTests -c Release
 
       - name: Run syntax choice checks (the syntax chosen by hand, detected from the file, and applied)
         run: dotnet run --project tests/SyntaxChoiceTests -c Release
@@ -447,12 +477,6 @@ jobs:
 
       - name: Run the remote file editor checks (the real editor loads, changes, saves and reloads files on OpenSSH and Dropbear, under Mono)
         run: xvfb-run -a mono tests/RemoteFileEditorIntegrationTests/bin/Release/net48/RemoteFileEditorIntegrationTests.exe
-
-      - name: Build the hex editor control checks
-        run: dotnet build tests/HexEditorControlTests -c Release
-
-      - name: Run the hex editor control checks (the real control driven by keys and calls, compared with what it did before its logic moved to the model)
-        run: xvfb-run -a mono tests/HexEditorControlTests/bin/Release/net48/HexEditorControlTests.exe
 
       - name: Build the model interop checks
         run: dotnet build tests/ModelInteropTests -c Release

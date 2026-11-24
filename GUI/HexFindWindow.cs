@@ -1,4 +1,5 @@
 using SmarTTY.Controls;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.Media;
@@ -16,7 +17,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 internal sealed class HexFindWindow : Window
 {
-    private readonly HexEditorControl _editor;
+    private readonly IHexEditorView _editor;
 
     private readonly TextBox _query;
 
@@ -28,7 +29,7 @@ internal sealed class HexFindWindow : Window
 
     private readonly TextBlock _result;
 
-    public HexFindWindow(HexEditorControl editor)
+    public HexFindWindow(IHexEditorView editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         Title = "Find in Hex";
@@ -127,10 +128,8 @@ internal sealed class HexFindWindow : Window
         };
         Closed += (object sender, EventArgs e) =>
         {
-            if (!_editor.IsDisposed)
-            {
-                _editor.Focus();
-            }
+            // The tab closes this window before it disposes the view; a disposed WinForms view takes no focus and says so.
+            _editor.Focus();
         };
     }
 

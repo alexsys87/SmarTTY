@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../CodeEditing/RemoteFileContent.cs" Link="RemoteFileContent.cs" />
+    <Compile Include="../../CodeEditing/IRemoteFileContentHost.cs" Link="IRemoteFileContentHost.cs" />
+    <Compile Include="../../CodeEditing/IRemoteSaveSource.cs" Link="IRemoteSaveSource.cs" />
+    <Compile Include="../../CodeEditing/RemoteFileSession.cs" Link="RemoteFileSession.cs" />
+    <Compile Include="../../CodeEditing/RemoteSaveJob.cs" Link="RemoteSaveJob.cs" />
+    <Compile Include="../../CodeEditing/ConfigValidation.cs" Link="ConfigValidation.cs" />
+    <Compile Include="../../CodeEditing/TextDiff.cs" Link="TextDiff.cs" />
+    <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+    <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
+    <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
+    <Compile Include="../../CodeEditing/TokenCache.cs" Link="TokenCache.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.AdminFormats.cs" Link="SyntaxHighlighting.AdminFormats.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.LinuxFormats.cs" Link="SyntaxHighlighting.LinuxFormats.cs" />
+    <Compile Include="../../TextEditing/TextFileEncodings.cs" Link="TextFileEncodings.cs" />
+    <Compile Include="../../TextEditing/LineEndingDetector.cs" Link="LineEndingDetector.cs" />
+    <Compile Include="../../IO/RemoteSaveCommand.cs" Link="RemoteSaveCommand.cs" />
+    <Compile Include="../../IO/RemotePathUtils.cs" Link="RemotePathUtils.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" Link="StringUtils.cs" />
+  </ItemGroup>
+</Project>

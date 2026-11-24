@@ -16,7 +16,7 @@ namespace SmarTTY.Forms;
 /// Designer sizes are for 96 DPI; fonts in points are rendered by GDI at the system DPI (the scale of the primary
 /// monitor at sign-in), so on another monitor they are scaled by monitor DPI / system DPI.
 /// WinForms itself only does this when opted in through app.config, which also changes how every form scales; the
-/// application keeps its own scaling instead (DpiAwareForm, DpiAwareControl).
+/// application keeps its own scaling instead (DpiAwareForm).
 /// </remarks>
 internal static class DpiScaling
 {
@@ -107,13 +107,11 @@ internal static class DpiScaling
             return;
         }
         float factor = (float)newDpi / oldDpi;
-        float absoluteScale = (float)newDpi / SystemDpi;
         // Collected before anything changes: an inherited font is the very object of its parent.
         List<Control> explicitFonts = new List<Control>();
         List<ToolStripItem> explicitItemFonts = new List<ToolStripItem>();
-        List<ReadonlyTextBrowser> textBrowsers = new List<ReadonlyTextBrowser>();
         List<ToolStrip> toolStrips = new List<ToolStrip>();
-        CollectFonts(root, scaleRootFont, explicitFonts, explicitItemFonts, textBrowsers, toolStrips);
+        CollectFonts(root, scaleRootFont, explicitFonts, explicitItemFonts, toolStrips);
         foreach (Control control in explicitFonts)
         {
             control.Font = ScaleFont(control.Font, factor);
@@ -127,19 +125,11 @@ internal static class DpiScaling
             Size imageSize = toolStrip.ImageScalingSize;
             toolStrip.ImageScalingSize = new Size((int)Math.Round(imageSize.Width * factor), (int)Math.Round(imageSize.Height * factor));
         }
-        foreach (ReadonlyTextBrowser textBrowser in textBrowsers)
-        {
-            textBrowser.SetFontDpiScale(absoluteScale);
-        }
     }
 
-    private static void CollectFonts(Control control, bool scaleAsExplicit, List<Control> explicitFonts, List<ToolStripItem> explicitItemFonts, List<ReadonlyTextBrowser> textBrowsers, List<ToolStrip> toolStrips)
+    private static void CollectFonts(Control control, bool scaleAsExplicit, List<Control> explicitFonts, List<ToolStripItem> explicitItemFonts, List<ToolStrip> toolStrips)
     {
-        if (control is ReadonlyTextBrowser textBrowser)
-        {
-            textBrowsers.Add(textBrowser);
-        }
-        else if (scaleAsExplicit || control.Parent == null || !ReferenceEquals(control.Font, control.Parent.Font))
+        if (scaleAsExplicit || control.Parent == null || !ReferenceEquals(control.Font, control.Parent.Font))
         {
             explicitFonts.Add(control);
         }
@@ -156,7 +146,7 @@ internal static class DpiScaling
         }
         foreach (Control child in control.Controls)
         {
-            CollectFonts(child, scaleAsExplicit: false, explicitFonts, explicitItemFonts, textBrowsers, toolStrips);
+            CollectFonts(child, scaleAsExplicit: false, explicitFonts, explicitItemFonts, toolStrips);
         }
     }
 

@@ -19,8 +19,6 @@ public class PseudoTabContext : ITabContext, IDisposable
 
     public string Title => null;
 
-    public TextEditorControl EditorControl => null;
-
     public TextSearcher Searcher => null;
 
     public FrameworkElement VerticalScrollBar => null;

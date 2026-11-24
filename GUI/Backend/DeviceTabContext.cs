@@ -34,8 +34,6 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FrameworkElement StatusBar => null;
 
-    public TextEditorControl EditorControl => null;
-
     public string Title => DeviceConnections.GetConnectionTitle(Settings.Connection);
 
     public IconType Icon => (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial) ? IconType.Serial : IconType.Network;

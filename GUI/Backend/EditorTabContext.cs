@@ -1,17 +1,21 @@
 ﻿using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.IO;
+using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Forms;
-using System.Windows.Forms.Integration;
-using Orientation = System.Windows.Controls.Orientation;
+using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace SmarTTY.GUI.Backend;
 
-public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement
+/// <summary>
+/// The tab of a file on the server (stage 3E-4: on WPF): the WPF text view and the WPF hex view of a <see cref="RemoteFileEditor"/>, one of them
+/// shown, with the tool bar and the status bar of the editor and their context menus, all running the same <see cref="RemoteFileEditorCommands"/>.
+/// </summary>
+public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement, IHexViewPlace
 {
     private SessionWrapper _Session;
 
@@ -19,14 +23,13 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     private string _Title;
 
-    // The find window of the hex view (modeless), and whether the WPF scroll bars were hidden for that view.
+    // The find window of the hex view (modeless).
     private HexFindWindow _hexFindWindow;
 
-    private bool _hexChromeHidden;
+    // The two views of the file, one shown in the place of the other.
+    private readonly TextView.WpfTextEditor _textView;
 
-    private Visibility _verticalScrollBarVisibility;
-
-    private Visibility _horizontalScrollBarVisibility;
+    private readonly HexView.WpfHexEditor _wpfHexView;
 
     public readonly string FilePath;
 
@@ -38,10 +41,11 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public FileExplorer FileExplorer => null;
 
-    public TextEditorControl EditorControl => Editor;
+    /// <summary>The text view of the file.</summary>
+    internal TextView.WpfTextEditor TextView => _textView;
 
-    /// <summary>The editor together with its context menu (the WinForms part of the tab).</summary>
-    internal RemoteFileEditorPanel EditorPanel { get; }
+    /// <summary>The commands of the editor and their state (the tool bar, the context menus and the keys run them).</summary>
+    internal RemoteFileEditorCommands Commands { get; }
 
     public string Title
     {
@@ -60,9 +64,10 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public TextSearcher Searcher { get; }
 
-    public FrameworkElement VerticalScrollBar { get; }
+    // The two views draw their own scroll bars.
+    public FrameworkElement VerticalScrollBar => null;
 
-    public FrameworkElement HorizontalScrollBar { get; }
+    public FrameworkElement HorizontalScrollBar => null;
 
     public string ToolTip => FilePath;
 
@@ -72,25 +77,35 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public EditorTabContext(SessionWrapper sessionWrapper, RemoteFileEditor editor, string filePath)
     {
-        WPFScrollBar wPFScrollBar = new WPFScrollBar();
-        wPFScrollBar.Orientation = Orientation.Vertical;
-        VerticalScrollBar = (FrameworkElement)wPFScrollBar;
-        WPFScrollBar wPFScrollBar2 = new WPFScrollBar();
-        wPFScrollBar2.Orientation = Orientation.Horizontal;
-        HorizontalScrollBar = (FrameworkElement)wPFScrollBar2;
         Editor = editor;
         _Session = sessionWrapper;
-        WinFormsHostWrapper winFormsHostWrapper = new WinFormsHostWrapper();
-        EditorPanel = new RemoteFileEditorPanel(editor);
-        ((WindowsFormsHost)winFormsHostWrapper).Child = EditorPanel;
-        Control = (FrameworkElement)winFormsHostWrapper;
-        ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(EditorPanel);
-        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, EditorPanel));
-        Searcher = new TextSearcher(editor)
+        _textView = editor.TextView as TextView.WpfTextEditor ?? throw new ArgumentException("The tab shows the WPF text view of the editor.", nameof(editor));
+        _wpfHexView = editor.HexEditor as HexView.WpfHexEditor ?? throw new ArgumentException("The tab shows the WPF hex view of the editor.", nameof(editor));
+        Commands = new RemoteFileEditorCommands(editor, PostRefresh);
+        // What the commands depend on in the text view: the selection, the text and its undo history (the commands follow the rest).
+        _textView.StateChanged += (object sender, EventArgs e) => Commands.ScheduleRefresh();
+        _textView.RangeChanged += (start, oldEnd, newEnd) => Commands.ScheduleRefresh();
+        _textView.KeyUp += (object sender, System.Windows.Input.KeyEventArgs e) => Commands.ScheduleRefresh();
+        _textView.ContextMenu = new TextView.TextViewContextMenu(Commands);
+        // The hex view lies over the place of the text: one of the two is shown.
+        _wpfHexView.Visibility = Visibility.Collapsed;
+        _wpfHexView.ContextMenu = new HexView.HexViewContextMenu(Commands, _wpfHexView, ShowHexDialog, () =>
+        {
+            Editor.FocusActiveView();
+            Commands.RefreshState();
+        });
+        System.Windows.Controls.Grid place = new System.Windows.Controls.Grid();
+        place.Children.Add(_textView);
+        place.Children.Add(_wpfHexView);
+        Control = place;
+        editor.HexViewPlace = this;
+        ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(Commands);
+        StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, Commands));
+        Searcher = new TextSearcher(_textView)
         {
             CanReplace = true
         };
-        EditorPanel.FindRequested += (object sender, EventArgs e) =>
+        Commands.FindRequested += (object sender, EventArgs e) =>
         {
             if (Editor.IsHexMode)
             {
@@ -100,19 +115,41 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             Searcher.IsReplaceVisible = false;
             Searcher.Activate();
         };
-        EditorPanel.HexDialogRequested += (object sender, HexDialogRequestedEventArgs e) => ShowHexDialog(e.Kind);
-        EditorPanel.ReplaceRequested += (object sender, EventArgs e) =>
+        Commands.HexDialogRequested += (object sender, HexDialogRequestedEventArgs e) => ShowHexDialog(e.Kind);
+        Commands.ReplaceRequested += (object sender, EventArgs e) =>
         {
             if (!Editor.IsHexMode)
             {
                 Searcher.ActivateReplace();
             }
         };
-        editor.ReplaceScrollBars((IScrollBar)VerticalScrollBar, (IScrollBar)HorizontalScrollBar);
-        editor.HexModeChanged += (object sender, EventArgs e) => UpdateEditorChrome();
-        UpdateEditorChrome();
+        editor.HexModeChanged += (object sender, EventArgs e) =>
+        {
+            if (!Editor.IsHexMode)
+            {
+                CloseHexFind();
+            }
+        };
         Title = RemotePathUtils.GetFileName(filePath);
         FilePath = filePath;
+        Commands.RefreshState();
+    }
+
+    // The refresh of the commands runs after the editor has finished what it is doing (see RemoteFileEditorCommands.ScheduleRefresh).
+    private bool PostRefresh(Action refresh)
+    {
+        if (_textView.IsClosed)
+        {
+            return false;
+        }
+        _textView.Dispatcher.BeginInvoke(DispatcherPriority.Normal, (Action)(() =>
+        {
+            if (!_textView.IsClosed)
+            {
+                refresh();
+            }
+        }));
+        return true;
     }
 
     /// <summary>Opens (or brings forward) the modeless find window of the hex view.</summary>
@@ -141,7 +178,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         {
             return;
         }
-        HexEditorControl hex = Editor.HexEditor;
+        IHexEditorView hex = Editor.HexEditor;
         try
         {
             switch (kind)
@@ -149,14 +186,14 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 case HexDialogKind.Highlight:
                 {
                     HexHighlight current = hex.HighlightAtCaret;
-                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexEditorControl.HighlightColors[0].Color;
+                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexViewChoices.HighlightColors[0].Color.ToColor();
                     int start = hex.HasSelection ? hex.SelectionStart : hex.CaretOffset;
                     int count = hex.HasSelection ? hex.SelectionLength : 1;
-                    string target = HexEditorControl.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
+                    string target = HexEditingModel.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
                     HexHighlightWindow window = new HexHighlightWindow(color, current?.Label ?? "", target);
                     if (window.ShowDialog() == true)
                     {
-                        hex.HighlightSelection(window.SelectedColor, window.Label);
+                        hex.HighlightSelection(window.SelectedColor.ToRgb(), window.Label);
                     }
                     break;
                 }
@@ -191,39 +228,37 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             MessageBoxes.Exception(exception);
         }
         Editor.FocusActiveView();
-        EditorPanel.RefreshState();
+        Commands.RefreshState();
+    }
+
+    void IHexViewPlace.ShowHexView()
+    {
+        _wpfHexView.Visibility = Visibility.Visible;
+        _textView.Visibility = Visibility.Collapsed;
+    }
+
+    void IHexViewPlace.HideHexView()
+    {
+        bool hadFocus = _wpfHexView.IsKeyboardFocusWithin;
+        _textView.Visibility = Visibility.Visible;
+        _wpfHexView.Visibility = Visibility.Collapsed;
+        if (hadFocus)
+        {
+            // The keyboard goes back to the text.
+            _textView.Focus();
+        }
+    }
+
+    void IHexViewPlace.SetAppearance(RgbColor background, RgbColor foreground, string fontFamily, float fontPoints)
+    {
+        _wpfHexView.SetColors(background, foreground);
+        _wpfHexView.SetFont(fontFamily, fontPoints);
     }
 
     private void CloseHexFind()
     {
         _hexFindWindow?.Close();
         _hexFindWindow = null;
-    }
-
-    /// <summary>
-    /// The hex view draws its own scroll bars: the WPF ones above and below the editor are hidden while it is shown.
-    /// The text view gets back the visibility it had.
-    /// </summary>
-    private void UpdateEditorChrome()
-    {
-        bool hex = Editor.IsHexMode;
-        if (hex && !_hexChromeHidden)
-        {
-            _verticalScrollBarVisibility = VerticalScrollBar.Visibility;
-            _horizontalScrollBarVisibility = HorizontalScrollBar.Visibility;
-        }
-        else if (!hex && _hexChromeHidden)
-        {
-            VerticalScrollBar.Visibility = _verticalScrollBarVisibility;
-            HorizontalScrollBar.Visibility = _horizontalScrollBarVisibility;
-            CloseHexFind();
-        }
-        if (hex)
-        {
-            VerticalScrollBar.Visibility = Visibility.Collapsed;
-            HorizontalScrollBar.Visibility = Visibility.Collapsed;
-        }
-        _hexChromeHidden = hex;
     }
 
     public void Close()
@@ -252,8 +287,6 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     public void Dispose()
     {
         CloseHexFind();
-        // The panel owns the editor; disposing the editor again is harmless.
-        EditorPanel.Dispose();
         Editor.Dispose();
     }
 

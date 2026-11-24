@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="HexEditorControlGolden.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../../CodeEditing/HexMenuModel.cs" Link="HexMenuModel.cs" />
+    <Compile Include="../../CodeEditing/IHexEditorView.cs" Link="IHexEditorView.cs" />
+    <Compile Include="../../CodeEditing/IEditorStatusSource.cs" Link="IEditorStatusSource.cs" />
+    <Compile Include="../../CodeEditing/IRemoteFileContentHost.cs" Link="IRemoteFileContentHost.cs" />
+    <Compile Include="../../TextEditing/HexViewChoices.cs" Link="HexViewChoices.cs" />
+    <Compile Include="../../TextEditing/HexInspectorModel.cs" Link="HexInspectorModel.cs" />
+    <Compile Include="../../TextEditing/HexEditingModel.cs" Link="HexEditingModel.cs" />
+    <Compile Include="../../TextEditing/HexChecksums.cs" Link="HexChecksums.cs" />
+    <Compile Include="../../TextEditing/VirtualKey.cs" Link="VirtualKey.cs" />
+    <Compile Include="../../TextEditing/HexDocument.cs" Link="HexDocument.cs" />
+    <Compile Include="../../TextEditing/HexValueFormats.cs" Link="HexValueFormats.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <!-- What the two interfaces files above name besides the hex view (the text view of the editor and its status). -->
+    <Compile Include="../../TextEditing/ILineCollection.cs" Link="ILineCollection.cs" />
+    <Compile Include="../../TextEditing/ITextSource.cs" Link="ITextSource.cs" />
+    <Compile Include="../../TextEditing/TextDocument.cs" Link="TextDocument.cs" />
+    <Compile Include="../../TextEditing/MutableTextDocument.cs" Link="MutableTextDocument.cs" />
+    <Compile Include="../../TextEditing/EditableTextDocument.cs" Link="EditableTextDocument.cs" />
+    <Compile Include="../../CodeEditing/TokenCache.cs" Link="TokenCache.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.cs" Link="SyntaxHighlighting.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.AdminFormats.cs" Link="SyntaxHighlighting.AdminFormats.cs" />
+    <Compile Include="../../CodeEditing/SyntaxHighlighting.LinuxFormats.cs" Link="SyntaxHighlighting.LinuxFormats.cs" />
+    <Compile Include="../../TextEditing/TextFileEncodings.cs" Link="TextFileEncodings.cs" />
+    <Compile Include="../../TextEditing/LineEndingDetector.cs" Link="LineEndingDetector.cs" />
+    <Compile Include="../../Utilities/StringUtils.cs" Link="StringUtils.cs" />
+    <Compile Include="../../TextEditing/HexViewLayout.cs" Link="HexViewLayout.cs" />
+    <Compile Include="../../TextEditing/HexKeyMap.cs" Link="HexKeyMap.cs" />
+    <Compile Include="../../TextEditing/HexPointer.cs" Link="HexPointer.cs" />
+    <Compile Include="../../TextEditing/HexByteText.cs" Link="HexByteText.cs" />
+    <Compile Include="../../TextEditing/HexPasteText.cs" Link="HexPasteText.cs" />
+  </ItemGroup>
+</Project>
