@@ -17,7 +17,6 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
     <NoWarn>$(NoWarn);CS0649;CS0169;CS0414;CS0197;CS1690;CS0108;CS0109</NoWarn>
     <!-- Visual Studio 2026 (18.5+) design-time builds report a spurious "MC1000: Unknown build error,
