@@ -1,16 +1,15 @@
 # CLAUDE.md
 
 SmarTTY: a graphical SSH client and terminal for Windows (SSH, SFTP/SCP, COM/TCP/telnet device terminals, remote file
-editor). C#, WPF (no WinForms control or form is left since stage 4; the WinForms assembly is still referenced for a few helpers, see
-"Done in 4B"). User docs: `README.md` (in Russian).
+editor). C#, WPF (no WinForms since stage 5B; `System.Drawing` types are still used, see "Done in 5B"). User docs: `README.md` (in Russian).
 
 Read this file instead of re-exploring the repository. Update the "Migration status" and the maps below in the same
 PR that changes them.
 
 ## Build and test
 
-- Platform: `net10.0-windows`, x64, WPF + WinForms (after alexsys87/SmarTTY#506; before it `main` was `net48` x86 built
-  with `msbuild`).
+- Platform: `net10.0-windows`, x64, WPF (WinForms too until stage 5B; after alexsys87/SmarTTY#506, before it `main` was `net48` x86
+  built with `msbuild`).
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
@@ -49,26 +48,26 @@ PR that changes them.
 
 | Folder | What is there | UI? |
 | --- | --- | --- |
-| `App.xaml(.cs)` | Entry point, theme, wiring of WPF dialogs into WinForms code through static delegates | WPF |
-| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
+| `App.xaml(.cs)` | Entry point, theme, wiring of the WPF dialogs into the code that cannot reference `GUI/` (`UserDialogs` and other static delegates) | WPF |
+| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); `UiTimer` (the timer of the windows); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
 | `GUI/Icons/` | Stage 5A: the icons as vector images, one resource dictionary of `DrawingImage`s for each folder the PNG files were in (`Root`, `MainWindow`, `Editor`, `Menu`, `Keys`, `Transfers`, `FileTypes`; converted from SVG outside the repository) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
-| `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) and Tools > WPF hex editor lab (`HexLabWindow`) | WPF |
-| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4, and Tools > WPF text editor lab (`TextLabWindow`) | WPF |
+| `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) | WPF |
+| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4 | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
-| `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`); `GUI/TerminalLabWindow` measures it | WPF |
+| `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`) | WPF |
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar, netconsole bar and menus are WPF since 4A) | WPF |
 | `Controls/` | The code the Mono stands compile that is not model: the remote file editor (not a control since 3E-4) and the commands of its tab, `UserDialogs` (the message boxes and file choosers that `App` points at the WPF windows), the interop of the model types, the interfaces of the terminal tabs; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5, the themed facades and `Forms/` in 4B | no window of its own |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
 | `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
-| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, key layouts), `DeviceTerminal/` state and line input | no (but uses `Color`/`Keys`) |
+| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes), `DeviceTerminal/` state and line input | no (but uses `Color`) |
 | `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore | no |
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -108,7 +107,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: nothing (the tool bar and menus of the device panel, which stayed WinForms, went to WPF in 4A) |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Done in alexsys87/SmarTTY#557 (the text view is a WPF view of our own on the model, not AvalonEdit): 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) done: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) and 3E-5 (the WinForms editor, hex control and their Mono stands removed; the hex golden replayed on the models, the remote editor stand on views of the test) done |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Done: 4A (the menus and bars of the terminal tabs and the device tab) in alexsys87/SmarTTY#558, 4B (the WinForms helpers nothing used, the paste and snippet dialogs without facades and `Forms/`, one dialogs seam `UserDialogs` for the message boxes and file choosers) after it, see "Stage 4" |
-| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | In progress: 5A (the icons as vector images, the PNG files removed) done, see "Stage 5"; next 5B (what is left of WinForms, listed in "Done in 4B") and 5C (`System.Drawing`) |
+| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | In progress: 5A (the icons as vector images, the PNG files removed) and 5B (no WinForms: `UseWindowsForms` off; the lab windows removed) done, see "Stage 5"; next 5C (`System.Drawing`) |
 
 ### Stage 1 rules
 
@@ -600,6 +599,34 @@ on Windows, at 100 %, 150 % and 200 % and on a 4K screen: the main window (tool 
 file-type icons, the connection list and the icon picker of a connection (and a picture file chosen for one), the dialogs with pictures
 (host key, credentials, public key, transfers, about), the message boxes, the editor tab (tool bar, context menus, the icons of the inline
 messages), the device tab; every icon as large as before and sharp; light and dark theme.
+
+Done in 5B (no WinForms): first the three lab windows of the Tools menu are gone (`GUI/TerminalLabWindow`, `GUI/HexView/HexLabWindow`,
+`GUI/TextView/TextLabWindow`, which tried the WPF views before they went into the tabs; the manual checks of stages 2 and 3 that name a lab are
+done in the tabs now; `TerminalBenchmarkScripts` stays, `TerminalRenderModelTests` uses it). Then what was left of `System.Windows.Forms`
+(the list of "Done in 4B"): the timers of the windows are `GUI/UiTimer` (a `DispatcherTimer` with `Interval` in milliseconds, `Tick`, `Start`,
+`Stop`, `Enabled`: the paste job, the device tab, whose line status timer the panel disposes itself instead of the designer's container), and
+`RemoteFileEditor` asks its text view for the timer of its drafts (`IRemoteTextView.StartTimer`: `UiTimer` in the WPF view, the WinForms timer in
+the Mono stand); the always-null `IRemoteTextView.MessageOwner` is gone. The owner of a dialog is `Controls/IDialogOwner` (a window handle)
+instead of `IWin32Window` (`UserDialogs`, `PasteAnchor`, `PasteGuard`, `WindowOwnership.Of`, the device tab). The device tab takes its keys as
+`KeyStroke` (`OnTerminalKeyDown` returns whether it took the key); the conversions between `VirtualKey` and the WinForms keys moved from
+`Controls/ModelInterop` into `tests/ModelInteropTests`, which keeps checking that `VirtualKey` is an exact copy of `Keys` (40 checks pass on
+Mono); `VisualTTY/TerminalKeyLayout`, which nothing used since `XtermKeyTable` reads `XTermKeys.xml` itself, is gone; the connection window
+reads Shift from `Keyboard.Modifiers`. `Native/DisplayMonitors` gives the bounds `Screen` gave (the same `EnumDisplayMonitors`,
+`MonitorFromPoint` and `GetMonitorInfo`, the same order and pixels), for the full screen mode and the remembered placement of
+`CommonGUIPreferences`. The COM port watcher (`Native/SerialPortArrivalWatcher`) has a hidden top-level window of a class of its own through
+Win32 (`RegisterClassEx`, `CreateWindowEx`, its procedure kept alive) instead of a `NativeWindow`; the WPF dispatcher of the UI thread pumps its
+messages. `SshConnector` lost `SynchronizationControl` and its `Site` (a WinForms control of the designer that nothing set; the dispatcher was
+always there). `App` no longer sets the WinForms default font and visual styles. `ScreenEdgeUtils.GetNearEdges` (on a WinForms control, not
+called) is gone, and so are the WinForms imports and aliases. Then `UseWindowsForms` is off in `SmarTTY.csproj`, and the built assembly has
+no reference to `System.Windows.Forms` or `WindowsFormsIntegration`. The Mono stand of the remote editor keeps its own reference to WinForms
+(its marshalling control and timer) and dropped that of the WinForms host of WPF; it passes (552 checks on OpenSSH and Dropbear). What is left
+for 5C: `System.Drawing` (`Color` and `Font` in the settings, `Rectangle` of the remembered placements, `ModelInterop` with `RgbColor` and
+`GridPoint`, `PasteAnchor.ScreenBounds`), which `System.Drawing.Common` of the WPF framework still provides. Manual check on Windows: a COM
+port plugged in again while its tab waits (the tab reconnects), the full screen mode on each monitor, the remembered size and place of the
+connection window, the drafts of an edited file (a draft every 10 s), a long and a slow paste (the progress window, Esc), the device tab's
+timers (the line status of a COM port, a quick script waiting for the prompt, the listing of a directory, the reconnect), Ctrl+W, Ctrl+D,
+Ctrl+Shift+Insert, Alt+Enter and Ctrl+Shift+C/V in a device tab, a connection deleted with Shift held (no question), the questions and the file
+choosers of the editor and the device tab.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20
