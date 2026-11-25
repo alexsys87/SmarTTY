@@ -55,8 +55,9 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
     public bool InsertMode { get; set; }
 
     /// <summary>
-    /// A wide character written takes two cells (<see cref="CellWidth"/>). The byte mode of the serial terminal turns it off while it writes: there
-    /// the device counts a byte as a column, and every character takes one cell.
+    /// A wide character written takes two cells and a character of no width none (it goes with the cell before it), see <see cref="CellWidth"/>.
+    /// The byte mode of the serial terminal turns it off while it writes: there the device counts a byte as a column, and every character takes
+    /// one cell.
     /// </summary>
     public bool WideCharacters { get; set; } = true;
 
@@ -367,7 +368,7 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
             {
                 _view.Trace("'" + text + "'");
             }
-            GridPoint point = WriteAtCore(_cursor, ToCells(text), CurrentStyle, scroll: true, InsertMode);
+            GridPoint point = WriteCells(_cursor, text, CurrentStyle, InsertMode);
             if (moveCursor)
             {
                 Cursor = point;
@@ -505,7 +506,63 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
 
     public void WriteAt(GridPoint point, string text, CellStyle cellStyle)
     {
-        WriteAtCore(point, ToCells(text), cellStyle, scroll: true, insert: false);
+        WriteCells(point, text, cellStyle, insert: false);
+    }
+
+    // Writes a text at a cell and gives where it ends: the characters of no width in it go with the cell before them, the rest as cells.
+    private GridPoint WriteCells(GridPoint point, string text, CellStyle cellStyle, bool insert)
+    {
+        int start = 0;
+        if (WideCharacters)
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                int length = CellWidth.ZeroWidthLength(text, index);
+                if (length == 0)
+                {
+                    continue;
+                }
+                if (index > start)
+                {
+                    point = WriteAtCore(point, ToCells(text.Substring(start, index - start)), cellStyle, scroll: true, insert);
+                }
+                AddMark(point, text.Substring(index, length));
+                index += length - 1;
+                start = index + 1;
+            }
+        }
+        if (start < text.Length)
+        {
+            point = WriteAtCore(point, ToCells(start == 0 ? text : text.Substring(start)), cellStyle, scroll: true, insert);
+        }
+        return point;
+    }
+
+    // A character of no width goes with the cell before the place it is written at (the first cell of a wide character); at the start of a row
+    // there is none, and it is dropped. The cursor does not move.
+    private void AddMark(GridPoint point, string mark)
+    {
+        if (point.X <= 0 || point.Y < 0 || point.Y >= _view.VisibleRows)
+        {
+            return;
+        }
+        int documentLine = ToDocumentPosition(point).Line;
+        if (documentLine >= _view.Document.LineCount)
+        {
+            return;
+        }
+        string line = _view.Document.GetLineText(documentLine) ?? "";
+        int column = Math.Min(point.X, _view.VisibleColumns) - 1;
+        if (CellWidth.IsSecondCell(line, column))
+        {
+            column--;
+        }
+        if (column < 0 || column >= line.Length || line[column] == CellWidth.Filler)
+        {
+            return;
+        }
+        ActiveBuffer.Lines.AddMark(point.Y, column, mark);
+        InvalidateView();
     }
 
     // The cells a text takes: with wide characters a filler after each of them (see CellWidth); a filler that came with the text is not one.
@@ -529,6 +586,7 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
         if (CellWidth.IsSecondCell(document.GetLineText(documentLine), column))
         {
             document.ReplaceInLine(documentLine, column - 1, 2, "  ");
+            ActiveBuffer.Lines.ClearMarks(documentLine, column - 1, 2);
         }
     }
 

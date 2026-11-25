@@ -76,9 +76,10 @@ internal sealed class SnapshotTerminal
 // the colours the WPF view paints every cell with (TerminalCellColorsGolden.txt, from RowRunBuilder and TerminalColorScheme), and the bytes of
 // the mouse reports (TerminalMouseGolden.txt, from TerminalInputEncoder as the view calls it). The keys and the pastes, which the old stand also
 // probed, were the WinForms input; the keys of the WPF view are checked by TerminalKeyEncoderTests. The goldens are never recorded again.
-// The WinForms terminal gave a wide character one cell; the screen gives it two since then (CellWidth). The cases whose output has a wide
-// character are compared with goldens of their own instead (TerminalWideGolden.txt, TerminalWideCellColorsGolden.txt), which the display model
-// wrote when wide characters came (--record-wide <folder>); every other case must still give the lines of the WinForms terminal.
+// The WinForms terminal gave a wide character one cell and a character of no width (a combining mark) one; the screen gives them two and none
+// since then (CellWidth). The cases whose output has such a character are compared with goldens of their own instead (TerminalWideGolden.txt,
+// TerminalWideCellColorsGolden.txt), which the display model wrote (--record-wide <folder>); every other case must still give the lines of the
+// WinForms terminal.
 internal static partial class Program
 {
     private const string Esc = "\u001b";
@@ -148,12 +149,12 @@ internal static partial class Program
 
     private static readonly List<string> WideCellLines = new List<string>();
 
-    // The cases whose output has a wide character: they are left out of the goldens of the WinForms terminal.
+    // The cases whose output has a wide character or one of no width: they are left out of the goldens of the WinForms terminal.
     private static readonly HashSet<string> WideCases = new HashSet<string>();
 
     private static bool HasWideCharacter(Case testCase)
     {
-        return testCase.Chunks.Any(chunk => chunk.Any(CellWidth.IsWide));
+        return testCase.Chunks.Any(chunk => chunk.Any(CellWidth.IsWide) || Enumerable.Range(0, chunk.Length).Any(index => CellWidth.ZeroWidthLength(chunk, index) > 0));
     }
 
     private static int Main(string[] args)
@@ -287,6 +288,14 @@ internal static partial class Program
             text.Append(line.ToString("D3")).Append('|').Append(Escape(document.GetLineText(line))).Append('|');
             LineInfo info = model.Lines.GetLine(line);
             text.Append(info == null ? "no info" : DescribeLine(info));
+            // The characters of no width of the cells (only in the cases with such characters: the WinForms terminal had none).
+            for (int column = 0; info?.Marks != null && column < info.Marks.Length; column++)
+            {
+                if (info.Marks[column] != null)
+                {
+                    text.Append(" mark ").Append(column).Append(':').Append(Escape(info.Marks[column]));
+                }
+            }
             text.Append('\n');
         }
         // Clicking every file link: what the terminal asks to open.

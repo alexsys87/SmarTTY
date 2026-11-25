@@ -187,6 +187,15 @@ internal static class Program
         Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+1", "a cell left empty before a wide character is a blank: no run ends with it");
         RowRunBuilder.Build(filler + "x", null, scheme, 80, layout);
         Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 1+1", "and none starts with it");
+        LineInfo marked = new LineInfo { Marks = new string[] { "\u0301", null, null, "\u0300" } };
+        RowRunBuilder.Build("ab  ", marked, scheme, 80, layout);
+        Check(layout.Marks == marked.Marks, "the marks of the cells go with the layout");
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+4", "a blank with a mark is drawn: it is in the run");
+        ulong withMarks = layout.Signature;
+        RowRunBuilder.Build("ab  ", null, scheme, 80, layout);
+        Check(layout.Marks == null && layout.Signature != withMarks, "a row without the marks has another signature (it is drawn again)");
+        RowRunBuilder.Build("ab", new LineInfo { Marks = new string[4] }, scheme, 80, layout);
+        Check(layout.Marks == null, "a line whose marks are all gone has none in its layout");
         RowRunBuilder.Build(null, null, scheme, 80, layout);
         Equal(layout.Text, "", "a missing line is empty");
 
@@ -542,6 +551,15 @@ internal static class Program
         Equal(wide.GetSelectedText(), "\u65e5\u672c", "the selected wide characters are copied without their fillers");
         wide.Select(new TextDocument.TextPosition(2, 0), new TextDocument.TextPosition(6, 0));
         Equal(wide.GetSelectedText(), "\u672cb", "a selection from the second cell of a character does not copy it");
+
+        TerminalDisplayModel marks = new TerminalDisplayModel(30, 5);
+        marks.ProcessOutput("cafe\u0301 \u65e5\u3099x\r\nnext");
+        Equal(marks.Document.GetLineText(0).Replace(CellWidth.Filler, '_'), "cafe \u65e5_x", "the marks take no cell of the line");
+        marks.Select(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(4, 1));
+        Equal(marks.GetSelectedText(), "cafe\u0301 \u65e5\u3099x\r\nnext", "a copy gives every mark after the character it was written with, as it came");
+        Equal(marks.GetText(new TextDocument.TextPosition(3, 0), new TextDocument.TextPosition(4, 0), line => "|"), "e\u0301", "the text of one cell has its marks");
+        found = DocumentSearch.Find(marks.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("cafe ", false), false, true, none, none, out length);
+        Equal(found.Column + "+" + length, "0+5", "the search sees the letters, not the marks over them");
 
         TerminalDisplayModel bytes = new TerminalDisplayModel(30, 5);
         bytes.ByteOrientedLineEditing = true;

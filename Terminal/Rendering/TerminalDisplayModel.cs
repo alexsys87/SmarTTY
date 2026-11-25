@@ -567,7 +567,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
     /// <summary>
     /// The selected text. A line that the terminal wrapped goes on without a line break, as the WinForms view copies it; the blanks at the
     /// end of a line that is not wrapped are dropped (the screen pads its rows with them). A wide character is in it once (without the filler
-    /// of its second cell).
+    /// of its second cell), a character of no width after the character it goes with.
     /// </summary>
     public string GetSelectedText()
     {
@@ -576,7 +576,35 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             return "";
         }
         GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end);
-        return CellWidth.Strip(_document.GetRangeText(start, end, GetLineBreak));
+        return GetText(start, end, GetLineBreak);
+    }
+
+    /// <summary>
+    /// The text between two places of the document as it leaves the screen (a copy, the text of a tab): a wide character once, a character of no
+    /// width after the character it goes with (<see cref="CellWidth.TextOf"/>), <paramref name="lineBreak"/> after every line but the last.
+    /// </summary>
+    public string GetText(TextDocument.TextPosition start, TextDocument.TextPosition end, Func<int, string> lineBreak)
+    {
+        if (end < start)
+        {
+            TextDocument.TextPosition other = start;
+            start = end;
+            end = other;
+        }
+        StringBuilder text = new StringBuilder();
+        int lastLine = Math.Min(end.Line, _document.LineCount - 1);
+        for (int line = start.Line; line <= lastLine; line++)
+        {
+            string cells = _document.GetLineText(line);
+            int from = line == start.Line ? Math.Min(start.Column, cells.Length) : 0;
+            int to = line == end.Line ? Math.Min(end.Column, cells.Length) : cells.Length;
+            text.Append(CellWidth.TextOf(cells, Lines.GetLine(line)?.Marks, from, Math.Max(from, to)));
+            if (line < end.Line)
+            {
+                text.Append(lineBreak(line));
+            }
+        }
+        return text.ToString();
     }
 
     private string GetLineBreak(int line)

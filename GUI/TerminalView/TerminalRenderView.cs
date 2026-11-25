@@ -1038,7 +1038,7 @@ internal sealed class TerminalRenderView : FrameworkElement
             foreach (TextRun run in layout.Texts)
             {
                 SolidColorBrush brush = GetBrush(run.Foreground);
-                DrawGlyphs(context, layout.Text, run.Start, run.Length, brush, font, 0);
+                DrawGlyphs(context, layout.Text, run.Start, run.Length, brush, font, 0, layout.Marks);
                 if (run.Underline)
                 {
                     context.DrawRectangle(brush, null, new Rect(run.Start * cellWidth, font.UnderlinePosition, run.Length * cellWidth, font.UnderlineThickness));
@@ -1049,9 +1049,11 @@ internal sealed class TerminalRenderView : FrameworkElement
 
     // Draws the characters of cells [start, start + length) of a row: one glyph run per face (the main font, or a fallback for a character
     // it lacks). Every glyph advances a whole cell; a surrogate pair, which takes two cells of the grid, and a wide character, which takes its own
-    // and the filler of its second cell (CellWidth), two. A filler draws nothing.
-    private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y)
+    // and the filler of its second cell (CellWidth), two. A filler draws nothing. A cell with characters of no width (marks) is drawn as the
+    // character they compose with it when Unicode has one (e and a combining acute: é), otherwise as its character with the marks over it.
+    private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y, string[] marks = null)
     {
+        List<KeyValuePair<double, string>> overlays = null;
         int end = Math.Min(text.Length, start + length);
         double cellWidth = font.CellWidth;
         GlyphTypeface face = null;
@@ -1077,6 +1079,19 @@ internal sealed class TerminalRenderView : FrameworkElement
             else if (CellWidth.IsSecondCell(text, column + 1))
             {
                 units = 2;
+            }
+            string mark = marks != null && column < marks.Length ? marks[column] : null;
+            if (mark != null)
+            {
+                string composed = (text.Substring(column, units == 2 && char.IsHighSurrogate(ch) ? 2 : 1) + mark).Normalize(NormalizationForm.FormC);
+                if (composed.Length == 1)
+                {
+                    codePoint = composed[0];
+                }
+                else
+                {
+                    (overlays ??= new List<KeyValuePair<double, string>>()).Add(new KeyValuePair<double, string>((column + units) * cellWidth, mark));
+                }
             }
             else if (ch < ' ')
             {
@@ -1104,6 +1119,34 @@ internal sealed class TerminalRenderView : FrameworkElement
         if (glyphs != null && glyphs.Count != 0)
         {
             FlushGlyphs(context, face, glyphs, advances, runX, y, brush, font);
+        }
+        if (overlays != null)
+        {
+            DrawMarks(context, overlays, y, brush, font);
+        }
+    }
+
+    // The marks that compose with no character, over the cells they go with: each glyph is put so that it ends at the right edge of the
+    // cell, which is where a mark of no advance is drawn from (its ink is left of its origin) and over the cell for one of a cell's advance.
+    private static void DrawMarks(DrawingContext context, List<KeyValuePair<double, string>> overlays, double y, Brush brush, TerminalFont font)
+    {
+        foreach (KeyValuePair<double, string> overlay in overlays)
+        {
+            string mark = overlay.Value;
+            for (int index = 0; index < mark.Length; index++)
+            {
+                int codePoint = mark[index];
+                if (char.IsHighSurrogate(mark[index]) && index + 1 < mark.Length && char.IsLowSurrogate(mark[index + 1]))
+                {
+                    codePoint = char.ConvertToUtf32(mark[index], mark[index + 1]);
+                    index++;
+                }
+                GlyphTypeface face = font.GetGlyph(codePoint, out ushort glyph);
+                double advance = face.AdvanceWidths.TryGetValue(glyph, out double width) ? width * font.EmSize : 0;
+                GlyphRun run = new GlyphRun(face, 0, false, font.EmSize, (float)font.PixelsPerDip, new[] { glyph }, new Point(overlay.Key - advance, y + font.Baseline),
+                    new[] { 0.0 }, null, null, null, null, null, null);
+                context.DrawGlyphRun(brush, run);
+            }
         }
     }
 

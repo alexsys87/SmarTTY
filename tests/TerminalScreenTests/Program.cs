@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 
@@ -419,6 +420,107 @@ internal static class Program
         Equal(Cells(view).Split('|')[0], "123456789" + Zhong + "#", "without the wrap a wide character goes on past the edge");
     }
 
+    // The characters of no width kept with the cells of a row: "column:marks" for every cell that has some (U+XXXX for each unit).
+    private static string Marks(TerminalScreen screen, int row)
+    {
+        LineInfo line = screen.ActiveBuffer.Lines.GetLine(screen.ActiveBuffer.FirstRow + row);
+        List<string> parts = new List<string>();
+        for (int column = 0; line?.Marks != null && column < line.Marks.Length; column++)
+        {
+            if (line.Marks[column] != null)
+            {
+                parts.Add(column + ":" + string.Concat(line.Marks[column].Select(ch => "U+" + ((int)ch).ToString("X4"))));
+            }
+        }
+        return string.Join(" ", parts);
+    }
+
+    private static void ZeroWidthChecks()
+    {
+        int zero = 0;
+        int starts = 0;
+        bool previous = false;
+        for (int code = 0; code <= 0x10FFFF; code++)
+        {
+            bool isZero = CellWidth.IsZeroWidth(code);
+            zero += isZero ? 1 : 0;
+            starts += isZero && !previous ? 1 : 0;
+            previous = isZero;
+        }
+        Equal(zero + " in " + starts, "2394 in 354", "the table of the characters of no width (Unicode 15.1: Mn, Me, Cf but the shown ones, the medial and final jamo)");
+        Check(CellWidth.IsZeroWidth(0x0301) && CellWidth.IsZeroWidth(0x200D) && CellWidth.IsZeroWidth(0xFE0F) && CellWidth.IsZeroWidth(0x1160) && CellWidth.IsZeroWidth(0xE0100),
+            "a combining accent, the joiner, a variation selector, a medial jamo and a selector above the plane take no cell");
+        Check(!CellWidth.IsZeroWidth(0x00AD) && !CellWidth.IsZeroWidth(0x0600) && !CellWidth.IsZeroWidth('a') && !CellWidth.IsZeroWidth(0x1100),
+            "the soft hyphen, a prepended concatenation mark, a letter and a leading jamo take one");
+        Equal(CellWidth.ZeroWidthLength("x\uDB40\uDD00", 1) + " " + CellWidth.ZeroWidthLength("\u0301", 0) + " " + CellWidth.ZeroWidthLength("ab", 0), "2 1 0", "the units of a character of no width");
+
+        TerminalScreen screen = Make(out FakeView view);
+        screen.WriteText("e\u0301x");
+        Equal(Lines(view) + "|" + Marks(screen, 0) + "|" + screen.Cursor.X, "ex|0:U+0301|2", "a combining accent goes with the cell before it and takes none");
+        screen = Make(out view);
+        screen.WriteText("o\u0302\u0323");
+        Equal(Marks(screen, 0), "0:U+0302U+0323", "two marks of one letter, in their order");
+        screen = Make(out view);
+        screen.WriteText("a");
+        screen.WriteText("\u0300");
+        Equal(Marks(screen, 0) + "|" + screen.Cursor.X, "0:U+0300|1", "a mark that comes in a write of its own finds the cell before the cursor");
+        screen = Make(out view);
+        screen.WriteText("\u4e2d\u0301b");
+        Equal(Marks(screen, 0) + "|" + screen.Cursor.X, "0:U+0301|3", "after a wide character a mark goes with its first cell");
+        screen = Make(out view);
+        screen.WriteText("\u231A\uFE0F");
+        Equal(Cells(view) + "|" + Marks(screen, 0) + "|" + screen.Cursor.X, "\u231A#|0:U+FE0F|2", "the variation selector after an emoji takes no cell");
+        screen = Make(out view);
+        screen.WriteText("x\uDB40\uDD00y");
+        Equal(Lines(view) + "|" + Marks(screen, 0), "xy|0:U+DB40U+DD00", "a character of no width above the plane is kept whole");
+        screen = Make(out view);
+        screen.WriteText("123456789x");
+        screen.WriteText("\u0301");
+        Equal(Marks(screen, 0) + "|" + screen.Cursor.X, "9:U+0301|10", "at the pending-wrap position a mark goes with the last cell");
+        screen = Make(out view);
+        screen.Cursor = new GridPoint(0, 1);
+        screen.WriteText("\u0301z");
+        Equal(Lines(view) + "|" + Marks(screen, 1), "|z|", "at the start of a row a mark has no cell before it and is dropped");
+
+        screen = Make(out view);
+        screen.WriteText("e\u0301");
+        screen.Cursor = new GridPoint(0, 0);
+        screen.WriteText("z");
+        Equal(Lines(view) + "|" + Marks(screen, 0), "z|", "a cell written again loses its marks");
+        screen = Make(out view);
+        screen.WriteText("ab\u0301c");
+        screen.Cursor = new GridPoint(0, 0);
+        screen.DeleteChars(1);
+        Equal(Lines(view) + "|" + Marks(screen, 0), "bc|0:U+0301", "a deletion moves the marks with their cells");
+        screen = Make(out view);
+        screen.WriteText("a\u0301b");
+        screen.Cursor = new GridPoint(0, 0);
+        screen.InsertChars(1);
+        Equal(Lines(view) + "|" + Marks(screen, 0), " ab|1:U+0301", "an insertion moves them too, and the cell put in has none");
+        screen = Make(out view);
+        screen.WriteText("a\u0301bc\u0300");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.InsertChars(1);
+        Equal(Lines(view) + "|" + Marks(screen, 0), "a bc|0:U+0301 3:U+0300", "the marks before the insertion stay, the cell put in takes none of them");
+        screen = Make(out view);
+        screen.WriteText("\u4e2d\u0301");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.WriteText("x");
+        Equal(Lines(view) + "|" + Marks(screen, 0), " x|", "a wide character cut in two loses its marks with it");
+        screen = Make(out view);
+        screen.WriteText("a\u0301b\u0301");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.EraseInLine(EraseMode.ToEnd);
+        Equal(Lines(view) + "|" + Marks(screen, 0), "a|0:U+0301", "erasing from a column takes the marks from there on");
+        screen.EraseInLine(EraseMode.All);
+        Equal(Marks(screen, 0), "", "and erasing the row takes them all");
+
+        screen = Make(out view);
+        screen.WideCharacters = false;
+        screen.WriteText("e\u0301");
+        Equal(Lines(view) + "|" + Marks(screen, 0) + "|" + screen.Cursor.X, "e\u0301||2", "in the byte mode a mark takes a cell of its own, as the device counts it");
+    }
+
     private static void ScrollRegionChecks()
     {
         TerminalScreen screen = Make(out FakeView view);
@@ -673,6 +775,7 @@ internal static class Program
         WriteChecks();
         WidthTableChecks();
         WideChecks();
+        ZeroWidthChecks();
         ScrollRegionChecks();
         EraseChecks();
         CharChecks();
