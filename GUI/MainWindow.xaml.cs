@@ -43,6 +43,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
 
     private GridLength? _FilesWidth = new GridLength(200.0);
 
+    private const double MinFilesWidth = 100.0;
+
+    // The width of the file manager when the window started to close (the window is not shown any more in OnClosed).
+    private int _FilesWidthAtClose;
+
     /// <summary>Opens the window with a COM-port or raw-TCP terminal as its first session (no SSH connection).</summary>
     public MainWindow(DeviceTerminalSettings deviceSettings)
     {
@@ -62,6 +67,11 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         }
         catch
         {
+        }
+        // The width of the file manager the user left it at (the column takes it when the file manager is shown).
+        if (commonGUIPreferences != null && commonGUIPreferences.FileListWidth > 0)
+        {
+            _FilesWidth = new GridLength(Math.Min(Math.Max(commonGUIPreferences.FileListWidth, MinFilesWidth), Math.Max(MinFilesWidth, Width * 0.7)));
         }
         this.DataContext = (Controller = new MainWindowController(this));
         Controller.CloseNewConnectionPopup += () =>
@@ -178,7 +188,18 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             ReturnToLauncher = false;
             return;
         }
+        _FilesWidthAtClose = CurrentFilesWidth();
         base.OnClosing(e);
+    }
+
+    /// <summary>The width of the file manager column in pixels: as shown, or as it was when it was hidden; 0 when it was never sized.</summary>
+    private int CurrentFilesWidth()
+    {
+        if (FileDock.IsVisible && FilesColumn.ActualWidth > 0.0)
+        {
+            return (int)Math.Round(FilesColumn.ActualWidth);
+        }
+        return _FilesWidth.HasValue && _FilesWidth.Value.IsAbsolute ? (int)Math.Round(_FilesWidth.Value.Value) : 0;
     }
 
     protected override void OnClosed(EventArgs e)
@@ -188,6 +209,10 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         if (commonGUIPreferences != null)
         {
             Controller.ExportPreferences(commonGUIPreferences);
+            if (_FilesWidthAtClose >= MinFilesWidth)
+            {
+                commonGUIPreferences.FileListWidth = _FilesWidthAtClose;
+            }
             commonGUIPreferences.MainWindow.Save((Window)this);
             GuiPreferencesStore.Save();
         }

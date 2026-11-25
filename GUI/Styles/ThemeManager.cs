@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
+using SmarTTY.Utilities;
 using VisualTTY;
 
 namespace SmarTTY.GUI.Styles;
@@ -61,6 +62,7 @@ public static class ThemeManager
     /// <summary>Applies the theme the settings select (a custom theme when its file is there, else the built-in one).</summary>
     public static void Apply(GlobalSettings settings)
     {
+        WindowAppearance.OpacityPercent = settings?.WindowOpacityPercent ?? WindowChromeRules.MaxOpacityPercent;
         Apply(settings?.ThemeChoice ?? ThemeLibrary.Find(SmarTTYTheme.Dark, null));
     }
 

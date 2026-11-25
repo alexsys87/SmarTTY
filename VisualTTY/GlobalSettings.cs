@@ -362,6 +362,26 @@ public class GlobalSettings : INotifyPropertyChanged
     [XmlIgnore]
     public bool IsLightTheme => ThemeChoice.IsLight;
 
+    private int _windowOpacityPercent = 100;
+
+    /// <summary>
+    /// How opaque the windows of the program are, in per cent (30 to 100; 100, the default, is not transparent at all). A value
+    /// out of that range, such as one from a hand-edited file, is brought into it.
+    /// </summary>
+    public int WindowOpacityPercent
+    {
+        get => _windowOpacityPercent;
+        set
+        {
+            int percent = SmarTTY.Utilities.WindowChromeRules.ClampOpacityPercent(value);
+            if (percent != _windowOpacityPercent)
+            {
+                _windowOpacityPercent = percent;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WindowOpacityPercent)));
+            }
+        }
+    }
+
     public HeaderOrientation TabHeaderOrientation { get; set; } = HeaderOrientation.Bottom;
 
     public HeaderOrientation SessionHeaderOrientation { get; set; } = HeaderOrientation.Left;

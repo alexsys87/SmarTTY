@@ -19,6 +19,7 @@ public partial class App : Application
         base.OnStartup(e);
         CrashLog.Install(this);
         // The theme lives in Application.Resources, so it has to be there before the first window loads its XAML.
+        WindowAppearance.Install();
         ThemeManager.Apply(GlobalSettings.Load());
 
         // The message boxes, file choosers and folder chooser of the code that cannot reference GUI/ (and of the rest) are the WPF windows.
