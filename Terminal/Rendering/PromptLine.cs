@@ -1,6 +1,8 @@
+using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace SmarTTY.Terminal.Rendering;
 
@@ -8,8 +10,10 @@ namespace SmarTTY.Terminal.Rendering;
 /// The command line of the Smart Terminal on a <see cref="TerminalDisplayModel"/>: the prompt and the text typed after it, at the end of the
 /// document, wrapped at the width of the screen, with the caret and a selection inside the text. It is what <c>SshTerminalControl</c> made
 /// of its editor (<c>InputRegion</c>, <c>RewrapInput</c> and the editing commands of the text editor): every change writes the rows again
-/// (<see cref="TerminalDisplayModel.ReplaceDocumentTail(int, IList{string})"/>), and the places in the text are mapped to the document by <see cref="InputRegionMap"/>.
-/// An index is a place in <see cref="Text"/> (0 is the start, <c>Text.Length</c> the end).
+/// (<see cref="TerminalDisplayModel.ReplaceDocumentTail(int, IList{string})"/>), and the places in the text are mapped to the document by the
+/// layout of those rows. An index is a place in <see cref="Text"/> (0 is the start, <c>Text.Length</c> the end). A wide character takes two cells
+/// of a row (<see cref="CellWidth"/>) and is never cut by its end: when one cell is left, it stays empty and the character starts the next row.
+/// The end of a full row and the start of the next one are the same index; the caret is shown at the end of the row then.
 /// </summary>
 internal sealed class PromptLine
 {
@@ -21,6 +25,12 @@ internal sealed class PromptLine
 
     // The other end of a selection (Shift with the arrows, the mouse in the line); -1: none.
     private int _anchor = -1;
+
+    // From the last time the rows were written: where the caret is before every index of the text (and at its end), and the cell every
+    // character of the text is drawn in.
+    private TextDocument.TextPosition[] _places = { new TextDocument.TextPosition(0, 0) };
+
+    private TextDocument.TextPosition[] _cells = { };
 
     public PromptLine(TerminalDisplayModel model, int startLine, string prompt)
         : this(model, startLine, prompt, promptOnScreen: false)
@@ -44,7 +54,10 @@ internal sealed class PromptLine
     /// <summary>The prompt is the device's own text on the screen (see the constructor).</summary>
     public bool PromptOnScreen { get; }
 
-    /// <summary>The column of the start line where the typed text starts (the length of the prompt).</summary>
+    /// <summary>
+    /// The column of the start line where the typed text starts when the prompt is the device's (<see cref="PromptOnScreen"/>): the length of the
+    /// prompt, which is the text of those cells.
+    /// </summary>
     public int StartColumn => Prompt.Length;
 
     /// <summary>
@@ -257,33 +270,47 @@ internal sealed class PromptLine
         return char.IsLetterOrDigit(ch) || ch == '_' || ch == '.' || ch == '-';
     }
 
-    /// <summary>The place in the document of an index of the text.</summary>
+    /// <summary>The place in the document of an index of the text (the end of the text for one past it).</summary>
     public TextDocument.TextPosition PositionAt(int index)
     {
-        return InputRegionMap.PositionAt(_model.Document, StartLine, Prompt.Length, index);
+        return _places[Math.Max(0, Math.Min(index, _places.Length - 1))];
     }
 
-    /// <summary>The index of the text at a place of the document, brought into the text (a place in the prompt is its start).</summary>
+    /// <summary>
+    /// The index of the text at a place of the document, brought into the text (a place in the prompt is its start): the first character drawn at
+    /// the place or after it (on the second cell of a wide character, the one after that character).
+    /// </summary>
     public int IndexOf(TextDocument.TextPosition position)
     {
         if (!Contains(position))
         {
-            return position.Line < StartLine || (position.Line == StartLine && position.Column < Prompt.Length) ? 0 : _text.Length;
+            return 0;
         }
-        int index = InputRegionMap.IndexOf(_model.Document, StartLine, Prompt.Length, position);
-        return Math.Max(0, Math.Min(index < 0 ? _text.Length : index, _text.Length));
+        for (int index = 0; index < _cells.Length; index++)
+        {
+            if (Compare(_cells[index], position) >= 0)
+            {
+                return index;
+            }
+        }
+        return _text.Length;
     }
 
     /// <summary>The place is in the text of the line (not in the prompt, not in the output above).</summary>
     public bool Contains(TextDocument.TextPosition position)
     {
-        return position.Line > StartLine || (position.Line == StartLine && position.Column >= Prompt.Length);
+        return Compare(position, _places[0]) >= 0;
+    }
+
+    private static int Compare(TextDocument.TextPosition first, TextDocument.TextPosition second)
+    {
+        return first.Line != second.Line ? first.Line.CompareTo(second.Line) : first.Column.CompareTo(second.Column);
     }
 
     /// <summary>Writes the rows again (the screen got another width).</summary>
     public void Render()
     {
-        WriteRows(_text);
+        _places = WriteRows(_text, out _cells);
         UpdateCaret();
     }
 
@@ -296,7 +323,7 @@ internal sealed class PromptLine
     {
         if (PromptOnScreen || keepLocalPrompt)
         {
-            WriteRows("");
+            WriteRows("", out _);
         }
         else
         {
@@ -304,19 +331,35 @@ internal sealed class PromptLine
         }
     }
 
-    private void WriteRows(string text)
+    // Writes the prompt and a text in rows of the width of the screen; returns where the caret is before every index of the text and after it,
+    // and gives the cell of every character of it.
+    private TextDocument.TextPosition[] WriteRows(string text, out TextDocument.TextPosition[] cells)
     {
         int columns = Math.Max(1, _model.Columns);
-        string all = Prompt + text;
         List<string> rows = new List<string>();
-        for (int offset = 0; offset < all.Length; offset += columns)
+        StringBuilder row = new StringBuilder(columns);
+        // The device's prompt is the text of its cells already; a local one is laid out as the text is.
+        if (PromptOnScreen)
         {
-            rows.Add(all.Substring(offset, Math.Min(columns, all.Length - offset)));
+            foreach (char ch in Prompt)
+            {
+                if (row.Length >= columns)
+                {
+                    rows.Add(row.ToString());
+                    row.Clear();
+                }
+                row.Append(ch);
+            }
         }
-        if (rows.Count == 0)
+        else
         {
-            rows.Add("");
+            Place(Prompt, rows, row, columns, null, null);
         }
+        TextDocument.TextPosition[] places = new TextDocument.TextPosition[text.Length + 1];
+        cells = new TextDocument.TextPosition[text.Length];
+        Place(text, rows, row, columns, places, cells);
+        places[text.Length] = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
+        rows.Add(row.ToString());
         if (PromptOnScreen && StartColumn < columns)
         {
             // The device's prompt stays as the device drew it, only the text after it is written again.
@@ -326,6 +369,48 @@ internal sealed class PromptLine
         else
         {
             _model.ReplaceDocumentTail(StartLine, rows);
+        }
+        return places;
+    }
+
+    // Lays out characters after the rows made so far: a full row is ended before the next character, and a wide character that would start in
+    // the last cell leaves it empty (a filler of its own) and starts the next row. The places and the cells are those of the start line on.
+    private void Place(string text, List<string> rows, StringBuilder row, int columns, TextDocument.TextPosition[] places, TextDocument.TextPosition[] cells)
+    {
+        for (int index = 0; index < text.Length; index++)
+        {
+            char ch = text[index];
+            bool wide = CellWidth.IsWide(ch);
+            bool full = row.Length >= columns;
+            bool leaveEmpty = !full && wide && columns > 1 && row.Length == columns - 1;
+            if (places != null && !leaveEmpty)
+            {
+                // At the end of a full row the caret stays on it (the start of the next row is the same index).
+                places[index] = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
+            }
+            if (full || leaveEmpty)
+            {
+                if (leaveEmpty)
+                {
+                    row.Append(CellWidth.Filler);
+                }
+                rows.Add(row.ToString());
+                row.Clear();
+            }
+            if (places != null && leaveEmpty)
+            {
+                // Before a wide character that starts the next row the caret is beside it, not in the cell left empty.
+                places[index] = new TextDocument.TextPosition(0, StartLine + rows.Count);
+            }
+            if (cells != null)
+            {
+                cells[index] = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
+            }
+            row.Append(ch == CellWidth.Filler ? '\uFFFD' : ch);
+            if (wide)
+            {
+                row.Append(CellWidth.Filler);
+            }
         }
     }
 

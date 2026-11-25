@@ -292,7 +292,13 @@ internal sealed class TerminalRenderView : FrameworkElement
             // The rest of the command after the caret; what does not fit on the row is cut (the line wraps when it is taken).
             int column = _ghostPosition.Column;
             int fits = Math.Max(0, model.Columns - column);
-            string text = _ghostText.Length > fits ? _ghostText.Substring(0, fits) : _ghostText;
+            // In cells: a wide character takes two (a filler after it), and one that does not fit whole is not drawn.
+            string cells = CellWidth.ToCells(_ghostText);
+            string text = cells.Length > fits ? cells.Substring(0, fits) : cells;
+            if (text.Length > 0 && CellWidth.IsWide(text[text.Length - 1]))
+            {
+                text = text.Substring(0, text.Length - 1);
+            }
             if (text.Length == 0)
             {
                 return;
@@ -1042,7 +1048,8 @@ internal sealed class TerminalRenderView : FrameworkElement
     }
 
     // Draws the characters of cells [start, start + length) of a row: one glyph run per face (the main font, or a fallback for a character
-    // it lacks). Every glyph advances a whole cell (a surrogate pair, which takes two cells of the grid, two).
+    // it lacks). Every glyph advances a whole cell; a surrogate pair, which takes two cells of the grid, and a wide character, which takes its own
+    // and the filler of its second cell (CellWidth), two. A filler draws nothing.
     private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y)
     {
         int end = Math.Min(text.Length, start + length);
@@ -1055,11 +1062,20 @@ internal sealed class TerminalRenderView : FrameworkElement
         while (column < end)
         {
             char ch = text[column];
+            if (ch == CellWidth.Filler)
+            {
+                column++;
+                continue;
+            }
             int codePoint = ch;
             int units = 1;
             if (char.IsHighSurrogate(ch) && column + 1 < text.Length && char.IsLowSurrogate(text[column + 1]))
             {
                 codePoint = char.ConvertToUtf32(ch, text[column + 1]);
+                units = 2;
+            }
+            else if (CellWidth.IsSecondCell(text, column + 1))
+            {
                 units = 2;
             }
             else if (ch < ' ')
@@ -1187,13 +1203,9 @@ internal sealed class TerminalRenderView : FrameworkElement
             {
                 break;
             }
-            string text = model.Document.GetLineText(line);
-            int from = 0;
-            while (from < text.Length && _matchHighlight.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length))
-            {
-                context.DrawRectangle(match, null, new Rect(index * font.CellWidth, row * font.CellHeight, length * font.CellWidth, font.CellHeight));
-                from = index + Math.Max(length, 1);
-            }
+            int y = row;
+            DocumentSearch.ForEachMatch(model.Document.GetLineText(line), _matchHighlight, (index, length) =>
+                context.DrawRectangle(match, null, new Rect(index * font.CellWidth, y * font.CellHeight, length * font.CellWidth, font.CellHeight)));
         }
     }
 
@@ -1214,8 +1226,15 @@ internal sealed class TerminalRenderView : FrameworkElement
         {
             int line = _model.Caret.Line;
             string text = line < _model.Document.LineCount ? _model.Document.GetLineText(line) : "";
-            under = cell.X < text.Length ? text.Substring(cell.X, 1) : " ";
+            under = " ";
+            if (cell.X < text.Length)
+            {
+                // On a wide character or a surrogate pair the caret covers both of its cells.
+                bool pair = CellWidth.IsSecondCell(text, cell.X + 1) || (char.IsHighSurrogate(text[cell.X]) && cell.X + 1 < text.Length && char.IsLowSurrogate(text[cell.X + 1]));
+                under = text.Substring(cell.X, pair ? 2 : 1);
+            }
         }
+        double caretWidth = under.Length * font.CellWidth;
         string state = visible ? cell.X + "," + cell.Y + "," + focused + "," + CursorShape + "," + under : "hidden";
         if (state == _cursorState)
         {
@@ -1235,20 +1254,20 @@ internal sealed class TerminalRenderView : FrameworkElement
                 Pen pen = new Pen(cursorBrush, font.OnePixel);
                 pen.Freeze();
                 double half = font.OnePixel / 2;
-                context.DrawRectangle(null, pen, new Rect(half, half, font.CellWidth - font.OnePixel, font.CellHeight - font.OnePixel));
+                context.DrawRectangle(null, pen, new Rect(half, half, caretWidth - font.OnePixel, font.CellHeight - font.OnePixel));
             }
             else
             {
                 switch (CursorShape)
                 {
                     case TerminalCursorShape.Underline:
-                        context.DrawRectangle(cursorBrush, null, new Rect(0, font.CellHeight - 2 * font.OnePixel, font.CellWidth, 2 * font.OnePixel));
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, font.CellHeight - 2 * font.OnePixel, caretWidth, 2 * font.OnePixel));
                         break;
                     case TerminalCursorShape.Bar:
                         context.DrawRectangle(cursorBrush, null, new Rect(0, 0, 2 * font.OnePixel, font.CellHeight));
                         break;
                     default:
-                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, font.CellWidth, font.CellHeight));
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, caretWidth, font.CellHeight));
                         if (under.Trim().Length != 0)
                         {
                             DrawGlyphs(context, under, 0, under.Length, GetBrush(_scheme.DefaultBackground), font, 0);
@@ -1675,6 +1694,12 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
     }
 
+    // A cell of a word: a word character, or the second cell of a wide one.
+    private bool IsWordCell(string text, int column)
+    {
+        return CellWidth.IsSecondCell(text, column) ? IsWordCharacter(text[column - 1]) : IsWordCharacter(text[column]);
+    }
+
     private void SelectWord(TextDocument.TextPosition position)
     {
         if (position.Line >= _model.Document.LineCount)
@@ -1683,17 +1708,17 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
         string text = _model.Document.GetLineText(position.Line);
         int column = Math.Min(position.Column, Math.Max(0, text.Length - 1));
-        if (text.Length == 0 || !IsWordCharacter(text[column]))
+        if (text.Length == 0 || !IsWordCell(text, column))
         {
             return;
         }
         int start = column;
-        while (start > 0 && IsWordCharacter(text[start - 1]))
+        while (start > 0 && IsWordCell(text, start - 1))
         {
             start--;
         }
         int end = column;
-        while (end < text.Length && IsWordCharacter(text[end]))
+        while (end < text.Length && IsWordCell(text, end))
         {
             end++;
         }

@@ -590,6 +590,12 @@ internal sealed class OutputLinkScanner : IColumnAwareLinkScanner
 
     private LinkCandidate ReadChar(char ch)
     {
+        if (ch == CellWidth.Filler)
+        {
+            // The second cell of a wide character (or a cell left empty before one) belongs to what the character before it is part of, and
+            // is not in the text of a link.
+            return _current;
+        }
         TrackDirectories(ch);
         char prevChar = _previousChar;
         _previousChar = ch;

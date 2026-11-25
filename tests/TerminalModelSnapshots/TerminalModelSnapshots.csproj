@@ -2,7 +2,9 @@
   <!-- The goldens of the WinForms terminal on the display model of the WPF terminal: the cases of tests/TerminalSnapshots (removed with the
        WinForms terminal in stage 2) run on TerminalDisplayModel, the painted colours come from RowRunBuilder and the mouse reports from
        TerminalInputEncoder, as the WPF view makes them. TerminalModelGolden.txt and TerminalCellColorsGolden.txt were written by that stand on
-       the WinForms control (its record-model option), TerminalMouseGolden.txt is its mouse golden; none is ever recorded again. -->
+       the WinForms control (its record-model option), TerminalMouseGolden.txt is its mouse golden; none is ever recorded again. The cases with
+       wide characters, which that control gave one cell each, are compared with TerminalWideGolden.txt and TerminalWideCellColorsGolden.txt,
+       written by the display model when the screen gave them two (the record-wide option). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -41,6 +43,6 @@
     <Compile Include="../../TextEditing/LineEndingDetector.cs" Link="LineEndingDetector.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="TerminalModelGolden.txt;TerminalCellColorsGolden.txt;TerminalMouseGolden.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TerminalModelGolden.txt;TerminalCellColorsGolden.txt;TerminalMouseGolden.txt;TerminalWideGolden.txt;TerminalWideCellColorsGolden.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

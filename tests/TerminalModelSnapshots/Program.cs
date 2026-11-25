@@ -76,6 +76,9 @@ internal sealed class SnapshotTerminal
 // the colours the WPF view paints every cell with (TerminalCellColorsGolden.txt, from RowRunBuilder and TerminalColorScheme), and the bytes of
 // the mouse reports (TerminalMouseGolden.txt, from TerminalInputEncoder as the view calls it). The keys and the pastes, which the old stand also
 // probed, were the WinForms input; the keys of the WPF view are checked by TerminalKeyEncoderTests. The goldens are never recorded again.
+// The WinForms terminal gave a wide character one cell; the screen gives it two since then (CellWidth). The cases whose output has a wide
+// character are compared with goldens of their own instead (TerminalWideGolden.txt, TerminalWideCellColorsGolden.txt), which the display model
+// wrote when wide characters came (--record-wide <folder>); every other case must still give the lines of the WinForms terminal.
 internal static partial class Program
 {
     private const string Esc = "\u001b";
@@ -141,7 +144,19 @@ internal static partial class Program
 
     private static readonly List<string> CellLines = new List<string>();
 
-    private static int Main()
+    private static readonly List<string> WideStateLines = new List<string>();
+
+    private static readonly List<string> WideCellLines = new List<string>();
+
+    // The cases whose output has a wide character: they are left out of the goldens of the WinForms terminal.
+    private static readonly HashSet<string> WideCases = new HashSet<string>();
+
+    private static bool HasWideCharacter(Case testCase)
+    {
+        return testCase.Chunks.Any(chunk => chunk.Any(CellWidth.IsWide));
+    }
+
+    private static int Main(string[] args)
     {
         foreach (Case testCase in HandWrittenCases())
         {
@@ -151,33 +166,57 @@ internal static partial class Program
         {
             foreach (Case testCase in RandomCases(seed, 60))
             {
+                bool wide = HasWideCharacter(testCase);
+                if (wide)
+                {
+                    WideCases.Add(testCase.Name);
+                }
                 Harness harness = Run(testCase, byChar: false, out string state);
-                CellLines.Add(testCase.Name + " " + Hash(DumpCells(harness)));
+                (wide ? WideCellLines : CellLines).Add(testCase.Name + " " + Hash(DumpCells(harness)));
                 string[] stateLines = state.Split('\n');
-                StateLines.Add(testCase.Name + " " + stateLines[0] + " lines " + stateLines.Count(line => line.Length > 3 && char.IsDigit(line[0]) && line[3] == '|') + " " + Hash(state));
+                (wide ? WideStateLines : StateLines).Add(testCase.Name + " " + stateLines[0] + " lines " + stateLines.Count(line => line.Length > 3 && char.IsDigit(line[0]) && line[3] == '|') + " " + Hash(state));
             }
         }
-        int failed = Compare("terminal state", "TerminalModelGolden.txt", StateLines, KnownDifferences);
-        failed += Compare("painted colours", "TerminalCellColorsGolden.txt", CellLines);
+        int recordAt = Array.IndexOf(args, "--record-wide");
+        if (recordAt >= 0 && recordAt + 1 < args.Length)
+        {
+            File.WriteAllLines(Path.Combine(args[recordAt + 1], "TerminalWideGolden.txt"), WideStateLines);
+            File.WriteAllLines(Path.Combine(args[recordAt + 1], "TerminalWideCellColorsGolden.txt"), WideCellLines);
+            Console.WriteLine("Recorded " + WideCases.Count + " cases with wide characters in " + args[recordAt + 1]);
+            return 0;
+        }
+        Console.WriteLine("INFO: " + WideCases.Count + " cases with wide characters are compared with the wide goldens: " + string.Join(", ", WideCases.Where(name => !name.StartsWith("random ", StringComparison.Ordinal))) + " and "
+            + WideCases.Count(name => name.StartsWith("random ", StringComparison.Ordinal)) + " generated ones");
+        int failed = Compare("terminal state", "TerminalModelGolden.txt", StateLines, KnownDifferences, WideCases);
+        failed += Compare("painted colours", "TerminalCellColorsGolden.txt", CellLines, null, WideCases);
+        failed += Compare("terminal state with wide characters", "TerminalWideGolden.txt", WideStateLines);
+        failed += Compare("painted colours with wide characters", "TerminalWideCellColorsGolden.txt", WideCellLines);
         failed += Compare("mouse reports", "TerminalMouseGolden.txt", RunMouse());
         return failed == 0 ? 0 : 1;
     }
 
     private static void RunCase(Case testCase)
     {
+        bool wide = HasWideCharacter(testCase);
+        if (wide)
+        {
+            WideCases.Add(testCase.Name);
+        }
+        List<string> cellLines = wide ? WideCellLines : CellLines;
+        List<string> stateLines = wide ? WideStateLines : StateLines;
         Harness harness = Run(testCase, byChar: false, out string whole);
-        CellLines.Add("=== " + testCase.Name);
-        CellLines.AddRange(DumpCells(harness).Split('\n'));
+        cellLines.Add("=== " + testCase.Name);
+        cellLines.AddRange(DumpCells(harness).Split('\n'));
         if (testCase.SpansOnly)
         {
             return;
         }
-        StateLines.Add("=== " + testCase.Name);
-        StateLines.AddRange(whole.Split('\n'));
+        stateLines.Add("=== " + testCase.Name);
+        stateLines.AddRange(whole.Split('\n'));
         if (testCase.AlsoByChar)
         {
             Run(testCase, byChar: true, out string perChar);
-            StateLines.Add(perChar == whole ? "by character: same" : "by character: DIFFERENT " + Hash(perChar));
+            stateLines.Add(perChar == whole ? "by character: same" : "by character: DIFFERENT " + Hash(perChar));
         }
     }
 
@@ -517,17 +556,24 @@ internal static partial class Program
 
     private static List<string> WithoutCases(IEnumerable<string> lines, Dictionary<string, string> cases)
     {
+        return WithoutCases(lines, new HashSet<string>(cases.Keys));
+    }
+
+    // The lines without those of some cases: the section of a hand-written case, the line of a generated one ("random 1/5 ...").
+    private static List<string> WithoutCases(IEnumerable<string> lines, HashSet<string> cases)
+    {
         List<string> result = new List<string>();
         bool skipping = false;
         foreach (string line in lines)
         {
             if (line.StartsWith("=== ", StringComparison.Ordinal))
             {
-                skipping = cases.ContainsKey(line.Substring(4));
+                skipping = cases.Contains(line.Substring(4));
             }
             else if (line.StartsWith("random ", StringComparison.Ordinal))
             {
-                skipping = false;
+                int end = line.IndexOf(' ', "random ".Length);
+                skipping = cases.Contains(end < 0 ? line : line.Substring(0, end));
             }
             if (!skipping)
             {
@@ -537,7 +583,7 @@ internal static partial class Program
         return result;
     }
 
-    private static int Compare(string what, string goldenFile, List<string> lines, Dictionary<string, string> knownDifferences = null)
+    private static int Compare(string what, string goldenFile, List<string> lines, Dictionary<string, string> knownDifferences = null, HashSet<string> otherGolden = null)
     {
         string goldenPath = Path.Combine(AppContext.BaseDirectory, goldenFile);
         if (!File.Exists(goldenPath))
@@ -554,6 +600,10 @@ internal static partial class Program
             }
             golden = WithoutCases(golden, knownDifferences).ToArray();
             lines = WithoutCases(lines, knownDifferences);
+        }
+        if (otherGolden != null)
+        {
+            golden = WithoutCases(golden, otherGolden).ToArray();
         }
         int differences = 0;
         for (int index = 0; index < Math.Max(golden.Length, lines.Count); index++)

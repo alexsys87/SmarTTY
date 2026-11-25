@@ -566,7 +566,8 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     /// <summary>
     /// The selected text. A line that the terminal wrapped goes on without a line break, as the WinForms view copies it; the blanks at the
-    /// end of a line that is not wrapped are dropped (the screen pads its rows with them).
+    /// end of a line that is not wrapped are dropped (the screen pads its rows with them). A wide character is in it once (without the filler
+    /// of its second cell).
     /// </summary>
     public string GetSelectedText()
     {
@@ -575,7 +576,7 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             return "";
         }
         GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end);
-        return _document.GetRangeText(start, end, GetLineBreak);
+        return CellWidth.Strip(_document.GetRangeText(start, end, GetLineBreak));
     }
 
     private string GetLineBreak(int line)
@@ -862,17 +863,26 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             _screen.WriteText(_modes.Charsets.Translate(replaced?.ToString() ?? text));
             return;
         }
-        int runStart = 0;
-        for (int index = 0; index < text.Length; index++)
+        // The device counts a byte as a column: every character takes one cell, a wide one too.
+        _screen.WideCharacters = false;
+        try
         {
-            if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+            int runStart = 0;
+            for (int index = 0; index < text.Length; index++)
             {
-                WriteByteModeRun(text.Substring(runStart, index - runStart));
-                WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
-                runStart = index + 1;
+                if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+                {
+                    WriteByteModeRun(text.Substring(runStart, index - runStart));
+                    WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
+                    runStart = index + 1;
+                }
             }
+            WriteByteModeRun(text.Substring(runStart));
         }
-        WriteByteModeRun(text.Substring(runStart));
+        finally
+        {
+            _screen.WideCharacters = true;
+        }
     }
 
     private void WriteByteModeRun(string text)

@@ -55,7 +55,8 @@ public sealed class RowLayout
 /// Turns a line of the terminal (its text and the style of every cell) into the runs it is painted with. Neighbouring cells of one colour
 /// make one run, so a line of plain text is one glyph run and one coloured word is one more; a blank (without an underline) never splits a
 /// run, because it draws nothing, and no run starts or ends with one. Background rectangles are merged the same way, across the text runs.
-/// No text layout is done: every character takes one cell of the grid.
+/// No text layout is done: every character takes one cell of the grid, a wide one two (itself and the filler of its second cell, which is in the
+/// run with it, see <see cref="CellWidth"/>); a filler that does not follow a wide character is an empty cell, a blank.
 /// </summary>
 public static class RowRunBuilder
 {
@@ -133,7 +134,7 @@ public static class RowRunBuilder
 
             // Text.
             char ch = text[column];
-            bool blank = ch == ' ' || ch == '\0';
+            bool blank = ch == ' ' || ch == '\0' || (ch == CellWidth.Filler && !CellWidth.IsSecondCell(text, column));
             if (blank && !colors.Underline)
             {
                 // A blank draws nothing: it does not end a run without an underline, but it is not under the line of an underlined one.

@@ -260,6 +260,165 @@ internal static class Program
         Check(view.MaxLineWidthCalls > 0, "and the view is told that the line is wider");
     }
 
+    // The lines with the second cell of a wide character shown as '#'.
+    private static string Cells(FakeView view)
+    {
+        return Lines(view).Replace(CellWidth.Filler, '#');
+    }
+
+    private static void WidthTableChecks()
+    {
+        int wide = 0;
+        int starts = 0;
+        bool previous = false;
+        for (int code = 0; code <= 0xFFFF; code++)
+        {
+            bool isWide = CellWidth.IsWide((char)code);
+            if (isWide)
+            {
+                wide++;
+            }
+            if (isWide && !previous)
+            {
+                starts++;
+            }
+            previous = isWide;
+        }
+        // The numbers of the wide and fullwidth characters of EastAsianWidth.txt of Unicode 15.1 in the Basic Multilingual Plane.
+        Equal(wide, 42184, "the table holds every wide and fullwidth character of the plane");
+        Equal(starts, 58, "in 58 ranges (the table is sorted and no two ranges touch)");
+        string[] narrow = { "a", "\u00e9", "\u0416", "\u1160", "\u2764", "\u303F", "\uD7A4", "\uFF61", "\uFFEE", "\uD83D", "\uFFFF", "\uFFFD", "\u2500" };
+        foreach (string ch in narrow)
+        {
+            Check(!CellWidth.IsWide(ch[0]), "U+" + ((int)ch[0]).ToString("X4") + " takes one cell");
+        }
+        string[] wideOnes = { "\u1100", "\u115F", "\u231A", "\u3000", "\u3042", "\u4E00", "\u9FFF", "\uAC00", "\uD7A3", "\uF900", "\uFF01", "\uFF60", "\uFFE6" };
+        foreach (string ch in wideOnes)
+        {
+            Check(CellWidth.IsWide(ch[0]), "U+" + ((int)ch[0]).ToString("X4") + " takes two cells");
+        }
+        Equal(CellWidth.ToCells("ab"), "ab", "a text without wide characters is its own cells");
+        Equal(CellWidth.ToCells("a\u4e2d\u6587b").Replace(CellWidth.Filler, '#'), "a\u4e2d#\u6587#b", "a filler after every wide character");
+        Equal(CellWidth.ToCells("\uFFFFx"), "\uFFFDx", "a filler in the text is not taken for one");
+        Equal(CellWidth.Strip("a\u4e2d\uFFFFb\uFFFF"), "a\u4e2db", "the fillers are taken out of the text that leaves the screen");
+        Check(CellWidth.Strip(null) == null, "nothing stays nothing");
+        Check(CellWidth.IsSecondCell("\u4e2d\uFFFF", 1), "the filler after a wide character is its second cell");
+        Check(!CellWidth.IsSecondCell("a\uFFFF", 1), "a filler after a narrow character is an empty cell");
+        Check(!CellWidth.IsSecondCell("\u4e2d\uFFFF", 0) && !CellWidth.IsSecondCell("\u4e2d\uFFFF", 2), "and no other place is");
+    }
+
+    private static void WideChecks()
+    {
+        const string Zhong = "\u4e2d";
+        const string Wen = "\u6587";
+        TerminalScreen screen = Make(out FakeView view);
+        screen.WriteText("a" + Zhong + "b");
+        Equal(Cells(view), "a" + Zhong + "#b", "a wide character takes two cells: itself and a filler");
+        Equal(screen.Cursor, new GridPoint(4, 0), "and the cursor moves by two for it");
+
+        screen = Make(out view);
+        screen.WriteText("123456789" + Zhong + "x");
+        Equal(Cells(view), "123456789#|" + Zhong + "#x", "a wide character that would start in the last column goes to the next row, the last cell left empty");
+        Check(screen.ActiveBuffer.Lines.GetLine(0).IsWrapped, "the row that wrapped is marked");
+        Equal(screen.Cursor, new GridPoint(3, 1), "the cursor is behind it in the next row");
+
+        screen = Make(out view);
+        screen.WriteText("12345678" + Zhong);
+        Equal(Cells(view), "12345678" + Zhong + "#|", "a wide character in the last two columns fits (the caret of the pending wrap is in the next row)");
+        Equal(screen.Cursor, new GridPoint(10, 0), "and leaves the cursor at the pending-wrap position");
+
+        screen = Make(out view);
+        screen.WriteText("12345678");
+        screen.WriteText(Zhong);
+        Equal(Cells(view), "12345678" + Zhong + "#|", "written on its own it fits there too");
+        screen.Cursor = new GridPoint(9, 0);
+        screen.WriteText(Wen);
+        Equal(Cells(view), "12345678 #|" + Wen + "#", "from the last column it goes to the next row: the half it was written over is a blank, the last cell is left empty");
+
+        screen = Make(out view);
+        screen.WriteText(Zhong);
+        screen.Cursor = new GridPoint(1, 0);
+        screen.WriteText("x");
+        Equal(Cells(view), " x", "writing over the second cell blanks the first one");
+        screen = Make(out view);
+        screen.WriteText(Zhong);
+        screen.Cursor = new GridPoint(0, 0);
+        screen.WriteText("x");
+        Equal(Cells(view), "x ", "writing over the first cell blanks the second one");
+        screen = Make(out view);
+        screen.WriteText(Zhong + Wen);
+        screen.Cursor = new GridPoint(1, 0);
+        screen.WriteText(Zhong);
+        Equal(Cells(view), " " + Zhong + "# ", "a wide character over the halves of two others blanks the halves left");
+        screen = Make(out view);
+        screen.WriteText("abc");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.WriteText(Zhong);
+        Equal(Cells(view), "a" + Zhong + "#", "a wide character over narrow ones takes two of them");
+
+        screen = Make(out view);
+        screen.WriteText("a" + Zhong + "b");
+        screen.Cursor = new GridPoint(2, 0);
+        screen.EraseInLine(EraseMode.ToEnd);
+        Equal(Cells(view), "a ", "erasing from the second cell blanks the first one");
+        screen = Make(out view);
+        screen.WriteText(Zhong + "ab");
+        screen.Cursor = new GridPoint(0, 0);
+        screen.EraseInLine(EraseMode.ToStart);
+        Equal(Cells(view), "  ab", "erasing up to the first cell blanks the second one");
+
+        screen = Make(out view);
+        screen.WriteText("a" + Zhong + "bc");
+        screen.Cursor = new GridPoint(2, 0);
+        screen.DeleteChars(1);
+        Equal(Cells(view), "a bc", "deleting the second cell leaves a blank for the first");
+        screen = Make(out view);
+        screen.WriteText("a" + Zhong + "bc");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.DeleteChars(2);
+        Equal(Cells(view), "abc", "deleting both cells removes the character");
+        screen = Make(out view);
+        screen.WriteText(Zhong + "b");
+        screen.Cursor = new GridPoint(1, 0);
+        screen.InsertChars(1);
+        Equal(Cells(view), "   b", "inserting between the two cells blanks the character");
+        screen = Make(out view);
+        screen.WriteText("12345678" + Zhong);
+        screen.Cursor = new GridPoint(0, 0);
+        screen.InsertChars(1);
+        Equal(Cells(view), " 12345678 |", "a wide character pushed half past the right edge becomes a blank");
+
+        screen = Make(out view);
+        screen.WriteText("ab");
+        screen.Cursor = new GridPoint(0, 0);
+        screen.InsertMode = true;
+        screen.WriteText(Zhong);
+        Equal(Cells(view), Zhong + "#ab", "in the insert mode a wide character pushes the rest by two");
+
+        screen = Make(out view);
+        screen.WriteText(Zhong);
+        screen.RepeatPreviousChar(2);
+        Equal(Cells(view), Zhong + "#" + Zhong + "#" + Zhong + "#", "REP after a wide character repeats it");
+
+        screen = Make(out view);
+        screen.WideCharacters = false;
+        screen.WriteText(Zhong + "x");
+        Equal(Cells(view), Zhong + "x", "without wide characters (the byte mode) every character takes one cell");
+        Equal(screen.Cursor, new GridPoint(2, 0), "and the cursor moves by one for it");
+        screen.WideCharacters = true;
+        screen.WriteText("\uFFFF");
+        Equal(Lines(view), Zhong + "x\uFFFD", "a filler that came with the text is shown as the replacement character");
+
+        screen = Make(out view, columns: 1);
+        screen.WriteText(Zhong);
+        Equal(Cells(view), Zhong + "|#|", "on a screen of one column the two cells go to two rows (and the write ends)");
+
+        screen = Make(out view);
+        screen.AutoWrap = false;
+        screen.WriteText("123456789" + Zhong);
+        Equal(Cells(view).Split('|')[0], "123456789" + Zhong + "#", "without the wrap a wide character goes on past the edge");
+    }
+
     private static void ScrollRegionChecks()
     {
         TerminalScreen screen = Make(out FakeView view);
@@ -512,6 +671,8 @@ internal static class Program
         CursorChecks();
         BatchChecks();
         WriteChecks();
+        WidthTableChecks();
+        WideChecks();
         ScrollRegionChecks();
         EraseChecks();
         CharChecks();

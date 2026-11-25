@@ -81,6 +81,7 @@ internal static class Program
             ThreadingSourceChecks();
             PromptLineChecks();
             DevicePromptChecks();
+            WidePromptChecks();
         }
         catch (Exception exception)
         {
@@ -179,6 +180,13 @@ internal static class Program
         Equal(Describe(layout), "", "an empty line has no runs");
         RowRunBuilder.Build("     ", null, scheme, 80, layout);
         Equal(Describe(layout), "", "a line of blanks has no runs");
+        string filler = CellWidth.Filler.ToString();
+        RowRunBuilder.Build("ab\u65e5" + filler, null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+4", "a wide character and its second cell are in the run of the text");
+        RowRunBuilder.Build("x" + filler, null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+1", "a cell left empty before a wide character is a blank: no run ends with it");
+        RowRunBuilder.Build(filler + "x", null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 1+1", "and none starts with it");
         RowRunBuilder.Build(null, null, scheme, 80, layout);
         Equal(layout.Text, "", "a missing line is empty");
 
@@ -511,6 +519,35 @@ internal static class Program
         Equal(found.Line + ":" + found.Column, "1:6", "inside a scope");
         found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("zeta", true), false, true, none, none, out length);
         Check(!found.IsValid, "no match");
+
+        // Wide characters: the text that is searched has each once, the places and lengths are cells (a\u65e5_\u672c_b \u65e5_\u672c_).
+        TerminalDisplayModel wide = new TerminalDisplayModel(30, 5);
+        wide.ProcessOutput("a\u65e5\u672cb \u65e5\u672c\r\n");
+        Equal(wide.Document.GetLineText(0).Replace(CellWidth.Filler, '_'), "a\u65e5_\u672c_b \u65e5_\u672c_", "a wide character takes two cells of the line");
+        TextMatcher both = TextMatcher.Literal("\u65e5\u672c", ignoreCase: false);
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), both, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:1+4", "two wide characters are found as they were typed, and take four cells");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(2, 0), both, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:7+4", "from the second cell of a wide character the search starts after it");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("\u672cb", false), false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:3+3", "a match of a wide and a narrow character");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(11, 0), TextMatcher.Literal("\u65e5", false), true, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:7+2", "backwards");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("\u672c", false), false, true, new TextDocument.TextPosition(4, 0), new TextDocument.TextPosition(11, 0), out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:9+2", "a scope that starts in the second cell of a character does not hold it");
+        List<string> matches = new List<string>();
+        DocumentSearch.ForEachMatch(wide.Document.GetLineText(0), TextMatcher.Literal("\u672c", false), (start, cells) => matches.Add(start + "+" + cells));
+        Equal(string.Join(",", matches), "3+2,9+2", "every match of a line for the highlight, in cells");
+        wide.Select(new TextDocument.TextPosition(1, 0), new TextDocument.TextPosition(5, 0));
+        Equal(wide.GetSelectedText(), "\u65e5\u672c", "the selected wide characters are copied without their fillers");
+        wide.Select(new TextDocument.TextPosition(2, 0), new TextDocument.TextPosition(6, 0));
+        Equal(wide.GetSelectedText(), "\u672cb", "a selection from the second cell of a character does not copy it");
+
+        TerminalDisplayModel bytes = new TerminalDisplayModel(30, 5);
+        bytes.ByteOrientedLineEditing = true;
+        bytes.ProcessOutput("\u65e5x");
+        Equal(bytes.Document.GetLineText(0), "\u65e5x", "in the byte mode a wide character takes one cell (the device counts bytes)");
+        Equal(bytes.CursorPosition.X, 2, "and the cursor moves by one for it");
     }
 
     // The session reads the Tag of a tab's terminal on the thread of the channel and the window on the thread of the input. A WPF element's own
@@ -616,6 +653,58 @@ internal static class Program
         Equal(model.Caret.Line + ":" + model.Caret.Column, "0:1", "a reset gives the caret back to the screen");
         Check(next.Prompt == "$ ", "the prompt");
     }
+    // The command line with wide characters: two cells each, never cut by the end of a row ('#' is the filler of a second or an empty cell).
+    private static void WidePromptChecks()
+    {
+        const string Ri = "\u65e5";
+        const string Ben = "\u672c";
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 4);
+        PromptLine line = new PromptLine(model, 0, "$ ");
+        line.Insert("ab" + Ri + Ben + "c");
+        Equal(Row(model, 0), "$ ab" + Ri + "#" + Ben + "#c", "a wide character takes two cells of the command line");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "0:9", "and the caret is after both of its cells");
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        Equal(line.CaretIndex + " " + model.Caret.Column, "3 6", "Left steps over a wide character, two cells at a time");
+        line.SetText("abcdef" + Ri);
+        Equal(Row(model, 0) + "|" + model.Document.LineCount, "$ abcdef" + Ri + "#|1", "a wide character fits in the last two cells");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "0:10", "the caret after it is at the end of the full row");
+        line.SetText("abcdefg" + Ri + "x");
+        Equal(Row(model, 0) + "|" + Row(model, 1), "$ abcdefg#|" + Ri + "#x", "a wide character that would start in the last cell leaves it empty and starts the next row");
+        Equal(Pos(line.PositionAt(7)), "1:0", "the caret before it is on the next row");
+        Equal(Pos(line.PositionAt(8)) + " " + Pos(line.PositionAt(9)), "1:2 1:3", "and after it two cells on");
+        Equal(line.IndexOf(new TextDocument.TextPosition(9, 0)), 7, "the empty cell is the place of the character after it");
+        Equal(line.IndexOf(new TextDocument.TextPosition(0, 1)), 7, "the first cell of a wide character is its index");
+        Equal(line.IndexOf(new TextDocument.TextPosition(1, 1)), 8, "its second cell is the index after it");
+        line.MoveCaret(7, extend: false);
+        line.MoveCaret(8, extend: true);
+        Equal(line.SelectedText + "|" + model.GetSelectedText(), Ri + "|" + Ri, "a selected wide character is copied once");
+        line.SetText("abcdefgh");
+        Equal(Pos(line.PositionAt(8)) + " " + line.IndexOf(new TextDocument.TextPosition(0, 1)), "0:10 8", "the end of a full row and the start of the next are the same index");
+
+        TerminalDisplayModel local = new TerminalDisplayModel(10, 4);
+        PromptLine wideLocal = new PromptLine(local, 0, Ri + "$ ");
+        Equal(Row(local, 0) + " " + local.Caret.Column, Ri + "#$  4", "a local prompt with a wide character takes its cells");
+        Check(!wideLocal.Contains(new TextDocument.TextPosition(3, 0)) && wideLocal.Contains(new TextDocument.TextPosition(4, 0)), "the text starts after the cells of the prompt");
+
+        TerminalDisplayModel device = new TerminalDisplayModel(12, 4);
+        device.ProcessOutput(Ri + "# ");
+        string prompt = device.GetScreenLineText(device.CursorPosition.Y).Substring(0, device.CursorPosition.X);
+        PromptLine input = new PromptLine(device, device.CursorDocumentLine, prompt, promptOnScreen: true);
+        input.Insert("ls");
+        Equal(Row(device, 0) + " " + input.StartColumn + " " + device.Caret.Column, Ri + "## ls 4 6", "the device's prompt with a wide character is kept as its cells");
+    }
+
+    private static string Row(TerminalDisplayModel model, int line)
+    {
+        return model.Document.GetLineText(line).Replace(CellWidth.Filler, '#');
+    }
+
+    private static string Pos(TextDocument.TextPosition position)
+    {
+        return position.Line + ":" + position.Column;
+    }
+
     // The input line of the serial terminal that continues the device's own prompt (PromptLine with the prompt on the screen).
     private static void DevicePromptChecks()
     {

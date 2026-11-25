@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Terminal/Emulation/CellStyle.cs" Link="CellStyle.cs" />
+    <Compile Include="../../Terminal/Emulation/CellWidth.cs" Link="CellWidth.cs" />
     <Compile Include="../../Terminal/Emulation/EraseMode.cs" Link="EraseMode.cs" />
     <Compile Include="../../Terminal/Emulation/ILineInfoHost.cs" Link="ILineInfoHost.cs" />
     <Compile Include="../../Terminal/Emulation/ITerminalScreen.cs" Link="ITerminalScreen.cs" />

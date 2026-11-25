@@ -11,6 +11,7 @@
     <Compile Include="../../Terminal/CommandRun.cs" Link="CommandRun.cs" />
     <Compile Include="../../Terminal/DiagnosticHighlighter.cs" Link="DiagnosticHighlighter.cs" />
     <Compile Include="../../Terminal/OutputLinkScanner.cs" Link="OutputLinkScanner.cs" />
+    <Compile Include="../../Terminal/Emulation/CellWidth.cs" Link="CellWidth.cs" />
     <Compile Include="../../Terminal/Emulation/LinkTypes.cs" Link="LinkTypes.cs" />
     <Compile Include="../../Terminal/TerminalDirectoryWatcher.cs" Link="TerminalDirectoryWatcher.cs" />
     <Compile Include="../../CodeEditing/CompilerColumns.cs" Link="CompilerColumns.cs" />
