@@ -11,12 +11,12 @@ namespace SmarTTY.GUI;
 
 /// <summary>
 /// What every window of the program gets without asking for it: the title bar and frame in the colours of the theme
-/// (<see cref="DwmTitleBar"/>), the opacity from the settings, and the size the user gave a window that can be resized.
+/// (<see cref="DwmTitleBar"/>) and the size the user gave a window that can be resized.
 /// </summary>
 /// <remarks>
 /// <c>SecondaryWindowStyle</c> (every window uses it) sets <see cref="ManageProperty"/>; <see cref="Install"/> adds a class handler of
 /// <c>Loaded</c> for a window that has no such style. Both end in <see cref="Attach"/>, which does its work once for a window:
-/// at <c>SourceInitialized</c> (the window handle exists, nothing is shown yet) the title bar, the opacity and the remembered size
+/// at <c>SourceInitialized</c> (the window handle exists, nothing is shown yet) the title bar and the remembered size
 /// are applied, and when the window closes its size is remembered.
 /// </remarks>
 internal static class WindowAppearance
@@ -30,27 +30,9 @@ internal static class WindowAppearance
 
     private static bool _installed;
 
-    private static int _opacityPercent = WindowChromeRules.MaxOpacityPercent;
-
     public static bool GetManage(DependencyObject element) => (bool)element.GetValue(ManageProperty);
 
     public static void SetManage(DependencyObject element, bool value) => element.SetValue(ManageProperty, value);
-
-    /// <summary>The opacity of all windows in per cent (100: not transparent); a new value is applied to the open windows at once.</summary>
-    public static int OpacityPercent
-    {
-        get => _opacityPercent;
-        set
-        {
-            int percent = WindowChromeRules.ClampOpacityPercent(value);
-            if (percent == _opacityPercent)
-            {
-                return;
-            }
-            _opacityPercent = percent;
-            ForEachWindow(ApplyOpacity);
-        }
-    }
 
     /// <summary>Hooks the theme and the windows that have no style; call once at the start of the program.</summary>
     public static void Install()
@@ -99,8 +81,6 @@ internal static class WindowAppearance
         {
             // The window is open already (it had no style): do what SourceInitialized would have done, minus the size.
             ApplyTitleBar(window);
-            ApplyOpacity(window);
-            HookStyle(window);
             int openWidth = (int)Math.Round(window.ActualWidth);
             int openHeight = (int)Math.Round(window.ActualHeight);
             window.Closing += (sender, e) => RememberSize(window, openWidth, openHeight);
@@ -109,12 +89,6 @@ internal static class WindowAppearance
         window.SourceInitialized += (sender, e) =>
         {
             ApplyTitleBar(window);
-            ApplyOpacity(window);
-            HookStyle(window);
-            // The window shows its first frame and is activated after this: the opacity is put again when it is there (WPF sets
-            // up the surface of the window while it is shown, and a style it changes then must not take the opacity away).
-            window.ContentRendered += (s, args) => ApplyOpacity(window);
-            window.Activated += (s, args) => ApplyOpacity(window);
             ApplyRememberedSize(window, out int initialWidth, out int initialHeight);
             window.Closing += (s, args) => RememberSize(window, initialWidth, initialHeight);
         };
@@ -167,63 +141,6 @@ internal static class WindowAppearance
     private static Color? ThemeColor(Window window, string key)
     {
         return window.TryFindResource(key) is SolidColorBrush brush ? brush.Color : (Color?)null;
-    }
-
-    // ------------------------------------------------------------------ the opacity
-
-    private static void ApplyOpacity(Window window)
-    {
-        if (window.AllowsTransparency)
-        {
-            // The window draws its own transparency (WPF owns the layered style then).
-            return;
-        }
-        IntPtr handle = new WindowInteropHelper(window).Handle;
-        if (handle == IntPtr.Zero)
-        {
-            return;
-        }
-        byte alpha = WindowChromeRules.OpacityToAlpha(_opacityPercent);
-        // An opaque window that is not layered needs nothing (the usual case: no call at all).
-        if (alpha == 255 && !DwmTitleBar.IsLayered(handle))
-        {
-            return;
-        }
-        if (!DwmTitleBar.SetOpacity(handle, alpha))
-        {
-            System.Diagnostics.Debug.WriteLine("WindowAppearance: the opacity " + _opacityPercent + " % could not be set on " + window.GetType().Name);
-        }
-    }
-
-    /// <summary>
-    /// Watches the extended style of a window: when something else (WPF itself, which writes again the extended style it keeps for
-    /// the window) is about to take the layered style away while the opacity is below 100 %, the style keeps it.
-    /// </summary>
-    /// <remarks>
-    /// This is done in <c>WM_STYLECHANGING</c>, before the change, and not by putting the style back after it: WPF took the style away
-    /// again each time, and the opacity put back from the dispatcher at the background priority every time made a loop that never ended.
-    /// It kept the dispatcher busy, so the work at a lower priority never ran (the Smart Terminal did not start and the file manager kept
-    /// loading), and the window was never transparent.
-    /// </remarks>
-    private static void HookStyle(Window window)
-    {
-        if (window.AllowsTransparency)
-        {
-            // WPF owns the layered style of such a window.
-            return;
-        }
-        HwndSource source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-        source?.AddHook(StyleHook);
-    }
-
-    private static IntPtr StyleHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        if (message == DwmTitleBar.WmStyleChanging && (int)wParam.ToInt64() == DwmTitleBar.ExStyleIndex
-            && _opacityPercent < WindowChromeRules.MaxOpacityPercent)
-        {
-            DwmTitleBar.KeepLayeredStyle(lParam);
-        }
-        return IntPtr.Zero;
     }
 
     // ------------------------------------------------------------------ the size

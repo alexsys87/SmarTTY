@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
@@ -49,7 +49,7 @@ PR that changes them.
 | Folder | What is there | UI? |
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of the WPF dialogs into the code that cannot reference `GUI/` (`UserDialogs` and other static delegates) | WPF |
-| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); `UiTimer` (the timer of the windows); `WindowAppearance` (the title bar, the opacity and the remembered size of every window, see "Window chrome"); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
+| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); `UiTimer` (the timer of the windows); `WindowAppearance` (the title bar and the remembered size of every window) and `TerminalBackdrop` (the see-through terminal background of the main window), see "Window chrome"; the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
 | `GUI/Icons/` | Stage 5A: the icons as vector images, one resource dictionary of `DrawingImage`s for each folder the PNG files were in (`Root`, `MainWindow`, `Editor`, `Menu`, `Keys`, `Transfers`, `FileTypes`; converted from SVG outside the repository) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) | WPF |
@@ -62,12 +62,12 @@ PR that changes them.
 | `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
-| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
+| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, the terminal colour schemes `TerminalColorPresets`; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
 | `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore | no |
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar and the opacity of a window (`DwmTitleBar`) | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar of a window (`DwmTitleBar`), the backdrop behind a see-through client area (`DwmBackdrop`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -747,8 +747,8 @@ the controls they drove are gone: 2E).
 
 ### Window chrome (after stage 5)
 
-Done: every window (the 56 of XAML and the ten made in code) gets, without a line of its own, the title bar in the colours of the theme, the
-opacity of the settings and the size the user gave it. `SecondaryWindowStyle` (all windows use it) sets `GUI/WindowAppearance.Manage`; the
+Done: every window (the 56 of XAML and the ten made in code) gets, without a line of its own, the title bar in the colours of the theme and
+the size the user gave it; the terminals of the main window can have a see-through background. `SecondaryWindowStyle` (all windows use it) sets `GUI/WindowAppearance.Manage`; the
 class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`) adds takes a window that has no such style. Both end in
 `Attach`, which works once for a window, at `SourceInitialized` (the handle exists, nothing is shown yet).
 
@@ -756,22 +756,34 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   `Theme.WindowBackground` is dark, `WindowChromeRules.IsDark`) and, on Windows 11 (build 22000), the caption, text and border colours from
   `Theme.WindowBackground`, `Theme.Text` and `Theme.Border`; on Windows 10 only the dark or light frame. A high contrast theme of the system
   gets the colours back (null). `ThemeManager.ThemeChanged` and `SystemParameters.HighContrast` apply it again to the open windows. Not done:
-  Mica or any backdrop, a title bar drawn by the program (`FluentWindow`, `WPF-UI`), tabs or controls in the title bar.
-- The opacity: `GlobalSettings.WindowOpacityPercent` (30 to 100, 100 by default; a value out of the range is brought into it; the settings
-  window has a slider in "Visual Settings", applied with OK). `ThemeManager.Apply(GlobalSettings)` hands it to `WindowAppearance.OpacityPercent`,
-  which applies it to the open windows; `DwmTitleBar.SetOpacity` puts the window in the layered state (`WS_EX_LAYERED`,
-  `SetLayeredWindowAttributes`, the frame included) and takes the layered style off again at 100 %, so an opaque window is drawn as before.
-  A window with `AllowsTransparency` is left alone. Popups and menus (not windows) are not made transparent. WPF manages the surface and
-  the extended style of its windows itself, so the style is not trusted to stay: `SetOpacity` redraws the frame after it adds the layered
-  style and reads the style and the alpha back (false, and a Debug line, when they are not as asked; a window already at that alpha is left
-  alone), the opacity is put again on `ContentRendered` and `Activated`, and `WindowAppearance.StyleHook` keeps the layered style in
-  `WM_STYLECHANGING` of the extended style (`DwmTitleBar.KeepLayeredStyle` sets the bit in the new style of the `STYLESTRUCT`) while the
-  opacity is below 100 %. Fixed after the first run on Windows: the hook put the style back after `WM_STYLECHANGED` with a `BeginInvoke` at
-  the background priority; WPF took it away again each time, so the loop never ended, the window never became transparent and the work of
-  the dispatcher below that priority (`ContextIdle`: the start of the Smart Terminal, the loading of the file manager) never ran. Do not put
-  the style back from the dispatcher. If the opacity still does nothing on Windows, the next step is to see whether
-  `SetLayeredWindowAttributes` fails (the Debug line) or WPF paints over it, and then a window made with `AllowsTransparency` for the
-  opacity case.
+  Mica (the acrylic backdrop is only behind a see-through terminal, below), a title bar drawn by the program (`FluentWindow`, `WPF-UI`), tabs or controls in the title bar.
+- The opacity of all windows (`GlobalSettings.WindowOpacityPercent`, a layered window with `SetLayeredWindowAttributes` and a hook that kept
+  the layered style) is gone: on Windows it never made a window transparent, and its first hook (the style put back after `WM_STYLECHANGED`
+  with a `BeginInvoke` at the background priority, which WPF took away again each time) made a loop that kept the dispatcher busy, so the
+  work below that priority (`ContextIdle`: the start of the Smart Terminal, the loading of the file manager) never ran (alexsys87/SmarTTY#565
+  stopped the loop). Do not put a window style back from the dispatcher. The settings member went; an old settings file with it is read as before.
+- The see-through terminal background instead: `GlobalSettings.TerminalOpacityPercent` (30 to 100, 100 by default, brought into the range)
+  and `TerminalBlurBehind` (on by default), on the terminal part of the settings window with a slider and a check box, applied with OK.
+  `WpfTerminal.ApplySettings` (the SSH tabs only; the device tab keeps its own colours and stays opaque) gives the view
+  `TerminalRenderView.BackgroundAlpha`, the alpha of its default background only (the text, the cells with a background colour, the caret
+  and the selection stay opaque). `MainWindowController.ApplyGlobalVisualSettings` calls `GUI/TerminalBackdrop.Apply` on the main window
+  (at the handle when it does not exist yet): below 100 % the window background and that of its composition target are transparent, the
+  inherited `TerminalBackdrop.IsActive` makes the content of `MainWindowTabControl` (a trigger in `Controls.xaml`) transparent too, the
+  device tab has a background of its own (`Theme.ContentBackground`), and `Native/DwmBackdrop.Enable` extends the frame over the whole
+  client area (`DwmExtendFrameIntoClientArea`, so the DWM uses the alpha of the pixels) and puts behind it, on Windows 11 22H2 (build 22621)
+  and later with blur, the acrylic system backdrop (`DWMWA_SYSTEMBACKDROP_TYPE` 3), otherwise the accent policy
+  (`SetWindowCompositionAttribute`: `ACCENT_ENABLE_BLURBEHIND`, or without blur `ACCENT_ENABLE_TRANSPARENTGRADIENT` with no tint). At 100 %
+  the window that was see-through gets its background, its composition colour and the DWM look back; one that never was is not touched.
+  Not seen on a real window yet: if it does not work, look first at whether the client area is black (the DWM ignores the alpha: the accent
+  policy or the backdrop did not take) or opaque (some element between the window and the terminal still draws a background).
+- The colours of the terminal: `VisualTTY/TerminalColorPresets` (UI-free) are the schemes of popular terminals (the default first, the
+  colours SmarTTY always had: black, light grey, white bold text, the PuTTY palette; Ubuntu, Ubuntu (Tango), Tango Dark, Campbell, One Half
+  Dark, xterm, Solarized Dark and Light, Dracula, Monokai, Gruvbox Dark, Nord, macOS Basic): the background, the text colour, the bold text
+  colour and the 16 colours. The settings window lists them; Apply sets `TerminalBackgroundColor`, `DefaultTextColor`, `DefaultBoldTextColor`
+  (new `ColorWrapper` members; no alpha means "never set", the default of the view) and `PaletteOverride`, and keeps the name in
+  `TerminalColorSchemeName`; each colour can still be changed on its own. `WpfTerminal.ApplySettings` sets the three colours of the
+  `TerminalColorScheme` from them. `tests/TerminalColorPresetsTests` (net8.0, 216 checks): every scheme is complete and opaque, the names
+  are unique and found again, the default is the old colours, the palettes go through XML unchanged, the alpha of the opacity.
 - The sizes: `CommonGUIPreferences.WindowSizes` (a `List<RememberedWindowSize>` by the full name of the window class, in
   `GUIPreferences.xml`; `VisualTTY/WindowSizeList`, at most 200, the oldest goes first) holds the size of every window that can be
   resized (`ResizeMode` `CanResize` or `CanResizeWithGrip`) and that the user changed. At `SourceInitialized` the window gets the size back
@@ -783,11 +795,12 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   the column takes when the file manager is shown) and written from `OnClosing` (the window is not shown any more in `OnClosed`).
 - Tests: `tests/WindowChromeTests` (net8.0, 68 checks) drives `Utilities/WindowChromeRules` (opacity, alpha, COLORREF, dark or light, the
   clamp of a length, the middle kept), `VisualTTY/WindowSizeList` and the XML of the preferences, an old file without the new members included.
-  Of 7 mutations of them each makes a check fail (two only after a check of the boundary was added: a grey just below half brightness, half a pixel past the end). The title bar, the layered window and the restoring of a size
+  Of 7 mutations of them each makes a check fail (two only after a check of the boundary was added: a grey just below half brightness, half a pixel past the end). The title bar, the see-through background and the restoring of a size
   need a real window and are compile-checked on Linux only. Manual check on Windows 11 and 10, 100 %, 150 % and 200 %: every theme (the
   title bar, the border, the text of the title; a custom theme; the theme switched while a dialog is open); High Contrast on and off; the
-  opacity slider at 30 %, 60 % and 100 % (every window, a dialog opened over the main window, the terminal still readable, 100 % draws as before,
-  the terminal and editor keep their speed); resize a dialog (the file transfer windows, the settings, the host-to-host copy), close it and open
+  background opacity at 30 %, 60 % and 100 % with and without blur (a classic and a Smart Terminal tab: the desktop behind shows through, the
+  text, the tab strip, the menu, the tool bar and the file manager stay opaque; an editor and a device tab look as before; 100 % draws as
+  before; the terminal keeps its speed; Remote Desktop); each colour scheme applied and a colour changed after it (`htop`, `mc`, `ls --color`); resize a dialog (the file transfer windows, the settings, the host-to-host copy), close it and open
   it again, also from another monitor and with the owner on a monitor of another scale; a dialog with `SizeToContent="Height"` (the directory
   download window) keeps only its width; a window made larger than the monitor is cut to it; the file manager width after a restart (shown,
   hidden before closing, never changed); an old `GUIPreferences.xml`.

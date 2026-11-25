@@ -362,31 +362,44 @@ public class GlobalSettings : INotifyPropertyChanged
     [XmlIgnore]
     public bool IsLightTheme => ThemeChoice.IsLight;
 
-    private int _windowOpacityPercent = 100;
+    private int _terminalOpacityPercent = 100;
 
     /// <summary>
-    /// How opaque the windows of the program are, in per cent (30 to 100; 100, the default, is not transparent at all). A value
-    /// out of that range, such as one from a hand-edited file, is brought into it.
+    /// How opaque the background of the terminals of the main window is, in per cent (30 to 100; 100, the default, is not transparent at
+    /// all): what is behind the window shows through it, the text stays opaque. A value out of that range, such as one from a hand-edited
+    /// file, is brought into it.
     /// </summary>
-    public int WindowOpacityPercent
+    public int TerminalOpacityPercent
     {
-        get => _windowOpacityPercent;
+        get => _terminalOpacityPercent;
         set
         {
             int percent = SmarTTY.Utilities.WindowChromeRules.ClampOpacityPercent(value);
-            if (percent != _windowOpacityPercent)
+            if (percent != _terminalOpacityPercent)
             {
-                _windowOpacityPercent = percent;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WindowOpacityPercent)));
+                _terminalOpacityPercent = percent;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TerminalOpacityPercent)));
             }
         }
     }
+
+    /// <summary>What shows through a transparent terminal background is blurred (acrylic), as in Windows Terminal; off: it is clear.</summary>
+    public bool TerminalBlurBehind { get; set; } = true;
 
     public HeaderOrientation TabHeaderOrientation { get; set; } = HeaderOrientation.Bottom;
 
     public HeaderOrientation SessionHeaderOrientation { get; set; } = HeaderOrientation.Left;
 
     public DeviceTerminalSettings.ColorWrapper DefaultTextColor { get; set; }
+
+    /// <summary>The background of the terminals; a colour with no alpha (nothing set) keeps the default, black.</summary>
+    public DeviceTerminalSettings.ColorWrapper TerminalBackgroundColor { get; set; }
+
+    /// <summary>The colour of bold text without a colour of its own; a colour with no alpha (nothing set) keeps the default, white.</summary>
+    public DeviceTerminalSettings.ColorWrapper DefaultBoldTextColor { get; set; }
+
+    /// <summary>The name of the colour scheme last chosen in the settings (<see cref="TerminalColorPreset"/>); only shown there.</summary>
+    public string TerminalColorSchemeName { get; set; }
 
     public ScrollbarMode VerticalScrollbarMode { get; set; }
 

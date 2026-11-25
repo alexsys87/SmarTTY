@@ -1984,6 +1984,8 @@ public class MainWindowController : INotifyPropertyChanged
         TabHeaderLocation = HeaderOrientationToDock(Settings.TabHeaderOrientation);
         SessionHeaderLocation = HeaderOrientationToDock(Settings.SessionHeaderOrientation);
         ThemeManager.Apply(Settings);
+        // The see-through background of the terminals: the window and its tabs (each terminal draws its own with that alpha).
+        TerminalBackdrop.Apply(_Window as Window, Settings.TerminalOpacityPercent, Settings.TerminalBlurBehind);
     }
 
     private void CloseActivePage()

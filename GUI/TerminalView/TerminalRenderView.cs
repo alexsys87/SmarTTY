@@ -437,6 +437,26 @@ internal sealed class TerminalRenderView : FrameworkElement
 
     public TerminalColorScheme ColorScheme => _scheme;
 
+    private byte _backgroundAlpha = 255;
+
+    /// <summary>
+    /// The alpha of the background of the view (255: opaque). Only the background without a colour of its own is drawn with it: the
+    /// text, the cells with a background colour, the caret and the selection stay as they are. What is behind the view shows through
+    /// (see <c>GUI/TerminalBackdrop</c> for the window).
+    /// </summary>
+    public byte BackgroundAlpha
+    {
+        get => _backgroundAlpha;
+        set
+        {
+            if (_backgroundAlpha != value)
+            {
+                _backgroundAlpha = value;
+                InvalidateVisual();
+            }
+        }
+    }
+
     public TerminalKeyOptions KeyOptions => _keyOptions;
 
     /// <summary>The encoding of typed and pasted text (UTF-8).</summary>
@@ -866,7 +886,12 @@ internal sealed class TerminalRenderView : FrameworkElement
     protected override void OnRender(DrawingContext drawingContext)
     {
         // The background; the rows draw only the cells that have a background of their own.
-        drawingContext.DrawRectangle(GetBrush(_scheme.DefaultBackground), null, new Rect(RenderSize));
+        RgbColor background = _scheme.DefaultBackground;
+        if (_backgroundAlpha != 255)
+        {
+            background = RgbColor.FromArgb(background.A * _backgroundAlpha / 255, background.R, background.G, background.B);
+        }
+        drawingContext.DrawRectangle(GetBrush(background), null, new Rect(RenderSize));
     }
 
     // Building a frame.

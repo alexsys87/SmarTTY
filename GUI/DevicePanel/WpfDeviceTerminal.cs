@@ -307,6 +307,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     public WpfDeviceTerminal()
     {
         InitializeComponent();
+        // An opaque background of its own: the tab around it has none while the SSH terminals are see-through (GUI/TerminalBackdrop).
+        SetResourceReference(BackgroundProperty, "Theme.ContentBackground");
         ApplyMenuIcons();
         CreateConnectionPrompt();
         BuildLayout();

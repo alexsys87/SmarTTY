@@ -68,6 +68,8 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
                 ((Selector)lbCutoffUnit).SelectedIndex = 0;
             }
         }
+        cbColorScheme.ItemsSource = TerminalColorPreset.All;
+        cbColorScheme.SelectedItem = TerminalColorPreset.Find(settings.TerminalColorSchemeName) ?? TerminalColorPreset.All[0];
         txtVcxsrvStatus.Text = VcxsrvSetup.DescribeInstallation(VcxsrvSetup.FindExecutable());
         // An installed VcXsrv has nothing to download.
         btnInstallVcxsrv.IsEnabled = VcxsrvSetup.FindExecutable() == null;
@@ -286,6 +288,23 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
             case 2:
                 _ClonedSettings.LargeBlockCutoffPoint = cutoffKilobytes * 1024 * 1024;
                 break;
+        }
+    }
+
+    private void ApplyColorScheme_Click(object sender, RoutedEventArgs e)
+    {
+        if (!(cbColorScheme.SelectedItem is TerminalColorPreset preset))
+        {
+            return;
+        }
+        _ClonedSettings.TerminalBackgroundColor = preset.Background;
+        _ClonedSettings.DefaultTextColor = preset.Foreground;
+        _ClonedSettings.DefaultBoldTextColor = preset.BoldForeground;
+        _ClonedSettings.PaletteOverride = preset.ToPalette();
+        _ClonedSettings.TerminalColorSchemeName = preset.Name;
+        foreach (Border border in new[] { brdBackgroundColor, brdTextColor, brdBoldTextColor })
+        {
+            border.GetBindingExpression(Border.BackgroundProperty)?.UpdateTarget();
         }
     }
 
