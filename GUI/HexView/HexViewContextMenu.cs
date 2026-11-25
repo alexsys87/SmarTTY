@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Image = System.Windows.Controls.Image;
 
@@ -150,12 +149,6 @@ internal sealed class HexViewContextMenu : ContextMenu
 
     private static ImageSource LoadIcon(string path)
     {
-        BitmapImage image = new BitmapImage();
-        image.BeginInit();
-        image.UriSource = new Uri("pack://application:,,,/icons/" + path, UriKind.Absolute);
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.EndInit();
-        image.Freeze();
-        return image;
+        return IconImages.Get(path);
     }
 }

@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace SmarTTY.GUI;
@@ -23,13 +22,13 @@ public partial class RemoteOpenFileWindow : Window
         Save
     }
 
-    private const string FolderIcon = "pack://application:,,,/icons/MainWindow/folder_flat.png";
+    private const string FolderIcon = "MainWindow/folder_flat.png";
 
-    private const string FileIcon = "pack://application:,,,/icons/MainWindow/document_flat.png";
+    private const string FileIcon = "MainWindow/document_flat.png";
 
-    private const string ExecutableIcon = "pack://application:,,,/icons/menu/executable.png";
+    private const string ExecutableIcon = "menu/executable.png";
 
-    private const string OtherIcon = "pack://application:,,,/icons/gear16.png";
+    private const string OtherIcon = "gear16.png";
 
     private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
 
@@ -445,7 +444,7 @@ public partial class RemoteOpenFileWindow : Window
     private static ListBoxItem CreateItem(FileEntry entry)
     {
         StackPanel content = new StackPanel { Orientation = Orientation.Horizontal };
-        content.Children.Add(new Image { Source = new BitmapImage(new Uri(entry.IconPath)), Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) });
+        content.Children.Add(new Image { Source = IconImages.Get(entry.IconPath), Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) });
         content.Children.Add(new TextBlock { Text = entry.Name });
         return new ListBoxItem { Content = content, Tag = entry };
     }

@@ -73,7 +73,7 @@ public partial class WpfDeviceTerminal
     private WindowOwner _owner;
 
     /// <summary>The window of the panel as the owner of the WinForms dialogs and of the clipboard calls.</summary>
-    private sealed class WindowOwner : System.Windows.Forms.IWin32Window
+    private sealed class WindowOwner : IDialogOwner
     {
         private readonly WpfDeviceTerminal _panel;
 
@@ -85,7 +85,7 @@ public partial class WpfDeviceTerminal
         public IntPtr Handle => (PresentationSource.FromVisual(_panel) as HwndSource)?.Handle ?? IntPtr.Zero;
     }
 
-    private System.Windows.Forms.IWin32Window Owner => (System.Windows.Forms.IWin32Window)_serialTerminalControl?.PasteAnchor ?? _owner ?? (_owner = new WindowOwner(this));
+    private IDialogOwner Owner => (IDialogOwner)_serialTerminalControl?.PasteAnchor ?? _owner ?? (_owner = new WindowOwner(this));
 
     private IntPtr Handle => Owner.Handle;
 
@@ -183,23 +183,21 @@ public partial class WpfDeviceTerminal
                 return;
             }
         }
-        System.Windows.Forms.Keys keys = (System.Windows.Forms.Keys)KeyInterop.VirtualKeyFromKey(key);
+        VirtualKey keys = (VirtualKey)KeyInterop.VirtualKeyFromKey(key);
         ModifierKeys modifiers = Keyboard.Modifiers;
         if ((modifiers & ModifierKeys.Shift) != 0)
         {
-            keys |= System.Windows.Forms.Keys.Shift;
+            keys |= VirtualKey.Shift;
         }
         if ((modifiers & ModifierKeys.Control) != 0)
         {
-            keys |= System.Windows.Forms.Keys.Control;
+            keys |= VirtualKey.Control;
         }
         if ((modifiers & ModifierKeys.Alt) != 0)
         {
-            keys |= System.Windows.Forms.Keys.Alt;
+            keys |= VirtualKey.Alt;
         }
-        System.Windows.Forms.KeyEventArgs args = new System.Windows.Forms.KeyEventArgs(keys);
-        OnTerminalKeyDown(sender, args);
-        if (args.Handled)
+        if (OnTerminalKeyDown(new KeyStroke(keys)))
         {
             e.Handled = true;
         }

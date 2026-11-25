@@ -2298,7 +2298,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         context.DrawRectangle(null, border, new Rect(band.BandLeft + 0.5, y + 0.5, band.BandWidth, rowHeight - 1));
     }
 
-    // The icons of the WinForms view (its resources), with their magenta made transparent as its colour key does.
+    // The icons of the messages (the vector images of the editor's icons).
     private void LoadIcons()
     {
         if (_iconsLoaded)
@@ -2306,42 +2306,8 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             return;
         }
         _iconsLoaded = true;
-        _errorIcon = LoadIcon("message-error");
-        _warningIcon = LoadIcon("message-warning");
-    }
-
-    private static ImageSource LoadIcon(string name)
-    {
-        try
-        {
-            using (System.IO.Stream stream = typeof(WpfTextEditor).Assembly.GetManifestResourceStream("SmarTTY.Icons." + name + ".png"))
-            {
-                if (stream == null)
-                {
-                    return null;
-                }
-                System.Windows.Media.Imaging.BitmapSource source = System.Windows.Media.Imaging.BitmapFrame.Create(stream, System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-                System.Windows.Media.Imaging.FormatConvertedBitmap bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
-                int stride = bgra.PixelWidth * 4;
-                byte[] pixels = new byte[stride * bgra.PixelHeight];
-                bgra.CopyPixels(pixels, stride, 0);
-                for (int i = 0; i < pixels.Length; i += 4)
-                {
-                    if (pixels[i] == 255 && pixels[i + 1] == 0 && pixels[i + 2] == 255)
-                    {
-                        pixels[i + 3] = 0;
-                    }
-                }
-                System.Windows.Media.Imaging.BitmapSource image = System.Windows.Media.Imaging.BitmapSource.Create(bgra.PixelWidth, bgra.PixelHeight, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
-                image.Freeze();
-                return image;
-            }
-        }
-        catch (Exception)
-        {
-            // No icon: the message is drawn without it.
-            return null;
-        }
+        _errorIcon = IconImages.Get("editor/message-error.png");
+        _warningIcon = IconImages.Get("editor/message-warning.png");
     }
 
     protected override void OnRender(DrawingContext context)
@@ -2596,7 +2562,13 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
 
     IUserPrompt IRemoteTextView.UserPrompt => UiDispatcherOfView;
 
-    System.Windows.Forms.IWin32Window IRemoteTextView.MessageOwner => null;
+    IDisposable IRemoteTextView.StartTimer(int intervalMs, Action tick)
+    {
+        UiTimer timer = new UiTimer { Interval = intervalMs };
+        timer.Tick += (sender, e) => tick();
+        timer.Start();
+        return timer;
+    }
 
     private WpfViewDispatcher UiDispatcherOfView => _uiDispatcher ?? (_uiDispatcher = new WpfViewDispatcher(this));
 }

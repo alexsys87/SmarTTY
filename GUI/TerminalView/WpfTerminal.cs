@@ -141,7 +141,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     public event Action<WpfTerminal, bool> CtrlTabPressed;
 
     /// <summary>The context menu of the terminal is asked for at a point of the screen (device pixels).</summary>
-    public event Action<WpfTerminal, System.Drawing.Point> ContextMenuRequested;
+    public event Action<WpfTerminal, Point> ContextMenuRequested;
 
     /// <summary>A key before the terminal looks at it: a handler that marks it handled takes it (the shortcuts of the window).</summary>
     public event KeyEventHandler ShortcutKey;
@@ -245,7 +245,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     }
 
     /// <summary>Applies the terminal settings of the application (the WinForms terminal got them in <c>ApplyTerminalSettings</c>).</summary>
-    public void ApplySettings(GlobalSettings settings, System.Drawing.Font font)
+    public void ApplySettings(GlobalSettings settings, FontSpec font)
     {
         AppSettings = settings;
         _model.ShowUnrecognizedAsHex = settings.ShowUnrecognizedCharactersAsHex;
@@ -256,7 +256,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         TerminalColorScheme scheme = _view.ColorScheme;
         if (settings.DefaultTextColor.Alpha != 0)
         {
-            System.Drawing.Color text = settings.DefaultTextColor;
+            RgbColor text = settings.DefaultTextColor;
             scheme.DefaultForeground = RgbColor.FromArgb(255, text.R, text.G, text.B);
         }
         SetPalette(settings.PaletteOverride ?? ConsolePalette.PuTTY, redraw: false);
@@ -272,12 +272,12 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         {
             if (index < palette.NormalColors.Length)
             {
-                System.Drawing.Color normal = palette.NormalColors[index];
+                RgbColor normal = palette.NormalColors[index];
                 scheme.SetPaletteColor(index, bright: false, RgbColor.FromArgb(normal.A, normal.R, normal.G, normal.B));
             }
             if (index < palette.BrightColors.Length)
             {
-                System.Drawing.Color bright = palette.BrightColors[index];
+                RgbColor bright = palette.BrightColors[index];
                 scheme.SetPaletteColor(index, bright: true, RgbColor.FromArgb(bright.A, bright.R, bright.G, bright.B));
             }
         }
@@ -291,11 +291,11 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
     /// The font of the settings, as the WinForms terminal used it: the family, the size in points (to device-independent pixels, 1/96 inch;
     /// WPF scales them to the DPI of the monitor itself), bold and italic. Null keeps the font and draws again.
     /// </summary>
-    public void SetFont(System.Drawing.Font font)
+    public void SetFont(FontSpec font)
     {
         if (font != null)
         {
-            _view.SetFont(new FontFamily(font.FontFamily.Name), Math.Max(4, font.SizeInPoints * 96.0 / 72.0), font.Bold, font.Italic);
+            _view.SetFont(new FontFamily(font.Name), Math.Max(4, font.Size * 96.0 / 72.0), font.Bold, font.Italic);
         }
         else
         {
@@ -629,7 +629,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     private void OnContextMenuRequested(Point screen)
     {
-        System.Drawing.Point where = new System.Drawing.Point((int)Math.Round(screen.X), (int)Math.Round(screen.Y));
+        Point where = new Point(Math.Round(screen.X), Math.Round(screen.Y));
         // What the right button does when the settings say something else than the menu; Shift+right button still opens it.
         PasteSettings.MouseAction action = PasteOptions.RightClick;
         if (action != PasteSettings.MouseAction.Menu && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
@@ -1060,7 +1060,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
             _terminal.Dispatcher.BeginInvoke(DispatcherPriority.Normal, action);
         }
 
-        public override System.Drawing.Rectangle ScreenBounds
+        public override ScreenRect ScreenBounds
         {
             get
             {
@@ -1068,11 +1068,11 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
                 {
                     Point topLeft = _terminal.PointToScreen(new Point(0, 0));
                     Point bottomRight = _terminal.PointToScreen(new Point(_terminal.ActualWidth, _terminal.ActualHeight));
-                    return System.Drawing.Rectangle.FromLTRB((int)topLeft.X, (int)topLeft.Y, (int)bottomRight.X, (int)bottomRight.Y);
+                    return ScreenRect.FromLTRB((int)topLeft.X, (int)topLeft.Y, (int)bottomRight.X, (int)bottomRight.Y);
                 }
                 catch (InvalidOperationException)
                 {
-                    return System.Drawing.Rectangle.Empty;
+                    return ScreenRect.Empty;
                 }
             }
         }

@@ -166,7 +166,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
     // The draft of this editor: its key, when the text is taken, the writes and removals (see RemoteFileDrafts).
     private RemoteFileDrafts _drafts;
 
-    private System.Windows.Forms.Timer _draftTimer;
+    private IDisposable _draftTimer;
 
     public event EventHandler LoadFailed;
 
@@ -416,7 +416,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             string expiryNotice = RemoteFileDrafts.TakeExpiryNotice();
             if (expiryNotice != null)
             {
-                UserDialogs.Show(_text.MessageOwner, expiryNotice, "SmarTTY", DialogButtons.Ok, DialogIcon.Warning);
+                UserDialogs.Show(expiryNotice, "SmarTTY", DialogButtons.Ok, DialogIcon.Warning);
             }
             EditorDraft restoredDraft = null;
             if (_flow.IsReloading)
@@ -509,7 +509,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             ? "The file on the server has changed since then; saving the draft would overwrite those changes.\n\n"
             : "";
         string when = draft.SavedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-        if (UserDialogs.Show(_text.MessageOwner, "Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
+        if (UserDialogs.Show("Unsaved changes of " + RemotePath + " from " + when + " were found: the connection was lost or the program was closed before they were saved.\n\n"
             + changed
             + "Yes: restore the draft.\n"
             + "No: discard it and open the file from the server.\n\n"
@@ -527,9 +527,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
         {
             return;
         }
-        _draftTimer = new System.Windows.Forms.Timer { Interval = DraftIntervalMs };
-        _draftTimer.Tick += (object sender, EventArgs e) => WriteDraftIfChanged();
-        _draftTimer.Start();
+        _draftTimer = _text.StartTimer(DraftIntervalMs, WriteDraftIfChanged);
     }
 
     /// <summary>Writes the draft if the content changed since the last one (UI thread; the file is written on another thread).</summary>
@@ -668,7 +666,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             return;
         }
         GlobalSettings.EditorColors colors = _settings.Editor.GetEffectiveColors(_settings.IsLightTheme);
-        _text.ApplyMessageColors(((System.Drawing.Color)colors.LineNumberBackground).ToRgb(), ((System.Drawing.Color)colors.ErrorColor).ToRgb(), ((System.Drawing.Color)colors.WarningColor).ToRgb(), ((System.Drawing.Color)colors.LineNumberForeground).ToRgb());
+        _text.ApplyMessageColors(colors.LineNumberBackground, colors.ErrorColor, colors.WarningColor, colors.LineNumberForeground);
     }
 
     /// <summary>
@@ -834,12 +832,12 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     void IRemoteFileContentHost.ShowError(string message)
     {
-        UserDialogs.Show(_text.MessageOwner, message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
+        UserDialogs.Show(message, "SmarTTY", DialogButtons.Ok, DialogIcon.Error);
     }
 
     bool IRemoteFileContentHost.ConfirmWarning(string question)
     {
-        return UserDialogs.Show(_text.MessageOwner, question, "SmarTTY", DialogButtons.YesNo, DialogIcon.Warning) == DialogAnswer.Yes;
+        return UserDialogs.Show(question, "SmarTTY", DialogButtons.YesNo, DialogIcon.Warning) == DialogAnswer.Yes;
     }
 
     // What the loading and the saves (RemoteFileFlow) need from the editor: the questions, the threads and the view.

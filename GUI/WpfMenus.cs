@@ -1,51 +1,73 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
 /// <summary>
-/// Pieces of the WPF menus that replace the WinForms ones (stage 4): the images of the items, from the same embedded files the WinForms
-/// menus used (<c>SmarTTY.Icons.&lt;name&gt;.png</c>, embedded by <c>SmarTTY.csproj</c>), items made in one call, and a menu opened at the mouse.
+/// Pieces of the WPF menus that replace the WinForms ones (stage 4): the images of the items by the names the WinForms menus used
+/// (vector images since stage 5A, see <see cref="IconImages"/>), items made in one call, and a menu opened at the mouse.
 /// The look is the theme's: <c>GUI/Styles/Controls.xaml</c> styles every <see cref="ContextMenu"/> and <see cref="MenuItem"/>.
 /// </summary>
 internal static class WpfMenus
 {
-    private static readonly Dictionary<string, ImageSource> _icons = new Dictionary<string, ImageSource>();
+    // The names the menus ask for and the icons they are (the names the WinForms menus embedded the PNG files under; the
+    // editor's icons are asked for by their own names, "editor/<name>").
+    private static readonly Dictionary<string, string> _names = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        { "upload", "MainWindow/upload" },
+        { "download", "MainWindow/download" },
+        { "terminal", "term16" },
+        { "settings", "gear16" },
+        { "edit", "edit16" },
+        { "delete", "delete16" },
+        { "network", "net16" },
+        { "refresh", "MainWindow/refresh16" },
+        { "question", "question16" },
+        { "go", "MainWindow/go16" },
+        { "event", "event16" },
+        { "copy", "MainWindow/copy" },
+        { "paste", "MainWindow/paste" },
+        { "add", "MainWindow/add16" },
+        { "clear", "transfers/removeall" },
+        { "save", "MainWindow/save16" },
+        { "cut", "menu/cut" },
+        { "find", "MainWindow/FindHS" },
+        { "key-locked", "keys/locked" },
+        { "key-unlocked", "keys/unlocked" },
+        { "terminal-disconnect", "terminal-disconnect" },
+        { "terminal-reconnect", "terminal-reconnect" },
+        { "terminal-send", "terminal-send" },
+        { "terminal-clear", "terminal-clear" },
+        { "terminal-transfer", "terminal-transfer" },
+        { "terminal-save", "terminal-save" },
+        { "terminal-settings", "terminal-settings" },
+        { "busy", "MainWindow/busy" }
+    };
 
-    /// <summary>The image of a name (<c>SmarTTY.Icons.&lt;name&gt;.png</c>), or null when there is none. Frozen and shared.</summary>
-    public static ImageSource LoadIcon(string name)
+    /// <summary>The icon path (see <see cref="IconImages"/>) of a name the menus ask for, or null for an unknown name.</summary>
+    internal static string PathOf(string name)
     {
         if (string.IsNullOrEmpty(name))
         {
             return null;
         }
-        lock (_icons)
+        if (_names.TryGetValue(name, out string path))
         {
-            if (!_icons.TryGetValue(name, out ImageSource image))
-            {
-                using (Stream stream = typeof(WpfMenus).Assembly.GetManifestResourceStream("SmarTTY.Icons." + name + ".png"))
-                {
-                    if (stream != null)
-                    {
-                        BitmapImage bitmap = new BitmapImage();
-                        bitmap.BeginInit();
-                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmap.StreamSource = stream;
-                        bitmap.EndInit();
-                        bitmap.Freeze();
-                        image = bitmap;
-                    }
-                }
-                _icons[name] = image;
-            }
-            return image;
+            return path;
         }
+        // The rest are the editor's icons by their names.
+        return "editor/" + name;
+    }
+
+    /// <summary>The image of a name the menus ask for, or null when there is none. Frozen and shared.</summary>
+    public static ImageSource LoadIcon(string name)
+    {
+        string path = PathOf(name);
+        return path != null ? IconImages.Get(path) : null;
     }
 
     /// <summary>The icon of a menu item or a tool bar button: the image at 16 x 16, or null.</summary>

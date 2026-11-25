@@ -9,11 +9,9 @@ using SmarTTY.TextEditing;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
@@ -88,7 +86,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
     // own disconnect cancels it (_manualDisconnect); everything runs on the UI thread (WinForms timer).
     private bool _manualDisconnect;
 
-    private System.Windows.Forms.Timer _autoReconnectTimer;
+    private UiTimer _autoReconnectTimer;
 
     // Throttles automatic reconnects: a server that accepts a connection and closes it at once (session limit,
     // device restarting) would otherwise be reconnected in a tight loop, wiping the screen each time.
@@ -677,7 +675,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             OpensPasteMenu = false
         };
         _serialTerminalControl.Model.ScrollbackLimit = int.MaxValue;
-        _serialTerminalControl.SetDefaultColors(Color.LightGray.ToRgb(), Color.Black.ToRgb());
+        _serialTerminalControl.SetDefaultColors(RgbColor.FromArgb(211, 211, 211) /* LightGray */, RgbColor.FromArgb(0, 0, 0) /* Black */);
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.ShortcutKey += OnWpfTerminalKey;
         _serialTerminalControl.ContextMenuRequested += (sender, where) => ShowContextMenu(sender);
@@ -821,16 +819,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         hexTerminalControl1.CopyOnSelect = settings.CopyOnSelection;
         ConsolePalette palette = settings.PaletteOverride ?? ConsolePalette.PuTTY;
         terminal.SetPalette(palette);
-        Font configuredFont = null;
-        try
-        {
-            // Same rule as for SSH tabs: without a configured font the terminal keeps its own default.
-            configuredFont = settings.ConfiguredFont;
-        }
-        catch
-        {
-            // An uninstalled font must not break the terminal; the previous font stays.
-        }
+        // Same rule as for SSH tabs: without a configured font the terminal keeps its own default.
+        FontSpec configuredFont = settings.ConfiguredFont;
         terminal.SetFont(configuredFont);
         foreach (WpfTerminal pane in hexTerminalControl1.Panes)
         {
@@ -856,13 +846,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             cbBaudRate.Text = advancedSettings.BaudRate.ToString();
         }
-        SetTerminalColors(((Color)deviceTerminalSettings.Colors.Text).ToRgb(), ((Color)deviceTerminalSettings.Colors.Background).ToRgb());
+        SetTerminalColors(deviceTerminalSettings.Colors.Text, deviceTerminalSettings.Colors.Background);
         _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         // The prompt drawn before the device prints one of its own (and when none is recognised).
         _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, deviceTerminalSettings.AutoDetectPrompt);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
-        hexTerminalControl1.EchoColor = ((Color)_deviceTerminalSettings.Colors.Echo).ToRgb();
+        hexTerminalControl1.EchoColor = _deviceTerminalSettings.Colors.Echo;
         // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
         // dump are resolved to the combined view instead of silently dropping one of the two panes.
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(
@@ -1045,7 +1035,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         if (_autoReconnectTimer == null)
         {
-            _autoReconnectTimer = new System.Windows.Forms.Timer();
+            _autoReconnectTimer = new UiTimer();
             _autoReconnectTimer.Tick += OnAutoReconnectTimerTick;
         }
         _autoReconnectTimer.Interval = delayMs;
@@ -1059,7 +1049,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
 
     private void OnAutoReconnectTimerTick(object sender, EventArgs e)
     {
-        ((System.Windows.Forms.Timer)sender).Stop();
+        ((UiTimer)sender).Stop();
         ReconnectIfAutoStillWanted();
     }
 
@@ -1177,7 +1167,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 {
                     hexTerminalControl1.HideCaret = true;
                     _serialTerminalControl.HideCaret = true;
-                    SetTerminalColors(null, ((Color)_deviceTerminalSettings.Colors.Disconnected).ToRgb());
+                    SetTerminalColors(null, (RgbColor)_deviceTerminalSettings.Colors.Disconnected);
                     // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
                     lblConnection.Text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
                     _connectionPrompt.Title = "Connection closed";
@@ -1194,7 +1184,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 break;
             case ConnectionStateEnum.Connected:
                 {
-                    SetTerminalColors(null, ((Color)_deviceTerminalSettings.Colors.Background).ToRgb());
+                    SetTerminalColors(null, (RgbColor)_deviceTerminalSettings.Colors.Background);
                     hexTerminalControl1.HideCaret = false;
                     _serialTerminalControl.HideCaret = false;
                     break;
@@ -1957,64 +1947,56 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         _sendRemoteSizeMenuItem.IsEnabled = !HexMode && _serialTerminalControl.CanSendRemoteSize;
     }
 
-    private void OnTerminalKeyDown(object sender, KeyEventArgs e)
+    // The keys of the terminals that the panel takes; true when it took the key.
+    private bool OnTerminalKeyDown(KeyStroke e)
     {
         GlobalSettings common = _commonSettings;
-        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.W)
+        if (common != null && common.UseCtrlShortcuts && e.Control && !e.Alt && !e.Shift && e.KeyCode == VirtualKey.W)
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // Ctrl+D closes the terminal window (same as Ctrl+W). It is not gated by the "Ctrl shortcuts"
         // option so the classic serial-terminal shortcut works out of the box, and the key is not
         // forwarded to the device.
-        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == Keys.D)
+        if (e.Control && !e.Alt && !e.Shift && e.KeyCode == VirtualKey.D)
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             CloseTabRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // The menu with the history and the snippets: Ctrl+Shift+Insert, and Ctrl+Shift+V when the settings say so.
         if (e.Control && e.Shift && !e.Alt
-            && (e.KeyCode == Keys.Insert || (e.KeyCode == Keys.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
+            && (e.KeyCode == VirtualKey.Insert || (e.KeyCode == VirtualKey.V && PasteGuard.OptionsOf(common).CtrlShiftV == PasteSettings.ShortcutAction.HistoryMenu)))
         {
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             ShowPasteMenu();
-            return;
+            return true;
         }
-        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == Keys.Return)
+        if (!e.Control && e.Alt && !e.Shift && e.KeyCode == VirtualKey.Return)
         {
             // Not a character for the device: toggle full screen like in SSH tabs.
-            e.Handled = true;
-            e.SuppressKeyPress = true;
             FullScreenToggleRequested?.Invoke(this, EventArgs.Empty);
-            return;
+            return true;
         }
         // By default Ctrl+C is sent to the device (e.g. SIGINT for a Linux console), so clipboard
         // operations use Ctrl+Shift+C / Ctrl+Shift+V like in common Linux terminals. When the shared option
         // "Ctrl-C/Ctrl-X/Ctrl-V = Copy/Cut/Paste" is on, plain Ctrl+C / Ctrl+V work on the clipboard (as in SSH tabs).
         // The HEX view never sends Ctrl+C to the device, so plain Ctrl+C copies there as well.
         bool interceptClipboard = common != null && common.InterceptCtrlClipboardShortcuts;
-        bool copy = e.Control && !e.Alt && e.KeyCode == Keys.C && (e.Shift || HexMode || interceptClipboard);
-        bool paste = e.Control && !e.Alt && e.KeyCode == Keys.V && (e.Shift || interceptClipboard);
+        bool copy = e.Control && !e.Alt && e.KeyCode == VirtualKey.C && (e.Shift || HexMode || interceptClipboard);
+        bool paste = e.Control && !e.Alt && e.KeyCode == VirtualKey.V && (e.Shift || interceptClipboard);
         if (copy)
         {
             CopySelection();
         }
         else if (paste)
         {
-            pasteToolStripMenuItem_Click(sender, e);
+            PasteToDevice(null, PasteKind.Auto);
         }
         else
         {
-            return;
+            return false;
         }
-        e.Handled = true;
-        e.SuppressKeyPress = true;
+        return true;
     }
 
     private enum PasteKind

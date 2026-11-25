@@ -11,9 +11,6 @@ namespace SmarTTY.GUI.DevicePanel;
 // button styles, ContextMenu and MenuItem in GUI/Styles/Controls.xaml).
 public partial class WpfDeviceTerminal
 {
-    // The WinForms timers of the partial files (the line status, the quick script, the listing) are made in it.
-    private IContainer components = new Container();
-
     private Grid _toolBarRow;
 
     private ToolBar toolStrip1;
@@ -102,11 +99,12 @@ public partial class WpfDeviceTerminal
 
     private Button btnReplay;
 
+    // The timers of the panel stop with it (the WinForms container of the designer held the timer of the serial lines).
     private void DisposeComponents(bool disposing)
     {
-        if (disposing && components != null)
+        if (disposing)
         {
-            components.Dispose();
+            _lineStatusTimer?.Dispose();
         }
     }
 

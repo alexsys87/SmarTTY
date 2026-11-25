@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.MtdFlashWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Flash (MTD) backup and restore" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="860" Height="720" MinWidth="640" MinHeight="520" Style="{DynamicResource SecondaryWindowStyle}">
+<Window x:Class="SmarTTY.GUI.MtdFlashWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Flash (MTD) backup and restore" SnapsToDevicePixels="True" WindowStartupLocation="CenterOwner" Width="860" Height="720" MinWidth="640" MinHeight="520" Style="{DynamicResource SecondaryWindowStyle}">
   <Grid Margin="12">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -94,7 +94,7 @@
             <TextBlock DockPanel.Dock="Left" Text="Backup:" VerticalAlignment="Center" Margin="0 0 8 0" />
             <Button Name="OpenImageButton" DockPanel.Dock="Right" Padding="8 2 8 2" Margin="4 0 0 0" Click="OpenImage_Click" ToolTip="Open the description of a backup made here (.mtdinfo), or a single image (.bin) to write into a partition you choose">
               <StackPanel Orientation="Horizontal">
-                <Image Width="16" Height="16" Source="../icons/open16.png" />
+                <Image Width="16" Height="16" Source="{gui:Icon open16.png}" />
                 <TextBlock Margin="4 0 0 0" Text="Open..." />
               </StackPanel>
             </Button>

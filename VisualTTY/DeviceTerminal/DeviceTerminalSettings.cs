@@ -1,6 +1,6 @@
 using System;
 using System.ComponentModel;
-using System.Drawing;
+using SmarTTY.TextEditing;
 using System.IO.Ports;
 using System.Xml.Serialization;
 
@@ -645,7 +645,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
         public abstract bool IsValid();
     }
 
-    [XmlInclude(typeof(Color))]
+    /// <summary>A colour of the settings, written as its four components (it converted to <c>System.Drawing.Color</c> until stage 5C).</summary>
     public struct ColorWrapper
     {
         public int Alpha;
@@ -656,12 +656,12 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
         public int Blue;
 
-        public static implicit operator Color(ColorWrapper wrapper)
+        public static implicit operator RgbColor(ColorWrapper wrapper)
         {
-            return Color.FromArgb(wrapper.Alpha, wrapper.Red, wrapper.Green, wrapper.Blue);
+            return RgbColor.FromArgb(wrapper.Alpha, wrapper.Red, wrapper.Green, wrapper.Blue);
         }
 
-        public static implicit operator ColorWrapper(Color color)
+        public static implicit operator ColorWrapper(RgbColor color)
         {
             return new ColorWrapper
             {
@@ -763,11 +763,11 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
 
     private TerminalColors _Colors = new TerminalColors
     {
-        Background = Color.Black,
-        Text = Color.LightGray,
-        Disconnected = Color.DarkGray,
-        Echo = Color.LightGreen,
-        Inactive = Color.DarkGray
+        Background = RgbColor.FromArgb(0, 0, 0) /* Black */,
+        Text = RgbColor.FromArgb(211, 211, 211) /* LightGray */,
+        Disconnected = RgbColor.FromArgb(169, 169, 169) /* DarkGray */,
+        Echo = RgbColor.FromArgb(144, 238, 144) /* LightGreen */,
+        Inactive = RgbColor.FromArgb(169, 169, 169) /* DarkGray */
     };
 
     public bool EchoTypedCharacters

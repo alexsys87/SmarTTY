@@ -16,7 +16,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -24,14 +23,10 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Threading;
 using VisualTTY;
 using VisualTTY.DeviceTerminal;
-using KeyEventArgs = System.Windows.Forms.KeyEventArgs;
-using MouseEventArgs = System.Windows.Forms.MouseEventArgs;
-using Point = System.Drawing.Point;
 using ContextMenu = System.Windows.Controls.ContextMenu;
 using MenuItem = System.Windows.Controls.MenuItem;
 using Separator = System.Windows.Controls.Separator;
@@ -706,14 +701,7 @@ public class MainWindowController : INotifyPropertyChanged
                 session.ApplyTransferSettings();
                 session.SaveTransferQueue();
             }
-            Font font = null;
-            try
-            {
-                font = _Controller.Settings.EffectiveFont;
-            }
-            catch
-            {
-            }
+            FontSpec font = _Controller.Settings.EffectiveFont;
             foreach (SessionWrapper allSession in _Controller.AllSessions)
             {
                 foreach (ITabContext tab in allSession.Tabs)
@@ -1471,7 +1459,7 @@ public class MainWindowController : INotifyPropertyChanged
             if (value)
             {
                 _PreFullScreenRect = Bounds;
-                Rectangle bounds = Screen.FromPoint(new Point((int)_Window.Left, (int)_Window.Top)).Bounds;
+                ScreenRect bounds = SmarTTY.Native.DisplayMonitors.BoundsAt((int)_Window.Left, (int)_Window.Top);
                 _Window.WindowState = WindowState.Normal;
                 _Window.WindowStyle = WindowStyle.None;
                 Bounds = new Rect((double)bounds.Left, (double)bounds.Top, (double)bounds.Width, (double)bounds.Height);
@@ -1611,9 +1599,9 @@ public class MainWindowController : INotifyPropertyChanged
     }
 
     // A colour of the settings as the WPF views take it.
-    private static RgbColor Rgb(System.Drawing.Color color)
+    private static RgbColor Rgb(DeviceTerminalSettings.ColorWrapper color)
     {
-        return color.ToRgb();
+        return color;
     }
 
     private void ApplyEditorSettings(RemoteFileEditor edit)
@@ -2189,18 +2177,10 @@ public class MainWindowController : INotifyPropertyChanged
         terminal.PasteLineBreak = "\r";
         terminal.AutoWrap = Settings.AutoWrapLines;
         // The font of the settings, or the default of the WinForms terminal (Courier New, 12 points) when none is set; EffectiveFont is both.
-        Font configuredFont = null;
-        try
-        {
-            configuredFont = Settings.EffectiveFont;
-        }
-        catch
-        {
-        }
-        ApplyTerminalSettings(terminal, configuredFont);
+        ApplyTerminalSettings(terminal, Settings.EffectiveFont);
         // A very large paste can be sent as a file instead of being typed into the terminal.
         terminal.LargePasteUploadRequested += (WpfTerminal source, string text) => session.UploadPastedText(text, source);
-        terminal.ContextMenuRequested += (WpfTerminal source, System.Drawing.Point screen) => ShowTerminalContextMenu(source);
+        terminal.ContextMenuRequested += (WpfTerminal source, System.Windows.Point screen) => ShowTerminalContextMenu(source);
         terminal.ShortcutKey += WpfTerminal_ShortcutKey;
         terminal.CtrlTabPressed += (WpfTerminal source, bool shift) => ActiveSession?.OnCtrlTabPressed(shift);
         terminal.KeyUp += (object sender, System.Windows.Input.KeyEventArgs e) =>
@@ -2405,7 +2385,7 @@ public class MainWindowController : INotifyPropertyChanged
         e.Popup = suggestionPopupController;
     }
 
-    private void ApplyTerminalSettings(WpfTerminal terminal, Font font)
+    private void ApplyTerminalSettings(WpfTerminal terminal, FontSpec font)
     {
         terminal.ApplySettings(Settings, font);
     }

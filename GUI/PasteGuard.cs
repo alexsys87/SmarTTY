@@ -3,7 +3,6 @@ using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Windows.Forms;
 using VisualTTY;
 
 namespace SmarTTY.GUI;
@@ -61,7 +60,7 @@ internal static class PasteGuard
     /// Asks what to do with a paste that is too large to be typed into a terminal: upload it as a file (Yes), paste it anyway
     /// (No) or do nothing (Cancel).
     /// </summary>
-    public static DialogAnswer AskUpload(int characters, IWin32Window owner)
+    public static DialogAnswer AskUpload(int characters, IDialogOwner owner)
     {
         string text = "The text is " + FormatSize(characters) + ". Typing so much into a terminal takes long, and a remote shell may lose or mangle it." +
             "\n\nYes: upload it as a file (scp) to the current directory.\nNo: paste it anyway.\nCancel: paste nothing.";
@@ -93,7 +92,7 @@ internal static class PasteGuard
     /// the text start the commands at once (a shell that does not use bracketed paste, the line editor of a COM or TCP
     /// terminal); where the text only lands in an editable line it is false and only the size is checked.
     /// </summary>
-    public static string Prepare(string clipboardText, GlobalSettings settings, bool linesRunAtOnce, IWin32Window owner)
+    public static string Prepare(string clipboardText, GlobalSettings settings, bool linesRunAtOnce, IDialogOwner owner)
     {
         if (string.IsNullOrEmpty(clipboardText))
         {
@@ -119,7 +118,7 @@ internal static class PasteGuard
     /// "?") the user is asked, unless the settings say to send them as they are. Returns the text to send, or null when
     /// the user cancelled.
     /// </summary>
-    public static string FitToEncoding(string text, Encoding encoding, GlobalSettings settings, IWin32Window owner)
+    public static string FitToEncoding(string text, Encoding encoding, GlobalSettings settings, IDialogOwner owner)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -139,7 +138,7 @@ internal static class PasteGuard
         return answer == DialogAnswer.Yes ? result.Text : null;
     }
 
-    private static bool Confirm(string text, PasteSettings options, GlobalSettings settings, bool linesRunAtOnce, IWin32Window owner)
+    private static bool Confirm(string text, PasteSettings options, GlobalSettings settings, bool linesRunAtOnce, IDialogOwner owner)
     {
         int lineBreaks = PasteSanitizer.CountLineBreaks(text);
         int lines = PasteSanitizer.CountLines(text);

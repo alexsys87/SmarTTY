@@ -37,7 +37,7 @@
               </Style>
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
-              <Image Width="16" Height="16" Source="../icons/lock16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon lock16.png}" />
               <TextBlock Text="{Binding Path=ConnectionCounts.SSH, StringFormat=SSH ({0})}" />
             </StackPanel>
           </ToggleButton>
@@ -52,7 +52,7 @@
               </Style>
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
-              <Image Width="16" Height="16" Source="../icons/com16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon com16.png}" />
               <TextBlock Text="{Binding Path=ConnectionCounts.Serial, StringFormat=COM ({0})}" />
             </StackPanel>
           </ToggleButton>
@@ -67,7 +67,7 @@
               </Style>
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
-              <Image Width="16" Height="16" Source="../icons/net16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon net16.png}" />
               <TextBlock Text="{Binding Path=ConnectionCounts.RawTcp, StringFormat=Raw TCP ({0})}" />
             </StackPanel>
           </ToggleButton>
@@ -82,7 +82,7 @@
               </Style>
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
-              <Image Width="16" Height="16" Source="../icons/term16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon term16.png}" />
               <TextBlock Text="{Binding Path=ConnectionCounts.Telnet, StringFormat=Telnet ({0})}" />
             </StackPanel>
           </ToggleButton>
@@ -97,21 +97,21 @@
               </Style>
             </FrameworkElement.Style>
             <StackPanel Orientation="Horizontal">
-              <Image Width="16" Height="16" Source="../icons/net16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon net16.png}" />
               <TextBlock Text="{Binding Path=ConnectionCounts.Netconsole, StringFormat=Netconsole ({0})}" />
             </StackPanel>
           </ToggleButton>
         </StackPanel>
       </Border>
       <ToggleButton Name="btnSort" VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicToggleButtonStyle}">
-        <Image Width="16" Height="16" Source="../icons/sort16.png" Margin="2" />
+        <Image Width="16" Height="16" Source="{local:Icon sort16.png}" Margin="2" />
       </ToggleButton>
       <!-- Settings archive: icons here, so the row of "New ..." links below fits on one line. -->
       <Button VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicButton}" Click="ImportSettings_Click" ToolTip="Import settings..." AutomationProperties.Name="Import settings">
-        <Image Width="16" Height="16" Source="../icons/import16.png" Margin="2" />
+        <Image Width="16" Height="16" Source="{local:Icon import16.png}" Margin="2" />
       </Button>
       <Button VerticalAlignment="Center" Margin="2" Style="{StaticResource DynamicButton}" Click="ExportSettings_Click" ToolTip="Export settings..." AutomationProperties.Name="Export settings">
-        <Image Width="16" Height="16" Source="../icons/export16.png" Margin="2" />
+        <Image Width="16" Height="16" Source="{local:Icon export16.png}" Margin="2" />
       </Button>
       <Popup PopupAnimation="Slide" Placement="Relative" SnapsToDevicePixels="True" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=btnSort}" PlacementTarget="{Binding ElementName=btnSort}" VerticalOffset="{Binding Path=ActualHeight, ElementName=btnSort}">
         <Border Style="{DynamicResource PopupBorder}" Padding="8">
@@ -249,19 +249,19 @@
                     <Style TargetType="{x:Type Image}">
                       <Style.Triggers>
                         <DataTrigger Value="Lock" Binding="{Binding TypeImage}">
-                          <Setter Property="Source" Value="../Icons/lock16.png" />
+                          <Setter Property="Source" Value="{local:Icon lock16.png}" />
                         </DataTrigger>
                         <DataTrigger Value="OpenLock" Binding="{Binding TypeImage}">
-                          <Setter Property="Source" Value="../Icons/unlock16.png" />
+                          <Setter Property="Source" Value="{local:Icon unlock16.png}" />
                         </DataTrigger>
                         <DataTrigger Value="SerialPort" Binding="{Binding TypeImage}">
-                          <Setter Property="Source" Value="../Icons/com16.png" />
+                          <Setter Property="Source" Value="{local:Icon com16.png}" />
                         </DataTrigger>
                         <DataTrigger Value="USB" Binding="{Binding TypeImage}">
-                          <Setter Property="Source" Value="../Icons/usb16.png" />
+                          <Setter Property="Source" Value="{local:Icon usb16.png}" />
                         </DataTrigger>
                         <DataTrigger Value="Terminal" Binding="{Binding TypeImage}">
-                          <Setter Property="Source" Value="../Icons/term16.png" />
+                          <Setter Property="Source" Value="{local:Icon term16.png}" />
                         </DataTrigger>
                       </Style.Triggers>
                     </Style>
@@ -352,7 +352,7 @@
                       </Style.Triggers>
                     </Style>
                   </FrameworkElement.Style>
-                  <Image Width="16" Height="16" Source="../icons/delete16.png" />
+                  <Image Width="16" Height="16" Source="{local:Icon delete16.png}" />
                 </Button>
                 <Button Grid.Row="0" Margin="0 2 0 2" Click="Edit_Click">
                   <FrameworkElement.Style>
@@ -365,7 +365,7 @@
                       </Style.Triggers>
                     </Style>
                   </FrameworkElement.Style>
-                  <Image Width="16" Height="16" Source="../icons/edit16.png" />
+                  <Image Width="16" Height="16" Source="{local:Icon edit16.png}" />
                 </Button>
               </Grid>
             </Grid>
@@ -420,43 +420,43 @@
         </FrameworkElement.Resources>
         <Button HorizontalAlignment="Left" Click="NewSSH_Click">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/lock16.png" />
+            <Image Source="{local:Icon lock16.png}" />
             <AccessText Text="New _SSH connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="NewRawTcp_Click">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/term16.png" />
+            <Image Source="{local:Icon term16.png}" />
             <AccessText Text="New _Raw TCP connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="NewTelnet_Click">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/term16.png" />
+            <Image Source="{local:Icon term16.png}" />
             <AccessText Text="New _Telnet connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="NewNetconsole_Click" ToolTip="Receive the console output (printk) of a Linux kernel or U-Boot sent with netconsole over UDP (port 6666 by default), and send input back.">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/net16.png" />
+            <Image Source="{local:Icon net16.png}" />
             <AccessText Text="New _Netconsole (UDP) receiver..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="QuickConnect_Click">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/event16.png" />
+            <Image Source="{local:Icon event16.png}" />
             <AccessText Text="_Quick SSH connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="QuickTelnet_Click">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/event16.png" />
+            <Image Source="{local:Icon event16.png}" />
             <AccessText Text="Quick telnet _connection..." />
           </StackPanel>
         </Button>
         <Button HorizontalAlignment="Left" Click="ScanNetwork_Click" ToolTip="Look for computers with an open SSH (22) or telnet (23) port in the local networks of this computer. SmarTTY opens and immediately closes a TCP connection to each address. Found computers are marked in the list and are not saved unless you save them.">
           <StackPanel Orientation="Horizontal">
-            <Image Source="../Icons/net16.png" />
+            <Image Source="{local:Icon net16.png}" />
             <AccessText Text="{Binding ScanButtonText}" />
           </StackPanel>
         </Button>
@@ -495,13 +495,13 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Image Width="48" Height="48" Source="{Binding}" />
+                  <Image Width="48" Height="48" Source="{Binding Image}" />
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ListBox>
             <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Margin="0 5 0 0" Click="BrowseIcon_Click">
               <StackPanel Orientation="Horizontal">
-                <Image Width="16" Height="16" Source="../icons/open16.png" Margin="0 0 5 0" />
+                <Image Width="16" Height="16" Source="{local:Icon open16.png}" Margin="0 0 5 0" />
                 <TextBlock Text="Select a custom 48x48 icon..." />
               </StackPanel>
             </Button>

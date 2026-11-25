@@ -110,7 +110,7 @@
               <TextBlock Text="Default directory for downloads:" />
               <TextBox Grid.Column="1" Text="{Binding DefaultDownloadDirectory}" />
               <Button Grid.Column="2" Margin="5 0 0 0" VerticalAlignment="Center" Click="BrowseDir_Click">
-                <Image Width="16" Height="16" Source="../icons/open16.png" />
+                <Image Width="16" Height="16" Source="{local:Icon open16.png}" />
               </Button>
               <TextBlock Text="Default remote directory for uploads:" Grid.Row="1" />
               <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding DefaultUploadDirectory}" />
@@ -426,7 +426,7 @@
               <TextBlock Text="Terminal font (monospace)" Grid.Row="2" />
               <TextBox IsReadOnly="True" Grid.Column="1" Grid.Row="2" VerticalContentAlignment="Center" VerticalAlignment="Stretch" Margin="0 2 0 2" Text="{Binding SelectedFont, Mode=OneWay, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:GlobalSettingsWindow}}}" />
               <Button Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="5 0 0 0" ToolTip="Choose a font..." Click="EditFont_Click">
-                <Image Width="16" Height="16" Source="../icons/FontHS.png" />
+                <Image Width="16" Height="16" Source="{local:Icon FontHS.png}" />
               </Button>
               <TextBlock Text="Default text color:" Grid.Row="3" />
               <Border Grid.Column="1" Grid.Row="3" Grid.ColumnSpan="2" Style="{StaticResource ColorEditor}" Background="{Binding DefaultTextColor, Converter={StaticResource ColorWrapperConverter}}" />
@@ -451,7 +451,7 @@
               <CheckBox Grid.Row="5" Grid.ColumnSpan="3" Content="Display unrecognized characters as \{code}" Margin="5" IsChecked="{Binding ShowUnrecognizedCharactersAsHex}" />
               <Button Grid.Row="6" Grid.ColumnSpan="3" Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Margin="5" Click="EditPalette_Click">
                 <StackPanel Orientation="Horizontal">
-                  <Image Width="16" Height="16" Source="../icons/color16.png" Margin="0 0 5 0" />
+                  <Image Width="16" Height="16" Source="{local:Icon color16.png}" Margin="0 0 5 0" />
                   <TextBlock Text="Customize console colors..." />
                 </StackPanel>
               </Button>
@@ -571,13 +571,13 @@
                           <Style TargetType="{x:Type Image}">
                             <Style.Triggers>
                               <DataTrigger Value="Enabled" Binding="{Binding}">
-                                <Setter Property="Source" Value="../icons/event16.png" />
+                                <Setter Property="Source" Value="{local:Icon event16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="Disabled" Binding="{Binding}">
-                                <Setter Property="Source" Value="../icons/term16.png" />
+                                <Setter Property="Source" Value="{local:Icon term16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="Ask" Binding="{Binding}">
-                                <Setter Property="Source" Value="../icons/question16.png" />
+                                <Setter Property="Source" Value="{local:Icon question16.png}" />
                               </DataTrigger>
                             </Style.Triggers>
                           </Style>

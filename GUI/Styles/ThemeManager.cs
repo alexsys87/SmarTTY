@@ -28,22 +28,8 @@ public static class ThemeManager
     /// <summary>The theme that is applied now; null before the first theme is applied.</summary>
     public static ThemeChoice Current { get; private set; }
 
-    /// <summary>Raised after a new palette is in place; WinForms controls repaint themselves with <see cref="GetColor"/>.</summary>
+    /// <summary>Raised after a new palette is in place.</summary>
     public static event EventHandler ThemeChanged;
-
-    /// <summary>
-    /// A palette colour (a "Theme.*" key) for WinForms controls, which cannot use the WPF resources directly.
-    /// Returns <paramref name="fallback"/> before a theme is applied.
-    /// </summary>
-    public static System.Drawing.Color GetColor(string key, System.Drawing.Color fallback)
-    {
-        if (Application.Current?.TryFindResource(key) is SolidColorBrush brush)
-        {
-            Color color = brush.Color;
-            return System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B);
-        }
-        return fallback;
-    }
 
     // The palettes built for the theme list previews; an entry goes away with its ThemeChoice (the list is reloaded).
     private static readonly ConditionalWeakTable<ThemeChoice, ResourceDictionary> _Previews = new ConditionalWeakTable<ThemeChoice, ResourceDictionary>();

@@ -2,7 +2,6 @@ using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
-using System.Drawing;
 using System.Windows;
 
 namespace SmarTTY.GUI.Backend;
@@ -54,7 +53,7 @@ public class TextSearcher : INotifyPropertyChanged
     // The searcher itself is editing the text: that must not end the search in the selection.
     private bool _applying;
 
-    private static readonly HighlightStyle ScopeStyle = new HighlightStyle(Color.FromArgb(45, 90, 140, 255).ToRgb(), Color.FromArgb(150, 70, 120, 230).ToRgb(), RgbColor.Empty);
+    private static readonly HighlightStyle ScopeStyle = new HighlightStyle(RgbColor.FromArgb(45, 90, 140, 255), RgbColor.FromArgb(150, 70, 120, 230), RgbColor.Empty);
 
     public bool IsVisible
     {

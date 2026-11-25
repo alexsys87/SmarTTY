@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
@@ -21,7 +20,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class HostToHostCopyWindow : Window
 {
-    private const string TransferImageUri = "pack://application:,,,/icons/dialog-scp-download.png";
+    private const string TransferImageUri = "dialog-scp-download.png";
 
     private readonly StringBuilder _errorLog = new StringBuilder();
 
@@ -57,7 +56,7 @@ public partial class HostToHostCopyWindow : Window
     public HostToHostCopyWindow(SessionWrapper activeSession, IEnumerable<SessionWrapper> sessions, string initialSourcePath)
     {
         InitializeComponent();
-        TransferImage.Source = new BitmapImage(new Uri(TransferImageUri));
+        TransferImage.Source = IconImages.Get(TransferImageUri);
         ObservableCollection<HostEntry> entries = new ObservableCollection<HostEntry>();
         foreach (SessionWrapper session in sessions)
         {

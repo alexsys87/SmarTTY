@@ -2,7 +2,6 @@ using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 
@@ -118,6 +117,9 @@ public interface IRemoteTextView
     /// <summary>The questions the loading asks from its thread.</summary>
     IUserPrompt UserPrompt { get; }
 
-    /// <summary>The window the message boxes of the editor belong to (null: the main window).</summary>
-    IWin32Window MessageOwner { get; }
+    /// <summary>
+    /// Calls <paramref name="tick"/> every <paramref name="intervalMs"/> milliseconds on the thread of the view until the result is
+    /// disposed (the timer that asks for a draft; it was a WinForms timer of the editor).
+    /// </summary>
+    IDisposable StartTimer(int intervalMs, Action tick);
 }

@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
@@ -21,7 +20,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class SynchronizeWindow : Window
 {
-    private const string SyncImageUri = "pack://application:,,,/icons/MainWindow/refresh16.png";
+    private const string SyncImageUri = "MainWindow/refresh16.png";
 
     private readonly SshSession _session;
 
@@ -40,7 +39,7 @@ public partial class SynchronizeWindow : Window
     {
         InitializeComponent();
         _session = sshSession;
-        SyncImage.Source = new BitmapImage(new Uri(SyncImageUri));
+        SyncImage.Source = IconImages.Get(SyncImageUri);
     }
 
     /// <summary>The local folder, pre-filled by the caller (the tab's current directory or the saved default).</summary>

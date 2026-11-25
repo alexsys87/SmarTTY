@@ -5,7 +5,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
@@ -17,7 +16,7 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class SyncFolderSelectionWindow : Window
 {
-    private const string FolderIcon = "pack://application:,,,/icons/MainWindow/folder_flat.png";
+    private const string FolderIcon = "MainWindow/folder_flat.png";
 
     private readonly string _root;
 
@@ -144,13 +143,6 @@ public partial class SyncFolderSelectionWindow : Window
 
     private static ImageSource LoadIcon(string uri)
     {
-        try
-        {
-            return new BitmapImage(new Uri(uri));
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        return IconImages.Get(uri);
     }
 }

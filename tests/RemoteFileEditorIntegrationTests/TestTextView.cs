@@ -370,7 +370,14 @@ internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchT
 
     public IUserPrompt UserPrompt => new Prompt(this);
 
-    public IWin32Window MessageOwner => null;
+    // The stand keeps the WinForms timer the editor had (the stand is WinForms: its marshalling control runs the posts).
+    public IDisposable StartTimer(int intervalMs, Action tick)
+    {
+        System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = intervalMs };
+        timer.Tick += (sender, e) => tick();
+        timer.Start();
+        return timer;
+    }
 
     private sealed class Dispatcher : IUiDispatcher
     {

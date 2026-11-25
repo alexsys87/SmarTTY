@@ -2,7 +2,6 @@ using SmarTTY.Terminal;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Windows.Forms;
 using VisualTTY;
 
 namespace SmarTTY.GUI;
@@ -63,7 +62,7 @@ internal sealed class PasteJob
 
     private readonly int _totalCharacters;
 
-    private readonly Timer _timer = new Timer();
+    private readonly UiTimer _timer = new UiTimer();
 
     private readonly StringBuilder _received = new StringBuilder();
 

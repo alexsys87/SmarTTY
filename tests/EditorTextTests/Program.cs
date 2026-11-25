@@ -3817,7 +3817,7 @@ internal static class Program
             "the tool bar toggle saves the ShowAllCharacters setting");
         string xaml = File.ReadAllText(Path.Combine(root, "GUI", "GlobalSettingsWindow.xaml"));
         Check(xaml.Contains("EditorWrapper.ShowAllCharacters"), "Editor Settings offers a checkbox for ShowAllCharacters");
-        Check(File.Exists(Path.Combine(root, "icons", "editor", "show-all-characters.png")),
+        Check(File.ReadAllText(Path.Combine(root, "GUI", "Icons", "Editor.xaml")).Contains("<DrawingImage x:Key=\"show_all_charactersDrawingImage\""),
             "the Show All Characters tool bar icon exists");
     }
 

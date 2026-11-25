@@ -12,31 +12,31 @@
           <Setter Property="Margin" Value="0 0 5 0" />
           <Style.Triggers>
             <DataTrigger Value="VirtualTerminal" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/term16v.png" />
+              <Setter Property="Source" Value="{local:Icon term16v.png}" />
             </DataTrigger>
             <DataTrigger Value="Terminal" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/term16.png" />
+              <Setter Property="Source" Value="{local:Icon term16.png}" />
             </DataTrigger>
             <DataTrigger Value="Add" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/MainWindow/add16.png" />
+              <Setter Property="Source" Value="{local:Icon MainWindow/add16.png}" />
             </DataTrigger>
             <DataTrigger Value="New" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/MainWindow/new16.png" />
+              <Setter Property="Source" Value="{local:Icon MainWindow/new16.png}" />
             </DataTrigger>
             <DataTrigger Value="Editor" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/MainWindow/editor.png" />
+              <Setter Property="Source" Value="{local:Icon MainWindow/editor.png}" />
             </DataTrigger>
             <DataTrigger Value="Open" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/MainWindow/open16.png" />
+              <Setter Property="Source" Value="{local:Icon MainWindow/open16.png}" />
             </DataTrigger>
             <DataTrigger Value="AddVirtual" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/event16.png" />
+              <Setter Property="Source" Value="{local:Icon event16.png}" />
             </DataTrigger>
             <DataTrigger Value="Serial" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/com16.png" />
+              <Setter Property="Source" Value="{local:Icon com16.png}" />
             </DataTrigger>
             <DataTrigger Value="Network" Binding="{Binding Icon}">
-              <Setter Property="Source" Value="../icons/net16.png" />
+              <Setter Property="Source" Value="{local:Icon net16.png}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding Title}" Value="{x:Null}">
               <Setter Property="Margin" Value="0" />
@@ -47,10 +47,10 @@
           <Setter Property="Template">
             <Setter.Value>
               <ControlTemplate>
-                <Image Name="Image" Width="8" Height="8" Source="../icons/MainWindow/close8.png" />
+                <Image Name="Image" Width="8" Height="8" Source="{local:Icon MainWindow/close8.png}" />
                 <ControlTemplate.Triggers>
                   <Trigger Property="UIElement.IsMouseOver" Value="True">
-                    <Setter TargetName="Image" Property="Image.Source" Value="../icons/MainWindow/close8red.png" />
+                    <Setter TargetName="Image" Property="Image.Source" Value="{local:Icon MainWindow/close8red.png}" />
                   </Trigger>
                 </ControlTemplate.Triggers>
               </ControlTemplate>
@@ -105,27 +105,27 @@
       <MenuItem Header="_File">
         <MenuItem Header="_New Tab" Click="NewTab_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/add16.png" />
+            <Image Source="{local:Icon MainWindow/add16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Open a remote file" Click="OpenFile_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/open16.png" />
+            <Image Source="{local:Icon MainWindow/open16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="{Binding RemoteFileSaveHeader}" Visibility="{Binding SaveCommandVisibility}" Click="SaveFile_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/save16.png" />
+            <Image Source="{local:Icon MainWindow/save16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Open _another session" Click="NewSession_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/term16.png" />
+            <Image Source="{local:Icon term16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Back to launcher" ToolTip="Close this window and its sessions and return to the start window" Click="BackToLauncher_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/go16.png" RenderTransformOrigin="0.5,0.5">
+            <Image Source="{local:Icon MainWindow/go16.png}" RenderTransformOrigin="0.5,0.5">
               <Image.RenderTransform>
                 <ScaleTransform ScaleX="-1" />
               </Image.RenderTransform>
@@ -134,51 +134,51 @@
         </MenuItem>
         <MenuItem Header="_Close current tab" Click="CloseTab_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/closetab.png" />
+            <Image Source="{local:Icon MainWindow/closetab.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Replay log" Visibility="{Binding ReplayVisibility}" Click="ReplayLog_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/PlayHS.png" />
+            <Image Source="{local:Icon PlayHS.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Log all terminal output to a file" Visibility="{Binding DebugVisibility}" Click="MakeLog_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/document_flat.png" />
+            <Image Source="{local:Icon MainWindow/document_flat.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="E_xit" Click="Exit_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/delete16.png" />
+            <Image Source="{local:Icon delete16.png}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Edit">
         <MenuItem Header="_Copy" Click="Copy_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/copy.png" />
+            <Image Source="{local:Icon MainWindow/copy.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Paste" Click="Paste_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/paste.png" />
+            <Image Source="{local:Icon MainWindow/paste.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Find" InputGestureText="Ctrl+F" Click="Find_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/FindHS.png" />
+            <Image Source="{local:Icon MainWindow/FindHS.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Copy _All" Click="CopyAll_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/copy.png" />
+            <Image Source="{local:Icon MainWindow/copy.png}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="_SCP Transfers" Click="SCPTransfers_Click" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/transfers.png" />
+            <Image Source="{local:Icon MainWindow/transfers.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_File List" IsCheckable="True" IsChecked="{Binding Path=MenuCommandHandlers.FileListVisible}" Visibility="{Binding Path=ActiveSession.FileListMenuVisibility, FallbackValue=Collapsed}" />
@@ -190,134 +190,131 @@
       <MenuItem Header="S_CP" Visibility="{Binding Path=ActiveSession.SshOnlyVisibility, FallbackValue=Visible}">
         <MenuItem Header="_Download a file" Click="Download_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/download.png" />
+            <Image Source="{local:Icon MainWindow/download.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_One-click download" Click="QuickDownload_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/qdownload.png" />
+            <Image Source="{local:Icon MainWindow/qdownload.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Upload a file" Click="Upload_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/upload.png" />
+            <Image Source="{local:Icon MainWindow/upload.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Download a directory" Click="DownloadDir_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/getdir.png" />
+            <Image Source="{local:Icon MainWindow/getdir.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Upload a directory" Click="UploadDir_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/updir.png" />
+            <Image Source="{local:Icon MainWindow/updir.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Copy a directory between hosts..." Click="CopyDirBetweenHosts_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/dialog-scp-download.png" />
+            <Image Source="{local:Icon dialog-scp-download.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Synchronize folders..." Click="Synchronize_Click" Visibility="{Binding Path=ActiveSession.DirectoryTransferMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/refresh16.png" />
+            <Image Source="{local:Icon MainWindow/refresh16.png}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Tools">
         <MenuItem Header="Manage Linux _Packages" Click="ManagePackages_Click" Visibility="{Binding Path=ActiveSession.PackageManagerMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/archive16.png" />
+            <Image Source="{local:Icon MainWindow/archive16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Process _manager..." Click="ProcessManager_Click" ToolTip="Lists the processes of the server with their processor and memory use, and ends or kills the selected one; works with any Linux, OpenWrt included" Visibility="{Binding Path=ActiveSession.ProcessManagerMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/chip.png" />
+            <Image Source="{local:Icon chip.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Backup to tar.gz..." Click="Backup_Click" ToolTip="Packs the whole root file system of the server, or the folders checked in a tree, into a tar.gz archive on this computer; tar sends the archive straight through the SSH connection, so nothing is written on the server, not even to /tmp" Visibility="{Binding Path=ActiveSession.BackupMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/archive16.png" />
+            <Image Source="{local:Icon MainWindow/archive16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="R_estore from tar.gz..." Click="Restore_Click" ToolTip="Unpacks a tar.gz archive of this computer (made by Backup to tar.gz, or any other) on the server, all of it or the files checked in a tree; the archive is sent straight to tar through the SSH connection, so it is never stored on the server, and md5sum checks every restored file" Visibility="{Binding Path=ActiveSession.BackupMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/import16.png" />
+            <Image Source="{local:Icon import16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Flash (_MTD) backup and restore..." Click="MtdFlash_Click" ToolTip="Saves the flash partitions listed in /proc/mtd (some or the whole flash) to this computer, and writes images back: each image is checked, staged in RAM, checked again, written and read back from the flash before the write counts as done" Visibility="{Binding Path=ActiveSession.MtdFlashMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/chip.png" />
+            <Image Source="{local:Icon chip.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Memor_y (devmem)..." Click="Memory_Click" ToolTip="Reads and writes physical memory and registers with devmem or devmem2 (driver and FPGA/PL debugging, e.g. Zynq): a table in hex, decimal, binary, ASCII and float, automatic refresh of the checked registers with the changes highlighted, writes of values, bit fields, masks and single bits" Visibility="{Binding Path=ActiveSession.MemoryEditorMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/chip.png" />
+            <Image Source="{local:Icon chip.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Local OpenWrt _repository server..." Click="LocalRepo_Click" ToolTip="Serve OpenWrt packages built on this computer to the device and install them with the package manager" Visibility="{Binding Path=ActiveSession.LocalRepoMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/archive16.png" />
+            <Image Source="{local:Icon MainWindow/archive16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Port _forwarding..." Click="PortForwarding_Click" ToolTip="Forwards TCP ports through this SSH connection: a port of this computer to a host behind the server (ssh -L), or a port of the server to a host reachable from here (ssh -R)" Visibility="{Binding Path=ActiveSession.PortForwardingMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/export16.png" />
+            <Image Source="{local:Icon export16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="S_OCKS5 proxy over SSH..." Click="SocksProxy_Click" ToolTip="Starts a SOCKS5 proxy on this computer (127.0.0.1:1080 by default) that carries the connections of other programs through this SSH connection, like ssh -N -D 127.0.0.1:1080 -o ServerAliveInterval=30" Visibility="{Binding Path=ActiveSession.SocksProxyMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/net16.png" />
+            <Image Source="{local:Icon net16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Public key authentication" Click="PublicKey_Click" Visibility="{Binding Path=ActiveSession.PublicKeyMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/pubkey.png" />
+            <Image Source="{local:Icon MainWindow/pubkey.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Re_boot server..." Click="Reboot_Click" ToolTip="Reboots the server with the command of its operating system, found out when you click: systemctl reboot (Linux with systemd), reboot (other Linux, OpenWrt), shutdown -r now (FreeBSD, OpenBSD, NetBSD, DragonFly, macOS), shutdown -y -i6 -g0 (Solaris), shutdown -Fr (AIX), shutdown /r /t 0 (Windows). The command is shown before it is typed in the terminal" Visibility="{Binding Path=ActiveSession.RebootMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/refresh16.png" />
+            <Image Source="{local:Icon MainWindow/refresh16.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Run _script..." Click="RunScript_Click" ToolTip="Uploads a shell script (bash or ash) to /tmp on the server, makes it executable, runs it in the terminal and removes it afterwards" Visibility="{Binding Path=ActiveSession.RunScriptMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/terminal.png" />
+            <Image Source="{local:Icon terminal.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="Check _X11 forwarding..." Click="CheckX11_Click" ToolTip="Shows whether X11 forwarding works for this connection: the server's answer, xauth and libX11 on the remote host, and VcXsrv on this computer" Visibility="{Binding Path=ActiveSession.X11CheckMenuVisibility, FallbackValue=Visible}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/x11.png" />
+            <Image Source="{local:Icon MainWindow/x11.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_TFTP server / U-Boot upload..." Click="TftpFirmware_Click" Visibility="{Binding Path=ActiveSession.TftpFirmwareMenuVisibility, FallbackValue=Collapsed}">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/upload.png" />
+            <Image Source="{local:Icon MainWindow/upload.png}" />
           </MenuItem.Icon>
         </MenuItem>
         <MenuItem Header="_Quick commands..." Click="QuickCommands_Click" ToolTip="Your own commands (cat /proc/mtd, sudo make install...) and shell scripts for the menu of the terminal (right click): a command is put into the command line, a script is put into the current folder and made executable; Enter runs it">
           <MenuItem.Icon>
-            <Image Source="../icons/terminal.png" />
+            <Image Source="{local:Icon terminal.png}" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="WPF _hex editor lab..." Click="HexLab_Click" ToolTip="Tries the hex editor drawn with WPF (stage 3B of the move from WinForms) on a file of this computer: keys, mouse, scrolling, tool tip and colours; the bytes can be changed but are never saved" />
-        <MenuItem Header="WPF text e_ditor lab..." Click="TextLab_Click" ToolTip="Tries the text editor drawn with WPF (stage 3D of the move from WinForms) on a file of this computer: typing, the edit keys, undo, the clipboard, the mouse, scrolling, word wrap and the line numbers; the text can be changed but is never saved" />
         <MenuItem Header="Command _completions..." Click="CommandCompletionsEditor_Click" ToolTip="Edit or create the options that the Smart Terminal suggests for commands (CommandCompletions.xml); can store the file compressed">
           <MenuItem.Icon>
-            <Image Source="../icons/edit16.png" />
+            <Image Source="{local:Icon edit16.png}" />
           </MenuItem.Icon>
         </MenuItem>
-        <MenuItem Header="WPF _terminal lab (experimental)..." Click="TerminalLab_Click" ToolTip="The new WPF terminal view on its own: speed scripts, a mirror of a classic terminal tab for trying the keyboard and the IME, and how WPF renders here (GPU, software, Remote Desktop)" />
         <MenuItem Header="_Settings" Click="Settings_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/settings.png" />
+            <Image Source="{local:Icon MainWindow/settings.png}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="_About..." Click="About_Click">
           <MenuItem.Icon>
-            <Image Source="../icons/MainWindow/help.png" />
+            <Image Source="{local:Icon MainWindow/help.png}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
@@ -393,7 +390,7 @@
                   <ColumnDefinition />
                 </Grid.ColumnDefinitions>
                 <Image Width="16" Height="16" Style="{StaticResource TabHeaderImage}" />
-                <Image Width="9" Height="9" Margin="0 0 5 0" VerticalAlignment="Bottom" HorizontalAlignment="Right" Source="../icons/MainWindow/err9.png">
+                <Image Width="9" Height="9" Margin="0 0 5 0" VerticalAlignment="Bottom" HorizontalAlignment="Right" Source="{local:Icon MainWindow/err9.png}">
                   <FrameworkElement.Style>
                     <Style TargetType="{x:Type Image}">
                       <Style.Triggers>
@@ -421,7 +418,7 @@
                 </FrameworkElement.Style>
                 <Control.Template>
                   <ControlTemplate>
-                    <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" Margin="5 0 5 0" ToolTip="Connect to another target" />
+                    <Image Width="16" Height="16" Source="{local:Icon MainWindow/new16.png}" Margin="5 0 5 0" ToolTip="Connect to another target" />
                   </ControlTemplate>
                 </Control.Template>
               </ToggleButton>
@@ -450,17 +447,17 @@
                           <ContextMenu>
                             <MenuItem Header="Copy _path" Tag="CopyPath" Click="TabContextMenu_CopyPath">
                               <MenuItem.Icon>
-                                <Image Source="../icons/MainWindow/copy.png" />
+                                <Image Source="{local:Icon MainWindow/copy.png}" />
                               </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem Header="Close _others" Tag="CloseOthers" Click="TabContextMenu_CloseOthers">
                               <MenuItem.Icon>
-                                <Image Source="../icons/MainWindow/closetab.png" />
+                                <Image Source="{local:Icon MainWindow/closetab.png}" />
                               </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem Header="Save a_ll" Tag="SaveAll" Click="TabContextMenu_SaveAll">
                               <MenuItem.Icon>
-                                <Image Source="../icons/MainWindow/save16.png" />
+                                <Image Source="{local:Icon MainWindow/save16.png}" />
                               </MenuItem.Icon>
                             </MenuItem>
                           </ContextMenu>
@@ -497,7 +494,7 @@
                           </FrameworkElement.Style>
                           <Control.Template>
                             <ControlTemplate>
-                              <Image Width="16" Height="16" Source="../icons/MainWindow/new16.png" Margin="5 0 5 0" />
+                              <Image Width="16" Height="16" Source="{local:Icon MainWindow/new16.png}" Margin="5 0 5 0" />
                             </ControlTemplate>
                           </Control.Template>
                         </ToggleButton>
@@ -579,13 +576,13 @@
                               <TextBlock Text="Sel" />
                             </ToggleButton>
                             <Button Grid.Column="6" Click="SearchUp_Click">
-                              <Image Width="16" Height="16" Source="../icons/MainWindow/go-up-search.png" />
+                              <Image Width="16" Height="16" Source="{local:Icon MainWindow/go-up-search.png}" />
                             </Button>
                             <Button Grid.Column="7" Click="SearchDown_Click">
-                              <Image Width="16" Height="16" Source="../icons/MainWindow/go-down-search.png" />
+                              <Image Width="16" Height="16" Source="{local:Icon MainWindow/go-down-search.png}" />
                             </Button>
                             <Button Grid.Column="8" Margin="5 0 0 0" Click="CloseSearch_Click">
-                              <Image Width="16" Height="16" Source="../icons/delete16.png" />
+                              <Image Width="16" Height="16" Source="{local:Icon delete16.png}" />
                             </Button>
                             <!-- Replace row: file editor tabs only, shown with Ctrl+H. -->
                             <TextBlock Grid.Row="1" Text="Replace: " VerticalAlignment="Center" Visibility="{Binding IsReplaceVisible, Converter={StaticResource BoolToVisibility}}" />
@@ -631,16 +628,16 @@
           </Grid.RowDefinitions>
           <ToolBar>
             <ToggleButton ToolTip="Pause All" Style="{DynamicResource DynamicToggleButtonStyle}" IsChecked="{Binding IsPaused}">
-              <Image Width="16" Height="16" Source="../icons/transfers/pause16.png" />
+              <Image Width="16" Height="16" Source="{local:Icon transfers/pause16.png}" />
             </ToggleButton>
             <Button ToolTip="Remove completed" Style="{DynamicResource DynamicButton}" Click="RemoveCompleted_Click">
-              <Image Width="16" Height="16" Source="../icons/transfers/removecomp.png" />
+              <Image Width="16" Height="16" Source="{local:Icon transfers/removecomp.png}" />
             </Button>
             <Button ToolTip="Remove all (cancels the transfers that are not finished)" Style="{DynamicResource DynamicButton}" Click="RemoveAll_Click">
-              <Image Width="16" Height="16" Source="../icons/transfers/removeall.png" />
+              <Image Width="16" Height="16" Source="{local:Icon transfers/removeall.png}" />
             </Button>
             <Button ToolTip="Retry all (also transfers the completed ones again)" Style="{DynamicResource DynamicButton}" Click="RetryAll_Click">
-              <Image Width="16" Height="16" Source="../icons/transfers/retryall.png" />
+              <Image Width="16" Height="16" Source="{local:Icon transfers/retryall.png}" />
             </Button>
           </ToolBar>
           <!-- Free disk space of the SSH host (df -h every 10 s), hidden until the first reading arrives. -->
@@ -678,54 +675,54 @@
               <ContextMenu Name="xferMenu" Visibility="Collapsed">
                 <MenuItem Name="cmdCancel" Header="_Cancel transfer(s)" Click="SelectedXfers_Cancel">
                   <MenuItem.Icon>
-                    <Image Source="../icons/delete16.png" />
+                    <Image Source="{local:Icon delete16.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Name="cmdRetry" Header="_Retry transfer(s)" Click="SelectedXfers_Retry">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/refresh16.png" />
+                    <Image Source="{local:Icon MainWindow/refresh16.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Name="cmdRetryAgain" Header="Retry _again (also if completed)" Click="SelectedXfers_RetryAgain">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/refresh16.png" />
+                    <Image Source="{local:Icon MainWindow/refresh16.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Retry all _failed" Click="RetryFailed_Click">
                   <MenuItem.Icon>
-                    <Image Source="../icons/transfers/retryall.png" />
+                    <Image Source="{local:Icon transfers/retryall.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
                 <MenuItem Header="Open local file" Click="SelectedXfers_OpenLocal">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/document_flat.png" />
+                    <Image Source="{local:Icon MainWindow/document_flat.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Open containing folder" Click="SelectedXfers_OpenFolder">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/folder_flat.png" />
+                    <Image Source="{local:Icon MainWindow/folder_flat.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Copy local file path" Click="SelectedXfers_CopyLocalPath">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/copy.png" />
+                    <Image Source="{local:Icon MainWindow/copy.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Header="Copy remote _path" Click="SelectedXfers_CopyRemotePath">
                   <MenuItem.Icon>
-                    <Image Source="../icons/MainWindow/copy.png" />
+                    <Image Source="{local:Icon MainWindow/copy.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <Separator Name="sepDeleteUploaded" />
                 <MenuItem Name="cmdDeleteUploaded" Header="_Delete uploaded file(s) from the server..." Click="SelectedXfers_DeleteUploaded">
                   <MenuItem.Icon>
-                    <Image Source="../icons/delete16.png" />
+                    <Image Source="{local:Icon delete16.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
                 <MenuItem Name="cmdDeleteDownloaded" Header="Delete downloaded file(s) from this computer..." Click="SelectedXfers_DeleteDownloaded">
                   <MenuItem.Icon>
-                    <Image Source="../icons/delete16.png" />
+                    <Image Source="{local:Icon delete16.png}" />
                   </MenuItem.Icon>
                 </MenuItem>
               </ContextMenu>
@@ -746,16 +743,16 @@
                               <Style TargetType="{x:Type Image}">
                                 <Style.Triggers>
                                   <DataTrigger Value="Up" Binding="{Binding Path=Images.Main}">
-                                    <Setter Property="Source" Value="../icons/transfers/up.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/up.png}" />
                                   </DataTrigger>
                                   <DataTrigger Value="Down" Binding="{Binding Path=Images.Main}">
-                                    <Setter Property="Source" Value="../icons/transfers/down.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/down.png}" />
                                   </DataTrigger>
                                   <DataTrigger Value="Done" Binding="{Binding Path=Images.Main}">
-                                    <Setter Property="Source" Value="../icons/transfers/check.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/check.png}" />
                                   </DataTrigger>
                                   <DataTrigger Value="Error" Binding="{Binding Path=Images.Main}">
-                                    <Setter Property="Source" Value="../icons/transfers/delete16.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/delete16.png}" />
                                   </DataTrigger>
                                 </Style.Triggers>
                               </Style>
@@ -766,10 +763,10 @@
                               <Style TargetType="{x:Type Image}">
                                 <Style.Triggers>
                                   <DataTrigger Value="Clock" Binding="{Binding Path=Images.Overlay}">
-                                    <Setter Property="Source" Value="../icons/transfers/clock9.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/clock9.png}" />
                                   </DataTrigger>
                                   <DataTrigger Value="Pause" Binding="{Binding Path=Images.Overlay}">
-                                    <Setter Property="Source" Value="../icons/transfers/pause9.png" />
+                                    <Setter Property="Source" Value="{local:Icon transfers/pause9.png}" />
                                   </DataTrigger>
                                 </Style.Triggers>
                               </Style>
@@ -800,7 +797,7 @@
                           </Grid.ColumnDefinitions>
                           <ProgressBar Maximum="1" HorizontalAlignment="Stretch" Height="10" Width="Auto" Margin="2" MinWidth="10" Value="{Binding Progress, Mode=OneWay}" Visibility="{Binding ProgressVisibility}" />
                           <Button Style="{StaticResource DynamicButton}" Grid.Column="1" Visibility="{Binding CancelVisibility}" Click="CancelTransfer">
-                            <Image Width="16" Height="16" Source="../icons/delete16.png" />
+                            <Image Width="16" Height="16" Source="{local:Icon delete16.png}" />
                           </Button>
                         </Grid>
                       </DataTemplate>
@@ -877,19 +874,19 @@
                           <Style TargetType="{x:Type Image}">
                             <Style.Triggers>
                               <DataTrigger Value="Lock" Binding="{Binding TypeImage}">
-                                <Setter Property="Source" Value="../Icons/lock16.png" />
+                                <Setter Property="Source" Value="{local:Icon lock16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="OpenLock" Binding="{Binding TypeImage}">
-                                <Setter Property="Source" Value="../Icons/unlock16.png" />
+                                <Setter Property="Source" Value="{local:Icon unlock16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="SerialPort" Binding="{Binding TypeImage}">
-                                <Setter Property="Source" Value="../Icons/com16.png" />
+                                <Setter Property="Source" Value="{local:Icon com16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="USB" Binding="{Binding TypeImage}">
-                                <Setter Property="Source" Value="../Icons/usb16.png" />
+                                <Setter Property="Source" Value="{local:Icon usb16.png}" />
                               </DataTrigger>
                               <DataTrigger Value="Terminal" Binding="{Binding TypeImage}">
-                                <Setter Property="Source" Value="../Icons/term16.png" />
+                                <Setter Property="Source" Value="{local:Icon term16.png}" />
                               </DataTrigger>
                             </Style.Triggers>
                           </Style>

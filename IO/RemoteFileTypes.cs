@@ -6,7 +6,7 @@ namespace SmarTTY.IO;
 
 /// <summary>
 /// The icon of an item in the file list. The XAML of the list (GUI/FileListControl.xaml) picks the picture by the name of the
-/// value, so a new value needs a trigger there and a picture in icons/filetypes (icons/MainWindow for the first ones).
+/// value, so a new value needs a trigger there and an image in GUI/Icons/FileTypes.xaml (MainWindow.xaml for the first ones).
 /// </summary>
 public enum ItemIcon
 {

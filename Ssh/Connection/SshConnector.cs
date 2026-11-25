@@ -10,7 +10,6 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using System.Windows.Threading;
 using VisualTTY;
 
@@ -40,38 +39,12 @@ public partial class SshConnector : Component
 
     private ConnectionAttempt _currentAttempt;
 
-    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public ContainerControl SynchronizationControl { get; set; }
-
-    public override ISite Site
-    {
-        get
-        {
-            return base.Site;
-        }
-        set
-        {
-            base.Site = value;
-            if (value != null && value.GetService(typeof(IDesignerHost)) is IDesignerHost { RootComponent: var rootComponent } && rootComponent is ContainerControl)
-            {
-                SynchronizationControl = rootComponent as ContainerControl;
-            }
-        }
-    }
-
     private bool IsOffUiThread
     {
         get
         {
-            if (Dispatcher != null)
-            {
-                return Dispatcher.Thread != Thread.CurrentThread;
-            }
-            if (SynchronizationControl != null)
-            {
-                return SynchronizationControl.InvokeRequired;
-            }
-            return false;
+            // The WinForms control of the designer that could stand for the dispatcher went in stage 5B (nothing set it).
+            return Dispatcher != null && Dispatcher.Thread != Thread.CurrentThread;
         }
     }
 
@@ -158,14 +131,7 @@ public partial class SshConnector : Component
 
     private void BeginInvokeOnUi(ThreadStart callback)
     {
-        if (Dispatcher != null)
-        {
-            Dispatcher.BeginInvoke((Delegate)callback, new object[0]);
-        }
-        else
-        {
-            SynchronizationControl.BeginInvoke(callback);
-        }
+        Dispatcher.BeginInvoke((Delegate)callback, new object[0]);
     }
 
     private void InvokeOnUi(ThreadStart callback)
@@ -174,13 +140,9 @@ public partial class SshConnector : Component
         {
             callback();
         }
-        else if (Dispatcher != null)
-        {
-            Dispatcher.Invoke((Delegate)callback, new object[0]);
-        }
         else
         {
-            SynchronizationControl.Invoke(callback);
+            Dispatcher.Invoke((Delegate)callback, new object[0]);
         }
     }
 
@@ -190,11 +152,7 @@ public partial class SshConnector : Component
         {
             return delegateValue.DynamicInvoke(items);
         }
-        if (Dispatcher != null)
-        {
-            return Dispatcher.Invoke(delegateValue, items);
-        }
-        return SynchronizationControl.Invoke(delegateValue, items);
+        return Dispatcher.Invoke(delegateValue, items);
     }
 
     private void OnDisposed(object sender, EventArgs e)

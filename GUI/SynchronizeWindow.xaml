@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Window x:Class="SmarTTY.GUI.SynchronizeWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Synchronize folders" Width="640" MinWidth="520" MaxWidth="2000" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+<Window x:Class="SmarTTY.GUI.SynchronizeWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:gui="clr-namespace:SmarTTY.GUI" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Style="{DynamicResource SecondaryWindowStyle}" Title="Synchronize folders" Width="640" MinWidth="520" MaxWidth="2000" SizeToContent="Height" ResizeMode="CanResize" WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -42,13 +42,13 @@
             <TextBlock Grid.Row="0" Grid.Column="0" Name="LocalLabel" Text="Local folder (target):" VerticalAlignment="Center" Margin="0 0 12 8" />
             <TextBox Grid.Row="0" Grid.Column="1" Name="LocalBox" Height="26" VerticalContentAlignment="Center" Margin="0 0 0 8" TextChanged="LocalBox_TextChanged" />
             <Button Grid.Row="0" Grid.Column="2" Name="LocalBrowseButton" Width="30" Height="26" Margin="6 0 0 8" Padding="0" ToolTip="Browse the local folders" Click="LocalBrowse_Click">
-                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+                <Image Source="{gui:Icon dialog-browse-folder.png}" Width="16" Height="16" />
             </Button>
 
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Remote folder:" VerticalAlignment="Center" Margin="0 0 12 8" />
             <TextBox Grid.Row="1" Grid.Column="1" Name="RemoteBox" Height="26" VerticalContentAlignment="Center" Margin="0 0 0 8" />
             <Button Grid.Row="1" Grid.Column="2" Name="RemoteBrowseButton" Width="30" Height="26" Margin="6 0 0 8" Padding="0" ToolTip="Browse the folders on the remote host" Click="RemoteBrowse_Click">
-                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+                <Image Source="{gui:Icon dialog-browse-folder.png}" Width="16" Height="16" />
             </Button>
 
             <TextBlock Grid.Row="2" Grid.Column="0" Text="Replace files:" VerticalAlignment="Center" Margin="0 0 12 8" />
@@ -73,7 +73,7 @@
             <TextBlock Grid.Row="5" Grid.Column="0" Text="Only these folders:" VerticalAlignment="Center" Margin="0 0 12 0" ToolTip="Synchronize only the picked subfolders of the local folder (and their contents)" />
             <TextBox Grid.Row="5" Grid.Column="1" Name="SelectionBox" Height="26" VerticalContentAlignment="Center" IsReadOnly="True" ToolTip="The subfolders to synchronize; empty means the whole folder" />
             <Button Grid.Row="5" Grid.Column="2" Name="SelectionBrowseButton" Width="30" Height="26" Margin="6 0 0 0" Padding="0" ToolTip="Pick the subfolders to synchronize" Click="SelectionBrowse_Click">
-                <Image Source="pack://application:,,,/icons/dialog-browse-folder.png" Width="16" Height="16" />
+                <Image Source="{gui:Icon dialog-browse-folder.png}" Width="16" Height="16" />
             </Button>
         </Grid>
 

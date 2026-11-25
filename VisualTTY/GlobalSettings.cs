@@ -2,7 +2,7 @@ using SmarTTY.Controls;
 using SmarTTY.Utilities;
 using System;
 using System.ComponentModel;
-using System.Drawing;
+using SmarTTY.TextEditing;
 using System.IO;
 using System.Reflection;
 using System.Xml;
@@ -48,36 +48,36 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public static EditorColors DarkColors => new EditorColors
         {
-            TextColor = Color.White,
-            BackColor = Color.FromArgb(58, 46, 15),
-            LineNumberBackground = Color.FromArgb(64, 64, 64),
-            LineNumberForeground = Color.LightGray,
-            KeywordColor = Color.FromArgb(86, 156, 214),
-            StringColor = Color.FromArgb(214, 157, 133),
-            CommentColor = Color.FromArgb(131, 148, 105),
-            NumberColor = Color.FromArgb(181, 206, 168),
-            VariableColor = Color.FromArgb(156, 220, 254),
-            SectionColor = Color.FromArgb(78, 201, 176),
-            PreprocessorColor = Color.FromArgb(189, 99, 197),
-            ErrorColor = Color.FromArgb(255, 123, 114),
-            WarningColor = Color.FromArgb(255, 180, 84)
+            TextColor = RgbColor.FromArgb(255, 255, 255) /* White */,
+            BackColor = RgbColor.FromArgb(58, 46, 15),
+            LineNumberBackground = RgbColor.FromArgb(64, 64, 64),
+            LineNumberForeground = RgbColor.FromArgb(211, 211, 211) /* LightGray */,
+            KeywordColor = RgbColor.FromArgb(86, 156, 214),
+            StringColor = RgbColor.FromArgb(214, 157, 133),
+            CommentColor = RgbColor.FromArgb(131, 148, 105),
+            NumberColor = RgbColor.FromArgb(181, 206, 168),
+            VariableColor = RgbColor.FromArgb(156, 220, 254),
+            SectionColor = RgbColor.FromArgb(78, 201, 176),
+            PreprocessorColor = RgbColor.FromArgb(189, 99, 197),
+            ErrorColor = RgbColor.FromArgb(255, 123, 114),
+            WarningColor = RgbColor.FromArgb(255, 180, 84)
         };
 
         public static EditorColors LightColors => new EditorColors
         {
-            TextColor = Color.Black,
-            BackColor = Color.LightGoldenrodYellow,
-            LineNumberBackground = SystemColors.ButtonFace,
-            LineNumberForeground = Color.DarkGray,
-            KeywordColor = Color.FromArgb(0, 0, 150),
-            StringColor = Color.FromArgb(163, 21, 21),
-            CommentColor = Color.FromArgb(0, 99, 49),
-            NumberColor = Color.FromArgb(135, 91, 33),
-            VariableColor = Color.FromArgb(0, 115, 165),
-            SectionColor = Color.FromArgb(0, 122, 117),
-            PreprocessorColor = Color.FromArgb(159, 23, 138),
-            ErrorColor = Color.FromArgb(198, 40, 40),
-            WarningColor = Color.FromArgb(168, 74, 0)
+            TextColor = RgbColor.FromArgb(0, 0, 0) /* Black */,
+            BackColor = RgbColor.FromArgb(250, 250, 210) /* LightGoldenrodYellow */,
+            LineNumberBackground = SmarTTY.Native.SystemColorValues.ButtonFace,
+            LineNumberForeground = RgbColor.FromArgb(169, 169, 169) /* DarkGray */,
+            KeywordColor = RgbColor.FromArgb(0, 0, 150),
+            StringColor = RgbColor.FromArgb(163, 21, 21),
+            CommentColor = RgbColor.FromArgb(0, 99, 49),
+            NumberColor = RgbColor.FromArgb(135, 91, 33),
+            VariableColor = RgbColor.FromArgb(0, 115, 165),
+            SectionColor = RgbColor.FromArgb(0, 122, 117),
+            PreprocessorColor = RgbColor.FromArgb(159, 23, 138),
+            ErrorColor = RgbColor.FromArgb(198, 40, 40),
+            WarningColor = RgbColor.FromArgb(168, 74, 0)
         };
     }
 
@@ -316,19 +316,16 @@ public class GlobalSettings : INotifyPropertyChanged
         }
     }
 
-    /// <summary>The bold/italic variant chosen in the font picker.</summary>
+    /// <summary>The terminal font: the configured one, or Courier New of 12 points (the default of the WinForms terminal).</summary>
     [XmlIgnore]
-    public FontStyle FontVariant => (FontBold ? FontStyle.Bold : FontStyle.Regular) | (FontItalic ? FontStyle.Italic : FontStyle.Regular);
-
-    [XmlIgnore]
-    public Font EffectiveFont => new Font(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize, FontVariant);
+    public FontSpec EffectiveFont => new FontSpec(string.IsNullOrEmpty(FontName) ? "Courier New" : FontName, (FontSize == 0f) ? 12f : FontSize, FontBold, FontItalic);
 
     /// <summary>
     /// The configured terminal font, or null when nothing is configured — the caller then keeps its own default
     /// instead of overriding it with Courier New.
     /// </summary>
     [XmlIgnore]
-    public Font ConfiguredFont => (string.IsNullOrEmpty(FontName) || FontSize == 0f) ? null : new Font(FontName, FontSize, FontVariant);
+    public FontSpec ConfiguredFont => (string.IsNullOrEmpty(FontName) || FontSize == 0f) ? null : new FontSpec(FontName, FontSize, FontBold, FontItalic);
 
     public bool ShowUnrecognizedCharactersAsHex { get; set; }
 
@@ -546,7 +543,7 @@ public class GlobalSettings : INotifyPropertyChanged
         if (DefaultTextColor.Alpha == 0)
         {
             // The colour of text without a colour of its own, as the WinForms terminal had it.
-            DefaultTextColor = Color.LightGray;
+            DefaultTextColor = RgbColor.FromArgb(211, 211, 211) /* LightGray */;
         }
         if (Editor.LightColors == null)
         {

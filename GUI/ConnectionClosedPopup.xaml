@@ -32,7 +32,7 @@
     </FrameworkElement.Resources>
     <TextBlock Text="{Binding Title}" Grid.ColumnSpan="2" HorizontalAlignment="Center" FontSize="24" FontWeight="Bold" Margin="3 0 3 6" />
     <TextBlock Grid.Row="1" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="3 0 3 6" Text="{Binding Message}" />
-    <Image Width="64" Height="64" Grid.Row="2" Grid.RowSpan="3" Source="../icons/MainWindow/busy.png" Margin="8" />
+    <Image Width="64" Height="64" Grid.Row="2" Grid.RowSpan="3" Source="{local:Icon MainWindow/busy.png}" Margin="8" />
     <Button Content="Try reconnecting" Grid.Column="1" Grid.Row="2" Click="Reconnect" />
     <Button Content="Close tab" Grid.Column="1" Grid.Row="3" Click="Close" />
     <Button Content="Ignore" Grid.Column="1" Grid.Row="4" Click="Ignore" />

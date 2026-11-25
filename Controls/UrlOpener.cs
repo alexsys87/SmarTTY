@@ -1,7 +1,6 @@
 using SmarTTY.Utilities;
 using System;
 using System.Diagnostics;
-using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 

@@ -60,7 +60,7 @@ public partial class FontPickerWindow : Window
 
     private const double DefaultSize = 12;
 
-    /// <summary>WPF sizes text in DIPs (1/96 inch) while <c>System.Drawing.Font.Size</c> is in points (1/72 inch).</summary>
+    /// <summary>WPF sizes text in DIPs (1/96 inch) while the font size of the settings is in points (1/72 inch).</summary>
     private const double PointsToDips = 96.0 / 72.0;
 
     private static readonly double[] CommonSizes = new double[] { 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 36, 48, 72 };
@@ -273,7 +273,7 @@ public partial class FontPickerWindow : Window
 
     private static string DisplayName(FontFamily family)
     {
-        // The English name is what System.Drawing.Font expects when the font is applied, so it is the one to keep.
+        // The English name is what the settings keep and the terminals give WPF when the font is applied.
         if (family.FamilyNames.TryGetValue(XmlLanguage.GetLanguage("en-US"), out string name) && !string.IsNullOrEmpty(name))
         {
             return name;

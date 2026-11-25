@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 
@@ -30,7 +29,7 @@ internal static class UserDialogs
     }
 
     /// <summary>Asks the user in a box owned by <paramref name="owner"/> (null: the window the user is working in).</summary>
-    public static DialogAnswer Show(IWin32Window owner, string text, string caption, DialogButtons buttons, DialogIcon icon)
+    public static DialogAnswer Show(IDialogOwner owner, string text, string caption, DialogButtons buttons, DialogIcon icon)
     {
         return Installed(MessageImpl)(new MessageRequest
         {
@@ -45,7 +44,7 @@ internal static class UserDialogs
     /// <summary>
     /// Asks for a single existing file to open. Returns the chosen path, or null when the user cancelled.
     /// </summary>
-    public static string OpenFile(IWin32Window owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
+    public static string OpenFile(IDialogOwner owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
     {
         FileDialogResult result = ShowFileDialog(owner, new FileDialogRequest
         {
@@ -61,7 +60,7 @@ internal static class UserDialogs
     /// <summary>
     /// Asks for one or more existing files to open. Returns the chosen paths (never empty), or null when cancelled.
     /// </summary>
-    public static string[] OpenFiles(IWin32Window owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
+    public static string[] OpenFiles(IDialogOwner owner, string title, string filter, int filterIndex = 1, string initialDirectory = null)
     {
         FileDialogResult result = ShowFileDialog(owner, new FileDialogRequest
         {
@@ -82,7 +81,7 @@ internal static class UserDialogs
     /// <summary>
     /// Asks for the destination file to save to. Returns the chosen path, or null when the user cancelled.
     /// </summary>
-    public static string SaveFile(IWin32Window owner, string title, string filter, int filterIndex = 1, string fileName = null, bool overwritePrompt = true, bool addExtension = false, string initialDirectory = null)
+    public static string SaveFile(IDialogOwner owner, string title, string filter, int filterIndex = 1, string fileName = null, bool overwritePrompt = true, bool addExtension = false, string initialDirectory = null)
     {
         return SaveFileEx(owner, title, filter, filterIndex, fileName, overwritePrompt, addExtension, initialDirectory)?.FileName;
     }
@@ -91,7 +90,7 @@ internal static class UserDialogs
     /// Like <see cref="SaveFile"/>, but also reports the filter entry the user finally chose (the caller may pick the
     /// file format from it). Returns null when the user cancelled.
     /// </summary>
-    public static FileDialogResult SaveFileEx(IWin32Window owner, string title, string filter, int filterIndex = 1, string fileName = null, bool overwritePrompt = true, bool addExtension = false, string initialDirectory = null)
+    public static FileDialogResult SaveFileEx(IDialogOwner owner, string title, string filter, int filterIndex = 1, string fileName = null, bool overwritePrompt = true, bool addExtension = false, string initialDirectory = null)
     {
         return ShowFileDialog(owner, new FileDialogRequest
         {
@@ -110,7 +109,7 @@ internal static class UserDialogs
     /// Asks for a folder. <paramref name="owner"/> is not used: the folder chooser is owned by the window the user is working in.
     /// Returns the chosen path, or null when the user cancelled.
     /// </summary>
-    public static string Browse(IWin32Window owner, string description, string initialPath = null)
+    public static string Browse(IDialogOwner owner, string description, string initialPath = null)
     {
         return Installed(FolderImpl)(description, initialPath);
     }
@@ -128,7 +127,7 @@ internal static class UserDialogs
         return (result.FileNames != null && result.FileNames.Count > 0) ? result.FileNames[0] : null;
     }
 
-    private static FileDialogResult ShowFileDialog(IWin32Window owner, FileDialogRequest request)
+    private static FileDialogResult ShowFileDialog(IDialogOwner owner, FileDialogRequest request)
     {
         request.OwnerHandle = owner?.Handle ?? IntPtr.Zero;
         return Installed(FileImpl)(request);
@@ -138,6 +137,16 @@ internal static class UserDialogs
     {
         return hook ?? throw new InvalidOperationException("No dialog is installed (App sets UserDialogs at startup).");
     }
+}
+
+/// <summary>
+/// A window the dialogs belong to, by its Win32 handle (what the WinForms <c>IWin32Window</c> was for them; a terminal's paste anchor, the
+/// device tab). The dialog is owned by the WPF window behind the handle, or by the window the user is working in.
+/// </summary>
+public interface IDialogOwner
+{
+    /// <summary>The Win32 handle of the window, or zero.</summary>
+    IntPtr Handle { get; }
 }
 
 /// <summary>Which buttons a message box offers.</summary>

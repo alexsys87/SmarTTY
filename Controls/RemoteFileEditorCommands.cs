@@ -1,6 +1,5 @@
 using SmarTTY.CodeEditing;
 using System;
-using System.Windows.Forms;
 
 namespace SmarTTY.Controls;
 

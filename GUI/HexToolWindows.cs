@@ -8,7 +8,6 @@ using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using DrawingColor = System.Drawing.Color;
 
 namespace SmarTTY.GUI;
 
@@ -85,11 +84,11 @@ internal sealed class HexHighlightWindow : HexToolWindow
 
     private readonly List<RadioButton> _choices = new List<RadioButton>();
 
-    public DrawingColor SelectedColor { get; private set; }
+    public RgbColor SelectedColor { get; private set; }
 
     public string Label => _label.Text ?? "";
 
-    public HexHighlightWindow(DrawingColor color, string label, string target)
+    public HexHighlightWindow(RgbColor color, string label, string target)
         : base("Highlight Bytes")
     {
         SelectedColor = color;
@@ -100,14 +99,14 @@ internal sealed class HexHighlightWindow : HexToolWindow
         bool known = false;
         foreach (HexHighlightColor preset in HexViewChoices.HighlightColors)
         {
-            DrawingColor presetColor = preset.Color.ToColor();
-            bool chosen = presetColor.ToArgb() == DrawingColor.FromArgb(255, color).ToArgb();
+            RgbColor presetColor = preset.Color;
+            bool chosen = presetColor.ToArgb() == RgbColor.FromArgb(255, color.R, color.G, color.B).ToArgb();
             known |= chosen;
             AddSwatch(presetColor, preset.Name, chosen);
         }
         if (!known)
         {
-            AddSwatch(DrawingColor.FromArgb(255, color), "Custom", true);
+            AddSwatch(RgbColor.FromArgb(255, color.R, color.G, color.B), "Custom", true);
         }
         Panel.Children.Add(_swatches);
         Button other = new Button
@@ -130,7 +129,7 @@ internal sealed class HexHighlightWindow : HexToolWindow
         };
     }
 
-    private void AddSwatch(DrawingColor color, string name, bool chosen)
+    private void AddSwatch(RgbColor color, string name, bool chosen)
     {
         RadioButton choice = new RadioButton
         {
@@ -148,7 +147,7 @@ internal sealed class HexHighlightWindow : HexToolWindow
                 BorderThickness = new Thickness(1)
             }
         };
-        DrawingColor value = color;
+        RgbColor value = color;
         choice.Checked += (sender, e) => SelectedColor = value;
         _choices.Add(choice);
         _swatches.Children.Add(choice);
@@ -159,7 +158,7 @@ internal sealed class HexHighlightWindow : HexToolWindow
         DeviceTerminalSettings.ColorWrapper? picked = ColorPickerWindow.Pick(this, SelectedColor);
         if (picked.HasValue)
         {
-            DrawingColor color = DrawingColor.FromArgb(255, picked.Value.Red, picked.Value.Green, picked.Value.Blue);
+            RgbColor color = RgbColor.FromArgb(255, picked.Value.Red, picked.Value.Green, picked.Value.Blue);
             AddSwatch(color, "Custom", true);
             SelectedColor = color;
         }

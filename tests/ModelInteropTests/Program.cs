@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using SmarTTY.CodeEditing;
-using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 
-// Checks of Controls/ModelInterop.cs against the real WinForms and GDI+ types, which the logic folders no longer use.
+// Checks of VirtualKey against the real WinForms keys and of the colour values of the settings against the named GDI+ colours they
+// replaced, which the logic folders and (since stages 5B and 5C) the application no longer use.
 internal static class Program
 {
     private static int _passed;
@@ -106,57 +107,70 @@ internal static class Program
         Check(alt.Alt && alt.KeyCode == VirtualKey.F4, "KeyEventArgs for Alt+F4");
     }
 
-    private static void ColorChecks()
+    // Stage 5C replaced the named colours of System.Drawing in the defaults of the settings and of the terminals by their numbers, each
+    // followed by the name as a comment: "RgbColor.FromArgb(211, 211, 211) /* LightGray */". Every such number is the named colour.
+    private static void NamedColorChecks()
     {
-        Equal(Color.FromArgb(10, 20, 30, 40).ToRgb(), RgbColor.FromArgb(10, 20, 30, 40), "a colour converts to the components");
-        Equal(RgbColor.FromArgb(10, 20, 30, 40).ToColor(), Color.FromArgb(10, 20, 30, 40), "components convert to a colour");
-        Equal(RgbColor.FromArgb(10, 20, 30, 40).ToColor().ToArgb(), RgbColor.FromArgb(10, 20, 30, 40).ToArgb(), "ToArgb of the converted colour is the same number");
-
-        Check(Color.Empty.ToRgb().IsEmpty, "Color.Empty becomes RgbColor.Empty");
-        Equal(RgbColor.Empty.ToColor(), Color.Empty, "RgbColor.Empty becomes Color.Empty");
-        Check(RgbColor.Empty.ToColor().IsEmpty, "the colour made from RgbColor.Empty is empty");
-
-        // The trap of the GDI+ colour: it compares "named" too, so a named colour differs from the same colour made of components.
-        Check(Color.Red != Color.FromArgb(255, 0, 0), "(the GDI+ colour) Color.Red != Color.FromArgb(255, 0, 0)");
-        Equal(Color.Red.ToRgb(), Color.FromArgb(255, 0, 0).ToRgb(), "after the conversion the named and the built colour are equal");
-        Check(Color.Red.ToRgb() == RgbColor.FromArgb(255, 255, 0, 0), "Color.Red equals opaque red components");
-        Equal(SystemColors.Window.ToRgb().ToArgb(), SystemColors.Window.ToArgb(), "a system colour is resolved to its value");
-
-        int sampled = 0;
-        for (int i = 0; i < 4096; i++)
+        string root = RepositoryRoot();
+        Regex named = new Regex(@"RgbColor\.FromArgb\((\d+), (\d+), (\d+)\) /\* (\w+) \*/");
+        int found = 0;
+        foreach (string file in new[] { "VisualTTY/GlobalSettings.cs", "VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs", "GUI/DevicePanel/WpfDeviceTerminal.cs" })
         {
-            int argb = unchecked((int)(0x9E3779B1u * (uint)(i + 1)));
-            Color c = Color.FromArgb(argb);
-            if (c.ToRgb().ToColor().ToArgb() != argb && argb != 0)
+            foreach (Match match in named.Matches(File.ReadAllText(Path.Combine(root, file))))
             {
-                throw new Exception("FAIL: colour " + argb.ToString("X8") + " does not survive the round trip");
+                Color color = Color.FromName(match.Groups[4].Value);
+                Check(color.IsKnownColor, file + ": " + match.Groups[4].Value + " is a named colour");
+                Equal(RgbColor.FromArgb(int.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value), int.Parse(match.Groups[3].Value)).ToArgb(), color.ToArgb(), file + ": " + match.Value);
+                found++;
             }
-            sampled++;
         }
-        Check(sampled == 4096, "4096 sample colours survive the round trip through RgbColor");
-
-        // A documented difference: fully transparent black is not distinguished from "not set".
-        Check(Color.FromArgb(0, 0, 0, 0).ToRgb().IsEmpty, "fully transparent black becomes the empty colour");
-        Check(Color.Transparent.ToRgb() != RgbColor.Empty, "Color.Transparent (white, alpha 0) is not the empty colour");
-        Equal(Color.Transparent.ToRgb().ToColor().ToArgb(), Color.Transparent.ToArgb(), "Color.Transparent keeps its components");
+        Check(found >= 12, "the named colours of the defaults are found (" + found + ")");
+        // The light grey that stands for SystemColors.ButtonFace where the system cannot be asked (Native/SystemColorValues.cs).
+        Check(File.ReadAllText(Path.Combine(root, "Native/SystemColorValues.cs")).Contains("RgbColor.FromArgb(240, 240, 240)"), "the fallback of ButtonFace is the light grey of Windows");
+        Equal(RgbColor.FromArgb(10, 20, 30, 40).ToArgb(), Color.FromArgb(10, 20, 30, 40).ToArgb(), "RgbColor packs the components as the GDI+ colour did");
+        Equal(RgbColor.FromArgb(1, 2, 3).ToArgb(), Color.FromArgb(1, 2, 3).ToArgb(), "a colour of three components is opaque in both");
     }
 
-    private static void PointChecks()
+    private static string RepositoryRoot()
     {
-        Equal(new GridPoint(5, 9).ToPoint(), new Point(5, 9), "GridPoint to Point: X is the column, Y the row");
-        Equal(new Point(5, 9).ToGridPoint(), new GridPoint(5, 9), "Point to GridPoint");
-        Equal(new GridPoint(-3, -1).ToPoint().ToGridPoint(), new GridPoint(-3, -1), "negative values survive the round trip");
-        Equal(GridPoint.Empty.ToPoint(), Point.Empty, "GridPoint.Empty is Point.Empty");
-        Equal(default(GridPoint).ToPoint().IsEmpty, true, "default(GridPoint) gives the empty point");
+        DirectoryInfo directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "SmarTTY.csproj")))
+        {
+            directory = directory.Parent;
+        }
+        if (directory == null)
+        {
+            throw new Exception("FAIL: the repository (SmarTTY.csproj) is not above " + AppDomain.CurrentDomain.BaseDirectory);
+        }
+        return directory.FullName;
     }
 
     private static void Main()
     {
         KeysMatchChecks();
         KeyConversionChecks();
-        ColorChecks();
-        PointChecks();
+        NamedColorChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " model interop checks passed.");
+    }
+}
+
+// The conversions between the WinForms keys and VirtualKey (they were in Controls/ModelInterop.cs until stage 5B; the application no
+// longer has the WinForms keys, the test keeps them to check that VirtualKey is still an exact copy).
+internal static class KeyInterop
+{
+    public static VirtualKey ToVirtualKey(this Keys keys)
+    {
+        return (VirtualKey)(int)keys;
+    }
+
+    public static Keys ToKeys(this VirtualKey key)
+    {
+        return (Keys)(int)key;
+    }
+
+    public static KeyStroke ToKeyStroke(this KeyEventArgs e)
+    {
+        return new KeyStroke(e.KeyData.ToVirtualKey());
     }
 }

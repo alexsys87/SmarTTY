@@ -7,7 +7,6 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Markup;
 using System.Windows.Threading;
@@ -300,18 +299,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         Controller.MenuCommandHandlers.SetupPublicKey();
     }
 
-    // Tools > WPF hex editor lab: the WPF hex view of stage 3B on a local file, before it goes into the editor tab.
-    private void HexLab_Click(object sender, RoutedEventArgs e)
-    {
-        new HexView.HexLabWindow(Controller.Settings).Show();
-    }
-
-    // Tools > WPF text editor lab: the WPF text view of stage 3D on a local file, before it goes into the editor tab.
-    private void TextLab_Click(object sender, RoutedEventArgs e)
-    {
-        new TextView.TextLabWindow(Controller.Settings).Show();
-    }
-
     private void QuickCommands_Click(object sender, RoutedEventArgs e)
     {
         Controller.ShowQuickCommands();
@@ -414,18 +401,6 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         try
         {
             CommandCompletionsEditorWindow.Open(this);
-        }
-        catch (Exception exception)
-        {
-            MessageBoxes.Exception(exception);
-        }
-    }
-
-    private void TerminalLab_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            new TerminalLabWindow { Owner = this }.Show();
         }
         catch (Exception exception)
         {

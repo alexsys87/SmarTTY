@@ -6,7 +6,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace SmarTTY.GUI;
 
@@ -18,9 +17,9 @@ namespace SmarTTY.GUI;
 /// </summary>
 public partial class LocalFolderBrowserWindow : Window
 {
-    private const string FolderIcon = "pack://application:,,,/icons/MainWindow/folder_flat.png";
+    private const string FolderIcon = "MainWindow/folder_flat.png";
 
-    private const string ComputerIcon = "pack://application:,,,/icons/computer.png";
+    private const string ComputerIcon = "computer.png";
 
     // A node carries this empty placeholder child until its real children are listed, so it shows an expander.
     private const string PlaceholderHeader = "";
@@ -292,13 +291,6 @@ public partial class LocalFolderBrowserWindow : Window
 
     private static ImageSource LoadIcon(string uri)
     {
-        try
-        {
-            return new BitmapImage(new Uri(uri));
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+        return IconImages.Get(uri);
     }
 }

@@ -22,7 +22,7 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <StackPanel Grid.Column="0" MinWidth="380" MaxWidth="450" VerticalAlignment="Top">
-        <local:SettingsGroupBox Text="{Binding TCPSettingsHeader}" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+        <local:SettingsGroupBox Text="{Binding TCPSettingsHeader}" ImageSource="{local:Icon net16.png}" Visibility="{Binding TCPSettingsVisibility}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -41,7 +41,7 @@
             <TextBox Grid.Column="1" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpConnectTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" ToolTip="Seconds (default 10, 0 = the operating system's own timeout, about 21 s per address of the host). How long connecting may take over all the addresses of the host; raise it for a slow link (VPN, satellite)." />
             <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Grid.Row="2" Grid.ColumnSpan="2" Click="Test_Click">
               <StackPanel Orientation="Horizontal">
-                <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                <Image Width="16" Height="16" Source="{local:Icon PlayHS.png}" Margin="0 0 5 0" />
                 <TextBlock Text="Test connection now" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
@@ -49,7 +49,7 @@
             <TextBox Grid.Column="3" Grid.Row="1" Margin="2" Width="50" HorizontalAlignment="Left" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TcpKeepAliveSeconds, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding TcpKeepAliveSettingsVisibility}" ToolTip="Seconds (0 = off, default 15). After this many idle seconds the operating system probes the connection every few seconds, so a dropped link (power loss, pulled cable, NAT timeout) is noticed soon after; nothing is written into the data stream, so the device protocol is not disturbed." />
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox ImageSource="../icons/com16.png" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
+        <local:SettingsGroupBox ImageSource="{local:Icon com16.png}" Text="{Binding SerialSettingsHeader}" Visibility="{Binding SerialSettingsVisibility}">
           <StackPanel Orientation="Vertical">
             <Grid Margin="0 0 0 0">
               <FrameworkElement.Resources>
@@ -208,13 +208,13 @@
             </Grid>
             <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click">
               <StackPanel Orientation="Horizontal">
-                <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                <Image Width="16" Height="16" Source="{local:Icon PlayHS.png}" Margin="0 0 5 0" />
                 <TextBlock Text="Test connection now" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </StackPanel>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Netconsole receiver (UDP)" ImageSource="../icons/net16.png" Visibility="{Binding NetconsoleSettingsVisibility}">
+        <local:SettingsGroupBox Text="Netconsole receiver (UDP)" ImageSource="{local:Icon net16.png}" Visibility="{Binding NetconsoleSettingsVisibility}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -260,7 +260,7 @@
             <StackPanel Grid.Row="8" Grid.ColumnSpan="4">
               <Button Style="{StaticResource HyperlinkButton}" HorizontalAlignment="Left" Click="Test_Click" ToolTip="Opens the UDP port and closes it again: tells whether another program already listens on it.">
                 <StackPanel Orientation="Horizontal">
-                  <Image Width="16" Height="16" Source="..\icons\PlayHS.png" Margin="0 0 5 0" />
+                  <Image Width="16" Height="16" Source="{local:Icon PlayHS.png}" Margin="0 0 5 0" />
                   <TextBlock Text="Test: open the port now" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
@@ -268,7 +268,7 @@
             </StackPanel>
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="../icons/net16.png" Visibility="{Binding TCPSettingsVisibility}">
+        <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="{local:Icon net16.png}" Visibility="{Binding TCPSettingsVisibility}">
           <Grid>
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto" />
@@ -288,7 +288,7 @@
             </CheckBox>
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Telnet options" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+        <local:SettingsGroupBox Text="Telnet options" ImageSource="{local:Icon net16.png}" Visibility="{Binding TelnetSettingsVisibility}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -316,7 +316,7 @@
             </CheckBox>
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Automatic login (typed once when the server asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+        <local:SettingsGroupBox Text="Automatic login (typed once when the server asks)" ImageSource="{local:Icon net16.png}" Visibility="{Binding TelnetSettingsVisibility}">
           <Grid ToolTip="The user name and the password are typed when the text from the server ends with a login or password prompt. Each is sent at most once per connection (a rejected password is not retried) and only during the first 30 seconds.">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -339,7 +339,7 @@
             <TextBox Grid.Column="1" Grid.ColumnSpan="3" Grid.Row="2" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding TelnetPasswordPrompts, UpdateSourceTrigger=PropertyChanged}" Tag="password:;passcode:" ToolTip="Texts separated by ';', case does not matter. Empty: password:;passcode:" />
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Data for the server (sent when it asks)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+        <local:SettingsGroupBox Text="Data for the server (sent when it asks)" ImageSource="{local:Icon net16.png}" Visibility="{Binding TelnetSettingsVisibility}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -365,7 +365,7 @@
         </local:SettingsGroupBox>
       </StackPanel>
       <StackPanel Grid.Column="1" Margin="16 0 0 0" MinWidth="380" VerticalAlignment="Top">
-        <local:SettingsGroupBox Text="Telnet security (TLS)" ImageSource="../icons/net16.png" Visibility="{Binding TelnetSettingsVisibility}">
+        <local:SettingsGroupBox Text="Telnet security (TLS)" ImageSource="{local:Icon net16.png}" Visibility="{Binding TelnetSettingsVisibility}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -397,7 +397,7 @@
             </Button>
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Terminal colors" ImageSource="..\icons\color16.png">
+        <local:SettingsGroupBox Text="Terminal colors" ImageSource="{local:Icon color16.png}">
           <Grid DataContext="{Binding Path=Settings}">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -432,7 +432,7 @@
             <Border Width="40" Grid.Column="4" BorderBrush="{DynamicResource Theme.BorderStrong}" BorderThickness="1" HorizontalAlignment="Left" Grid.Row="1" Background="{Binding Path=Colors.Echo, Converter={StaticResource ColorWrapperConverter}}" />
           </Grid>
         </local:SettingsGroupBox>
-        <local:SettingsGroupBox Text="Terminal settings" ImageSource="..\Icons\term16.png">
+        <local:SettingsGroupBox Text="Terminal settings" ImageSource="{local:Icon term16.png}">
           <Grid>
             <FrameworkElement.Resources>
               <ResourceDictionary>

@@ -100,7 +100,7 @@
                     <CheckBox Name="cbOverrideKey" Margin="20 0 0 0" Grid.Row="1" Grid.Column="0" Content="Override default key location:" VerticalAlignment="Center" IsChecked="{Binding Path=DataContext.HasCustomSSHKeyFile, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}}" />
                     <TextBox Grid.Row="1" Grid.Column="1" Margin="5" Text="{Binding Path=DataContext.CustomSSHKeyFile, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}}" IsEnabled="{Binding IsChecked, ElementName=cbOverrideKey}" />
                     <Button ToolTip="Browse..." Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Style="{DynamicResource DynamicButton}" IsEnabled="{Binding IsChecked, ElementName=cbOverrideKey}" Click="Browse_Click">
-                      <Image Width="16" Height="16" Source="../icons/open16.png" />
+                      <Image Width="16" Height="16" Source="{local:Icon open16.png}" />
                     </Button>
                     <CheckBox Name="cbPassphraseKey" Margin="20 0 0 0" Grid.Row="2" Grid.Column="0" Content="Passphrase:" VerticalAlignment="Center" IsChecked="{Binding Path=DataContext.HasPassphrase, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:NewSSHConnectionWindow}}}" />
                     <Grid Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="5 5 0 5" VerticalAlignment="Center" IsEnabled="{Binding IsChecked, ElementName=cbPassphraseKey}">
@@ -140,7 +140,7 @@
           <ColumnDefinition Width="Auto" SharedSizeGroup="UpperLabelColumn" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Image Width="48" Height="48" Source="../icons/user48.png" Margin="5 5 10 5" Grid.RowSpan="2" />
+        <Image Width="48" Height="48" Source="{local:Icon user48.png}" Margin="5 5 10 5" Grid.RowSpan="2" />
         <TextBlock Text="Host Name:" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="0 0 5 0" />
         <TextBox Name="txtHostName" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text="{Binding HostName, UpdateSourceTrigger=PropertyChanged}" TextChanged="TextBox_TextChanged" />
         <TextBlock Text="User Name:" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" />
@@ -167,7 +167,7 @@
       <GroupBox Margin="0 5 0 5">
         <HeaderedContentControl.Header>
           <StackPanel Orientation="Horizontal">
-            <Image Width="16" Height="16" Source="../icons/MainWindow/pubkey.png" />
+            <Image Width="16" Height="16" Source="{local:Icon MainWindow/pubkey.png}" />
             <TextBlock Text="Authentication method" />
           </StackPanel>
         </HeaderedContentControl.Header>
