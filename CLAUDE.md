@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
@@ -90,7 +90,8 @@ The WinForms controls this replaced (`ReadonlyTextBrowser` and its subclasses up
 
 The terminals are WPF (`GUI/TerminalView/`): `WpfTerminal` (a `Border` with `TerminalPanel`: `TerminalRenderView` and a scroll bar) shows
 a `Terminal/Rendering/TerminalDisplayModel`, which holds the emulator and the screen of `Terminal/Emulation/` (a screen is an
-`EditableTextDocument` plus a `LineInfoStore`, one `CellStyle[]` per line, plus a `GridPoint` cursor); `WpfSmartTerminal`,
+`EditableTextDocument` plus a `LineInfoStore`, one `CellStyle[]` per line, plus a `GridPoint` cursor; a column is an index of the text of its line,
+and a wide character is itself and the filler of its second cell, `Terminal/Emulation/CellWidth`, see "Wide characters"); `WpfSmartTerminal`,
 `WpfSerialTerminal` and the panes of `WpfHexTerminal` are `WpfTerminal`s, and `GUI/DevicePanel/WpfDeviceTerminal` is the device tab around
 the last two. Bytes typed or sent back to the host leave through `WpfTerminal.DataEntered` via `TerminalEventDispatcher.PostInput`.
 
@@ -514,7 +515,7 @@ is gone; `XtermKeyTable` reads the same `XTermKeys.xml`. `CsiRepeatLimitTests`, 
 `FolderBrowserTests` and `PasteProgressTests` read the WPF files now.
 
 Not in 2A–2E: the view in the other tabs (`ITabContext.EditorControl` was a `TextEditorControl` for the editor tabs; it went in 3E-4), wide (East Asian) characters taking two cells (the
-screen gives every UTF-16 unit one cell; a wide glyph is drawn in one), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
+screen gave every UTF-16 unit one cell and drew a wide glyph in one; done after stage 5, see "Wide characters"), bold glyphs (neither view draws them), UI Automation. If `GlyphRun` is too
 slow in the lab, the next step is Direct2D through `D3DImage` (not `HwndHost`, which brings back the airspace problems of `WindowsFormsHost`).
 
 Manual check on Windows, for every change of the view (record the numbers of the lab in the pull request): local with a GPU; the same with
@@ -652,6 +653,52 @@ dark theme, the line numbers on the system's button colour, a device tab and its
 one; the font of the settings in a classic, a Smart Terminal and a device tab, and the font picker; the remembered place of the connection
 window after an update from the previous version; a hex mark with a preset and with another colour; the paste progress window near its
 terminal; the full screen mode.
+
+### Wide characters (after stage 5)
+
+Done: a character that the programs on the other side count as two columns (`wcwidth`) takes two cells of the screen. The width is
+`Terminal/Emulation/CellWidth.IsWide`: the East Asian Wide and Fullwidth ranges of Unicode 15.1 below U+10000 (58 ranges, 42184 characters,
+generated from Python's `unicodedata`; `TerminalScreenTests` checks the counts). A wide character is kept in the text of its line as itself and
+`CellWidth.Filler` (U+FFFF, a noncharacter; one that arrives is written as U+FFFD), so that a column stays an index of the text and the styles, the
+selection, the cursor, the mouse and the screen operations need no mapping; a filler that does not follow a wide character is a cell left empty
+before one that did not fit at the end of a row. A surrogate pair took two cells as two units already and still does (right for the wide ones
+there; a narrow one takes a cell too many). Combining marks and variation selectors still take a cell each (`wcwidth` 0): not done.
+
+- The screen (`TerminalScreen`): `WriteText` and `WriteAt` write the cells of the text (`ToCells`); a wide character never starts in the last
+  column when the text wraps (that cell gets a filler of its own and the character goes to the next row; not on a screen of one column, where the
+  two cells go to two rows); a write, an erase from a column, an insertion, a deletion and the truncation of an insertion at the right edge that
+  would cut a wide character in two make both its cells blanks first (`SplitWideCharacter`, as xterm does); REP after a wide character repeats it.
+  `WideCharacters` (on) is turned off by `TerminalDisplayModel` while it writes in the byte mode of the serial terminal, where the device counts a
+  byte as a column and every character takes one cell, as before.
+- What leaves the screen has no fillers (`CellWidth.Strip`): the copy (`TerminalDisplayModel.GetSelectedText`), the text of the document of a tab
+  (`WpfTerminal.DocumentText`, which the device tab saves and copies), `ISearchTarget.GetRangeText` (the text the search bar takes from the
+  selection) and the directory `AppEnvironment` reads from a prompt. The search (`DocumentSearch.Find` and `ForEachMatch`, which the highlight of
+  all the matches uses now) matches the text without the fillers and gives cells. The two link scanners take a filler as part of what the character
+  before it is part of and leave it out of the text of a link (an address with wide characters opens without them). A double click selects a word
+  of wide characters whole.
+- The view: `RowRunBuilder` keeps a wide character and its second cell in one run (a filler of an empty cell is a blank), `DrawGlyphs` gives a wide
+  glyph the advance of two cells and draws nothing for a filler, the caret covers both cells of a wide character or a surrogate pair, and the grey
+  suggestion is drawn in cells.
+- The command line (`PromptLine`, the Smart Terminal and the input line of a device) lays its rows out itself: a wide character takes two cells and is
+  never cut by the end of a row (the cell left empty gets a filler, and the caret before the character is at the start of the next row); the end of a
+  full row and the start of the next one are the same index, with the caret at the end of the row, as before; `PositionAt`, `IndexOf` and `Contains`
+  read that layout (a place in the second cell of a wide character is the index after it), and a local prompt with wide characters takes its cells.
+  `Terminal/InputRegionMap` (C7), which counted a character as a cell, had no other caller and is gone with `tests/InputRegionMapTests`; the checks of
+  `PromptLine` in `TerminalRenderModelTests` that were written against it pass unchanged.
+- Tests: `TerminalScreenTests` (169 checks, 62 new: the table, the writes, the edges, the halves, erase, insert, delete, REP, the byte mode, one column),
+  `TerminalRenderModelTests` (234, 30 new: the runs, the search in cells, the copy, the byte mode, the command line), `OutputLinkTests` (258) and
+  `LocalLinkScannerTests` (93). `TerminalModelSnapshots`: the WinForms terminal gave a wide character one cell, so the 59 cases whose output has one
+  (the hand-written "unicode text" and "wide characters wrap" and 57 generated ones) are compared with goldens of their own,
+  `TerminalWideGolden.txt` and `TerminalWideCellColorsGolden.txt` (written by the display model, `--record-wide <folder>`: the cursor three columns
+  further after three wide characters, the last cell of a row left empty and the two characters in the next row); every other case still gives the
+  lines of the WinForms goldens, which were not recorded again. Four mutations (no empty cell at the edge, no split at the end of a write, every filler
+  taken for a second cell, no empty cell in the command line) each make a check fail.
+- Manual check on Windows: `ls` of a directory with Chinese, Japanese and Korean names in a classic tab and in a Smart Terminal; `vim` and `mc` with
+  such files (the columns stay in place, the cursor over a wide character); `htop` with a process of a CJK name; a line of wide characters longer than
+  the screen (the wrap, the empty last cell); emoji such as U+231A and U+1F600; the selection and the copy of wide characters, a double click on a
+  word of them, the search bar (Enter, the highlight of all the matches), Ctrl+click on an address with them; the caret (block, underline) on a wide
+  character; typing them with the IME in a Smart Terminal and in the input line of a COM or TCP device (Left, Right, Backspace, the wrap, the grey
+  suggestion); a BusyBox device in byte mode (one cell each, as before).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20
