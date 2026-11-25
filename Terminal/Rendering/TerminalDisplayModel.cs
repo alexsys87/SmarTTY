@@ -222,6 +222,8 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             document.RemoveLines(startLine + 1, document.LineCount - startLine - 1);
         }
         Lines.RemoveLines(startLine + 1, int.MaxValue);
+        // The characters of no width of the text that was written after the kept columns go with it.
+        Lines.ClearMarks(startLine, keepColumns, int.MaxValue);
         string line = document.GetLineText(startLine);
         string kept = line.Length >= keepColumns ? line.Substring(0, keepColumns) : line.PadRight(keepColumns);
         string first = rows.Count > 0 ? rows[0] ?? "" : "";
@@ -238,6 +240,23 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         {
             _selectionAnchor = Clamp(_selectionAnchor);
             _selectionEnd = Clamp(_selectionEnd);
+        }
+        OnChanged();
+    }
+
+    /// <summary>
+    /// Puts characters of no width on cells of the document, after what they have (the command line, which writes its rows with
+    /// <see cref="ReplaceDocumentTail(int, IList{string})"/>, keeps them out of the text, as the screen does).
+    /// </summary>
+    public void AddMarks(IList<KeyValuePair<TextDocument.TextPosition, string>> marks)
+    {
+        if (marks == null || marks.Count == 0)
+        {
+            return;
+        }
+        foreach (KeyValuePair<TextDocument.TextPosition, string> mark in marks)
+        {
+            Lines.AddMarkToLine(mark.Key.Line, mark.Key.Column, mark.Value);
         }
         OnChanged();
     }
@@ -566,7 +585,8 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
 
     /// <summary>
     /// The selected text. A line that the terminal wrapped goes on without a line break, as the WinForms view copies it; the blanks at the
-    /// end of a line that is not wrapped are dropped (the screen pads its rows with them).
+    /// end of a line that is not wrapped are dropped (the screen pads its rows with them). A wide character is in it once (without the filler
+    /// of its second cell), a character of no width after the character it goes with.
     /// </summary>
     public string GetSelectedText()
     {
@@ -575,7 +595,35 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             return "";
         }
         GetSelection(out TextDocument.TextPosition start, out TextDocument.TextPosition end);
-        return _document.GetRangeText(start, end, GetLineBreak);
+        return GetText(start, end, GetLineBreak);
+    }
+
+    /// <summary>
+    /// The text between two places of the document as it leaves the screen (a copy, the text of a tab): a wide character once, a character of no
+    /// width after the character it goes with (<see cref="CellWidth.TextOf"/>), <paramref name="lineBreak"/> after every line but the last.
+    /// </summary>
+    public string GetText(TextDocument.TextPosition start, TextDocument.TextPosition end, Func<int, string> lineBreak)
+    {
+        if (end < start)
+        {
+            TextDocument.TextPosition other = start;
+            start = end;
+            end = other;
+        }
+        StringBuilder text = new StringBuilder();
+        int lastLine = Math.Min(end.Line, _document.LineCount - 1);
+        for (int line = start.Line; line <= lastLine; line++)
+        {
+            string cells = _document.GetLineText(line);
+            int from = line == start.Line ? Math.Min(start.Column, cells.Length) : 0;
+            int to = line == end.Line ? Math.Min(end.Column, cells.Length) : cells.Length;
+            text.Append(CellWidth.TextOf(cells, Lines.GetLine(line)?.Marks, from, Math.Max(from, to)));
+            if (line < end.Line)
+            {
+                text.Append(lineBreak(line));
+            }
+        }
+        return text.ToString();
     }
 
     private string GetLineBreak(int line)
@@ -862,17 +910,26 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             _screen.WriteText(_modes.Charsets.Translate(replaced?.ToString() ?? text));
             return;
         }
-        int runStart = 0;
-        for (int index = 0; index < text.Length; index++)
+        // The device counts a byte as a column: every character takes one cell, a wide one too.
+        _screen.WideCharacters = false;
+        try
         {
-            if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+            int runStart = 0;
+            for (int index = 0; index < text.Length; index++)
             {
-                WriteByteModeRun(text.Substring(runStart, index - runStart));
-                WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
-                runStart = index + 1;
+                if (Utf8StreamDecoder.IsEscapedByte(text[index]))
+                {
+                    WriteByteModeRun(text.Substring(runStart, index - runStart));
+                    WriteEscapedByte((byte)(text[index] - Utf8StreamDecoder.EscapedByteBase));
+                    runStart = index + 1;
+                }
             }
+            WriteByteModeRun(text.Substring(runStart));
         }
-        WriteByteModeRun(text.Substring(runStart));
+        finally
+        {
+            _screen.WideCharacters = true;
+        }
     }
 
     private void WriteByteModeRun(string text)

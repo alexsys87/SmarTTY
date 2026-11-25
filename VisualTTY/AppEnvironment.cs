@@ -55,7 +55,8 @@ public static class AppEnvironment
                     {
                         parsedPath = "~";
                     }
-                    workingDir = parsedPath;
+                    // A wide character of the name is followed on the screen by the filler of its second cell.
+                    workingDir = SmarTTY.Terminal.Emulation.CellWidth.Strip(parsedPath);
                 }
             }
         }

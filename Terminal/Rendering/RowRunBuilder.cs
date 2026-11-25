@@ -1,5 +1,6 @@
 using SmarTTY.Terminal.Emulation;
 using SmarTTY.TextEditing;
+using System;
 using System.Collections.Generic;
 
 namespace SmarTTY.Terminal.Rendering;
@@ -39,6 +40,9 @@ public sealed class RowLayout
     /// <summary>The text of the row that the runs cover (cut to the number of columns that are painted).</summary>
     public string Text = "";
 
+    /// <summary>The characters of no width drawn over the cells of <see cref="Text"/> (<see cref="LineInfo.Marks"/>); null when there are none.</summary>
+    public string[] Marks;
+
     /// <summary>A 64-bit hash of the text and the runs. Two rows with the same signature and the same <see cref="Text"/> look the same.</summary>
     public ulong Signature;
 
@@ -47,6 +51,7 @@ public sealed class RowLayout
         Backgrounds.Clear();
         Texts.Clear();
         Text = "";
+        Marks = null;
         Signature = 0;
     }
 }
@@ -55,7 +60,9 @@ public sealed class RowLayout
 /// Turns a line of the terminal (its text and the style of every cell) into the runs it is painted with. Neighbouring cells of one colour
 /// make one run, so a line of plain text is one glyph run and one coloured word is one more; a blank (without an underline) never splits a
 /// run, because it draws nothing, and no run starts or ends with one. Background rectangles are merged the same way, across the text runs.
-/// No text layout is done: every character takes one cell of the grid.
+/// No text layout is done: every character takes one cell of the grid, a wide one two (itself and the filler of its second cell, which is in the
+/// run with it, see <see cref="CellWidth"/>); a filler that does not follow a wide character is an empty cell, a blank. A cell with characters of
+/// no width (<see cref="LineInfo.Marks"/>) is drawn with them, a blank one too.
 /// </summary>
 public static class RowRunBuilder
 {
@@ -78,6 +85,9 @@ public static class RowRunBuilder
         }
         layout.Text = length == text.Length ? text : text.Substring(0, length);
         CellStyle[] cells = line?.Cells;
+        string[] marks = line?.Marks;
+        layout.Marks = marks != null && Array.Exists(marks, mark => mark != null) ? marks : null;
+        marks = layout.Marks;
         bool dimmed = line != null && line.IsDimmed;
         RgbColor defaultForeground = scheme.DefaultForeground;
 
@@ -133,7 +143,8 @@ public static class RowRunBuilder
 
             // Text.
             char ch = text[column];
-            bool blank = ch == ' ' || ch == '\0';
+            bool blank = (ch == ' ' || ch == '\0' || (ch == CellWidth.Filler && !CellWidth.IsSecondCell(text, column)))
+                && (marks == null || column >= marks.Length || marks[column] == null);
             if (blank && !colors.Underline)
             {
                 // A blank draws nothing: it does not end a run without an underline, but it is not under the line of an underlined one.
@@ -195,6 +206,19 @@ public static class RowRunBuilder
             hash = Mix(hash, text[index]);
         }
         hash = Mix(hash, (uint)text.Length | (dimmed ? 0x80000000u : 0u));
+        string[] marks = layout.Marks;
+        for (int column = 0; marks != null && column < text.Length && column < marks.Length; column++)
+        {
+            string mark = marks[column];
+            if (mark != null)
+            {
+                hash = Mix(hash, (uint)column | 0x40000000u);
+                foreach (char ch in mark)
+                {
+                    hash = Mix(hash, ch);
+                }
+            }
+        }
         foreach (BackgroundRun run in layout.Backgrounds)
         {
             hash = Mix(hash, (uint)run.Start);

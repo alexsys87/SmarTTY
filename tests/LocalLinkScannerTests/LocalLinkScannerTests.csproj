@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Terminal/LocalLinkScanner.cs" Link="LocalLinkScanner.cs" />
+    <Compile Include="../../Terminal/Emulation/CellWidth.cs" Link="CellWidth.cs" />
     <Compile Include="../../Terminal/Emulation/LinkTypes.cs" Link="LinkTypes.cs" />
     <Compile Include="../../Utilities/LocalLinkRules.cs" Link="LocalLinkRules.cs" />
     <Compile Include="../../Utilities/UrlLinks.cs" Link="UrlLinks.cs" />

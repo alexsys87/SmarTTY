@@ -54,6 +54,13 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
     /// <summary>The text pushes the characters after it to the right (insert mode, CSI 4 h) instead of replacing them.</summary>
     public bool InsertMode { get; set; }
 
+    /// <summary>
+    /// A wide character written takes two cells and a character of no width none (it goes with the cell before it), see <see cref="CellWidth"/>.
+    /// The byte mode of the serial terminal turns it off while it writes: there the device counts a byte as a column, and every character takes
+    /// one cell.
+    /// </summary>
+    public bool WideCharacters { get; set; } = true;
+
     public int Rows => _view.VisibleRows;
 
     public int Columns => _view.VisibleColumns;
@@ -361,7 +368,7 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
             {
                 _view.Trace("'" + text + "'");
             }
-            GridPoint point = WriteAtCore(_cursor, text, CurrentStyle, scroll: true, InsertMode);
+            GridPoint point = WriteCells(_cursor, text, CurrentStyle, InsertMode);
             if (moveCursor)
             {
                 Cursor = point;
@@ -374,9 +381,19 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
         TextDocument.TextPosition textPosition = ToDocumentPosition(_cursor);
         string text = _view.Document.GetLineText(textPosition.Line);
         char ch = ' ';
-        if (textPosition.Column > 0 && text != null && textPosition.Column <= text.Length)
+        int column = textPosition.Column;
+        if (column > 0 && text != null && column <= text.Length && CellWidth.IsSecondCell(text, column - 1))
         {
-            ch = text[textPosition.Column - 1];
+            // The character before the cursor is a wide one: it is the one repeated.
+            column--;
+        }
+        if (column > 0 && text != null && column <= text.Length)
+        {
+            ch = text[column - 1];
+        }
+        if (ch == CellWidth.Filler)
+        {
+            ch = ' ';
         }
         CellStyle cellStyle = default;
         LineInfo lineInfo = ActiveBuffer.Lines.GetLine(textPosition.Line);
@@ -449,6 +466,8 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
             return;
         }
         count = Math.Min(count, lineLength - textPosition.Column);
+        SplitWideCharacter(textPosition.Line, textPosition.Column);
+        SplitWideCharacter(textPosition.Line, textPosition.Column + count);
         _view.Document.ReplaceInLine(textPosition.Line, textPosition.Column, count, "");
         ActiveBuffer.Lines.DeleteCells(_cursor, count);
         _view.Redraw();
@@ -462,6 +481,7 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
     public void InsertChars(int count, char ch)
     {
         TextDocument.TextPosition textPosition = EnsureCursorPosition(_cursor);
+        SplitWideCharacter(textPosition.Line, textPosition.Column);
         _view.Document.ReplaceInLine(textPosition.Line, textPosition.Column, 0, new string(ch, count));
         ActiveBuffer.Lines.InsertCells(_cursor, count);
         TruncateToScreenWidth(textPosition.Line);
@@ -479,16 +499,101 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
         int length = _view.Document.GetLineText(documentLine).Length;
         if (length > _view.VisibleColumns)
         {
+            SplitWideCharacter(documentLine, _view.VisibleColumns);
             _view.Document.ReplaceInLine(documentLine, _view.VisibleColumns, length - _view.VisibleColumns, "");
         }
     }
 
     public void WriteAt(GridPoint point, string text, CellStyle cellStyle)
     {
-        WriteAtCore(point, text, cellStyle, scroll: true, insert: false);
+        WriteCells(point, text, cellStyle, insert: false);
     }
 
-    /// <summary>Writes text at a cell, wrapping and scrolling as the options say; returns where the cursor goes next.</summary>
+    // Writes a text at a cell and gives where it ends: the characters of no width in it go with the cell before them, the rest as cells.
+    private GridPoint WriteCells(GridPoint point, string text, CellStyle cellStyle, bool insert)
+    {
+        int start = 0;
+        if (WideCharacters)
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                int length = CellWidth.ZeroWidthLength(text, index);
+                if (length == 0)
+                {
+                    continue;
+                }
+                if (index > start)
+                {
+                    point = WriteAtCore(point, ToCells(text.Substring(start, index - start)), cellStyle, scroll: true, insert);
+                }
+                AddMark(point, text.Substring(index, length));
+                index += length - 1;
+                start = index + 1;
+            }
+        }
+        if (start < text.Length)
+        {
+            point = WriteAtCore(point, ToCells(start == 0 ? text : text.Substring(start)), cellStyle, scroll: true, insert);
+        }
+        return point;
+    }
+
+    // A character of no width goes with the cell before the place it is written at (the first cell of a wide character); at the start of a row
+    // there is none, and it is dropped. The cursor does not move.
+    private void AddMark(GridPoint point, string mark)
+    {
+        if (point.X <= 0 || point.Y < 0 || point.Y >= _view.VisibleRows)
+        {
+            return;
+        }
+        int documentLine = ToDocumentPosition(point).Line;
+        if (documentLine >= _view.Document.LineCount)
+        {
+            return;
+        }
+        string line = _view.Document.GetLineText(documentLine) ?? "";
+        int column = Math.Min(point.X, _view.VisibleColumns) - 1;
+        if (CellWidth.IsSecondCell(line, column))
+        {
+            column--;
+        }
+        if (column < 0 || column >= line.Length || line[column] == CellWidth.Filler)
+        {
+            return;
+        }
+        ActiveBuffer.Lines.AddMark(point.Y, column, mark);
+        InvalidateView();
+    }
+
+    // The cells a text takes: with wide characters a filler after each of them (see CellWidth); a filler that came with the text is not one.
+    private string ToCells(string text)
+    {
+        if (WideCharacters)
+        {
+            return CellWidth.ToCells(text);
+        }
+        return text.IndexOf(CellWidth.Filler) < 0 ? text : text.Replace(CellWidth.Filler, '\uFFFD');
+    }
+
+    // A wide character that a change of the cells from (or up to) a column would cut in two becomes two blanks, as on a real terminal.
+    private void SplitWideCharacter(int documentLine, int column)
+    {
+        EditableTextDocument document = _view.Document;
+        if (documentLine < 0 || documentLine >= document.LineCount)
+        {
+            return;
+        }
+        if (CellWidth.IsSecondCell(document.GetLineText(documentLine), column))
+        {
+            document.ReplaceInLine(documentLine, column - 1, 2, "  ");
+            ActiveBuffer.Lines.ClearMarks(documentLine, column - 1, 2);
+        }
+    }
+
+    /// <summary>
+    /// Writes the cells of a text at a cell, wrapping and scrolling as the options say; returns where the cursor goes next. A wide character never
+    /// starts in the last column of a row when the text wraps: that cell is left empty (a filler of its own) and the character goes to the next row.
+    /// </summary>
     public GridPoint WriteAtCore(GridPoint point, string text, CellStyle cellStyle, bool scroll, bool insert)
     {
         bool wrapped = false;
@@ -512,12 +617,20 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
             {
                 // The parts keep the way of writing: in the insert mode every part is inserted (the text behind it moves right, and what
                 // leaves the screen is lost), not written over the text that was there.
-                point = WriteAtCore(point, text.Substring(0, availableColumns), cellStyle, scroll, insert);
-                int chunkLength;
-                for (int chunkOffset = availableColumns; chunkOffset < text.Length; chunkOffset += chunkLength)
+                int chunkOffset = 0;
+                int room = availableColumns;
+                while (chunkOffset < text.Length)
                 {
-                    chunkLength = Math.Min(text.Length - chunkOffset, _view.VisibleColumns);
-                    point = WriteAtCore(point, text.Substring(chunkOffset, chunkLength), cellStyle, scroll, insert);
+                    int chunkLength = Math.Min(text.Length - chunkOffset, room);
+                    bool leaveEmpty = chunkOffset + chunkLength < text.Length && _view.VisibleColumns > 1 && CellWidth.IsSecondCell(text, chunkOffset + chunkLength);
+                    if (leaveEmpty)
+                    {
+                        chunkLength--;
+                    }
+                    string chunk = text.Substring(chunkOffset, chunkLength);
+                    point = WriteAtCore(point, leaveEmpty ? chunk + CellWidth.Filler : chunk, cellStyle, scroll, insert);
+                    chunkOffset += chunkLength;
+                    room = _view.VisibleColumns;
                 }
                 return point;
             }
@@ -535,6 +648,11 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
             }
         }
         LinkCell[] linkCells = _linkTracker?.Scan(text, textPosition, wrapped);
+        SplitWideCharacter(textPosition.Line, textPosition.Column);
+        if (!insert)
+        {
+            SplitWideCharacter(textPosition.Line, textPosition.Column + text.Length);
+        }
         if (insert)
         {
             document.ReplaceInLine(textPosition.Line, textPosition.Column, 0, text);
@@ -567,6 +685,7 @@ internal sealed class TerminalScreen : ITerminalScreen, ILineInfoHost
     public void ClearLineFrom(int line, int startColumn, CellStyle cellStyle)
     {
         TextDocument.TextPosition textPosition = ToDocumentPosition(new GridPoint(startColumn, line));
+        SplitWideCharacter(textPosition.Line, textPosition.Column);
         _view.Document.ReplaceInLine(textPosition.Line, textPosition.Column, -1, "");
         if (startColumn == 0)
         {

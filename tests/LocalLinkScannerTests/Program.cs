@@ -113,6 +113,9 @@ internal static class Program
         Equal(Scan(new Host(), true, "<a href=\"https://a.org/p\">x"), "+https://a.org/p -x => https://a.org/p", "an address ends at a quote");
         Equal(Scan(new Host(), true, "http://h.org:8080/p?q=1#top end"), "+http://h.org:8080/p?q=1#top -end => http://h.org:8080/p?q=1#top", "a port, a query and an anchor stay in the address");
         Equal(Scan(new Host(), true, "see (https://a.org/p) now"), "+https://a.org/p) -now => https://a.org/p", "the bracket after an address is cut off when it opens");
+        string filler = CellWidth.Filler.ToString();
+        Equal(Scan(new Host(), true, "see https://a.org/\u65e5" + filler + "\u672c" + filler + " now").Replace(filler, "_"), "+https://a.org/\u65e5_\u672c_ -now => https://a.org/\u65e5\u672c",
+            "an address with wide characters covers both cells of each and opens without the fillers");
         Equal(Scan(new Host(), true, ""), " => ", "empty text");
         Equal(Scan(new Host(), true, "a\\ b.txt"), "-b.txt => ", "a word after a backslash and a blank is a word of its own");
         Equal(Scan(new Host(), true, "see C:\\dir\\a.txt ok"), "-C:\\dir\\a.txt -ok => ", "a path with a drive letter is a candidate (it opens only on a system where the full path is of this computer)");

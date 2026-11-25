@@ -81,6 +81,8 @@ internal static class Program
             ThreadingSourceChecks();
             PromptLineChecks();
             DevicePromptChecks();
+            WidePromptChecks();
+            MarkPromptChecks();
         }
         catch (Exception exception)
         {
@@ -179,6 +181,22 @@ internal static class Program
         Equal(Describe(layout), "", "an empty line has no runs");
         RowRunBuilder.Build("     ", null, scheme, 80, layout);
         Equal(Describe(layout), "", "a line of blanks has no runs");
+        string filler = CellWidth.Filler.ToString();
+        RowRunBuilder.Build("ab\u65e5" + filler, null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+4", "a wide character and its second cell are in the run of the text");
+        RowRunBuilder.Build("x" + filler, null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+1", "a cell left empty before a wide character is a blank: no run ends with it");
+        RowRunBuilder.Build(filler + "x", null, scheme, 80, layout);
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 1+1", "and none starts with it");
+        LineInfo marked = new LineInfo { Marks = new string[] { "\u0301", null, null, "\u0300" } };
+        RowRunBuilder.Build("ab  ", marked, scheme, 80, layout);
+        Check(layout.Marks == marked.Marks, "the marks of the cells go with the layout");
+        Equal(layout.Texts.Count + " " + layout.Texts[0].Start + "+" + layout.Texts[0].Length, "1 0+4", "a blank with a mark is drawn: it is in the run");
+        ulong withMarks = layout.Signature;
+        RowRunBuilder.Build("ab  ", null, scheme, 80, layout);
+        Check(layout.Marks == null && layout.Signature != withMarks, "a row without the marks has another signature (it is drawn again)");
+        RowRunBuilder.Build("ab", new LineInfo { Marks = new string[4] }, scheme, 80, layout);
+        Check(layout.Marks == null, "a line whose marks are all gone has none in its layout");
         RowRunBuilder.Build(null, null, scheme, 80, layout);
         Equal(layout.Text, "", "a missing line is empty");
 
@@ -511,6 +529,44 @@ internal static class Program
         Equal(found.Line + ":" + found.Column, "1:6", "inside a scope");
         found = DocumentSearch.Find(model.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("zeta", true), false, true, none, none, out length);
         Check(!found.IsValid, "no match");
+
+        // Wide characters: the text that is searched has each once, the places and lengths are cells (a\u65e5_\u672c_b \u65e5_\u672c_).
+        TerminalDisplayModel wide = new TerminalDisplayModel(30, 5);
+        wide.ProcessOutput("a\u65e5\u672cb \u65e5\u672c\r\n");
+        Equal(wide.Document.GetLineText(0).Replace(CellWidth.Filler, '_'), "a\u65e5_\u672c_b \u65e5_\u672c_", "a wide character takes two cells of the line");
+        TextMatcher both = TextMatcher.Literal("\u65e5\u672c", ignoreCase: false);
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), both, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:1+4", "two wide characters are found as they were typed, and take four cells");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(2, 0), both, false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:7+4", "from the second cell of a wide character the search starts after it");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("\u672cb", false), false, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:3+3", "a match of a wide and a narrow character");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(11, 0), TextMatcher.Literal("\u65e5", false), true, true, none, none, out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:7+2", "backwards");
+        found = DocumentSearch.Find(wide.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("\u672c", false), false, true, new TextDocument.TextPosition(4, 0), new TextDocument.TextPosition(11, 0), out length);
+        Equal(found.Line + ":" + found.Column + "+" + length, "0:9+2", "a scope that starts in the second cell of a character does not hold it");
+        List<string> matches = new List<string>();
+        DocumentSearch.ForEachMatch(wide.Document.GetLineText(0), TextMatcher.Literal("\u672c", false), (start, cells) => matches.Add(start + "+" + cells));
+        Equal(string.Join(",", matches), "3+2,9+2", "every match of a line for the highlight, in cells");
+        wide.Select(new TextDocument.TextPosition(1, 0), new TextDocument.TextPosition(5, 0));
+        Equal(wide.GetSelectedText(), "\u65e5\u672c", "the selected wide characters are copied without their fillers");
+        wide.Select(new TextDocument.TextPosition(2, 0), new TextDocument.TextPosition(6, 0));
+        Equal(wide.GetSelectedText(), "\u672cb", "a selection from the second cell of a character does not copy it");
+
+        TerminalDisplayModel marks = new TerminalDisplayModel(30, 5);
+        marks.ProcessOutput("cafe\u0301 \u65e5\u3099x\r\nnext");
+        Equal(marks.Document.GetLineText(0).Replace(CellWidth.Filler, '_'), "cafe \u65e5_x", "the marks take no cell of the line");
+        marks.Select(new TextDocument.TextPosition(0, 0), new TextDocument.TextPosition(4, 1));
+        Equal(marks.GetSelectedText(), "cafe\u0301 \u65e5\u3099x\r\nnext", "a copy gives every mark after the character it was written with, as it came");
+        Equal(marks.GetText(new TextDocument.TextPosition(3, 0), new TextDocument.TextPosition(4, 0), line => "|"), "e\u0301", "the text of one cell has its marks");
+        found = DocumentSearch.Find(marks.Document, new TextDocument.TextPosition(0, 0), TextMatcher.Literal("cafe ", false), false, true, none, none, out length);
+        Equal(found.Column + "+" + length, "0+5", "the search sees the letters, not the marks over them");
+
+        TerminalDisplayModel bytes = new TerminalDisplayModel(30, 5);
+        bytes.ByteOrientedLineEditing = true;
+        bytes.ProcessOutput("\u65e5x");
+        Equal(bytes.Document.GetLineText(0), "\u65e5x", "in the byte mode a wide character takes one cell (the device counts bytes)");
+        Equal(bytes.CursorPosition.X, 2, "and the cursor moves by one for it");
     }
 
     // The session reads the Tag of a tab's terminal on the thread of the channel and the window on the thread of the input. A WPF element's own
@@ -616,6 +672,121 @@ internal static class Program
         Equal(model.Caret.Line + ":" + model.Caret.Column, "0:1", "a reset gives the caret back to the screen");
         Check(next.Prompt == "$ ", "the prompt");
     }
+    // The command line with wide characters: two cells each, never cut by the end of a row ('#' is the filler of a second or an empty cell).
+    private static void WidePromptChecks()
+    {
+        const string Ri = "\u65e5";
+        const string Ben = "\u672c";
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 4);
+        PromptLine line = new PromptLine(model, 0, "$ ");
+        line.Insert("ab" + Ri + Ben + "c");
+        Equal(Row(model, 0), "$ ab" + Ri + "#" + Ben + "#c", "a wide character takes two cells of the command line");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "0:9", "and the caret is after both of its cells");
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        Equal(line.CaretIndex + " " + model.Caret.Column, "3 6", "Left steps over a wide character, two cells at a time");
+        line.SetText("abcdef" + Ri);
+        Equal(Row(model, 0) + "|" + model.Document.LineCount, "$ abcdef" + Ri + "#|1", "a wide character fits in the last two cells");
+        Equal(model.Caret.Line + ":" + model.Caret.Column, "0:10", "the caret after it is at the end of the full row");
+        line.SetText("abcdefg" + Ri + "x");
+        Equal(Row(model, 0) + "|" + Row(model, 1), "$ abcdefg#|" + Ri + "#x", "a wide character that would start in the last cell leaves it empty and starts the next row");
+        Equal(Pos(line.PositionAt(7)), "1:0", "the caret before it is on the next row");
+        Equal(Pos(line.PositionAt(8)) + " " + Pos(line.PositionAt(9)), "1:2 1:3", "and after it two cells on");
+        Equal(line.IndexOf(new TextDocument.TextPosition(9, 0)), 7, "the empty cell is the place of the character after it");
+        Equal(line.IndexOf(new TextDocument.TextPosition(0, 1)), 7, "the first cell of a wide character is its index");
+        Equal(line.IndexOf(new TextDocument.TextPosition(1, 1)), 8, "its second cell is the index after it");
+        line.MoveCaret(7, extend: false);
+        line.MoveCaret(8, extend: true);
+        Equal(line.SelectedText + "|" + model.GetSelectedText(), Ri + "|" + Ri, "a selected wide character is copied once");
+        line.SetText("abcdefgh");
+        Equal(Pos(line.PositionAt(8)) + " " + line.IndexOf(new TextDocument.TextPosition(0, 1)), "0:10 8", "the end of a full row and the start of the next are the same index");
+
+        TerminalDisplayModel local = new TerminalDisplayModel(10, 4);
+        PromptLine wideLocal = new PromptLine(local, 0, Ri + "$ ");
+        Equal(Row(local, 0) + " " + local.Caret.Column, Ri + "#$  4", "a local prompt with a wide character takes its cells");
+        Check(!wideLocal.Contains(new TextDocument.TextPosition(3, 0)) && wideLocal.Contains(new TextDocument.TextPosition(4, 0)), "the text starts after the cells of the prompt");
+
+        TerminalDisplayModel device = new TerminalDisplayModel(12, 4);
+        device.ProcessOutput(Ri + "# ");
+        string prompt = device.GetScreenLineText(device.CursorPosition.Y).Substring(0, device.CursorPosition.X);
+        PromptLine input = new PromptLine(device, device.CursorDocumentLine, prompt, promptOnScreen: true);
+        input.Insert("ls");
+        Equal(Row(device, 0) + " " + input.StartColumn + " " + device.Caret.Column, Ri + "## ls 4 6", "the device's prompt with a wide character is kept as its cells");
+    }
+
+    // Characters of no width in the command line: no cell, kept on the cell before them, stepped over with that character.
+    private static void MarkPromptChecks()
+    {
+        const string Acute = "\u0301";
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 4);
+        PromptLine line = new PromptLine(model, 0, "$ ");
+        line.Insert("cafe" + Acute);
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 5), "$ cafe|" + Acute, "a combining mark takes no cell and is on the cell of its letter");
+        Equal(Pos(model.Caret), "0:6", "the caret is after the letter");
+        Equal(Pos(line.PositionAt(4)), "0:6", "the place before the mark is after its letter (a caret set there by a completion)");
+        Equal(line.Text, "cafe" + Acute, "the text keeps the mark");
+        line.Insert("x");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 5) + "|" + Pos(model.Caret), "$ cafex|" + Acute + "|0:7", "a letter after it takes the next cell");
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        Equal(line.CaretIndex + " " + Pos(model.Caret), "3 0:5", "Left steps over a letter and its mark as one");
+        line.MoveCaret(line.StepIndex(forward: true, word: false), extend: false);
+        Equal(line.CaretIndex, 5, "Right too");
+        line.DeleteBackward(word: false);
+        Equal(line.Text + "|" + Row(model, 0) + "|" + Mark(model, 0, 5) + "|" + Mark(model, 0, 4), "cafx|$ cafx||", "Backspace takes the letter with its mark, and the marks go with the old rows");
+        line.SetText("e" + Acute + "\u0323z");
+        line.MoveCaret(0, extend: false);
+        line.DeleteForward(word: false);
+        Equal(line.Text, "z", "Delete takes a letter with all its marks");
+        line.SetText("ab e" + Acute + "f");
+        Equal(line.StepIndex(forward: false, word: true) + " " + line.StepIndex(forward: false, word: false), "3 5", "a mark is part of the word of its letter");
+        line.MoveCaret(3, extend: false);
+        line.MoveCaret(5, extend: true);
+        Equal(model.GetSelectedText(), "e" + Acute, "the copy of the selection keeps the mark after its letter");
+        Equal(line.IndexOf(new TextDocument.TextPosition(5, 0)), 3, "a click on the cell of a letter with a mark is that letter");
+        Equal(line.IndexOf(new TextDocument.TextPosition(6, 0)), 5, "the next cell is the character after the mark");
+
+        line.SetText("abcdefgh" + Acute + "i");
+        Equal(Row(model, 0) + "|" + Row(model, 1) + "|" + Mark(model, 0, 9), "$ abcdefgh|i|" + Acute, "a mark after the last cell of a row goes on that cell");
+        Equal(Pos(line.PositionAt(9)) + " " + Pos(line.PositionAt(10)), "0:10 1:1", "the caret before it is at the end of the row");
+        line.SetText("\u65e5" + Acute);
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 2) + "|" + Pos(model.Caret), "$ \u65e5#|" + Acute + "|0:4", "a mark of a wide character is on its first cell");
+        line.SetText("\U0001F468\u200D\U0001F469");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 2), "$ \U0001F468\U0001F469|\u200D", "a joiner is on the first half of the surrogate pair before it");
+        line.SetText(Acute + "a");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 1) + "|" + line.CaretIndex, "$ a|" + Acute + "|2", "a mark at the start of the text goes on the last cell of a local prompt");
+
+        TerminalDisplayModel device = new TerminalDisplayModel(12, 4);
+        device.ProcessOutput("o\u0302# ");
+        string prompt = device.GetScreenLineText(device.CursorPosition.Y).Substring(0, device.CursorPosition.X);
+        PromptLine input = new PromptLine(device, device.CursorDocumentLine, prompt, promptOnScreen: true);
+        input.Insert("e" + Acute);
+        input.Insert("x");
+        input.DeleteBackward(word: false);
+        input.DeleteBackward(word: false);
+        input.Insert("a" + Acute);
+        Equal(Row(device, 0) + "|" + Mark(device, 0, 0) + "|" + Mark(device, 0, 3) + "|" + Mark(device, 0, 4), "o# a|\u0302|" + Acute + "|", "the device's prompt keeps its marks and the text's are written again");
+        input.SetText(Acute + "b");
+        input.SetText(Acute + "c");
+        Equal(Row(device, 0) + "|" + Mark(device, 0, 0) + "|" + Mark(device, 0, 2) + "|" + Mark(device, 0, 3), "o# c|\u0302||", "a mark at the start of the text is not put on a cell of the device's prompt");
+    }
+
+    private static string Mark(TerminalDisplayModel model, int line, int column)
+    {
+        string[] marks = model.Lines.GetLine(line)?.Marks;
+        return marks != null && column < marks.Length ? marks[column] ?? "" : "";
+    }
+
+    private static string Row(TerminalDisplayModel model, int line)
+    {
+        return model.Document.GetLineText(line).Replace(CellWidth.Filler, '#');
+    }
+
+    private static string Pos(TextDocument.TextPosition position)
+    {
+        return position.Line + ":" + position.Column;
+    }
+
     // The input line of the serial terminal that continues the device's own prompt (PromptLine with the prompt on the screen).
     private static void DevicePromptChecks()
     {

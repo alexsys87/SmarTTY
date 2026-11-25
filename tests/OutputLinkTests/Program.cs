@@ -651,6 +651,14 @@ internal static class Program
         Output prefix = Urls("url=https://example.com/a --link:http://example.com/b\n");
         Check(prefix.Host.Urls.SequenceEqual(new[] { "https://example.com/a", "http://example.com/b" }), "the link starts at the scheme, not at the word in front of it");
 
+        // The screen gives the scanner its cells: a wide character and the filler of its second cell.
+        string filler = CellWidth.Filler.ToString();
+        Output wide = Urls("see https://ja.wikipedia.org/wiki/\u65e5" + filler + "\u672c" + filler + " now\n");
+        Check(wide.Host.Urls.SequenceEqual(new[] { "https://ja.wikipedia.org/wiki/\u65e5\u672c" }), "an address with wide characters opens without the fillers: " + string.Join(" | ", wide.Host.Urls));
+        Check(wide.Covered.Count == 1 && wide.Covered[0] == "https://ja.wikipedia.org/wiki/\u65e5" + filler + "\u672c" + filler, "and the link covers both cells of each: " + string.Join(" | ", wide.Covered));
+        Output wideFile = Urls("\u65e5" + filler + " main.c:3:1: error\n");
+        Check(wideFile.Host.Opened.SequenceEqual(new[] { "/w/main.c|2|0" }), "a file name after a wide character is a link: " + string.Join(" | ", wideFile.Host.Opened));
+
         // In pieces: the same link, whole when its pieces come in one write, and the rest of it when the scheme came before.
         string full = "see https://example.com/dir/a.html and b.c:2:1\n";
         for (int cut = 1; cut < full.Length; cut++)

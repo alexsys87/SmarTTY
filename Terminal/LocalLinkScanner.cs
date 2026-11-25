@@ -199,6 +199,11 @@ internal class LocalLinkScanner : IColumnAwareLinkScanner
 
     private LocalLinkCandidate ReadChar(char ch)
     {
+        if (ch == CellWidth.Filler)
+        {
+            // The second cell of a wide character belongs to what the character before it is part of, and is not in the text of a link.
+            return _current;
+        }
         char prevChar = _previousChar;
         _previousChar = ch;
         if (_current == null)

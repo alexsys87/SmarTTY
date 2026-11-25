@@ -292,13 +292,20 @@ internal sealed class TerminalRenderView : FrameworkElement
             // The rest of the command after the caret; what does not fit on the row is cut (the line wraps when it is taken).
             int column = _ghostPosition.Column;
             int fits = Math.Max(0, model.Columns - column);
-            string text = _ghostText.Length > fits ? _ghostText.Substring(0, fits) : _ghostText;
+            // In cells: a wide character takes two (a filler after it), one that does not fit whole is not drawn, and a character of no width
+            // is drawn over the cell before it.
+            string cells = CellWidth.ToCells(_ghostText, out string[] marks);
+            string text = cells.Length > fits ? cells.Substring(0, fits) : cells;
+            if (text.Length > 0 && CellWidth.IsWide(text[text.Length - 1]))
+            {
+                text = text.Substring(0, text.Length - 1);
+            }
             if (text.Length == 0)
             {
                 return;
             }
             context.PushTransform(new TranslateTransform(column * font.CellWidth, row * font.CellHeight));
-            DrawGlyphs(context, text, 0, text.Length, GetBrush(new RgbColor((uint)(GhostTextColor.A << 24 | GhostTextColor.R << 16 | GhostTextColor.G << 8 | GhostTextColor.B))), font, 0);
+            DrawGlyphs(context, text, 0, text.Length, GetBrush(new RgbColor((uint)(GhostTextColor.A << 24 | GhostTextColor.R << 16 | GhostTextColor.G << 8 | GhostTextColor.B))), font, 0, marks);
             context.Pop();
         }
     }
@@ -1032,7 +1039,7 @@ internal sealed class TerminalRenderView : FrameworkElement
             foreach (TextRun run in layout.Texts)
             {
                 SolidColorBrush brush = GetBrush(run.Foreground);
-                DrawGlyphs(context, layout.Text, run.Start, run.Length, brush, font, 0);
+                DrawGlyphs(context, layout.Text, run.Start, run.Length, brush, font, 0, layout.Marks);
                 if (run.Underline)
                 {
                     context.DrawRectangle(brush, null, new Rect(run.Start * cellWidth, font.UnderlinePosition, run.Length * cellWidth, font.UnderlineThickness));
@@ -1042,9 +1049,12 @@ internal sealed class TerminalRenderView : FrameworkElement
     }
 
     // Draws the characters of cells [start, start + length) of a row: one glyph run per face (the main font, or a fallback for a character
-    // it lacks). Every glyph advances a whole cell (a surrogate pair, which takes two cells of the grid, two).
-    private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y)
+    // it lacks). Every glyph advances a whole cell; a surrogate pair, which takes two cells of the grid, and a wide character, which takes its own
+    // and the filler of its second cell (CellWidth), two. A filler draws nothing. A cell with characters of no width (marks) is drawn as the
+    // character they compose with it when Unicode has one (e and a combining acute: é), otherwise as its character with the marks over it.
+    private static void DrawGlyphs(DrawingContext context, string text, int start, int length, Brush brush, TerminalFont font, double y, string[] marks = null)
     {
+        List<KeyValuePair<double, string>> overlays = null;
         int end = Math.Min(text.Length, start + length);
         double cellWidth = font.CellWidth;
         GlyphTypeface face = null;
@@ -1055,12 +1065,34 @@ internal sealed class TerminalRenderView : FrameworkElement
         while (column < end)
         {
             char ch = text[column];
+            if (ch == CellWidth.Filler)
+            {
+                column++;
+                continue;
+            }
             int codePoint = ch;
             int units = 1;
             if (char.IsHighSurrogate(ch) && column + 1 < text.Length && char.IsLowSurrogate(text[column + 1]))
             {
                 codePoint = char.ConvertToUtf32(ch, text[column + 1]);
                 units = 2;
+            }
+            else if (CellWidth.IsSecondCell(text, column + 1))
+            {
+                units = 2;
+            }
+            string mark = marks != null && column < marks.Length ? marks[column] : null;
+            if (mark != null)
+            {
+                string composed = (text.Substring(column, units == 2 && char.IsHighSurrogate(ch) ? 2 : 1) + mark).Normalize(NormalizationForm.FormC);
+                if (composed.Length == 1)
+                {
+                    codePoint = composed[0];
+                }
+                else
+                {
+                    (overlays ??= new List<KeyValuePair<double, string>>()).Add(new KeyValuePair<double, string>((column + units) * cellWidth, mark));
+                }
             }
             else if (ch < ' ')
             {
@@ -1088,6 +1120,34 @@ internal sealed class TerminalRenderView : FrameworkElement
         if (glyphs != null && glyphs.Count != 0)
         {
             FlushGlyphs(context, face, glyphs, advances, runX, y, brush, font);
+        }
+        if (overlays != null)
+        {
+            DrawMarks(context, overlays, y, brush, font);
+        }
+    }
+
+    // The marks that compose with no character, over the cells they go with: each glyph is put so that it ends at the right edge of the
+    // cell, which is where a mark of no advance is drawn from (its ink is left of its origin) and over the cell for one of a cell's advance.
+    private static void DrawMarks(DrawingContext context, List<KeyValuePair<double, string>> overlays, double y, Brush brush, TerminalFont font)
+    {
+        foreach (KeyValuePair<double, string> overlay in overlays)
+        {
+            string mark = overlay.Value;
+            for (int index = 0; index < mark.Length; index++)
+            {
+                int codePoint = mark[index];
+                if (char.IsHighSurrogate(mark[index]) && index + 1 < mark.Length && char.IsLowSurrogate(mark[index + 1]))
+                {
+                    codePoint = char.ConvertToUtf32(mark[index], mark[index + 1]);
+                    index++;
+                }
+                GlyphTypeface face = font.GetGlyph(codePoint, out ushort glyph);
+                double advance = face.AdvanceWidths.TryGetValue(glyph, out double width) ? width * font.EmSize : 0;
+                GlyphRun run = new GlyphRun(face, 0, false, font.EmSize, (float)font.PixelsPerDip, new[] { glyph }, new Point(overlay.Key - advance, y + font.Baseline),
+                    new[] { 0.0 }, null, null, null, null, null, null);
+                context.DrawGlyphRun(brush, run);
+            }
         }
     }
 
@@ -1187,13 +1247,9 @@ internal sealed class TerminalRenderView : FrameworkElement
             {
                 break;
             }
-            string text = model.Document.GetLineText(line);
-            int from = 0;
-            while (from < text.Length && _matchHighlight.Match(text, from, text.Length, backward: false, allowEmpty: false, out int index, out int length))
-            {
-                context.DrawRectangle(match, null, new Rect(index * font.CellWidth, row * font.CellHeight, length * font.CellWidth, font.CellHeight));
-                from = index + Math.Max(length, 1);
-            }
+            int y = row;
+            DocumentSearch.ForEachMatch(model.Document.GetLineText(line), _matchHighlight, (index, length) =>
+                context.DrawRectangle(match, null, new Rect(index * font.CellWidth, y * font.CellHeight, length * font.CellWidth, font.CellHeight)));
         }
     }
 
@@ -1214,8 +1270,15 @@ internal sealed class TerminalRenderView : FrameworkElement
         {
             int line = _model.Caret.Line;
             string text = line < _model.Document.LineCount ? _model.Document.GetLineText(line) : "";
-            under = cell.X < text.Length ? text.Substring(cell.X, 1) : " ";
+            under = " ";
+            if (cell.X < text.Length)
+            {
+                // On a wide character or a surrogate pair the caret covers both of its cells.
+                bool pair = CellWidth.IsSecondCell(text, cell.X + 1) || (char.IsHighSurrogate(text[cell.X]) && cell.X + 1 < text.Length && char.IsLowSurrogate(text[cell.X + 1]));
+                under = text.Substring(cell.X, pair ? 2 : 1);
+            }
         }
+        double caretWidth = under.Length * font.CellWidth;
         string state = visible ? cell.X + "," + cell.Y + "," + focused + "," + CursorShape + "," + under : "hidden";
         if (state == _cursorState)
         {
@@ -1235,20 +1298,20 @@ internal sealed class TerminalRenderView : FrameworkElement
                 Pen pen = new Pen(cursorBrush, font.OnePixel);
                 pen.Freeze();
                 double half = font.OnePixel / 2;
-                context.DrawRectangle(null, pen, new Rect(half, half, font.CellWidth - font.OnePixel, font.CellHeight - font.OnePixel));
+                context.DrawRectangle(null, pen, new Rect(half, half, caretWidth - font.OnePixel, font.CellHeight - font.OnePixel));
             }
             else
             {
                 switch (CursorShape)
                 {
                     case TerminalCursorShape.Underline:
-                        context.DrawRectangle(cursorBrush, null, new Rect(0, font.CellHeight - 2 * font.OnePixel, font.CellWidth, 2 * font.OnePixel));
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, font.CellHeight - 2 * font.OnePixel, caretWidth, 2 * font.OnePixel));
                         break;
                     case TerminalCursorShape.Bar:
                         context.DrawRectangle(cursorBrush, null, new Rect(0, 0, 2 * font.OnePixel, font.CellHeight));
                         break;
                     default:
-                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, font.CellWidth, font.CellHeight));
+                        context.DrawRectangle(cursorBrush, null, new Rect(0, 0, caretWidth, font.CellHeight));
                         if (under.Trim().Length != 0)
                         {
                             DrawGlyphs(context, under, 0, under.Length, GetBrush(_scheme.DefaultBackground), font, 0);
@@ -1675,6 +1738,12 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
     }
 
+    // A cell of a word: a word character, or the second cell of a wide one.
+    private bool IsWordCell(string text, int column)
+    {
+        return CellWidth.IsSecondCell(text, column) ? IsWordCharacter(text[column - 1]) : IsWordCharacter(text[column]);
+    }
+
     private void SelectWord(TextDocument.TextPosition position)
     {
         if (position.Line >= _model.Document.LineCount)
@@ -1683,17 +1752,17 @@ internal sealed class TerminalRenderView : FrameworkElement
         }
         string text = _model.Document.GetLineText(position.Line);
         int column = Math.Min(position.Column, Math.Max(0, text.Length - 1));
-        if (text.Length == 0 || !IsWordCharacter(text[column]))
+        if (text.Length == 0 || !IsWordCell(text, column))
         {
             return;
         }
         int start = column;
-        while (start > 0 && IsWordCharacter(text[start - 1]))
+        while (start > 0 && IsWordCell(text, start - 1))
         {
             start--;
         }
         int end = column;
-        while (end < text.Length && IsWordCharacter(text[end]))
+        while (end < text.Length && IsWordCell(text, end))
         {
             end++;
         }

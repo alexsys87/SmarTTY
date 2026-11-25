@@ -383,7 +383,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         get
         {
             EditableTextDocument document = _model.Document;
-            return document.LineCount == 0 ? "" : document.GetRangeText(new TextDocument.TextPosition(0, 0), document.EndPosition, line => "\r\n");
+            return document.LineCount == 0 ? "" : _model.GetText(new TextDocument.TextPosition(0, 0), document.EndPosition, line => "\r\n");
         }
     }
 
@@ -987,7 +987,7 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
 
     string ISearchTarget.GetRangeText(TextDocument.TextPosition start, TextDocument.TextPosition end)
     {
-        return _model.Document.GetRangeText(start, end);
+        return _model.GetText(start, end, line => "\r\n");
     }
 
     TextDocument.TextPosition ISearchTarget.Find(TextDocument.TextPosition textPosition, TextMatcher matcher, bool searchBackward, bool wrapAround, FindSelectMode findSelectMode, TextDocument.TextPosition scopeStart, TextDocument.TextPosition scopeEnd)
