@@ -150,6 +150,9 @@ jobs:
       - name: Run netconsole checks (plain and extended messages, fragments, line and character input over UDP)
         run: dotnet run --project tests/NetconsoleTests -c Release
 
+      - name: Run local console checks (the built-in consoles, the command line, the start folder, the settings and their XML)
+        run: dotnet run --project tests/LocalConsoleTests -c Release
+
       - name: Run TAR extractor security checks
         run: dotnet run --project tests/TarExtractorSecurityTests -c Release
 

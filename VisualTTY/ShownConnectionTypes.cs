@@ -35,4 +35,7 @@ public struct ShownConnectionTypes
 
     /// <summary>Netconsole receivers are hidden when this is set (inverted for the same reason as <see cref="HideTelnet"/>).</summary>
     public bool HideNetconsole;
+
+    /// <summary>Local consoles (cmd, PowerShell, WSL) are hidden when this is set (inverted for the same reason as <see cref="HideTelnet"/>).</summary>
+    public bool HideLocalConsoles;
 }

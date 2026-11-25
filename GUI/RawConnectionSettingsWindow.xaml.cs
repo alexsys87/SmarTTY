@@ -133,6 +133,51 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public bool IsNetconsole => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole;
 
+        public bool IsLocalConsole => Settings.Connection is DeviceTerminalSettings.ConnectionSettings.LocalConsole;
+
+        // --- local console: the program, its arguments and its start folder ---
+
+        public string LocalConsoleName { get; set; }
+
+        private string _LocalConsoleProgram;
+
+        public string LocalConsoleProgram
+        {
+            get
+            {
+                return _LocalConsoleProgram;
+            }
+            set
+            {
+                _LocalConsoleProgram = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalConsoleProgram"));
+            }
+        }
+
+        public string LocalConsoleArguments { get; set; }
+
+        private string _LocalConsoleWorkingDirectory;
+
+        public string LocalConsoleWorkingDirectory
+        {
+            get
+            {
+                return _LocalConsoleWorkingDirectory;
+            }
+            set
+            {
+                _LocalConsoleWorkingDirectory = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LocalConsoleWorkingDirectory"));
+            }
+        }
+
+        public Visibility LocalConsoleSettingsVisibility { get; } = Visibility.Collapsed;
+
+        private static string Trimmed(string text)
+        {
+            return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        }
+
         // --- netconsole receiver: kept here while the window is open and turned into the connection by
         // EffectiveConnectionSettings (the ports are text, so a wrong value can be reported instead of lost) ---
 
@@ -197,8 +242,9 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public Visibility NetconsoleSettingsVisibility { get; } = Visibility.Collapsed;
 
-        // The prompt and the echo of the terminal do not apply to netconsole (it has its own echo setting).
-        public Visibility PromptSettingsVisibility => IsNetconsole ? Visibility.Collapsed : Visibility.Visible;
+        // The prompt and the echo of the terminal do not apply to netconsole (it has its own echo setting) nor to a local console
+        // (the program edits its own command line and echoes it).
+        public Visibility PromptSettingsVisibility => IsNetconsole || IsLocalConsole ? Visibility.Collapsed : Visibility.Visible;
 
         /// <summary>What to set on the device so that it sends here: the netconsole parameter and the U-Boot variables.</summary>
         public string NetconsoleHint
@@ -499,6 +545,16 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                 {
                     return SerialSettings;
                 }
+                if (IsLocalConsole)
+                {
+                    return new DeviceTerminalSettings.ConnectionSettings.LocalConsole
+                    {
+                        Name = Trimmed(LocalConsoleName),
+                        Program = Trimmed(LocalConsoleProgram),
+                        Arguments = Trimmed(LocalConsoleArguments),
+                        WorkingDirectory = Trimmed(LocalConsoleWorkingDirectory)
+                    };
+                }
                 if (IsNetconsole)
                 {
                     // A port that is not a number is 0, which makes the connection invalid instead of throwing.
@@ -652,6 +708,10 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
             if (IsNetconsole)
             {
                 return ValidateNetconsole();
+            }
+            if (IsLocalConsole)
+            {
+                return string.IsNullOrWhiteSpace(LocalConsoleProgram) ? "Enter the program to run (for example cmd.exe, powershell.exe or wsl.exe)." : null;
             }
             if (!(Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp))
             {
@@ -832,6 +892,16 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
                     TCPEndpoint = (tcp.Host.Contains(":") ? "[" + tcp.Host + "]" : tcp.Host) + ":" + tcp.Port;
                 }
             }
+            else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.LocalConsole console)
+            {
+                LocalConsoleName = console.Name;
+                LocalConsoleProgram = console.Program;
+                LocalConsoleArguments = console.Arguments;
+                LocalConsoleWorkingDirectory = console.WorkingDirectory;
+                SerialSettingsVisibility = Visibility.Collapsed;
+                TCPSettingsVisibility = Visibility.Collapsed;
+                LocalConsoleSettingsVisibility = Visibility.Visible;
+            }
             else if (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole)
             {
                 NetconsoleLocalAddress = netconsole.LocalAddress;
@@ -950,7 +1020,7 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
 
         public void ApplyTCPEndpoint()
         {
-            if (IsNetconsole)
+            if (IsNetconsole || IsLocalConsole)
             {
                 Settings.Connection = EffectiveConnectionSettings;
                 return;
@@ -985,6 +1055,12 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (_Controller.IsNetconsole)
         {
             Title = "Netconsole Receiver Settings";
+        }
+        if (_Controller.IsLocalConsole)
+        {
+            Title = "Local Console Settings";
+            // Nothing to test without starting the program: OK only checks that a program is set.
+            _TestOnOK = false;
         }
         if (_Controller.IsTelnet)
         {
@@ -1043,6 +1119,11 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (_Controller.IsNetconsole)
         {
             txtNetconsoleLocalPort.Focus();
+            return;
+        }
+        if (_Controller.IsLocalConsole)
+        {
+            txtConsoleProgram.Focus();
             return;
         }
         txtHost.Focus();
@@ -1206,6 +1287,24 @@ public partial class RawConnectionSettingsWindow : Window, IComponentConnector, 
         if (reason != null)
         {
             MessageBoxes.Warning("The password could not be saved (" + reason + "). The connection is saved without it, so the password has to be entered again.");
+        }
+    }
+
+    private void BrowseConsoleProgram_Click(object sender, RoutedEventArgs e)
+    {
+        string program = LocalFileDialogWindow.OpenFile(this, "Program of the console", "Programs (*.exe;*.cmd;*.bat)|*.exe;*.cmd;*.bat|All files (*.*)|*.*");
+        if (program != null)
+        {
+            _Controller.LocalConsoleProgram = program;
+        }
+    }
+
+    private void BrowseConsoleFolder_Click(object sender, RoutedEventArgs e)
+    {
+        string folder = UserDialogs.Browse(null, "Start folder of the console", _Controller.LocalConsoleWorkingDirectory);
+        if (folder != null)
+        {
+            _Controller.LocalConsoleWorkingDirectory = folder;
         }
     }
 

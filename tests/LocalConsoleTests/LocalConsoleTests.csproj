@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The settings of a local console and the rules that need no Windows call; the pseudo console itself is checked by hand on Windows. -->
+    <Compile Include="../../VisualTTY/DeviceTerminal/LocalConsoleProfiles.cs" Link="LocalConsoleProfiles.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
+    <Compile Include="../../VisualTTY/ShownConnectionTypes.cs" Link="ShownConnectionTypes.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
+    <Compile Include="../../VisualTTY/DeviceTerminal/RawConnectionSettings.cs" Link="RawConnectionSettings.cs" />
+    <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
+    <Compile Include="../ConnectionLookupTests/Stubs.cs" Link="Stubs.cs" />
+  </ItemGroup>
+</Project>

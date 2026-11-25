@@ -189,6 +189,10 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             return NetconsoleStatusText(name);
         }
+        if (IsLocalConsole)
+        {
+            return name + ": running";
+        }
         string state = DeviceTerminalStateText.State(connected: true, _serialTerminalControl.HasInputLine, _serialTerminalControl.FullScreenProgramActive, _serialTerminalControl.CurrentPrompt);
         return state.Length == 0 ? name + ": connected" : name + ": connected (" + state + ")";
     }
@@ -868,8 +872,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             sendImmediatelyToolStripMenuItem.IsChecked = deviceTerminalSettings.HexSettings.AutoSend;
         }
         changeSettingsToolStripMenuItem.SetVisible(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial);
-        // Telnet passes the size on by itself; a netconsole receiver has no shell to tell it to.
-        bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet) && !IsNetconsole;
+        // Telnet and a local console pass the size on by themselves; a netconsole receiver has no shell to tell it to.
+        bool needsStty = !(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet) && !IsNetconsole && !IsLocalConsole;
         _syncRemoteSizeMenuItem.SetVisible(needsStty);
         _sendRemoteSizeMenuItem.SetVisible(needsStty);
         _syncRemoteSizeMenuItem.IsChecked = needsStty && _deviceTerminalSettings.SyncRemoteTerminalSize;
@@ -878,6 +882,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         UpdateSerialLineUi();
         UpdateTelnetMenu(_deviceTerminalSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Telnet);
         ConfigureNetconsole();
+        ConfigureLocalConsole();
         ConfigureCommandLists();
         Connect();
     }
@@ -921,7 +926,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         }
         _transportDisplayName = deviceTransport.GetDisplayName(includeParameters: true);
         // Nothing is connected to for netconsole: the port is opened and waits for the device.
-        lblConnection.Text = (deviceTransport is NetconsoleTransport ? "Listening: " : "Connected to ") + _transportDisplayName;
+        lblConnection.Text = (deviceTransport is NetconsoleTransport ? "Listening: " : deviceTransport is ConPtyTransport ? "Running: " : "Connected to ") + _transportDisplayName;
         Interlocked.Exchange(ref _bytesSent, 0L);
         Interlocked.Exchange(ref _bytesReceived, 0L);
         _connectionState = ConnectionStateEnum.Connecting;
@@ -1878,8 +1883,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             contextMenuStrip1.Items.Remove(old);
         }
         _quickCommandItems.Clear();
-        // The bytes of the HEX view are not a command line, and netconsole has a line input of its own.
-        if (HexMode || IsNetconsole)
+        // The bytes of the HEX view are not a command line, netconsole has a line input of its own, and a local console edits its own.
+        if (HexMode || IsNetconsole || IsLocalConsole)
         {
             return;
         }

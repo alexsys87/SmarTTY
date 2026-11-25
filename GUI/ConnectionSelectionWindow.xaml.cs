@@ -530,6 +530,69 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
 
         /// <summary>
+        /// A local console (cmd, PowerShell, WSL in a Windows pseudo console). The consoles of the installed programs are listed without
+        /// being saved (<see cref="LocalConsoleProfiles.BuiltIn"/>); one that was opened, edited or given an icon is saved under its name
+        /// and takes the place of the built-in one, so deleting it brings the built-in settings back. Never probed: nothing to reach.
+        /// </summary>
+        public class LocalConsole : Raw, IConnectionSettingsWrapper
+        {
+            private DeviceTerminalSettings.ConnectionSettings.LocalConsole Console => Settings.Settings.Connection as DeviceTerminalSettings.ConnectionSettings.LocalConsole;
+
+            public string ImagePath => IconPathOf(Settings.Icon ?? "terminal.png");
+
+            public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
+
+            public SubtypeImage TypeImage => SubtypeImage.None;
+
+            public string Title => Console?.DisplayName ?? "";
+
+            public string Detail1 => LocalConsoleProfiles.BuildCommandLine(Console?.Program, Console?.Arguments) ?? "local console";
+
+            public string Detail2 => Settings.Settings.LastConnectionTime == 0 ? "local console" : FormatLastUsedString(DateTime.FromFileTime(Settings.Settings.LastConnectionTime));
+
+            public bool HasBaudRate => false;
+
+            public int BaudRate { get; set; }
+
+            public long LastUseTime => Settings.Settings.LastConnectionTime;
+
+            public bool IsDiscovered => false;
+
+            public bool IsInactive
+            {
+                get
+                {
+                    return false;
+                }
+                set
+                {
+                }
+            }
+
+            public bool IsUnreachable
+            {
+                get
+                {
+                    return false;
+                }
+                set
+                {
+                }
+            }
+
+            public LocalConsole(SavedConnectionStore mgr, RawConnectionSettings settings)
+                : base(mgr, settings)
+            {
+            }
+
+            public bool MatchesFilter(string filter)
+            {
+                return Title.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) != -1
+                    || Detail1.IndexOf(filter, StringComparison.InvariantCultureIgnoreCase) != -1;
+            }
+        }
+
+        /// <summary>
         /// A computer found by the network scan with an open SSH or telnet port. It lives as long as the window only and is
         /// never saved by itself: connecting opens the connection dialog with "save" switched off, and "Edit" saves it on
         /// request. It is counted and filtered with the SSH or the telnet connections, and marked with a badge.
@@ -662,6 +725,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             public int Telnet { get; set; }
 
             public int Netconsole { get; set; }
+
+            public int LocalConsole { get; set; }
 
             public int Serial { get; set; }
         }
@@ -897,6 +962,20 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 _ShownTypes.HideNetconsole = !value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowNetconsole"));
+                UpdateFilteredItems();
+            }
+        }
+
+        public bool ShowLocalConsoles
+        {
+            get
+            {
+                return !_ShownTypes.HideLocalConsoles;
+            }
+            set
+            {
+                _ShownTypes.HideLocalConsoles = !value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShowLocalConsoles"));
                 UpdateFilteredItems();
             }
         }
@@ -1281,6 +1360,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     connectionCounts.Netconsole++;
                 }
+                else if (item is SettingsWrappers.LocalConsole)
+                {
+                    connectionCounts.LocalConsole++;
+                }
                 else if (item is SettingsWrappers.RawTcp)
                 {
                     connectionCounts.RawTcp++;
@@ -1393,6 +1476,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 return ShowNetconsole;
             }
+            if (item is SettingsWrappers.LocalConsole)
+            {
+                return ShowLocalConsoles;
+            }
             if (item is SettingsWrappers.RawTcp)
             {
                 return ShowRawTcp;
@@ -1413,6 +1500,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             {
                 // Built aside and swapped in whole: the port list thread reads it meanwhile.
                 Dictionary<SerialPortKey, RawConnectionSettings> knownSettings = new Dictionary<SerialPortKey, RawConnectionSettings>();
+                // The names of the saved local consoles: a built-in console of the same name is not listed again.
+                HashSet<string> savedConsoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (RawConnectionSettings entry in _Connections.RawConnections)
                 {
                     if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Serial serConn)
@@ -1432,6 +1521,19 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                     else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.Netconsole)
                     {
                         _StaticItems.Add(new SettingsWrappers.Netconsole(_Connections, entry));
+                    }
+                    else if (entry.Settings?.Connection is DeviceTerminalSettings.ConnectionSettings.LocalConsole savedConsole)
+                    {
+                        _StaticItems.Add(new SettingsWrappers.LocalConsole(_Connections, entry));
+                        savedConsoles.Add(savedConsole.FileNameBase);
+                    }
+                }
+                // The consoles of the installed programs, unless one of the same name was saved (changed or opened before).
+                foreach (DeviceTerminalSettings.ConnectionSettings.LocalConsole builtIn in LocalConsoleProfiles.BuiltIn(LocalConsoleProfiles.Current()))
+                {
+                    if (savedConsoles.Add(builtIn.FileNameBase))
+                    {
+                        _StaticItems.Add(new SettingsWrappers.LocalConsole(_Connections, new RawConnectionSettings { Settings = LocalConsoleProfiles.NewSettings(builtIn) }));
                     }
                 }
                 _KnownSerialPortSettings = knownSettings;
@@ -1856,6 +1958,16 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             return CreateNewTcpConnection(wnd, NewNetconsoleSettings(new DeviceTerminalSettings.ConnectionSettings.Netconsole()));
         }
 
+        /// <summary>A console of another program (or of the same one with other arguments or another start folder) than the built-in ones.</summary>
+        public bool CreateNewLocalConsole(Window wnd)
+        {
+            return CreateNewTcpConnection(wnd, LocalConsoleProfiles.NewSettings(new DeviceTerminalSettings.ConnectionSettings.LocalConsole
+            {
+                Name = "My console",
+                Program = "cmd.exe"
+            }));
+        }
+
         // The kernel ends its lines with a bare LF (netconsole has no tty to add the CR), and U-Boot reads LF as Enter.
         // There is no prompt to detect: the device prints log messages.
         private static DeviceTerminalSettings NewNetconsoleSettings(DeviceTerminalSettings.ConnectionSettings.Netconsole connection)
@@ -2212,6 +2324,14 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     private void NewTelnet_Click(object sender, RoutedEventArgs e)
     {
         if (Controller.CreateNewTelnetConnection((Window)this))
+        {
+            this.Close();
+        }
+    }
+
+    private void NewLocalConsole_Click(object sender, RoutedEventArgs e)
+    {
+        if (Controller.CreateNewLocalConsole((Window)this))
         {
             this.Close();
         }

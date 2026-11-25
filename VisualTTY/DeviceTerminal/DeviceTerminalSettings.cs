@@ -12,6 +12,7 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
     [XmlInclude(typeof(Tcp))]
     [XmlInclude(typeof(Telnet))]
     [XmlInclude(typeof(Netconsole))]
+    [XmlInclude(typeof(LocalConsole))]
     public abstract class ConnectionSettings
     {
         [XmlType("com.sysprogs.terminal.connection.serial")]
@@ -636,6 +637,63 @@ public class DeviceTerminalSettings : INotifyPropertyChanged
                     throw new FormatException("Invalid port number: '" + text + "' (expected 1-65535)");
                 }
                 return port;
+            }
+        }
+
+        /// <summary>
+        /// A program of this computer (cmd, PowerShell, WSL) run in a Windows pseudo console (ConPTY): the tab is its console window.
+        /// </summary>
+        [XmlType("com.sysprogs.terminal.connection.localconsole")]
+        public class LocalConsole : ConnectionSettings
+        {
+            /// <summary>The name in the launcher and on the tab; empty: the file name of the program without ".exe".</summary>
+            public string Name { get; set; }
+
+            /// <summary>The program to run: a full path or a name found in PATH ("cmd.exe"); environment variables are expanded.</summary>
+            public string Program { get; set; }
+
+            /// <summary>The arguments, as they are put after the program on its command line.</summary>
+            public string Arguments { get; set; }
+
+            /// <summary>The folder the program starts in; empty: the profile folder of the user. Environment variables are expanded.</summary>
+            public string WorkingDirectory { get; set; }
+
+            [XmlIgnore]
+            public string DisplayName
+            {
+                get
+                {
+                    if (!string.IsNullOrWhiteSpace(Name))
+                    {
+                        return Name.Trim();
+                    }
+                    string program = (Program ?? "").Trim().Trim('"');
+                    int slash = Math.Max(program.LastIndexOf('\\'), program.LastIndexOf('/'));
+                    string file = slash >= 0 ? program.Substring(slash + 1) : program;
+                    if (file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        file = file.Substring(0, file.Length - 4);
+                    }
+                    return file.Length == 0 ? "Console" : file;
+                }
+            }
+
+            [XmlIgnore]
+            public override string FileNameBase => "console_" + DisplayName;
+
+            public override string ToString()
+            {
+                return DisplayName;
+            }
+
+            public override bool IsValid()
+            {
+                return !string.IsNullOrWhiteSpace(Program);
+            }
+
+            public LocalConsole Clone()
+            {
+                return (LocalConsole)MemberwiseClone();
             }
         }
 

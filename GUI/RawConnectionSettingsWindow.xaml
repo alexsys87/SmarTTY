@@ -268,6 +268,37 @@
             </StackPanel>
           </Grid>
         </local:SettingsGroupBox>
+        <local:SettingsGroupBox Text="Local console" ImageSource="{local:Icon term16.png}" Visibility="{Binding LocalConsoleSettingsVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="Name:" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Grid.ColumnSpan="2" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding LocalConsoleName, UpdateSourceTrigger=PropertyChanged}" Tag="the name of the program" ToolTip="Shown in the connection list and on the tab. A console is saved under its name: a console named like a built-in one (Command Prompt, Windows PowerShell, PowerShell 7, WSL) takes its place." />
+            <TextBlock Text="Program:" Grid.Row="1" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Name="txtConsoleProgram" Grid.Row="1" Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding LocalConsoleProgram, UpdateSourceTrigger=PropertyChanged}" Tag="cmd.exe, powershell.exe, wsl.exe..." ToolTip="A full path or a program found in PATH; %VARIABLES% are expanded. Any console program works: cmd.exe, powershell.exe, pwsh.exe, wsl.exe, bash.exe of Git, ssh.exe, python.exe..." />
+            <Button Grid.Row="1" Grid.Column="2" Margin="2" Padding="6 0 6 0" Click="BrowseConsoleProgram_Click" ToolTip="Choose the program">
+              <TextBlock Text="..." />
+            </Button>
+            <TextBlock Text="Arguments:" Grid.Row="2" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding LocalConsoleArguments, UpdateSourceTrigger=PropertyChanged}" Tag="none" ToolTip="Put after the program on its command line as they are written, for example -NoLogo, -d Ubuntu or /k chcp 65001." />
+            <TextBlock Text="Start folder:" Grid.Row="3" Style="{StaticResource HeaderText}" VerticalAlignment="Center" />
+            <TextBox Grid.Row="3" Grid.Column="1" Margin="2" VerticalContentAlignment="Center" Padding="2 1 2 2" Text="{Binding LocalConsoleWorkingDirectory, UpdateSourceTrigger=PropertyChanged}" Tag="your profile folder" ToolTip="The folder the program starts in; %VARIABLES% are expanded. Empty: your profile folder (%USERPROFILE%)." />
+            <Button Grid.Row="3" Grid.Column="2" Margin="2" Padding="6 0 6 0" Click="BrowseConsoleFolder_Click" ToolTip="Choose the start folder">
+              <TextBlock Text="..." />
+            </Button>
+            <TextBlock Grid.Row="4" Grid.ColumnSpan="3" Margin="5 4 5 2" TextWrapping="Wrap" Foreground="{DynamicResource Theme.TextSecondary}" Text="The program runs in a Windows pseudo console (Windows 10 1809 or later): it edits its own command line, every key goes to it, and the tab is its console window. Closing the tab ends the program." />
+          </Grid>
+        </local:SettingsGroupBox>
         <local:SettingsGroupBox Text="Automatic reconnect" ImageSource="{local:Icon net16.png}" Visibility="{Binding TCPSettingsVisibility}">
           <Grid>
             <Grid.RowDefinitions>

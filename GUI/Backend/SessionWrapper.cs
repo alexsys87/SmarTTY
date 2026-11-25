@@ -341,7 +341,12 @@ public class SessionWrapper : INotifyPropertyChanged, IDisposable, ICloseableEle
         {
             if (IsDevice)
             {
-                return (DeviceSettings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial) ? IconType.Serial : IconType.Network;
+                return DeviceSettings.Connection switch
+                {
+                    DeviceTerminalSettings.ConnectionSettings.Serial => IconType.Serial,
+                    DeviceTerminalSettings.ConnectionSettings.LocalConsole => IconType.Terminal,
+                    _ => IconType.Network,
+                };
             }
             if (Session == null)
             {
