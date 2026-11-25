@@ -763,11 +763,15 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   `SetLayeredWindowAttributes`, the frame included) and takes the layered style off again at 100 %, so an opaque window is drawn as before.
   A window with `AllowsTransparency` is left alone. Popups and menus (not windows) are not made transparent. WPF manages the surface and
   the extended style of its windows itself, so the style is not trusted to stay: `SetOpacity` redraws the frame after it adds the layered
-  style and reads the style and the alpha back (false, and a Debug line, when they are not as asked), the opacity is put again on
-  `ContentRendered` and `Activated`, and `WindowAppearance.StyleHook` (`WM_STYLECHANGED` of the extended style) puts it back when the layered
-  style is taken away while the opacity is below 100 %. Not seen on a real window yet: if the opacity still does nothing on Windows, the
-  next step is to see whether `SetLayeredWindowAttributes` fails (the Debug line) or WPF paints over it, and then a window made with
-  `AllowsTransparency` for the opacity case.
+  style and reads the style and the alpha back (false, and a Debug line, when they are not as asked; a window already at that alpha is left
+  alone), the opacity is put again on `ContentRendered` and `Activated`, and `WindowAppearance.StyleHook` keeps the layered style in
+  `WM_STYLECHANGING` of the extended style (`DwmTitleBar.KeepLayeredStyle` sets the bit in the new style of the `STYLESTRUCT`) while the
+  opacity is below 100 %. Fixed after the first run on Windows: the hook put the style back after `WM_STYLECHANGED` with a `BeginInvoke` at
+  the background priority; WPF took it away again each time, so the loop never ended, the window never became transparent and the work of
+  the dispatcher below that priority (`ContextIdle`: the start of the Smart Terminal, the loading of the file manager) never ran. Do not put
+  the style back from the dispatcher. If the opacity still does nothing on Windows, the next step is to see whether
+  `SetLayeredWindowAttributes` fails (the Debug line) or WPF paints over it, and then a window made with `AllowsTransparency` for the
+  opacity case.
 - The sizes: `CommonGUIPreferences.WindowSizes` (a `List<RememberedWindowSize>` by the full name of the window class, in
   `GUIPreferences.xml`; `VisualTTY/WindowSizeList`, at most 200, the oldest goes first) holds the size of every window that can be
   resized (`ResizeMode` `CanResize` or `CanResizeWithGrip`) and that the user changed. At `SourceInitialized` the window gets the size back

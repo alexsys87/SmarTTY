@@ -33,11 +33,17 @@ internal static class DwmTitleBar
     private const uint RdwAllChildren = 0x0080;
     private const uint RdwFrame = 0x0400;
 
-    /// <summary>The message a window gets after its style changed; <c>wParam</c> is <see cref="GwlExStyle"/> for the extended style.</summary>
-    public const int WmStyleChanged = 0x007D;
+    /// <summary>
+    /// The message a window gets before its style changes; <c>wParam</c> is <see cref="GwlExStyle"/> for the extended style, <c>lParam</c>
+    /// points to the old and the new style (a <c>STYLESTRUCT</c>), and the new one may be changed there.
+    /// </summary>
+    public const int WmStyleChanging = 0x007C;
 
-    /// <summary>The <c>wParam</c> of <see cref="WmStyleChanged"/> when the extended style changed.</summary>
+    /// <summary>The <c>wParam</c> of <see cref="WmStyleChanging"/> when the extended style changes.</summary>
     public const int ExStyleIndex = GwlExStyle;
+
+    // The offset of styleNew in STYLESTRUCT (two DWORDs: styleOld, styleNew).
+    private const int StyleNewOffset = 4;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
@@ -132,6 +138,28 @@ internal static class DwmTitleBar
     }
 
     /// <summary>
+    /// Keeps the layered style in a change of the extended style that would take it away (<see cref="WmStyleChanging"/> with
+    /// <see cref="ExStyleIndex"/>; <paramref name="styleStruct"/> is its <c>lParam</c>). WPF writes the extended style it keeps for a
+    /// window (which has no layered style) again when it sees fit; without this the opacity would be lost every time. Returns whether
+    /// the new style was changed.
+    /// </summary>
+    public static bool KeepLayeredStyle(IntPtr styleStruct)
+    {
+        if (styleStruct == IntPtr.Zero)
+        {
+            return false;
+        }
+        int oldStyle = Marshal.ReadInt32(styleStruct);
+        int newStyle = Marshal.ReadInt32(styleStruct, StyleNewOffset);
+        if ((oldStyle & WsExLayered) == 0 || (newStyle & WsExLayered) != 0)
+        {
+            return false;
+        }
+        Marshal.WriteInt32(styleStruct, StyleNewOffset, newStyle | WsExLayered);
+        return true;
+    }
+
+    /// <summary>
     /// Makes the whole window (the frame included) <paramref name="alpha"/> of 255 opaque; 255 takes the layered style off again,
     /// so a window that is not transparent is drawn as it always was. Returns whether the window is in the wanted state afterwards
     /// (read back from the system, not taken from the return value of the call).
@@ -154,6 +182,12 @@ internal static class DwmTitleBar
                     Refresh(hwnd);
                 }
                 return (GetWindowLong(hwnd, GwlExStyle) & WsExLayered) == 0;
+            }
+            if (layered && GetLayeredWindowAttributes(hwnd, out _, out byte current, out uint currentFlags)
+                && (currentFlags & LwaAlpha) != 0 && current == alpha)
+            {
+                // Already as asked (the window is activated again, say): nothing to do, nothing to redraw.
+                return true;
             }
             bool changed = false;
             if (!layered)

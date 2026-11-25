@@ -5,7 +5,6 @@ using System;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using VisualTTY;
 
 namespace SmarTTY.GUI;
@@ -197,24 +196,32 @@ internal static class WindowAppearance
     }
 
     /// <summary>
-    /// Watches the extended style of a window: when something else (WPF itself, while it sets up or changes the surface of the
-    /// window) takes the layered style away, the opacity is put back once the message is done.
+    /// Watches the extended style of a window: when something else (WPF itself, which writes again the extended style it keeps for
+    /// the window) is about to take the layered style away while the opacity is below 100 %, the style keeps it.
     /// </summary>
+    /// <remarks>
+    /// This is done in <c>WM_STYLECHANGING</c>, before the change, and not by putting the style back after it: WPF took the style away
+    /// again each time, and the opacity put back from the dispatcher at the background priority every time made a loop that never ended.
+    /// It kept the dispatcher busy, so the work at a lower priority never ran (the Smart Terminal did not start and the file manager kept
+    /// loading), and the window was never transparent.
+    /// </remarks>
     private static void HookStyle(Window window)
     {
+        if (window.AllowsTransparency)
+        {
+            // WPF owns the layered style of such a window.
+            return;
+        }
         HwndSource source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
         source?.AddHook(StyleHook);
     }
 
     private static IntPtr StyleHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message == DwmTitleBar.WmStyleChanged && (int)wParam.ToInt64() == DwmTitleBar.ExStyleIndex
-            && _opacityPercent < WindowChromeRules.MaxOpacityPercent && !DwmTitleBar.IsLayered(hwnd))
+        if (message == DwmTitleBar.WmStyleChanging && (int)wParam.ToInt64() == DwmTitleBar.ExStyleIndex
+            && _opacityPercent < WindowChromeRules.MaxOpacityPercent)
         {
-            if (HwndSource.FromHwnd(hwnd)?.RootVisual is Window window)
-            {
-                window.Dispatcher.BeginInvoke(new Action(() => ApplyOpacity(window)), DispatcherPriority.Background);
-            }
+            DwmTitleBar.KeepLayeredStyle(lParam);
         }
         return IntPtr.Zero;
     }
