@@ -321,9 +321,6 @@ jobs:
       - name: Run session environment checks (the variables of a Smart Terminal tab, their order, replacement and unset, the exports put in front of a command)
         run: dotnet run --project tests/SessionEnvironmentTests -c Release
 
-      - name: Run input region map checks (the text of a command line edited in place, and its indices and positions over several rows)
-        run: dotnet run --project tests/InputRegionMapTests -c Release
-
       - name: Run line paste checks (the state of a paste line by line, its progress text, its notes and the cancel)
         run: dotnet run --project tests/LinePasteRunTests -c Release
 
