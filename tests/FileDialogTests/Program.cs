@@ -172,7 +172,7 @@ internal static class Program
             Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.Kermit.cs"),
             Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.YModem.cs"),
             Path.Combine(root, "GUI", "DevicePanel", "WpfDeviceTerminal.Toolbar.cs"),
-            Path.Combine(root, "VisualTTY", "Backend", "NewConnectionController.cs"),
+            Path.Combine(root, "GUI", "Backend", "NewConnectionController.cs"),
             Path.Combine(root, "VisualTTY", "XServerLaunchController.cs"),
             Path.Combine(root, "GUI", "Backend", "MainWindowController.cs"),
             Path.Combine(root, "GUI", "PublicKeyManagerWindow.xaml.cs"),
@@ -193,7 +193,7 @@ internal static class Program
         // These files pulled in Microsoft.Win32 only for the file dialogs.
         string[] win32Dropped = new string[]
         {
-            Path.Combine(root, "VisualTTY", "Backend", "NewConnectionController.cs"),
+            Path.Combine(root, "GUI", "Backend", "NewConnectionController.cs"),
             Path.Combine(root, "VisualTTY", "XServerLaunchController.cs")
         };
         foreach (string path in win32Dropped)
