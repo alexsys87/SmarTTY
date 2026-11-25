@@ -7,6 +7,7 @@ using SmarTTY.Terminal;
 using SmarTTY.Terminal.Emulation;
 using SmarTTY.Terminal.Input;
 using SmarTTY.Terminal.Rendering;
+using SmarTTY.Utilities;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
@@ -254,14 +255,20 @@ public class WpfTerminal : Border, ITerminalSurface, ISearchTarget
         BellSoundFile = settings.BeepFileName;
         _view.CopyOnSelect = settings.CopyOnSelection;
         TerminalColorScheme scheme = _view.ColorScheme;
-        if (settings.DefaultTextColor.Alpha != 0)
-        {
-            RgbColor text = settings.DefaultTextColor;
-            scheme.DefaultForeground = RgbColor.FromArgb(255, text.R, text.G, text.B);
-        }
+        TerminalColorScheme defaults = new TerminalColorScheme();
+        // A colour with no alpha is one that was never set: the default of the terminal (as the text colour has always worked).
+        scheme.DefaultForeground = OpaqueOr(settings.DefaultTextColor, defaults.DefaultForeground);
+        scheme.DefaultBackground = OpaqueOr(settings.TerminalBackgroundColor, defaults.DefaultBackground);
+        scheme.BoldDefaultForeground = OpaqueOr(settings.DefaultBoldTextColor, defaults.BoldDefaultForeground);
+        _view.BackgroundAlpha = WindowChromeRules.OpacityToAlpha(settings.TerminalOpacityPercent);
         SetPalette(settings.PaletteOverride ?? ConsolePalette.PuTTY, redraw: false);
         SetFont(font);
         _panel.ScrollBarVisibility = settings.VerticalScrollbarMode == GlobalSettings.ScrollbarMode.Hide ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static RgbColor OpaqueOr(RgbColor color, RgbColor fallback)
+    {
+        return color.A == 0 ? fallback : RgbColor.FromArgb(255, color.R, color.G, color.B);
     }
 
     /// <summary>The 16 colours of the ANSI palette.</summary>

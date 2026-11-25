@@ -379,11 +379,6 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <TextBlock Text="Window opacity:" Grid.Row="5" />
-              <StackPanel Grid.Column="1" Grid.Row="5" Orientation="Horizontal" VerticalAlignment="Center" ToolTip="How opaque the windows of the program are (the title bar too); 100% is not transparent. Applied with OK.">
-                <Slider Width="240" Minimum="30" Maximum="100" TickFrequency="5" SmallChange="1" LargeChange="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" Value="{Binding WindowOpacityPercent, Mode=TwoWay}" />
-                <TextBlock Width="44" Margin="8 0 0 0" VerticalAlignment="Center" Text="{Binding WindowOpacityPercent, StringFormat={}{0}%}" />
-              </StackPanel>
             </Grid>
           </GroupBox>
           <GroupBox Header="Other Settings">
@@ -433,8 +428,38 @@
               <Button Grid.Row="2" Grid.Column="2" VerticalAlignment="Center" Margin="5 0 0 0" ToolTip="Choose a font..." Click="EditFont_Click">
                 <Image Width="16" Height="16" Source="{local:Icon FontHS.png}" />
               </Button>
-              <TextBlock Text="Default text color:" Grid.Row="3" />
-              <Border Grid.Column="1" Grid.Row="3" Grid.ColumnSpan="2" Style="{StaticResource ColorEditor}" Background="{Binding DefaultTextColor, Converter={StaticResource ColorWrapperConverter}}" />
+              <!-- The colours of the terminal: a ready-made scheme fills the colours and the palette below, which can then be changed one by one. -->
+              <Grid Grid.Row="3" Grid.ColumnSpan="3">
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Terminal color scheme:" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0 2 0 2">
+                  <ComboBox Name="cbColorScheme" MinWidth="200" VerticalAlignment="Center" ToolTip="A color scheme of a popular terminal: the background, the text colors and the palette" />
+                  <Button Margin="5 0 0 0" Padding="8 1" VerticalAlignment="Center" Content="Apply" ToolTip="Sets the background, the text colors and the palette of the chosen scheme" Click="ApplyColorScheme_Click" />
+                </StackPanel>
+                <TextBlock Text="Background color:" Grid.Row="1" />
+                <Border Name="brdBackgroundColor" Grid.Column="1" Grid.Row="1" Style="{StaticResource ColorEditor}" Background="{Binding TerminalBackgroundColor, Converter={StaticResource ColorWrapperConverter}}" ToolTip="Click to choose the background of the terminals" />
+                <TextBlock Text="Default text color:" Grid.Row="2" />
+                <Border Name="brdTextColor" Grid.Column="1" Grid.Row="2" Style="{StaticResource ColorEditor}" Background="{Binding DefaultTextColor, Converter={StaticResource ColorWrapperConverter}}" />
+                <TextBlock Text="Bold text color:" Grid.Row="3" />
+                <Border Name="brdBoldTextColor" Grid.Column="1" Grid.Row="3" Style="{StaticResource ColorEditor}" Background="{Binding DefaultBoldTextColor, Converter={StaticResource ColorWrapperConverter}}" />
+                <TextBlock Text="Background opacity:" Grid.Row="4" />
+                <StackPanel Grid.Column="1" Grid.Row="4" Orientation="Horizontal" VerticalAlignment="Center" ToolTip="How opaque the background of the terminals is; 100% is not transparent. The text stays opaque. Applied with OK.">
+                  <Slider Width="240" Minimum="30" Maximum="100" TickFrequency="5" SmallChange="1" LargeChange="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" Value="{Binding TerminalOpacityPercent, Mode=TwoWay}" />
+                  <TextBlock Width="44" Margin="8 0 0 0" VerticalAlignment="Center" Text="{Binding TerminalOpacityPercent, StringFormat={}{0}%}" />
+                </StackPanel>
+                <CheckBox Grid.Column="1" Grid.Row="5" Margin="0 2 0 2" Content="Blur what is behind a transparent background (acrylic)" IsChecked="{Binding TerminalBlurBehind}" />
+              </Grid>
               <Grid Row="4" ColumnSpan="3" Margin="5">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />

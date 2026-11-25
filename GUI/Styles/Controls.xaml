@@ -20,7 +20,7 @@
     <Setter Property="Background" Value="{DynamicResource Theme.WindowBackground}" />
     <Setter Property="Foreground" Value="{DynamicResource Theme.Text}" />
     <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
-    <!-- The title bar in the colours of the theme, the opacity of the settings and the remembered size: GUI/WindowAppearance. -->
+    <!-- The title bar in the colours of the theme and the remembered size: GUI/WindowAppearance. -->
     <Setter Property="gui:WindowAppearance.Manage" Value="True" />
   </Style>
 
@@ -1419,6 +1419,12 @@
         </ControlTemplate>
       </Setter.Value>
     </Setter>
+    <Style.Triggers>
+      <!-- A see-through terminal background (GUI/TerminalBackdrop): the content of the tabs has no background of its own. -->
+      <Trigger Property="gui:TerminalBackdrop.IsActive" Value="True">
+        <Setter Property="Background" Value="Transparent" />
+      </Trigger>
+    </Style.Triggers>
   </Style>
 
   <Style x:Key="MainWindowOuterTabControl" TargetType="{x:Type TabControl}" BasedOn="{StaticResource MainWindowTabControl}" />

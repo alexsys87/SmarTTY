@@ -721,6 +721,12 @@ public class MainWindowController : INotifyPropertyChanged
                 }
             }
             _Controller.ApplyGlobalVisualSettings();
+            if (_Controller.Settings.TerminalOpacityPercent < SmarTTY.Utilities.WindowChromeRules.MaxOpacityPercent
+                && !TerminalBackdrop.IsSeeThroughWindow(_Controller._Window))
+            {
+                MessageBoxes.Info("The transparent terminal background takes effect the next time the main window is opened "
+                    + "(restart SmarTTY, or use File > Back to launcher and connect again).");
+            }
         }
 
         internal void SetupPublicKey()
@@ -1462,11 +1468,20 @@ public class MainWindowController : INotifyPropertyChanged
                 ScreenRect bounds = SmarTTY.Native.DisplayMonitors.BoundsAt((int)_Window.Left, (int)_Window.Top);
                 _Window.WindowState = WindowState.Normal;
                 _Window.WindowStyle = WindowStyle.None;
+                TerminalBackdrop.SetTitleBarVisible(_Window, visible: false);
                 Bounds = new Rect((double)bounds.Left, (double)bounds.Top, (double)bounds.Width, (double)bounds.Height);
             }
             else
             {
-                _Window.WindowStyle = WindowStyle.SingleBorderWindow;
+                // A see-through window has no system frame (it is drawn with per-pixel alpha): it keeps its own title bar instead.
+                if (TerminalBackdrop.IsSeeThroughWindow(_Window))
+                {
+                    TerminalBackdrop.SetTitleBarVisible(_Window, visible: true);
+                }
+                else
+                {
+                    _Window.WindowStyle = WindowStyle.SingleBorderWindow;
+                }
                 if (_PreFullScreenRect.Width > 0.0 && _PreFullScreenRect.Height > 0.0)
                 {
                     Bounds = _PreFullScreenRect;
@@ -1984,6 +1999,8 @@ public class MainWindowController : INotifyPropertyChanged
         TabHeaderLocation = HeaderOrientationToDock(Settings.TabHeaderOrientation);
         SessionHeaderLocation = HeaderOrientationToDock(Settings.SessionHeaderOrientation);
         ThemeManager.Apply(Settings);
+        // The see-through background of the terminals: the window and its tabs (each terminal draws its own with that alpha).
+        TerminalBackdrop.Apply(_Window as Window, Settings.TerminalOpacityPercent, Settings.TerminalBlurBehind);
     }
 
     private void CloseActivePage()
