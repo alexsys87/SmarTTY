@@ -91,7 +91,8 @@ The WinForms controls this replaced (`ReadonlyTextBrowser` and its subclasses up
 The terminals are WPF (`GUI/TerminalView/`): `WpfTerminal` (a `Border` with `TerminalPanel`: `TerminalRenderView` and a scroll bar) shows
 a `Terminal/Rendering/TerminalDisplayModel`, which holds the emulator and the screen of `Terminal/Emulation/` (a screen is an
 `EditableTextDocument` plus a `LineInfoStore`, one `CellStyle[]` per line, plus a `GridPoint` cursor; a column is an index of the text of its line,
-and a wide character is itself and the filler of its second cell, `Terminal/Emulation/CellWidth`, see "Wide characters"); `WpfSmartTerminal`,
+a wide character is itself and the filler of its second cell, and a character of no width is kept with the cell before it in `LineInfo.Marks`,
+`Terminal/Emulation/CellWidth`, see "Wide characters"); `WpfSmartTerminal`,
 `WpfSerialTerminal` and the panes of `WpfHexTerminal` are `WpfTerminal`s, and `GUI/DevicePanel/WpfDeviceTerminal` is the device tab around
 the last two. Bytes typed or sent back to the host leave through `WpfTerminal.DataEntered` via `TerminalEventDispatcher.PostInput`.
 
@@ -662,7 +663,7 @@ generated from Python's `unicodedata`; `TerminalScreenTests` checks the counts).
 `CellWidth.Filler` (U+FFFF, a noncharacter; one that arrives is written as U+FFFD), so that a column stays an index of the text and the styles, the
 selection, the cursor, the mouse and the screen operations need no mapping; a filler that does not follow a wide character is a cell left empty
 before one that did not fit at the end of a row. A surrogate pair took two cells as two units already and still does (right for the wide ones
-there; a narrow one takes a cell too many). Combining marks and variation selectors still take a cell each (`wcwidth` 0): not done.
+there; a narrow one takes a cell too many). A character of no width takes no cell (added afterwards in the same pull request, see the last item).
 
 - The screen (`TerminalScreen`): `WriteText` and `WriteAt` write the cells of the text (`ToCells`); a wide character never starts in the last
   column when the text wraps (that cell gets a filler of its own and the character goes to the next row; not on a screen of one column, where the
@@ -693,12 +694,35 @@ there; a narrow one takes a cell too many). Combining marks and variation select
   further after three wide characters, the last cell of a row left empty and the two characters in the next row); every other case still gives the
   lines of the WinForms goldens, which were not recorded again. Four mutations (no empty cell at the edge, no split at the end of a write, every filler
   taken for a second cell, no empty cell in the command line) each make a check fail.
+- Characters of no width (`wcwidth` 0): `CellWidth.IsZeroWidth` is the table of Unicode 15.1 of what glibc gives no width (the combining marks Mn
+  and Me, the format characters Cf but the soft hyphen and the prepended concatenation marks, the medial and final Hangul jamo; 354 ranges, 2394
+  code points, also above U+FFFF; generated from Python's `unicodedata`, the counts checked by `TerminalScreenTests`). Such a character is not put in
+  the text of its line: `TerminalScreen.WriteCells` writes the text around it and `AddMark` keeps it in `LineInfo.Marks` (a `string` per cell, null
+  for a line without any) of the cell before the place it is written at (the first cell of a wide character; at the start of a row there is none and
+  it is dropped); the cursor does not move. `LineInfoStore` keeps the marks with their cells: a cell written again loses them (`SetCells`), a deletion
+  and an insertion move them (the cells put in have none), a wide character cut in two loses them (`ClearMarks`), and lines move with their
+  `LineInfo`. A mark that arrives in a write of its own finds its cell the same way, so the output fed one character at a time gives the same
+  screen. In the byte mode a mark takes a cell of its own, as before. Out: `TerminalDisplayModel.GetText` (the copy, `WpfTerminal.DocumentText` and
+  `GetRangeText`) gives every mark after the character it went with (`CellWidth.TextOf`), as it came, so a file name copied keeps its decomposed
+  form; the search matches the letters without the marks; the links do not see them. The view: `RowRunBuilder` carries the marks of the row
+  (`RowLayout.Marks`, in the signature; a blank with a mark is drawn), and `DrawGlyphs` draws a cell with marks as the character they compose with
+  it in Normalization Form C when that is one character (e and U+0301 as é), otherwise as its character with each mark as a glyph of no advance
+  put to end at the right edge of the cell (`DrawMarks`: a mark of no advance has its ink left of its origin; one of a cell's advance lands on the
+  cell). Not done: the command line (`PromptLine`) still gives a mark a cell of its own. Tests: `TerminalScreenTests` (189 checks, 20 of the marks),
+  `TerminalRenderModelTests` (242, 8 of them: the runs and the signature, the copy, the search); `TerminalModelSnapshots` compares the cases with
+  a character of no width (the hand-written "combining marks", "unicode text" and generated ones with `e\u0301`) with the wide goldens too, which
+  were recorded again and write the marks of a line (`mark 0:\u0301`): 111 cases there now, and of the 59 recorded before only the five with marks
+  changed (checked case by case); every other case still gives the WinForms lines. Of four mutations (a mark on the filler, a write that keeps the
+  marks, an insertion that copies one into the cell put in, a copy without the marks) each makes a check fail, the third after a check was added.
 - Manual check on Windows: `ls` of a directory with Chinese, Japanese and Korean names in a classic tab and in a Smart Terminal; `vim` and `mc` with
   such files (the columns stay in place, the cursor over a wide character); `htop` with a process of a CJK name; a line of wide characters longer than
   the screen (the wrap, the empty last cell); emoji such as U+231A and U+1F600; the selection and the copy of wide characters, a double click on a
   word of them, the search bar (Enter, the highlight of all the matches), Ctrl+click on an address with them; the caret (block, underline) on a wide
   character; typing them with the IME in a Smart Terminal and in the input line of a COM or TCP device (Left, Right, Backspace, the wrap, the grey
-  suggestion); a BusyBox device in byte mode (one cell each, as before).
+  suggestion); a BusyBox device in byte mode (one cell each, as before). For the characters of no width: `ls` of files made on macOS (names with
+  decomposed accents: the letters and the columns in place), `printf 'e\u0301 o\u0302\u0323 \u0915\u093f \u231a\ufe0f \U0001F468\u200D\U0001F469\n'`
+  (the accents over their letters, the Devanagari vowel sign, the emoji with the selector and the joined emoji, the cursor after each in its
+  place), `vim` with such a line, the copy of it pasted elsewhere (the same bytes), and the selection over it.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20
