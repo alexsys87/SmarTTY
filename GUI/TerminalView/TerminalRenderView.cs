@@ -439,10 +439,19 @@ internal sealed class TerminalRenderView : FrameworkElement
 
     private byte _backgroundAlpha = 255;
 
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.Property == TerminalBackdrop.IsActiveProperty)
+        {
+            InvalidateVisual();
+        }
+    }
+
     /// <summary>
     /// The alpha of the background of the view (255: opaque). Only the background without a colour of its own is drawn with it: the
     /// text, the cells with a background colour, the caret and the selection stay as they are. What is behind the view shows through
-    /// (see <c>GUI/TerminalBackdrop</c> for the window).
+    /// (see <c>GUI/TerminalBackdrop</c> for the window); it is used only while the window is see-through (<c>TerminalBackdrop.IsActive</c>).
     /// </summary>
     public byte BackgroundAlpha
     {
@@ -887,7 +896,8 @@ internal sealed class TerminalRenderView : FrameworkElement
     {
         // The background; the rows draw only the cells that have a background of their own.
         RgbColor background = _scheme.DefaultBackground;
-        if (_backgroundAlpha != 255)
+        // Only while the window shows what is behind it: over an opaque window the alpha would only mix the colour with the one under it.
+        if (_backgroundAlpha != 255 && TerminalBackdrop.GetIsActive(this))
         {
             background = RgbColor.FromArgb(background.A * _backgroundAlpha / 255, background.R, background.G, background.B);
         }

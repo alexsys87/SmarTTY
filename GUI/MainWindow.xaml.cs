@@ -60,6 +60,9 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
     private void InitializeWindow()
     {
         InitializeComponent();
+        // A see-through terminal background needs a window with per-pixel alpha, which has to be made so before it is shown and
+        // before the controller sets its style (the full screen mode).
+        TerminalBackdrop.Prepare(this, (GlobalSettings.Load() ?? new GlobalSettings()).TerminalOpacityPercent);
         CommonGUIPreferences commonGUIPreferences = GuiPreferencesStore.Current;
         try
         {

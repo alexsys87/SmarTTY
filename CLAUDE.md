@@ -67,7 +67,7 @@ PR that changes them.
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar of a window (`DwmTitleBar`), the backdrop behind a see-through client area (`DwmBackdrop`) | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar of a window (`DwmTitleBar`), the blur behind a see-through window and its maximized size (`DwmBackdrop`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -766,16 +766,23 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   and `TerminalBlurBehind` (on by default), on the terminal part of the settings window with a slider and a check box, applied with OK.
   `WpfTerminal.ApplySettings` (the SSH tabs only; the device tab keeps its own colours and stays opaque) gives the view
   `TerminalRenderView.BackgroundAlpha`, the alpha of its default background only (the text, the cells with a background colour, the caret
-  and the selection stay opaque). `MainWindowController.ApplyGlobalVisualSettings` calls `GUI/TerminalBackdrop.Apply` on the main window
-  (at the handle when it does not exist yet): below 100 % the window background and that of its composition target are transparent, the
-  inherited `TerminalBackdrop.IsActive` makes the content of `MainWindowTabControl` (a trigger in `Controls.xaml`) transparent too, the
-  device tab has a background of its own (`Theme.ContentBackground`), and `Native/DwmBackdrop.Enable` extends the frame over the whole
-  client area (`DwmExtendFrameIntoClientArea`, so the DWM uses the alpha of the pixels) and puts behind it, on Windows 11 22H2 (build 22621)
-  and later with blur, the acrylic system backdrop (`DWMWA_SYSTEMBACKDROP_TYPE` 3), otherwise the accent policy
-  (`SetWindowCompositionAttribute`: `ACCENT_ENABLE_BLURBEHIND`, or without blur `ACCENT_ENABLE_TRANSPARENTGRADIENT` with no tint). At 100 %
-  the window that was see-through gets its background, its composition colour and the DWM look back; one that never was is not touched.
-  Not seen on a real window yet: if it does not work, look first at whether the client area is black (the DWM ignores the alpha: the accent
-  policy or the backdrop did not take) or opaque (some element between the window and the terminal still draws a background).
+  and the selection stay opaque), used only while the inherited `TerminalBackdrop.IsActive` is set on it. The first version (alexsys87/SmarTTY#566)
+  kept the system frame and extended it over the client area (`DwmExtendFrameIntoClientArea`, a transparent composition target, the acrylic
+  system backdrop or the accent policy): on Windows 10 22H2 the client area was black, the DWM does not use the alpha of a plain WPF window
+  there. So the window is one with per-pixel alpha now: `MainWindow.InitializeWindow` calls `GUI/TerminalBackdrop.Prepare` before the controller
+  exists (it sets the style for the full screen mode), and below 100 % it makes the window `WindowStyle.None` with `AllowsTransparency`, a
+  `WindowChrome` (caption 30, resize border 6, no glass) and a title bar of its own above the old content in a frame of `Theme.Border` (the
+  title, minimize, maximize or restore and close in Segoe MDL2 Assets; dragging, the double click and the system menu are the caption area's),
+  and a hook of `WM_GETMINMAXINFO` that fits a maximized window to the work area of its monitor (`Native/DwmBackdrop.FitMaximizedToWorkArea`).
+  This cannot change once a window is shown: `MainWindowController.ApplyGlobalVisualSettings` calls `TerminalBackdrop.Apply`, which on a
+  see-through window sets `IsActive` (the content of `MainWindowTabControl` transparent through a trigger in `Controls.xaml`, the window
+  background almost transparent, alpha 1, so that the mouse is not let through) and the blur (`DwmBackdrop.SetBlur`, the accent policy
+  `ACCENT_ENABLE_BLURBEHIND`, which Windows 10 and 11 apply behind a layered window), and at 100 % gives the backgrounds of the theme back
+  (the window keeps its own title bar); on a window opened opaque it does nothing, and the settings window says the change takes effect the
+  next time the main window is opened. The full screen mode hides the title bar of a see-through window and does not give it the system
+  frame back (`WindowStyle.SingleBorderWindow` would throw with `AllowsTransparency`). The device tab has a background of its own
+  (`Theme.ContentBackground`). A window with per-pixel alpha is drawn by WPF and copied for the DWM on every frame, so it costs more than an
+  opaque one, most on large monitors; at 100 % nothing of this is used.
 - The colours of the terminal: `VisualTTY/TerminalColorPresets` (UI-free) are the schemes of popular terminals (the default first, the
   colours SmarTTY always had: black, light grey, white bold text, the PuTTY palette; Ubuntu, Ubuntu (Tango), Tango Dark, Campbell, One Half
   Dark, xterm, Solarized Dark and Light, Dracula, Monokai, Gruvbox Dark, Nord, macOS Basic): the background, the text colour, the bold text
@@ -798,9 +805,10 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   Of 7 mutations of them each makes a check fail (two only after a check of the boundary was added: a grey just below half brightness, half a pixel past the end). The title bar, the see-through background and the restoring of a size
   need a real window and are compile-checked on Linux only. Manual check on Windows 11 and 10, 100 %, 150 % and 200 %: every theme (the
   title bar, the border, the text of the title; a custom theme; the theme switched while a dialog is open); High Contrast on and off; the
-  background opacity at 30 %, 60 % and 100 % with and without blur (a classic and a Smart Terminal tab: the desktop behind shows through, the
-  text, the tab strip, the menu, the tool bar and the file manager stay opaque; an editor and a device tab look as before; 100 % draws as
-  before; the terminal keeps its speed; Remote Desktop); each colour scheme applied and a colour changed after it (`htop`, `mc`, `ls --color`); resize a dialog (the file transfer windows, the settings, the host-to-host copy), close it and open
+  background opacity at 30 %, 60 % and 100 % with and without blur, after a restart (a classic and a Smart Terminal tab: the desktop behind
+  shows through, the text, the tab strip, the menu, the tool bar and the file manager stay opaque; an editor and a device tab look as before;
+  the own title bar: drag, double click, the system menu, minimize, maximize and restore, Win+arrows, the size kept off the task bar, resize
+  at every edge, the full screen mode on and off; 100 % draws as before with the system frame; the terminal speed at 4K; Remote Desktop); each colour scheme applied and a colour changed after it (`htop`, `mc`, `ls --color`); resize a dialog (the file transfer windows, the settings, the host-to-host copy), close it and open
   it again, also from another monitor and with the owner on a monitor of another scale; a dialog with `SizeToContent="Height"` (the directory
   download window) keeps only its width; a window made larger than the monitor is cut to it; the file manager width after a restart (shown,
   hidden before closing, never changed); an old `GUIPreferences.xml`.
