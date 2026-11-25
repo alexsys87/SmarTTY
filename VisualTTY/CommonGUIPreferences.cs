@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Xml.Serialization;
@@ -54,4 +55,13 @@ public class CommonGUIPreferences
     public bool FullScreen;
 
     public bool Minimalistic;
+
+    /// <summary>
+    /// The sizes of the windows (other than the main and the connection window, which have a placement of their own) that the user
+    /// changed, by the name of the window class; see <see cref="WindowSizeList"/>.
+    /// </summary>
+    public List<RememberedWindowSize> WindowSizes = new List<RememberedWindowSize>();
+
+    /// <summary>The width of the file manager beside the terminals in pixels; 0 when the user never changed it.</summary>
+    public int FileListWidth;
 }

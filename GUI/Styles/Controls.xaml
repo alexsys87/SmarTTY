@@ -20,6 +20,8 @@
     <Setter Property="Background" Value="{DynamicResource Theme.WindowBackground}" />
     <Setter Property="Foreground" Value="{DynamicResource Theme.Text}" />
     <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+    <!-- The title bar in the colours of the theme, the opacity of the settings and the remembered size: GUI/WindowAppearance. -->
+    <Setter Property="gui:WindowAppearance.Manage" Value="True" />
   </Style>
 
   <!-- ============================================================ Popups -->

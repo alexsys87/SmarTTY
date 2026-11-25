@@ -379,6 +379,11 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
+              <TextBlock Text="Window opacity:" Grid.Row="5" />
+              <StackPanel Grid.Column="1" Grid.Row="5" Orientation="Horizontal" VerticalAlignment="Center" ToolTip="How opaque the windows of the program are (the title bar too); 100% is not transparent. Applied with OK.">
+                <Slider Width="240" Minimum="30" Maximum="100" TickFrequency="5" SmallChange="1" LargeChange="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" Value="{Binding WindowOpacityPercent, Mode=TwoWay}" />
+                <TextBlock Width="44" Margin="8 0 0 0" VerticalAlignment="Center" Text="{Binding WindowOpacityPercent, StringFormat={}{0}%}" />
+              </StackPanel>
             </Grid>
           </GroupBox>
           <GroupBox Header="Other Settings">

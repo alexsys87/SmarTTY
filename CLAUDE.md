@@ -49,7 +49,7 @@ PR that changes them.
 | Folder | What is there | UI? |
 | --- | --- | --- |
 | `App.xaml(.cs)` | Entry point, theme, wiring of the WPF dialogs into the code that cannot reference `GUI/` (`UserDialogs` and other static delegates) | WPF |
-| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); `UiTimer` (the timer of the windows); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
+| `GUI/` | WPF windows and dialogs (`MainWindow`, `ConnectionSelectionWindow`, settings, file lists, `MessageDialog`); `WpfMenus` (icons and items of the WPF menus); `IconImages` and the `{gui:Icon ...}` extension (the icons, see "Done in 5A"); `UiTimer` (the timer of the windows); `WindowAppearance` (the title bar, the opacity and the remembered size of every window, see "Window chrome"); the paste of the terminals (`PasteGuard`, `PasteJob`, `PasteAnchor`, `PasteMenu` and their windows) | WPF |
 | `GUI/Icons/` | Stage 5A: the icons as vector images, one resource dictionary of `DrawingImage`s for each folder the PNG files were in (`Root`, `MainWindow`, `Editor`, `Menu`, `Keys`, `Transfers`, `FileTypes`; converted from SVG outside the repository) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) | WPF |
@@ -67,7 +67,7 @@ PR that changes them.
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`) | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar and the opacity of a window (`DwmTitleBar`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -665,6 +665,43 @@ Safety nets that stage 1 adds before moving code: terminal golden snapshots capt
 terminal move (`tests/TerminalSnapshots/`, never re-recorded); `tests/check-model-boundary.sh` with an allowlist that
 only shrinks. Mono tests stay until each of their checks is ported to net8.0 tests on the model (or, for the terminals, until
 the controls they drove are gone: 2E).
+
+### Window chrome (after stage 5)
+
+Done: every window (the 56 of XAML and the ten made in code) gets, without a line of its own, the title bar in the colours of the theme, the
+opacity of the settings and the size the user gave it. `SecondaryWindowStyle` (all windows use it) sets `GUI/WindowAppearance.Manage`; the
+class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`) adds takes a window that has no such style. Both end in
+`Attach`, which works once for a window, at `SourceInitialized` (the handle exists, nothing is shown yet).
+
+- The title bar: `Native/DwmTitleBar.Apply` sets the dark frame (`DWMWA_USE_IMMERSIVE_DARK_MODE`, Windows 10 1809 and later: dark when
+  `Theme.WindowBackground` is dark, `WindowChromeRules.IsDark`) and, on Windows 11 (build 22000), the caption, text and border colours from
+  `Theme.WindowBackground`, `Theme.Text` and `Theme.Border`; on Windows 10 only the dark or light frame. A high contrast theme of the system
+  gets the colours back (null). `ThemeManager.ThemeChanged` and `SystemParameters.HighContrast` apply it again to the open windows. Not done:
+  Mica or any backdrop, a title bar drawn by the program (`FluentWindow`, `WPF-UI`), tabs or controls in the title bar.
+- The opacity: `GlobalSettings.WindowOpacityPercent` (30 to 100, 100 by default; a value out of the range is brought into it; the settings
+  window has a slider in "Visual Settings", applied with OK). `ThemeManager.Apply(GlobalSettings)` hands it to `WindowAppearance.OpacityPercent`,
+  which applies it to the open windows; `DwmTitleBar.SetOpacity` puts the window in the layered state (`WS_EX_LAYERED`,
+  `SetLayeredWindowAttributes`, the frame included) and takes the layered style off again at 100 %, so an opaque window is drawn as before.
+  A window with `AllowsTransparency` is left alone. Popups and menus (not windows) are not made transparent.
+- The sizes: `CommonGUIPreferences.WindowSizes` (a `List<RememberedWindowSize>` by the full name of the window class, in
+  `GUIPreferences.xml`; `VisualTTY/WindowSizeList`, at most 200, the oldest goes first) holds the size of every window that can be
+  resized (`ResizeMode` `CanResize` or `CanResizeWithGrip`) and that the user changed. At `SourceInitialized` the window gets the size back
+  (`SizeToContent` is respected: only the width of a `Height` window, only the height of a `Width` one, none of a `WidthAndHeight` one; the
+  size is cut to `MinWidth`/`MaxWidth` and the monitor, and the window keeps the middle it had, inside its monitor); when it closes the size
+  (`RestoreBounds` if maximized) is saved if it differs from the one the window opened at by more than a pixel. `MainWindow` and
+  `ConnectionSelectionWindow` keep their placement (`CommonGUIPreferences.WindowPlacement`) and are left out. The width of the file manager
+  beside the terminals is `CommonGUIPreferences.FileListWidth` (0: never changed), read in `MainWindow.InitializeWindow` into `_FilesWidth` (which
+  the column takes when the file manager is shown) and written from `OnClosing` (the window is not shown any more in `OnClosed`).
+- Tests: `tests/WindowChromeTests` (net8.0, 68 checks) drives `Utilities/WindowChromeRules` (opacity, alpha, COLORREF, dark or light, the
+  clamp of a length, the middle kept), `VisualTTY/WindowSizeList` and the XML of the preferences, an old file without the new members included.
+  Of 7 mutations of them each makes a check fail (two only after a check of the boundary was added: a grey just below half brightness, half a pixel past the end). The title bar, the layered window and the restoring of a size
+  need a real window and are compile-checked on Linux only. Manual check on Windows 11 and 10, 100 %, 150 % and 200 %: every theme (the
+  title bar, the border, the text of the title; a custom theme; the theme switched while a dialog is open); High Contrast on and off; the
+  opacity slider at 30 %, 60 % and 100 % (every window, a dialog opened over the main window, the terminal still readable, 100 % draws as before,
+  the terminal and editor keep their speed); resize a dialog (the file transfer windows, the settings, the host-to-host copy), close it and open
+  it again, also from another monitor and with the owner on a monitor of another scale; a dialog with `SizeToContent="Height"` (the directory
+  download window) keeps only its width; a window made larger than the monitor is cut to it; the file manager width after a restart (shown,
+  hidden before closing, never changed); an old `GUIPreferences.xml`.
 
 ### Stage 3 (the editor and the hex editor on WPF)
 
