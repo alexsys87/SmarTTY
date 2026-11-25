@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 141 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - No test needs Mono any more (see "The stands off Mono"). `RemoteFileEditorIntegrationTests` (net10.0, the real remote editor on
@@ -61,11 +61,11 @@ PR that changes them.
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
 | `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, the terminal colour schemes `TerminalColorPresets`; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
-| `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore; `ReachabilityChecker` (whether the port of a saved connection answers, see "Launcher") | no |
+| `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; the local console (`ConPtyTransport`, see "Local console"); file transfer manager; backup/restore; `ReachabilityChecker` (whether the port of a saved connection answers, see "Launcher") | no |
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar of a window (`DwmTitleBar`), the blur behind a see-through window and its maximized size (`DwmBackdrop`) | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`), the title bar of a window (`DwmTitleBar`), the blur behind a see-through window and its maximized size (`DwmBackdrop`), the Windows pseudo console (`PseudoConsole`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -853,6 +853,35 @@ the host, a failure and a throw, invalid hosts and ports; and for real against a
 makes five checks fail. Manual check on Windows: the launcher with reachable and unreachable SSH, TCP and telnet connections (the badge
 appears within 5 s, the window stays responsive, the tool tip), a COM port and a netconsole receiver (no badge), the check box off and on,
 "Probe all connections" on (dimmed and sorted, the badge too), File > Back to launcher (checked again).
+
+### Local console (after stage 5)
+
+Done: cmd, PowerShell, WSL or any console program of this computer in a tab, through the Windows pseudo console (ConPTY, Windows 10 1809+).
+It is a fifth kind of device connection, so the device tab (`WpfDeviceTerminal`) shows it with its terminal, log, paste, search and colours.
+
+- Settings: `DeviceTerminalSettings.ConnectionSettings.LocalConsole` (`Name`, `Program`, `Arguments`, `WorkingDirectory`; XML type
+  `com.sysprogs.terminal.connection.localconsole`; saved as a `.rawconnection` under `console_<name>`). `VisualTTY/DeviceTerminal/LocalConsoleProfiles`
+  (UI-free) has the built-in consoles of the installed programs (Command Prompt, Windows PowerShell, PowerShell 7 from Program Files or PATH, WSL with
+  `~`), the command line (the program quoted when it has a blank), the start folder (expanded, else the profile folder) and `NewSettings` (Enter is
+  CR, UTF-8, no prompt detection, no echo, no `stty` size command, no automatic reconnect).
+- Transport: `Native/PseudoConsole` (`CreatePseudoConsole`, two pipes, `CreateProcessW` with the pseudo console attribute and
+  `STARTF_USESTDHANDLES` with no handles; a thread waits for the process and closes the console, which ends the output; `Dispose` closes the
+  input at once and the console and then the output on the thread pool, because before Windows 11 `ClosePseudoConsole` waits until the output
+  is read). `Transport/ConPtyTransport` is the `IDeviceTransport` and `ITerminalSizeAwareTransport` on it (the size given before `Open` is the size it
+  starts with; a resize is `ResizePseudoConsole`). `DeviceConnections` makes it.
+- The tab (`GUI/DevicePanel/WpfDeviceTerminal.LocalConsole.cs`): the input line is off (every key goes to the program, which echoes), no local echo,
+  no stty items, no quick commands, no file transfer button, no echo item; the status says "running". The tab icon is `IconType.Terminal`.
+- The launcher: `SettingsWrappers.LocalConsole` (a `Raw` item, never probed), the built-in consoles added in `RefreshAll` unless one of the same name is
+  saved (opening one saves it, as a COM port is, for the last use time), the filter **Local consoles** (`ShownConnectionTypes.HideLocalConsoles`,
+  inverted so an older file shows them), **New local console...**; `RawConnectionSettingsWindow` has a "Local console" group (name, program with a
+  file chooser, arguments, start folder with a folder chooser) and does not test a console on OK.
+- Tests: `tests/LocalConsoleTests` (net8.0, 57 checks: the built-in consoles on a fake machine, PATH, the command line, the start folder, the
+  names, the settings, the XML of a profile and of the shown types); five mutations of `LocalConsoleProfiles` each make a check fail. The pseudo
+  console needs Windows and is compile-checked on Linux only. Manual check on Windows 10 and 11: each built-in console opens, the prompt, typing,
+  arrows, Tab, history, Ctrl+C, `cls`, PSReadLine in PowerShell (Ctrl+Backspace, Ctrl+Left), Cyrillic and CJK text (`chcp`, `dir` of such
+  names), `vim`, `mc` and `htop` in WSL (the mouse, the size after a resize of the tab), `exit` (the closed prompt, reconnect starts it again),
+  closing the tab while a program runs (no process left), a console with arguments and a start folder, one with a program that does not exist
+  (the error), a saved console with the name of a built-in one, the filter, an older `GUIPreferences.xml`.
 
 ### Stage 3 (the editor and the hex editor on WPF)
 

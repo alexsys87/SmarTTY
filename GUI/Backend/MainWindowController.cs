@@ -2115,6 +2115,10 @@ public class MainWindowController : INotifyPropertyChanged
             // The input mode and the echo are switched per tab.
             clone.Connection = netconsole.Clone();
         }
+        else if (source.Connection is DeviceTerminalSettings.ConnectionSettings.LocalConsole console)
+        {
+            clone.Connection = console.Clone();
+        }
         return clone;
     }
 

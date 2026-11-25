@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Transport;
 
 /// <summary>
-/// The connections of a device tab (COM, TCP, telnet, netconsole) as the tab and the settings window use them: the name of a connection for a
+/// The connections of a device tab (COM, TCP, telnet, netconsole, a local console) as the tab and the settings window use them: the name of a connection for a
 /// tab header, the transport it opens, and a test that opens it once. They were static members of the WinForms device panel.
 /// </summary>
 public static class DeviceConnections
@@ -21,6 +21,7 @@ public static class DeviceConnections
             DeviceTerminalSettings.ConnectionSettings.Serial serial => serial.ComPortName,
             DeviceTerminalSettings.ConnectionSettings.Tcp tcp => tcp.ToString(),
             DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole => netconsole.ToString(),
+            DeviceTerminalSettings.ConnectionSettings.LocalConsole console => console.DisplayName,
             _ => "Raw Terminal",
         };
     }
@@ -44,6 +45,10 @@ public static class DeviceConnections
         if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.Netconsole netconsole)
         {
             return () => new NetconsoleTransport(netconsole);
+        }
+        if (connectionSettings is DeviceTerminalSettings.ConnectionSettings.LocalConsole console)
+        {
+            return () => new ConPtyTransport(console);
         }
         return null;
     }

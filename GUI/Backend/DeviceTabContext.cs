@@ -35,7 +35,12 @@ public class DeviceTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public string Title => DeviceConnections.GetConnectionTitle(Settings.Connection);
 
-    public IconType Icon => (Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Serial) ? IconType.Serial : IconType.Network;
+    public IconType Icon => Settings.Connection switch
+    {
+        DeviceTerminalSettings.ConnectionSettings.Serial => IconType.Serial,
+        DeviceTerminalSettings.ConnectionSettings.LocalConsole => IconType.Terminal,
+        _ => IconType.Network,
+    };
 
     /// <summary>
     /// The shared search bar searches the view that is currently shown by the device terminal: the decoded text in
