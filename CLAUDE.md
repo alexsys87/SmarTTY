@@ -16,17 +16,15 @@ PR that changes them.
 - Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
-- Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
-  remote editor on OpenSSH and Dropbear, on views of the test built on the models since 3E-5) and `ModelInteropTests` (`VirtualKey` against the
-  real `Keys`, the colour numbers of the settings against the named GDI+ colours). The stands of the WinForms terminals went with them in stage 2 (see "Done in 2E"), those of the WinForms editor and hex control
-  in 3E-5 (see "Done in 3E-5"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
-  minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
-  `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
-  Build: `dotnet build tests/<Name> -c Release`, run: `xvfb-run -a mono tests/<Name>/bin/Release/net48/<Name>.exe`.
+- No test needs Mono any more (see "The stands off Mono"). `RemoteFileEditorIntegrationTests` (net10.0, the real remote editor on
+  OpenSSH and Dropbear, on views of the test built on the models since 3E-5) compiles all non-GUI code including `Controls/`
+  (`Compile Include="../../**/*.cs"` minus `GUI/**`, `App.xaml.cs` and the DPAPI protector of the drafts), so that code must build without
+  Windows and WPF: no `System.Windows*` outside `GUI/` and `App.xaml.cs` (the thread of the windows is `Utilities/IUiThread`), and nothing
+  that only Windows has on the paths the stand runs. `ModelInteropTests` (net8.0) checks `VirtualKey` against `KeysGolden.txt` (the WinForms
+  `Keys`, recorded on Mono) and the colour numbers of the settings against the named colours of `System.Drawing.Color`.
 - `SshNetIntegrationTests` and `RemoteFileEditorIntegrationTests` need a real sshd and Dropbear
   (`tests/SshNetIntegrationTests/setup-*.sh`; apt `openssh-server dropbear-bin busybox`; as root they also run in a sandbox:
-  `set -a; source <(setup-sshd.sh); source <(setup-dropbear.sh); set +a`). Mono cannot open its sockets on a kernel without
-  IPv6: build `tests/RemoteFileEditorIntegrationTests/mono-ipv4-shim.c` (command in its csproj) and run mono with `LD_PRELOAD`.
+  `set -a; source <(setup-sshd.sh); source <(setup-dropbear.sh); set +a`).
 
 ## Conventions
 
@@ -57,7 +55,7 @@ PR that changes them.
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`) | WPF |
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar, netconsole bar and menus are WPF since 4A) | WPF |
-| `Controls/` | The code the Mono stands compile that is not model: the remote file editor (not a control since 3E-4) and the commands of its tab, `UserDialogs` (the message boxes and file choosers that `App` points at the WPF windows), the interop of the model types, the interfaces of the terminal tabs; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5, the themed facades and `Forms/` in 4B | no window of its own |
+| `Controls/` | The code the remote editor stand compiles that is not model: the remote file editor (not a control since 3E-4) and the commands of its tab, `UserDialogs` (the message boxes and file choosers that `App` points at the WPF windows), the interop of the model types, the interfaces of the terminal tabs; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5, the themed facades and `Forms/` in 4B | no window of its own |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
 | `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
@@ -812,6 +810,29 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   it again, also from another monitor and with the owner on a monitor of another scale; a dialog with `SizeToContent="Height"` (the directory
   download window) keeps only its width; a window made larger than the monitor is cut to it; the file manager width after a restart (shown,
   hidden before closing, never changed); an old `GUIPreferences.xml`.
+
+### The stands off Mono (after stage 5)
+
+Done: the last two stands that ran on Mono (net48 with WinForms, under `xvfb`) run on .NET on any machine. First `ModelInteropTests`, still on
+Mono, wrote the members of the WinForms `Keys` with their values, the underlying type and `[Flags]` to `tests/ModelInteropTests/KeysGolden.txt`
+(197 lines, a `--record-keys` option that was not committed); the stand (net8.0) now compares `VirtualKey` with that file member by member,
+checks that a `KeyStroke` reads the key code and the modifiers of every key code with every set of modifiers (the round trips through `Keys`
+and `KeyEventArgs` went with WinForms), and compares the colour numbers of the settings with `System.Drawing.Color`, which .NET has on every
+platform (48 checks; a changed value in the golden makes it fail). Then the WPF types left in the code outside `GUI/`: the `Dispatcher` of
+`Ssh/Connection/SshConnector` (`UiThread` now) and of `Transport/AsyncTransportConnection` is `Utilities/IUiThread` (`IsCurrent`, `Post`, `Send`;
+`GUI/DispatcherUiThread` for a WPF dispatcher, `Post` at the normal priority as before); `NewConnectionController`, the view model of the new
+connection window (it has `Visibility` and the dispatcher), moved from `VisualTTY/Backend/` to `GUI/Backend/` (namespace unchanged; `FileDialogTests`
+reads it there); `Apply` and `Save` of `CommonGUIPreferences.WindowPlacement` (on a WPF `Window`) are `GUI/WindowPlacements.Apply` and `Of` (the
+members of the struct, which the preferences file holds, did not change). `AsyncTransportConnectionTests` and `TcpTransportTests` stub the thread as
+`FakeUiThread` instead of a fake `System.Windows.Threading.Dispatcher`. Then `RemoteFileEditorIntegrationTests` (net10.0): the main thread is the UI
+thread of the stand (`TestUiThread`: the posts of the views wait in a queue that `Pump` runs where `Application.DoEvents` was, a post of a view
+that was closed is dropped, the timer of the drafts posts its ticks; the WinForms forms, the marshalling control and the timer are gone), and
+`TestDraftProtector.cs` stands for `IO/DpapiDraftProtector` (DPAPI is Windows only; it turns the bytes with a key, so a draft is still not plain
+text). The 552 checks pass on OpenSSH and Dropbear with the same lines as on Mono (compared line by line, but for the temporary folder names).
+CI runs both with `dotnet run` in the SSH job; Mono, `xvfb` and `mono-ipv4-shim.c` are gone. The two `#if NET5_0_OR_GREATER` written for net48
+(the code pages of `TextFileEncodings` and `TerminalEncodings`) went. Manual check on Windows: a connection from the launcher with a new host key, a changed host key and
+a proxy that asks for credentials (the questions on the UI thread), a COM and a TCP device tab (connect, data, reconnect), the remembered place of
+the main window and of the launcher after a restart, the new connection window (the save buttons, connect, an error).
 
 ### Launcher: unreachable connections (after stage 5)
 

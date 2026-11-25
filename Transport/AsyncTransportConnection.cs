@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System.Windows.Threading;
+using SmarTTY.Utilities;
 using VisualTTY.DeviceTerminal;
 
 namespace SmarTTY.Transport;
@@ -28,7 +28,7 @@ internal class AsyncTransportConnection : IDisposable
 
     private readonly IDeviceTransport _transport;
 
-    private readonly Dispatcher _dispatcher;
+    private readonly IUiThread _uiThread;
 
     private readonly int _connectTimeoutMs;
 
@@ -106,11 +106,11 @@ internal class AsyncTransportConnection : IDisposable
 
     public event StateChangedHandler StateChanged;
 
-    public AsyncTransportConnection(IDeviceTransport deviceTransport, Dispatcher dispatcher, int connectTimeoutMs = 0, IHostNameResolver hostNameResolver = null)
+    public AsyncTransportConnection(IDeviceTransport deviceTransport, IUiThread uiThread, int connectTimeoutMs = 0, IHostNameResolver hostNameResolver = null)
     {
         _transport = deviceTransport;
         WriteTimeoutMs = deviceTransport is SerialTransport ? 0 : DefaultNetworkWriteTimeoutMs;
-        _dispatcher = dispatcher;
+        _uiThread = uiThread;
         _connectTimeoutMs = connectTimeoutMs;
         _hostResolver = hostNameResolver;
     }
@@ -119,9 +119,7 @@ internal class AsyncTransportConnection : IDisposable
     {
         try
         {
-            // Normal priority is what BeginInvoke(Delegate, object[]) uses as well; this overload also exists in Mono's
-            // WindowsBase, so the control runs under the Mono test harnesses too.
-            _dispatcher.BeginInvoke(DispatcherPriority.Normal, callback);
+            _uiThread.Post(() => callback());
         }
         catch
         {

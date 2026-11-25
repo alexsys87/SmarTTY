@@ -8,7 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Windows.Threading;
+using SmarTTY.Tests;
 using VisualTTY.DeviceTerminal;
 
 // Runs the real raw TCP transport (and the connection class that drives it) against listeners on this machine:
@@ -102,7 +102,7 @@ internal static class Program
     /// <summary>The connection class with the real TCP transport, as a device tab uses it.</summary>
     private sealed class Session : IDisposable
     {
-        public readonly Dispatcher Ui = new Dispatcher();
+        public readonly FakeUiThread Ui = new FakeUiThread();
         public readonly AsyncTransportConnection Connection;
         public readonly List<(ConnectionStateEnum State, string Message)> States = new List<(ConnectionStateEnum, string)>();
         public readonly ManualResetEventSlim Connected = new ManualResetEventSlim();
@@ -406,7 +406,7 @@ internal static class Program
             using Server server = new Server(IPAddress.Loopback);
             using Session s = new Session(Endpoint("127.0.0.1", server.Port));
             ManualResetEventSlim release = new ManualResetEventSlim();
-            s.Ui.BeginInvoke((Action)(() => release.Wait(5000)), new object[0]);
+            s.Ui.Post(() => release.Wait(5000));
             s.Connection.Start();
             Socket peer = server.Client;
             peer.Shutdown(SocketShutdown.Both);
@@ -440,7 +440,7 @@ internal static class Program
 
         Run("an open that cannot succeed is not retried until the time is up", () =>
         {
-            using Dispatcher ui = new Dispatcher();
+            using FakeUiThread ui = new FakeUiThread();
             using AsyncTransportConnection connection = new AsyncTransportConnection(new TcpTransport(Endpoint("1", 23)), ui, 10000);
             ManualResetEventSlim failed = new ManualResetEventSlim();
             connection.StateChanged += (sender, state, message) => { if (state == ConnectionStateEnum.Failed) failed.Set(); };

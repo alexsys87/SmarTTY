@@ -12,6 +12,7 @@
     <Compile Include="../../Transport/ReachabilityChecker.cs" Link="ReachabilityChecker.cs" />
     <Compile Include="../../Transport/TcpTransport.cs" Link="TcpTransport.cs" />
     <Compile Include="../../Transport/AsyncTransportConnection.cs" Link="AsyncTransportConnection.cs" />
+    <Compile Include="../../Utilities/IUiThread.cs" Link="IUiThread.cs" />
     <Compile Include="../../Transport/IDeviceTransport.cs" Link="IDeviceTransport.cs" />
     <Compile Include="../../Transport/IHostNameResolver.cs" Link="IHostNameResolver.cs" />
     <Compile Include="../../Transport/ITerminalSizeAwareTransport.cs" Link="ITerminalSizeAwareTransport.cs" />

@@ -1072,7 +1072,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
             // Without it the connector runs its callbacks (progress, error message boxes, credential prompts, the new session)
             // on its worker thread instead of the UI thread.
-            _Initiator.Dispatcher = dispatcher;
+            _Initiator.UiThread = new DispatcherUiThread(dispatcher);
             _Initiator.StatusChanged += _Initiator_ConnectionProgress;
             _Initiator.CredentialsRequested += _Initiator_PasswordRequest;
             _Initiator.ProxyCredentialsRequested += _Initiator_ProxyAuthRequest;
@@ -1989,7 +1989,11 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         }
         try
         {
-            GuiPreferencesStore.Current?.ConnectionWindow.Apply((Window)this);
+            CommonGUIPreferences current = GuiPreferencesStore.Current;
+            if (current != null)
+            {
+                WindowPlacements.Apply(current.ConnectionWindow, this);
+            }
         }
         catch
         {
@@ -2008,7 +2012,10 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
     {
         base.OnClosed(e);
         CommonGUIPreferences prefs = GuiPreferencesStore.Current;
-        prefs?.ConnectionWindow.Save((Window)this);
+        if (prefs != null)
+        {
+            prefs.ConnectionWindow = WindowPlacements.Of(this);
+        }
         Controller.ExportSettings(ref prefs);
         Controller.Dispose();
         GuiPreferencesStore.Save();

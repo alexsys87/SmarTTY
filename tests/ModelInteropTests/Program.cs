@@ -4,12 +4,13 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Windows.Forms;
-using SmarTTY.CodeEditing;
 using SmarTTY.TextEditing;
 
-// Checks of VirtualKey against the real WinForms keys and of the colour values of the settings against the named GDI+ colours they
-// replaced, which the logic folders and (since stages 5B and 5C) the application no longer use.
+// Checks of VirtualKey against the WinForms keys and of the colour values of the settings against the named GDI+ colours they replaced, which
+// the logic folders and (since stages 5B and 5C) the application no longer use. The keys are those of KeysGolden.txt: every member of
+// System.Windows.Forms.Keys with its value, the underlying type and the [Flags] attribute, as the WinForms of .NET Framework had them,
+// written by this stand while it still ran on Mono (with the WinForms of the system), so that it runs on .NET on any machine now. The named
+// colours are those of System.Drawing.Color, which .NET has on every platform.
 internal static class Program
 {
     private static int _passed;
@@ -39,9 +40,52 @@ internal static class Program
         return result;
     }
 
+    // The members of the WinForms keys as KeysGolden.txt has them, with its underlying type and whether it is [Flags].
+    private sealed class RecordedKeys
+    {
+        public readonly Dictionary<string, int> Members = new Dictionary<string, int>();
+
+        public string UnderlyingType;
+
+        public bool Flags;
+
+        public int this[string name] => Members[name];
+    }
+
+    private static RecordedKeys ReadKeys()
+    {
+        RecordedKeys keys = new RecordedKeys();
+        foreach (string line in File.ReadAllLines(Path.Combine(RepositoryRoot(), "tests", "ModelInteropTests", "KeysGolden.txt")))
+        {
+            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            string[] parts = line.Split(' ');
+            if (parts.Length != 2)
+            {
+                throw new Exception("FAIL: a line of KeysGolden.txt is not a name and a value: " + line);
+            }
+            if (parts[0] == "underlying")
+            {
+                keys.UnderlyingType = parts[1];
+            }
+            else if (parts[0] == "flags")
+            {
+                keys.Flags = bool.Parse(parts[1]);
+            }
+            else
+            {
+                keys.Members[parts[0]] = int.Parse(parts[1]);
+            }
+        }
+        return keys;
+    }
+
     private static void KeysMatchChecks()
     {
-        Dictionary<string, int> keys = Members(typeof(Keys));
+        RecordedKeys recorded = ReadKeys();
+        Dictionary<string, int> keys = recorded.Members;
         Dictionary<string, int> virtualKeys = Members(typeof(VirtualKey));
         Check(keys.Count > 100, "the Keys enumeration is read (" + keys.Count + " members)");
 
@@ -53,58 +97,46 @@ internal static class Program
         string[] different = keys.Where(k => virtualKeys.ContainsKey(k.Key) && virtualKeys[k.Key] != k.Value).Select(k => k.Key + " " + k.Value + " vs " + virtualKeys[k.Key]).ToArray();
         Equal(string.Join(", ", different), "", "every member has the same value in both enumerations");
 
-        Equal(Enum.GetUnderlyingType(typeof(VirtualKey)), Enum.GetUnderlyingType(typeof(Keys)), "both enumerations have the same underlying type");
-        Equal(typeof(VirtualKey).IsDefined(typeof(FlagsAttribute), false), typeof(Keys).IsDefined(typeof(FlagsAttribute), false), "both enumerations are [Flags] alike");
-        Equal((int)VirtualKey.KeyCode, (int)Keys.KeyCode, "KeyCode");
-        Equal((int)VirtualKey.Modifiers, (int)Keys.Modifiers, "Modifiers");
-        Equal((int)VirtualKey.Shift, (int)Keys.Shift, "Shift");
-        Equal((int)VirtualKey.Control, (int)Keys.Control, "Control");
-        Equal((int)VirtualKey.Alt, (int)Keys.Alt, "Alt");
+        Equal(Enum.GetUnderlyingType(typeof(VirtualKey)).Name, recorded.UnderlyingType, "both enumerations have the same underlying type");
+        Equal(typeof(VirtualKey).IsDefined(typeof(FlagsAttribute), false), recorded.Flags, "both enumerations are [Flags] alike");
+        Equal((int)VirtualKey.KeyCode, recorded["KeyCode"], "KeyCode");
+        Equal((int)VirtualKey.Modifiers, recorded["Modifiers"], "Modifiers");
+        Equal((int)VirtualKey.Shift, recorded["Shift"], "Shift");
+        Equal((int)VirtualKey.Control, recorded["Control"], "Control");
+        Equal((int)VirtualKey.Alt, recorded["Alt"], "Alt");
     }
 
-    private static void KeyConversionChecks()
+    // What the key events of WinForms gave as KeyData (a key code and the modifier bits) is what a KeyStroke reads: for every key code with every
+    // set of modifiers the code, the modifiers and the data come back as they were put in.
+    private static void KeyStrokeChecks()
     {
-        int checkedValues = 0;
-        foreach (Keys key in Enum.GetValues(typeof(Keys)))
-        {
-            Keys back = key.ToVirtualKey().ToKeys();
-            if (back != key || (int)key.ToVirtualKey() != (int)key)
-            {
-                throw new Exception("FAIL: " + key + " does not survive the round trip through VirtualKey");
-            }
-            checkedValues++;
-        }
-        Check(checkedValues > 100, "every member of Keys survives the round trip through VirtualKey (" + checkedValues + " members)");
-
-        // Combinations with modifiers, as in KeyData of a key event, for every key code and every modifier set.
+        RecordedKeys recorded = ReadKeys();
+        int keyCodeMask = recorded["KeyCode"];
         int combinations = 0;
-        foreach (Keys modifiers in new[] { Keys.None, Keys.Shift, Keys.Control, Keys.Alt, Keys.Shift | Keys.Control, Keys.Control | Keys.Alt, Keys.Shift | Keys.Alt, Keys.Shift | Keys.Control | Keys.Alt })
+        foreach (string[] modifierNames in new[] { new string[0], new[] { "Shift" }, new[] { "Control" }, new[] { "Alt" }, new[] { "Shift", "Control" }, new[] { "Control", "Alt" }, new[] { "Shift", "Alt" }, new[] { "Shift", "Control", "Alt" } })
         {
+            int modifiers = modifierNames.Aggregate(0, (bits, name) => bits | recorded[name]);
             for (int code = 0; code <= 255; code++)
             {
-                Keys key = (Keys)code | modifiers;
-                if (key.ToVirtualKey().ToKeys() != key || (int)key.ToVirtualKey() != (int)key)
+                KeyStroke stroke = new KeyStroke((VirtualKey)(code | modifiers));
+                if ((int)stroke.KeyData != (code | modifiers) || (int)stroke.KeyCode != ((code | modifiers) & keyCodeMask)
+                    || stroke.Shift != modifierNames.Contains("Shift") || stroke.Control != modifierNames.Contains("Control") || stroke.Alt != modifierNames.Contains("Alt"))
                 {
-                    throw new Exception("FAIL: " + key + " does not survive the round trip");
+                    throw new Exception("FAIL: the key data " + (code | modifiers) + " does not give its key code and modifiers");
                 }
                 combinations++;
             }
         }
-        Check(combinations == 8 * 256, "all " + combinations + " key codes with all modifier sets survive the round trip");
+        Check(combinations == 8 * 256, "all " + combinations + " key codes with all modifier sets give their code and modifiers");
 
-        Equal(Keys.Control.ToVirtualKey() | Keys.C.ToVirtualKey(), (Keys.Control | Keys.C).ToVirtualKey(), "modifiers combine the same way");
-        Equal(((Keys.Control | Keys.Shift | Keys.F5).ToVirtualKey() & VirtualKey.KeyCode), VirtualKey.F5, "KeyCode strips the modifiers of a converted value");
-
-        var e = new KeyEventArgs(Keys.Control | Keys.Shift | Keys.Left);
-        KeyStroke stroke = e.ToKeyStroke();
-        Equal(stroke.KeyData, VirtualKey.Control | VirtualKey.Shift | VirtualKey.Left, "KeyEventArgs gives the key data");
-        Equal(stroke.KeyCode, VirtualKey.Left, "KeyEventArgs gives the key code");
-        Check(stroke.Control && stroke.Shift && !stroke.Alt, "KeyEventArgs gives the modifiers");
-        Equal(stroke.Char, '\0', "a key-down event has no character");
-        var plain = new KeyEventArgs(Keys.A).ToKeyStroke();
-        Equal(plain, new KeyStroke(VirtualKey.A), "KeyEventArgs for a plain key");
-        var alt = new KeyEventArgs(Keys.Alt | Keys.F4).ToKeyStroke();
-        Check(alt.Alt && alt.KeyCode == VirtualKey.F4, "KeyEventArgs for Alt+F4");
+        KeyStroke left = new KeyStroke((VirtualKey)(recorded["Control"] | recorded["Shift"] | recorded["Left"]));
+        Equal(left.KeyData, VirtualKey.Control | VirtualKey.Shift | VirtualKey.Left, "Ctrl+Shift+Left gives the key data");
+        Equal(left.KeyCode, VirtualKey.Left, "and the key code");
+        Check(left.Control && left.Shift && !left.Alt, "and the modifiers");
+        Equal(left.Char, '\0', "a key-down stroke has no character");
+        Equal(new KeyStroke((VirtualKey)recorded["A"]), new KeyStroke(VirtualKey.A), "a plain key");
+        KeyStroke alt = new KeyStroke((VirtualKey)(recorded["Alt"] | recorded["F4"]));
+        Check(alt.Alt && alt.KeyCode == VirtualKey.F4, "Alt+F4");
     }
 
     // Stage 5C replaced the named colours of System.Drawing in the defaults of the settings and of the terminals by their numbers, each
@@ -148,29 +180,9 @@ internal static class Program
     private static void Main()
     {
         KeysMatchChecks();
-        KeyConversionChecks();
+        KeyStrokeChecks();
         NamedColorChecks();
         Console.WriteLine();
         Console.WriteLine("All " + _passed + " model interop checks passed.");
-    }
-}
-
-// The conversions between the WinForms keys and VirtualKey (they were in Controls/ModelInterop.cs until stage 5B; the application no
-// longer has the WinForms keys, the test keeps them to check that VirtualKey is still an exact copy).
-internal static class KeyInterop
-{
-    public static VirtualKey ToVirtualKey(this Keys keys)
-    {
-        return (VirtualKey)(int)keys;
-    }
-
-    public static Keys ToKeys(this VirtualKey key)
-    {
-        return (Keys)(int)key;
-    }
-
-    public static KeyStroke ToKeyStroke(this KeyEventArgs e)
-    {
-        return new KeyStroke(e.KeyData.ToVirtualKey());
     }
 }

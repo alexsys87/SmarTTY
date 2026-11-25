@@ -10,7 +10,6 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using System.Windows.Threading;
 using VisualTTY;
 
 namespace SmarTTY.Ssh;
@@ -35,7 +34,8 @@ public partial class SshConnector : Component
     // Used when the connection settings do not enable keep-alive packets, so that a dead link is detected without user input.
     private const int DefaultKeepAliveSeconds = 15;
 
-    public Dispatcher Dispatcher;
+    /// <summary>The thread of the windows: the events and the questions of the connection are raised there (null: on the thread of the connection).</summary>
+    public IUiThread UiThread;
 
     private ConnectionAttempt _currentAttempt;
 
@@ -44,7 +44,7 @@ public partial class SshConnector : Component
         get
         {
             // The WinForms control of the designer that could stand for the dispatcher went in stage 5B (nothing set it).
-            return Dispatcher != null && Dispatcher.Thread != Thread.CurrentThread;
+            return UiThread != null && !UiThread.IsCurrent;
         }
     }
 
@@ -131,7 +131,7 @@ public partial class SshConnector : Component
 
     private void BeginInvokeOnUi(ThreadStart callback)
     {
-        Dispatcher.BeginInvoke((Delegate)callback, new object[0]);
+        UiThread.Post(() => callback());
     }
 
     private void InvokeOnUi(ThreadStart callback)
@@ -142,7 +142,7 @@ public partial class SshConnector : Component
         }
         else
         {
-            Dispatcher.Invoke((Delegate)callback, new object[0]);
+            UiThread.Send(() => callback());
         }
     }
 
@@ -152,7 +152,9 @@ public partial class SshConnector : Component
         {
             return delegateValue.DynamicInvoke(items);
         }
-        return Dispatcher.Invoke(delegateValue, items);
+        object result = null;
+        UiThread.Send(() => result = delegateValue.DynamicInvoke(items));
+        return result;
     }
 
     private void OnDisposed(object sender, EventArgs e)

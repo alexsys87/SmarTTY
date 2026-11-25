@@ -42,9 +42,7 @@ public static class TextFileEncodings
 
     private static bool RegisterCodePages()
     {
-#if NET5_0_OR_GREATER
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-#endif
         return true;
     }
 

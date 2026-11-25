@@ -310,7 +310,7 @@ public class NewConnectionController : INotifyPropertyChanged
         _Dispatcher = dispatcher;
         // Without it the connector creates its dialogs (the new/changed host key prompt, the proxy credentials prompt)
         // on its worker thread, and creating a WPF window off the STA UI thread throws "The calling thread must be STA".
-        _BackgroundSessionInitiator.Dispatcher = dispatcher;
+        _BackgroundSessionInitiator.UiThread = new SmarTTY.GUI.DispatcherUiThread(dispatcher);
         _Settings = settings?.CloneSlow() ?? new SSHConnectionSettings();
         if (customization != null && customization.BypassHostKeyCheck)
         {

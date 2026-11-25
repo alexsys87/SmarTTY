@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Windows;
 using System.Xml.Serialization;
 
 namespace VisualTTY;
@@ -14,24 +13,7 @@ public class CommonGUIPreferences
 
         public ScreenRect[] ScreenRectanglesWhenWindowRectangleRemembered;
 
-        public void Apply(Window wnd)
-        {
-            ScreenRect[] first = SmarTTY.Native.DisplayMonitors.AllBounds();
-            if (ScreenRectanglesWhenWindowRectangleRemembered != null && first.SequenceEqual(ScreenRectanglesWhenWindowRectangleRemembered))
-            {
-                wnd.WindowStartupLocation = WindowStartupLocation.Manual;
-                wnd.Top = LastKnownConnectionWindowRectangle.Top;
-                wnd.Left = LastKnownConnectionWindowRectangle.Left;
-                ((FrameworkElement)wnd).Width = LastKnownConnectionWindowRectangle.Width;
-                ((FrameworkElement)wnd).Height = LastKnownConnectionWindowRectangle.Height;
-            }
-        }
-
-        public void Save(Window wnd)
-        {
-            LastKnownConnectionWindowRectangle = new ScreenRect((int)wnd.Left, (int)wnd.Top, (int)((FrameworkElement)wnd).Width, (int)((FrameworkElement)wnd).Height);
-            ScreenRectanglesWhenWindowRectangleRemembered = SmarTTY.Native.DisplayMonitors.AllBounds();
-        }
+        // Put on a window and read from it by GUI/WindowPlacements.
     }
 
     public WindowPlacement MainWindow;
