@@ -1,10 +1,10 @@
 using SmarTTY.Utilities;
 using System;
-using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using VisualTTY;
 
 namespace SmarTTY.GUI;
 
@@ -119,7 +119,7 @@ public partial class PasteProgressWindow : Window, IPasteProgress
         Matrix fromDevice = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         try
         {
-            Rectangle bounds = anchor.ScreenBounds;
+            ScreenRect bounds = anchor.ScreenBounds;
             double widthPx = ActualWidth * toDevice.M11;
             double heightPx = ActualHeight * toDevice.M22;
             double leftPx = PasteProgressRules.NearLeft(bounds.Left, bounds.Width, widthPx);

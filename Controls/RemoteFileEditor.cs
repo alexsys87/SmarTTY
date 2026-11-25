@@ -666,7 +666,7 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
             return;
         }
         GlobalSettings.EditorColors colors = _settings.Editor.GetEffectiveColors(_settings.IsLightTheme);
-        _text.ApplyMessageColors(((System.Drawing.Color)colors.LineNumberBackground).ToRgb(), ((System.Drawing.Color)colors.ErrorColor).ToRgb(), ((System.Drawing.Color)colors.WarningColor).ToRgb(), ((System.Drawing.Color)colors.LineNumberForeground).ToRgb());
+        _text.ApplyMessageColors(colors.LineNumberBackground, colors.ErrorColor, colors.WarningColor, colors.LineNumberForeground);
     }
 
     /// <summary>

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 SmarTTY: a graphical SSH client and terminal for Windows (SSH, SFTP/SCP, COM/TCP/telnet device terminals, remote file
-editor). C#, WPF (no WinForms since stage 5B; `System.Drawing` types are still used, see "Done in 5B"). User docs: `README.md` (in Russian).
+editor). C#, WPF (no WinForms since stage 5B, no `System.Drawing` since 5C). User docs: `README.md` (in Russian).
 
 Read this file instead of re-exploring the repository. Update the "Migration status" and the maps below in the same
 PR that changes them.
@@ -13,12 +13,12 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 139 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 140 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - Mono tests (net48, need `mono` + `xvfb`; `libmono-i18n4.0-all` for code pages): `RemoteFileEditorIntegrationTests` (the real
   remote editor on OpenSSH and Dropbear, on views of the test built on the models since 3E-5) and `ModelInteropTests` (`VirtualKey` against the
-  real `Keys`). The stands of the WinForms terminals went with them in stage 2 (see "Done in 2E"), those of the WinForms editor and hex control
+  real `Keys`, the colour numbers of the settings against the named GDI+ colours). The stands of the WinForms terminals went with them in stage 2 (see "Done in 2E"), those of the WinForms editor and hex control
   in 3E-5 (see "Done in 3E-5"). They compile all non-GUI code including `Controls/` (`Compile Include="../../**/*.cs"`
   minus `GUI/**`, `App.xaml.cs`), so that code must still compile for net48: no `Range`/`Index`, `HashCode`,
   `Math.Clamp`, `ArgumentNullException.ThrowIfNull`, `string.Contains(char)` unless behind `#if NET5_0_OR_GREATER`.
@@ -62,12 +62,12 @@ PR that changes them.
 | `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
-| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes), `DeviceTerminal/` state and line input | no (but uses `Color`) |
+| `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
 | `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore | no |
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
-| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`) | no |
+| `Native/` | P/Invoke: serial port and its arrival watcher, setupapi, clipboard, reparse points, the monitors (`DisplayMonitors`), the system colours (`SystemColorValues`) | no |
 | `Utilities/` | Shared helpers; `IconPaths` (the rules of the icon paths, UI-free for the tests) | no |
 
 ## The editor and the views (since stage 3E-5 there is no WinForms control hierarchy)
@@ -107,7 +107,7 @@ Goal: drop WinForms, render with WPF for better performance and scaling up to 8K
 | 2 | New WPF terminal view (`GlyphRun`, row cache), device panel in XAML | In progress: 2A (the view, its model, the keyboard, the lab window), 2B (the classic SSH tab and the sudo prompt on `WpfTerminal`), 2C (the Smart Terminal on `WpfSmartTerminal`) and 2D (the device tab on `WpfDeviceTerminal` with `WpfSerialTerminal` and `WpfHexTerminal`) and 2E (the WinForms terminals and their Mono stands removed, their goldens on the display model) done, see "Stage 2". Left of the stage: nothing (the tool bar and menus of the device panel, which stayed WinForms, went to WPF in 4A) |
 | 3 | Editor on AvalonEdit, hex editor on WPF | Done in alexsys87/SmarTTY#557 (the text view is a WPF view of our own on the model, not AvalonEdit): 3A (what `RemoteFileEditor` decides that needs no window) done in 3A-1 (the content of the file and the switching between the text and the hex view, `RemoteFileContent`) and 3A-2 (the loading and the saves, `RemoteFileFlow`), see "Stage 3"; 3B (the hex view on WPF) done in 3B-1 (the layout, the keys, the mouse selection and the texts of `HexEditorControl` to the model), 3B-2 (the WPF view `GUI/HexView/WpfHexEditor` and its lab window) and 3B-3 (the consumers through `IHexEditorView`, the menu and the data inspector to the model, the WPF inspector and context menu, the WPF view in the editor tab); 3C (the caret, the selection, the wrap and the undo of the text view to the model) done in 3C-1 (the caret moves and the wrap map, `CaretNavigator`, `WrapMap`), 3C-2 (the selection, `TextSelection`) and 3C-3 (the undo history, `UndoHistory`, `IndentEdits`); 3D (the text view on WPF, a view of our own on the model, not AvalonEdit) in progress: 3D-1 (the edit commands and the typing to the model, `TextEditCommands`, `TextTyping`) and 3D-2 (what an edit becomes and the navigation keys to the model, `TextReplace`, the layout and the mouse selection, `TextViewLayout`, `TextPointer`, the WPF view `GUI/TextView/WpfTextEditor` and its lab window) 3D-3 (the syntax colours: `SyntaxColoring`, the colour runs of a row, the tokens in the WPF view) 3D-4 (the folds: `FoldingManager.ClickMark`, the folds in `TextViewLayout` through `ITextFolds`, the fold margin in the WPF view) and 3D-5 (the inline messages: `InlineMessageBand`, `InlineMessageProvider.AddReported`, the rows of the messages in `TextViewLayout` through `ILineMessages`, the messages in the WPF view) and 3D-6 (the completion: `EditorCompletion`, what the list selects and its keys `SuggestionListMatch`, the WPF list and hint) done; 3E (the WPF editor in the tab) done: 3E-1 (the line commands, the moves to a bracket, the zoom steps and the key bindings: `LineCommands`, `TokenMoves`, `EditorZoom`, the commands in the WPF view) and 3E-2 (the search, the highlights, the pair of a bracket and the marks of the blanks: `TextSearch`, `BracketPair`, `BlankMarks`, the WPF view as an `ISearchTarget`) and 3E-3 (several cursors: `MultiCursorSession`, the cursors in the WPF view) and 3E-4 (`RemoteFileEditor` on a text view it is given: `IRemoteTextView`, `RemoteTextView`; the commands of the tab: `RemoteFileEditorCommands`; the tab, the status bar and the search on the WPF text view) and 3E-5 (the WinForms editor, hex control and their Mono stands removed; the hex golden replayed on the models, the remote editor stand on views of the test) done |
 | 4 | Popups and menus to WPF, remove `Themed*Adapter`, `Forms/` | Done: 4A (the menus and bars of the terminal tabs and the device tab) in alexsys87/SmarTTY#558, 4B (the WinForms helpers nothing used, the paste and snippet dialogs without facades and `Forms/`, one dialogs seam `UserDialogs` for the message boxes and file choosers) after it, see "Stage 4" |
-| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | In progress: 5A (the icons as vector images, the PNG files removed) and 5B (no WinForms: `UseWindowsForms` off; the lab windows removed) done, see "Stage 5"; next 5C (`System.Drawing`) |
+| 5 | Remove `UseWindowsForms` and `System.Drawing`, vector icons | In progress: 5A (the icons as vector images, the PNG files removed) and 5B (no WinForms: `UseWindowsForms` off; the lab windows removed) and 5C (no `System.Drawing`) done, see "Stage 5" |
 
 ### Stage 1 rules
 
@@ -118,7 +118,7 @@ commits), one small PR per step, each green on its own. Do not fix bugs found on
   `System.Windows.Forms`, `System.Drawing` (including `Point`, `Color`, `Rectangle`), WPF, `Controls/`, `Forms/`, `GUI/`.
   View files found there move to `Controls/TextView/` or `Controls/TerminalView/`.
 - New model types in `TextEditing/`: `RgbColor` (ARGB, `Empty`), `GridPoint` (mutable `X` column / `Y` row, like `Point`),
-  `VirtualKey` (exact copy of `Keys`: same names and values), `KeyStroke`. Conversions only in `Controls/ModelInterop.cs`.
+  `VirtualKey` (exact copy of `Keys`: same names and values), `KeyStroke`. Conversions only in `Controls/ModelInterop.cs` (gone in 5C: nothing converts any more).
 - Seams are derived from real call sites, no methods "for later": `IUiDispatcher`, `IUserPrompt`, `IEditorTextBuffer`,
   `ISearchTarget`, `IEditorStatusSource`, events on `TerminalEmulator` (`RowsChanged`, `BufferSwitched`, `CursorMoved`,
   `TitleChanged`, `Bell`, `ModesChanged`, `DataEntered`). Events fire synchronously where the direct call was.
@@ -627,6 +627,31 @@ connection window, the drafts of an edited file (a draft every 10 s), a long and
 timers (the line status of a COM port, a quick script waiting for the prompt, the listing of a directory, the reconnect), Ctrl+W, Ctrl+D,
 Ctrl+Shift+Insert, Alt+Enter and Ctrl+Shift+C/V in a device tab, a connection deleted with Shift held (no question), the questions and the file
 choosers of the editor and the device tab.
+
+Done in 5C (no `System.Drawing`): the settings and the views use types of their own, and the settings files are read and written as before.
+The colours were `ColorWrapper` in the settings already (four numbers in the XML); it converts to `RgbColor` now instead of `Color`, and the
+defaults that were named colours (`Color.LightGray`, `Black`, `White`, `DarkGray`, `LightGreen`, `LightGoldenrodYellow`) are their numbers with
+the name as a comment (`RgbColor.FromArgb(211, 211, 211) /* LightGray */`); `SystemColors.ButtonFace` of the light editor colours is
+`Native/SystemColorValues` (the same `GetSysColor`, the light grey of Windows where it cannot be asked). The `[XmlInclude(typeof(Color))]` of
+`ColorWrapper` went: it names a type for members declared as `object`, which the settings have none of. The font of the settings
+(`EffectiveFont`, `ConfiguredFont`) is `VisualTTY/FontSpec` (family, points, bold, italic), which `WpfTerminal.SetFont` takes as the WinForms
+font was taken (the points at 96/72); `FontVariant` went, and so did the `try`/`catch` around the font of the settings (making a `Font` of a
+family that is not installed could throw, a `FontSpec` cannot; WPF falls back itself). The remembered placement of the connection window and the
+monitors it was remembered on (`CommonGUIPreferences.WindowPlacement`) are `VisualTTY/ScreenRect`, a struct written to XML as
+`System.Drawing.Rectangle` was (an array item is a `Rectangle` element, then `Location`, `Size`, `X`, `Y`, `Width`, `Height`);
+`tests/ScreenRectXmlTests` (net8.0, where `Rectangle` is part of .NET, 32 checks) writes both under the same root and compares the XML and
+reads each with the other (one monitor, two with negative coordinates, nothing remembered, an empty list); of three mutations two make it
+fail and the third (no `[XmlIgnore]` on the edges, which have no setter) was an equivalent change, so those attributes were taken out.
+`DisplayMonitors`, `PasteAnchor.ScreenBounds` and the full screen mode use `ScreenRect` too; the context menu events of `WpfTerminal` and
+`WpfHexTerminal` give a WPF `Point` (device pixels, rounded as before); the colour of a hex mark (`HexHighlightWindow`) is an `RgbColor`;
+`ThemeManager.GetColor` (for the WinForms controls) is gone; `Controls/ModelInterop` is gone (nothing converts between the model types and
+GDI+), and `ModelInteropTests` checks instead that every `RgbColor.FromArgb(...) /* Name */` of the settings and of the device tab is the
+named colour (51 checks on Mono). The four test projects that link `DeviceTerminalSettings.cs` link `RgbColor.cs` too. The built assembly has no
+reference to `System.Drawing` (nor to WinForms). Manual check on Windows: the colours of a new settings file (the editor in the light and the
+dark theme, the line numbers on the system's button colour, a device tab and its disconnected colour, the echo of the HEX view) and of an old
+one; the font of the settings in a classic, a Smart Terminal and a device tab, and the font picker; the remembered place of the connection
+window after an update from the previous version; a hex mark with a preset and with another colour; the paste progress window near its
+terminal; the full screen mode.
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20

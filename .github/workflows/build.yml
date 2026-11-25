@@ -225,6 +225,9 @@ jobs:
       - name: Run model type checks (RgbColor, GridPoint, VirtualKey, KeyStroke)
         run: dotnet run --project tests/ModelTypesTests -c Release
 
+      - name: Run screen rectangle checks (the remembered window placement is written to XML and read from it as System.Drawing.Rectangle was)
+        run: dotnet run --project tests/ScreenRectXmlTests -c Release
+
       - name: Run folding model checks (fold marks, hidden lines, folded text, expanding; answers of the model before it was separated from the painting)
         run: dotnet run --project tests/FoldingTests -c Release
 
@@ -481,7 +484,7 @@ jobs:
       - name: Build the model interop checks
         run: dotnet build tests/ModelInteropTests -c Release
 
-      - name: Run the model interop checks (VirtualKey matches the WinForms Keys member by member; colour, point and key conversions, under Mono)
+      - name: Run the model interop checks (VirtualKey matches the WinForms Keys member by member, the key conversions, the colour numbers of the settings are the named GDI+ colours they replaced, under Mono)
         run: xvfb-run -a mono tests/ModelInteropTests/bin/Release/net48/ModelInteropTests.exe
 
   build:

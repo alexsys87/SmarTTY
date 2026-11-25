@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Runtime.InteropServices;
+using VisualTTY;
 
 namespace SmarTTY.Native;
 
@@ -51,12 +51,12 @@ internal static class DisplayMonitors
     private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     /// <summary>The bounds of every monitor, in the order Windows lists them (that of <c>Screen.AllScreens</c>).</summary>
-    public static Rectangle[] AllBounds()
+    public static ScreenRect[] AllBounds()
     {
-        List<Rectangle> bounds = new List<Rectangle>();
+        List<ScreenRect> bounds = new List<ScreenRect>();
         MonitorEnumProc callback = (monitor, hdc, rect, data) =>
         {
-            if (TryGetBounds(monitor, out Rectangle rectangle))
+            if (TryGetBounds(monitor, out ScreenRect rectangle))
             {
                 bounds.Add(rectangle);
             }
@@ -68,21 +68,21 @@ internal static class DisplayMonitors
     }
 
     /// <summary>The bounds of the monitor a point is on, or of the nearest one (<c>Screen.FromPoint(...).Bounds</c>).</summary>
-    public static Rectangle BoundsAt(int x, int y)
+    public static ScreenRect BoundsAt(int x, int y)
     {
         IntPtr monitor = MonitorFromPoint(new NativePoint { X = x, Y = y }, MonitorDefaultToNearest);
-        return TryGetBounds(monitor, out Rectangle rectangle) ? rectangle : Rectangle.Empty;
+        return TryGetBounds(monitor, out ScreenRect rectangle) ? rectangle : ScreenRect.Empty;
     }
 
-    private static bool TryGetBounds(IntPtr monitor, out Rectangle bounds)
+    private static bool TryGetBounds(IntPtr monitor, out ScreenRect bounds)
     {
         MonitorInfo info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
         if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
         {
-            bounds = Rectangle.Empty;
+            bounds = ScreenRect.Empty;
             return false;
         }
-        bounds = Rectangle.FromLTRB(info.Monitor.Left, info.Monitor.Top, info.Monitor.Right, info.Monitor.Bottom);
+        bounds = ScreenRect.FromLTRB(info.Monitor.Left, info.Monitor.Top, info.Monitor.Right, info.Monitor.Bottom);
         return true;
     }
 }

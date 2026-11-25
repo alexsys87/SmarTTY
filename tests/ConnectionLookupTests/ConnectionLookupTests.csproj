@@ -18,6 +18,7 @@
     <Compile Include="../../Utilities/XmlStorage.cs" Link="XmlStorage.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/RawConnectionSettings.cs" Link="RawConnectionSettings.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
   </ItemGroup>
 </Project>

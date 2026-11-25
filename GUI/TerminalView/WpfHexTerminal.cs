@@ -137,7 +137,7 @@ public sealed class WpfHexTerminal : Grid, IByteSearchTarget
     public event KeyEventHandler ShortcutKey;
 
     /// <summary>The right button: the context menu at a point of the screen.</summary>
-    public event Action<WpfHexTerminal, System.Drawing.Point> ContextMenuRequested;
+    public event Action<WpfHexTerminal, Point> ContextMenuRequested;
 
     /// <summary>The colour of the echo of what was typed; null until the settings are applied.</summary>
     public RgbColor? EchoColor;

@@ -2,7 +2,6 @@ using SmarTTY.Ssh;
 using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
-using System.Drawing;
 using System.IO;
 
 namespace VisualTTY;

@@ -16,6 +16,7 @@
     <Compile Include="../../Transport/ITerminalSizeAwareTransport.cs" Link="ITerminalSizeAwareTransport.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/ConnectionStateEnum.cs" Link="ConnectionStateEnum.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/DeviceTerminalSettings.cs" Link="DeviceTerminalSettings.cs" />
+    <Compile Include="../../TextEditing/RgbColor.cs" Link="RgbColor.cs" />
     <Compile Include="../../VisualTTY/DeviceTerminal/TerminalEncodings.cs" Link="TerminalEncodings.cs" />
   </ItemGroup>
 </Project>

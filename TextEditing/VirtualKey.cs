@@ -4,7 +4,7 @@ namespace SmarTTY.TextEditing;
 
 /// <summary>
 /// An exact copy of the WinForms <c>Keys</c> enumeration for code that must not depend on WinForms: the same member
-/// names and the same values, so that a <c>Keys</c> value converts with a plain cast (see <c>Controls/ModelInterop.cs</c>).
+/// names and the same values, so that a <c>Keys</c> value converts with a plain cast.
 /// The match is verified by <c>tests/ModelInteropTests</c> against the real <c>Keys</c> enumeration.
 /// </summary>
 [Flags]

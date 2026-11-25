@@ -9,7 +9,6 @@ using SmarTTY.TextEditing;
 using SmarTTY.Transport;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -676,7 +675,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             OpensPasteMenu = false
         };
         _serialTerminalControl.Model.ScrollbackLimit = int.MaxValue;
-        _serialTerminalControl.SetDefaultColors(Color.LightGray.ToRgb(), Color.Black.ToRgb());
+        _serialTerminalControl.SetDefaultColors(RgbColor.FromArgb(211, 211, 211) /* LightGray */, RgbColor.FromArgb(0, 0, 0) /* Black */);
         _serialTerminalControl.DataEntered += OnTerminalDataEntered;
         _serialTerminalControl.ShortcutKey += OnWpfTerminalKey;
         _serialTerminalControl.ContextMenuRequested += (sender, where) => ShowContextMenu(sender);
@@ -820,16 +819,8 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         hexTerminalControl1.CopyOnSelect = settings.CopyOnSelection;
         ConsolePalette palette = settings.PaletteOverride ?? ConsolePalette.PuTTY;
         terminal.SetPalette(palette);
-        Font configuredFont = null;
-        try
-        {
-            // Same rule as for SSH tabs: without a configured font the terminal keeps its own default.
-            configuredFont = settings.ConfiguredFont;
-        }
-        catch
-        {
-            // An uninstalled font must not break the terminal; the previous font stays.
-        }
+        // Same rule as for SSH tabs: without a configured font the terminal keeps its own default.
+        FontSpec configuredFont = settings.ConfiguredFont;
         terminal.SetFont(configuredFont);
         foreach (WpfTerminal pane in hexTerminalControl1.Panes)
         {
@@ -855,13 +846,13 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
         {
             cbBaudRate.Text = advancedSettings.BaudRate.ToString();
         }
-        SetTerminalColors(((Color)deviceTerminalSettings.Colors.Text).ToRgb(), ((Color)deviceTerminalSettings.Colors.Background).ToRgb());
+        SetTerminalColors(deviceTerminalSettings.Colors.Text, deviceTerminalSettings.Colors.Background);
         _serialTerminalControl.EnterSequence = GetLineEnding(deviceTerminalSettings.LineEnding);
         // The prompt drawn before the device prints one of its own (and when none is recognised).
         _serialTerminalControl.SetPrompt(deviceTerminalSettings.DefaultPrompt, deviceTerminalSettings.AutoDetectPrompt);
         SetTextEncoding(deviceTerminalSettings.TextEncoding);
         SelectEncodingInToolbar(deviceTerminalSettings.TextEncoding);
-        hexTerminalControl1.EchoColor = ((Color)_deviceTerminalSettings.Colors.Echo).ToRgb();
+        hexTerminalControl1.EchoColor = _deviceTerminalSettings.Colors.Echo;
         // One persisted mode decides what is rendered; older profiles that enabled the text pane next to the HEX
         // dump are resolved to the combined view instead of silently dropping one of the two panes.
         DeviceTerminalSettings.CharacterDisplayMode displayMode = DeviceTerminalSettings.CharacterDisplayModeHelper.Resolve(
@@ -1176,7 +1167,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 {
                     hexTerminalControl1.HideCaret = true;
                     _serialTerminalControl.HideCaret = true;
-                    SetTerminalColors(null, ((Color)_deviceTerminalSettings.Colors.Disconnected).ToRgb());
+                    SetTerminalColors(null, (RgbColor)_deviceTerminalSettings.Colors.Disconnected);
                     // A reason is given when the connection broke (an unplugged adapter, a reset) instead of being closed.
                     lblConnection.Text = string.IsNullOrEmpty(value) ? "Connection closed" : "Connection closed: " + value;
                     _connectionPrompt.Title = "Connection closed";
@@ -1193,7 +1184,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
                 break;
             case ConnectionStateEnum.Connected:
                 {
-                    SetTerminalColors(null, ((Color)_deviceTerminalSettings.Colors.Background).ToRgb());
+                    SetTerminalColors(null, (RgbColor)_deviceTerminalSettings.Colors.Background);
                     hexTerminalControl1.HideCaret = false;
                     _serialTerminalControl.HideCaret = false;
                     break;

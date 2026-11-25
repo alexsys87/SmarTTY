@@ -4,7 +4,6 @@ using SmarTTY.GUI.TerminalView;
 using SmarTTY.Native;
 using SmarTTY.Transport;
 using System;
-using System.Drawing;
 using System.Threading;
 using VisualTTY.DeviceTerminal;
 

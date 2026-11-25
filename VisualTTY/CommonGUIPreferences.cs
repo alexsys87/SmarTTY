@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Drawing;
 using System.Linq;
 using System.Windows;
 using System.Xml.Serialization;
@@ -10,13 +9,13 @@ public class CommonGUIPreferences
 {
     public struct WindowPlacement
     {
-        public Rectangle LastKnownConnectionWindowRectangle;
+        public ScreenRect LastKnownConnectionWindowRectangle;
 
-        public Rectangle[] ScreenRectanglesWhenWindowRectangleRemembered;
+        public ScreenRect[] ScreenRectanglesWhenWindowRectangleRemembered;
 
         public void Apply(Window wnd)
         {
-            Rectangle[] first = SmarTTY.Native.DisplayMonitors.AllBounds();
+            ScreenRect[] first = SmarTTY.Native.DisplayMonitors.AllBounds();
             if (ScreenRectanglesWhenWindowRectangleRemembered != null && first.SequenceEqual(ScreenRectanglesWhenWindowRectangleRemembered))
             {
                 wnd.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -29,13 +28,7 @@ public class CommonGUIPreferences
 
         public void Save(Window wnd)
         {
-            LastKnownConnectionWindowRectangle = new Rectangle
-            {
-                X = (int)wnd.Left,
-                Y = (int)wnd.Top,
-                Width = (int)((FrameworkElement)wnd).Width,
-                Height = (int)((FrameworkElement)wnd).Height
-            };
+            LastKnownConnectionWindowRectangle = new ScreenRect((int)wnd.Left, (int)wnd.Top, (int)((FrameworkElement)wnd).Width, (int)((FrameworkElement)wnd).Height);
             ScreenRectanglesWhenWindowRectangleRemembered = SmarTTY.Native.DisplayMonitors.AllBounds();
         }
     }

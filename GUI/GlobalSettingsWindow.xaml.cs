@@ -1,6 +1,5 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Windows;
@@ -28,7 +27,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
     {
         get
         {
-            Font effectiveFont = _ClonedSettings.EffectiveFont;
+            FontSpec effectiveFont = _ClonedSettings.EffectiveFont;
             string style = (effectiveFont.Bold ? " Bold" : string.Empty) + (effectiveFont.Italic ? " Italic" : string.Empty);
             return $"{effectiveFont.Name}{style}, Size = {effectiveFont.Size}";
         }
@@ -153,7 +152,7 @@ public partial class GlobalSettingsWindow : Window, INotifyPropertyChanged, ICom
 
     private void EditFont_Click(object sender, RoutedEventArgs e)
     {
-        Font current = _ClonedSettings.EffectiveFont;
+        FontSpec current = _ClonedSettings.EffectiveFont;
         FontSelection selection = FontPickerWindow.Pick(this, current.Name, current.Size, current.Bold, current.Italic);
         if (selection == null)
         {

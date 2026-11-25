@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+﻿using SmarTTY.TextEditing;
 using VisualTTY.DeviceTerminal;
 
 namespace VisualTTY;
@@ -13,25 +13,25 @@ public class ConsolePalette
     {
         NormalColors = new DeviceTerminalSettings.ColorWrapper[8]
         {
-            Color.FromArgb(0, 0, 0),
-            Color.FromArgb(187, 0, 0),
-            Color.FromArgb(0, 187, 0),
-            Color.FromArgb(187, 187, 0),
-            Color.FromArgb(0, 0, 187),
-            Color.FromArgb(187, 0, 187),
-            Color.FromArgb(0, 187, 187),
-            Color.FromArgb(187, 187, 187)
+            RgbColor.FromArgb(0, 0, 0),
+            RgbColor.FromArgb(187, 0, 0),
+            RgbColor.FromArgb(0, 187, 0),
+            RgbColor.FromArgb(187, 187, 0),
+            RgbColor.FromArgb(0, 0, 187),
+            RgbColor.FromArgb(187, 0, 187),
+            RgbColor.FromArgb(0, 187, 187),
+            RgbColor.FromArgb(187, 187, 187)
         },
         BrightColors = new DeviceTerminalSettings.ColorWrapper[8]
         {
-            Color.FromArgb(85, 85, 85),
-            Color.FromArgb(255, 85, 85),
-            Color.FromArgb(85, 255, 85),
-            Color.FromArgb(255, 255, 85),
-            Color.FromArgb(85, 85, 255),
-            Color.FromArgb(255, 85, 255),
-            Color.FromArgb(85, 255, 255),
-            Color.FromArgb(255, 255, 255)
+            RgbColor.FromArgb(85, 85, 85),
+            RgbColor.FromArgb(255, 85, 85),
+            RgbColor.FromArgb(85, 255, 85),
+            RgbColor.FromArgb(255, 255, 85),
+            RgbColor.FromArgb(85, 85, 255),
+            RgbColor.FromArgb(255, 85, 255),
+            RgbColor.FromArgb(85, 255, 255),
+            RgbColor.FromArgb(255, 255, 255)
         }
     };
 

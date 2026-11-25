@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Checks that VisualTTY/ScreenRect is written to XML and read from it as System.Drawing.Rectangle was (stage 5C): the window placement
+    of the settings (CommonGUIPreferences.WindowPlacement) held Rectangle fields until then, and a settings file of either version must
+    read the same in the other. System.Drawing.Rectangle is part of .NET itself, so the check runs on Linux.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../VisualTTY/ScreenRect.cs" Link="ScreenRect.cs" />
+  </ItemGroup>
+</Project>

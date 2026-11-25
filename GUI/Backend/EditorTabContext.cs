@@ -186,14 +186,14 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
                 case HexDialogKind.Highlight:
                 {
                     HexHighlight current = hex.HighlightAtCaret;
-                    System.Drawing.Color color = (current != null) ? System.Drawing.Color.FromArgb(current.Argb) : HexViewChoices.HighlightColors[0].Color.ToColor();
+                    RgbColor color = (current != null) ? RgbColor.FromArgb(current.Argb) : HexViewChoices.HighlightColors[0].Color;
                     int start = hex.HasSelection ? hex.SelectionStart : hex.CaretOffset;
                     int count = hex.HasSelection ? hex.SelectionLength : 1;
                     string target = HexEditingModel.FormatByteCount(count) + " at offset 0x" + start.ToString("X8", System.Globalization.CultureInfo.InvariantCulture);
                     HexHighlightWindow window = new HexHighlightWindow(color, current?.Label ?? "", target);
                     if (window.ShowDialog() == true)
                     {
-                        hex.HighlightSelection(window.SelectedColor.ToRgb(), window.Label);
+                        hex.HighlightSelection(window.SelectedColor, window.Label);
                     }
                     break;
                 }

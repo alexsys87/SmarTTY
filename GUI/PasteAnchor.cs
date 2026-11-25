@@ -1,6 +1,6 @@
 using System;
-using System.Drawing;
 using SmarTTY.Controls;
+using VisualTTY;
 
 namespace SmarTTY.GUI;
 
@@ -21,5 +21,5 @@ public abstract class PasteAnchor : IDialogOwner
     public abstract void Post(Action action);
 
     /// <summary>The area of the terminal on the screen, in device pixels.</summary>
-    public abstract Rectangle ScreenBounds { get; }
+    public abstract ScreenRect ScreenBounds { get; }
 }
