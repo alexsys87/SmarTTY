@@ -22,6 +22,23 @@ internal static class DwmTitleBar
     private const int WsExLayered = 0x00080000;
     private const int LwaAlpha = 0x2;
 
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+
+    private const uint RdwInvalidate = 0x0001;
+    private const uint RdwErase = 0x0004;
+    private const uint RdwAllChildren = 0x0080;
+    private const uint RdwFrame = 0x0400;
+
+    /// <summary>The message a window gets after its style changed; <c>wParam</c> is <see cref="GwlExStyle"/> for the extended style.</summary>
+    public const int WmStyleChanged = 0x007D;
+
+    /// <summary>The <c>wParam</c> of <see cref="WmStyleChanged"/> when the extended style changed.</summary>
+    public const int ExStyleIndex = GwlExStyle;
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
     {
@@ -42,6 +59,15 @@ internal static class DwmTitleBar
 
     [DllImport("user32.dll")]
     private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint colorKey, byte alpha, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetLayeredWindowAttributes(IntPtr hwnd, out uint colorKey, out byte alpha, out uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool RedrawWindow(IntPtr hwnd, IntPtr updateRect, IntPtr updateRegion, uint flags);
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
@@ -88,15 +114,33 @@ internal static class DwmTitleBar
         }
     }
 
+    /// <summary>Whether the window has the layered style (the one an opacity below 100 % needs).</summary>
+    public static bool IsLayered(IntPtr hwnd)
+    {
+        try
+        {
+            return hwnd != IntPtr.Zero && (GetWindowLong(hwnd, GwlExStyle) & WsExLayered) != 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Makes the whole window (the frame included) <paramref name="alpha"/> of 255 opaque; 255 takes the layered style off again,
-    /// so a window that is not transparent is drawn as it always was.
+    /// so a window that is not transparent is drawn as it always was. Returns whether the window is in the wanted state afterwards
+    /// (read back from the system, not taken from the return value of the call).
     /// </summary>
-    public static void SetOpacity(IntPtr hwnd, byte alpha)
+    public static bool SetOpacity(IntPtr hwnd, byte alpha)
     {
         if (hwnd == IntPtr.Zero)
         {
-            return;
+            return false;
         }
         try
         {
@@ -107,21 +151,41 @@ internal static class DwmTitleBar
                 if (layered)
                 {
                     SetWindowLong(hwnd, GwlExStyle, style & ~WsExLayered);
+                    Refresh(hwnd);
                 }
-                return;
+                return (GetWindowLong(hwnd, GwlExStyle) & WsExLayered) == 0;
             }
+            bool changed = false;
             if (!layered)
             {
                 SetWindowLong(hwnd, GwlExStyle, style | WsExLayered);
+                changed = true;
             }
             SetLayeredWindowAttributes(hwnd, 0, alpha, LwaAlpha);
+            if (changed)
+            {
+                // A window that has shown content becomes a layered one only when its frame and its surface are drawn again.
+                Refresh(hwnd);
+            }
+            return (GetWindowLong(hwnd, GwlExStyle) & WsExLayered) != 0
+                && GetLayeredWindowAttributes(hwnd, out _, out byte actual, out uint flags)
+                && (flags & LwaAlpha) != 0
+                && actual == alpha;
         }
         catch (DllNotFoundException)
         {
+            return false;
         }
         catch (EntryPointNotFoundException)
         {
+            return false;
         }
+    }
+
+    private static void Refresh(IntPtr hwnd)
+    {
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
+        RedrawWindow(hwnd, IntPtr.Zero, IntPtr.Zero, RdwInvalidate | RdwErase | RdwFrame | RdwAllChildren);
     }
 
     /// <summary>The bounds of a window in screen pixels; false when the window is gone.</summary>
