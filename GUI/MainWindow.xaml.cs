@@ -66,7 +66,10 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
         CommonGUIPreferences commonGUIPreferences = GuiPreferencesStore.Current;
         try
         {
-            commonGUIPreferences?.MainWindow.Apply((Window)this);
+            if (commonGUIPreferences != null)
+            {
+                WindowPlacements.Apply(commonGUIPreferences.MainWindow, this);
+            }
         }
         catch
         {
@@ -216,7 +219,7 @@ public partial class MainWindow : Window, IComponentConnector, IStyleConnector
             {
                 commonGUIPreferences.FileListWidth = _FilesWidthAtClose;
             }
-            commonGUIPreferences.MainWindow.Save((Window)this);
+            commonGUIPreferences.MainWindow = WindowPlacements.Of(this);
             GuiPreferencesStore.Save();
         }
         Controller.Dispose();

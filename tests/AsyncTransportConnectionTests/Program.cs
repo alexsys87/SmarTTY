@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Windows.Threading;
+using SmarTTY.Tests;
 using VisualTTY.DeviceTerminal;
 
 // Runs the real AsyncTransportConnection against a fake transport: what happens to written data when a write fails, and
@@ -112,7 +112,7 @@ internal static class Program
 
         public Session()
         {
-            Connection = new AsyncTransportConnection(Transport, new Dispatcher());
+            Connection = new AsyncTransportConnection(Transport, new FakeUiThread());
             Connection.WriteFailed += (sender, message) => { lock (Failures) Failures.Add(message); };
             Connection.StateChanged += (sender, state, message) =>
             {

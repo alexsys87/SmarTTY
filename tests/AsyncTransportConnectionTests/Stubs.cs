@@ -1,27 +1,17 @@
 using System;
 using System.IO;
 
-// Stand-ins for the Windows-only types AsyncTransportConnection mentions, so the real class can run on any machine.
-namespace System.Windows.Threading
+// Stand-ins for the Windows-only types AsyncTransportConnection mentions (and the thread of the windows it posts to), so the real class can run on any machine.
+namespace SmarTTY.Tests
 {
     /// <summary>Runs posted callbacks right away on the posting thread.</summary>
-    public class Dispatcher
+    public class FakeUiThread : SmarTTY.Utilities.IUiThread
     {
-        public object BeginInvoke(Delegate method, object[] args)
-        {
-            method.DynamicInvoke(args);
-            return null;
-        }
+        public bool IsCurrent => true;
 
-        public object BeginInvoke(DispatcherPriority priority, Delegate method)
-        {
-            return BeginInvoke(method, new object[0]);
-        }
-    }
+        public void Post(Action action) => action();
 
-    public enum DispatcherPriority
-    {
-        Normal = 9
+        public void Send(Action action) => action();
     }
 }
 

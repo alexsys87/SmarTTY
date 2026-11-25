@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 
-// Stand-ins for the Windows-only types the transport classes mention, so the real classes can run on any machine.
+// Stand-ins for the Windows-only types the transport classes mention (and the thread of the windows they post to), so the real classes can run on any machine.
 namespace System.IO.Ports
 {
     public enum Parity { None, Odd, Even, Mark, Space }
@@ -13,33 +13,37 @@ namespace System.IO.Ports
     public enum Handshake { None, XOnXOff, RequestToSend, RequestToSendXOnXOff }
 }
 
-namespace System.Windows.Threading
+namespace SmarTTY.Tests
 {
     /// <summary>
     /// Runs posted callbacks one after another on a thread of its own, like the UI thread of the application, and
     /// remembers how long its queue ever got (what a flood of received data does to the UI).
     /// </summary>
-    public class Dispatcher : IDisposable
+    public class FakeUiThread : SmarTTY.Utilities.IUiThread, IDisposable
     {
-        private readonly BlockingCollection<Delegate> _queue = new BlockingCollection<Delegate>();
+        private readonly BlockingCollection<Action> _queue = new BlockingCollection<Action>();
         private readonly Thread _thread;
         private int _maxQueueLength;
 
         public int MaxQueueLength => Volatile.Read(ref _maxQueueLength);
 
-        public Dispatcher()
+        public FakeUiThread()
         {
             _thread = new Thread(() =>
             {
-                foreach (Delegate callback in _queue.GetConsumingEnumerable())
+                foreach (Action callback in _queue.GetConsumingEnumerable())
                 {
-                    callback.DynamicInvoke();
+                    callback();
                 }
             }) { IsBackground = true, Name = "Fake UI thread" };
             _thread.Start();
         }
 
-        public object BeginInvoke(Delegate method, object[] args)
+        public bool IsCurrent => Thread.CurrentThread == _thread;
+
+        public void Send(Action action) => throw new NotSupportedException("the connection only posts");
+
+        public void Post(Action method)
         {
             _queue.Add(method);
             int length = _queue.Count;
@@ -47,20 +51,9 @@ namespace System.Windows.Threading
             while (length > (max = Volatile.Read(ref _maxQueueLength)) && Interlocked.CompareExchange(ref _maxQueueLength, length, max) != max)
             {
             }
-            return null;
-        }
-
-        public object BeginInvoke(DispatcherPriority priority, Delegate method)
-        {
-            return BeginInvoke(method, new object[0]);
         }
 
         public void Dispose() => _queue.CompleteAdding();
-    }
-
-    public enum DispatcherPriority
-    {
-        Normal = 9
     }
 }
 

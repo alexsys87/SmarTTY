@@ -933,7 +933,7 @@ public partial class WpfDeviceTerminal : System.Windows.Controls.DockPanel, IDev
             telnetTransport.Charset = _textEncoding?.WebName;
             AttachTelnet(telnetTransport, telnetSettings);
         }
-        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, Dispatcher.CurrentDispatcher, connectTimeoutMs)
+        _asyncTransportConnection = new AsyncTransportConnection(deviceTransport, DispatcherUiThread.Current, connectTimeoutMs)
         {
             WaitForPrevious = previousClosed
         };
