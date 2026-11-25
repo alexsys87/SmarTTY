@@ -138,7 +138,7 @@ jobs:
       - name: Run transport write failure checks
         run: dotnet run --project tests/AsyncTransportConnectionTests -c Release
 
-      - name: Run raw TCP transport checks (IPv4/IPv6, keep-alive, connect abort, data flood back-pressure)
+      - name: Run raw TCP transport checks (IPv4/IPv6, keep-alive, connect abort, data flood back-pressure, the reachability check of the launcher)
         run: dotnet run --project tests/TcpTransportTests -c Release
 
       - name: Run local network scan checks (scanned address ranges, open SSH/telnet ports, cancellation, name lookup)

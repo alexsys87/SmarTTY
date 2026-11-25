@@ -14,6 +14,8 @@ public class PreferencesNow
     public List<RememberedWindowSize> WindowSizes = new List<RememberedWindowSize>();
 
     public int FileListWidth;
+
+    public bool MarkUnreachableConnections = true;
 }
 
 // A preferences file of the version before the window sizes.
@@ -170,13 +172,14 @@ internal static class Program
 
     private static void Xml()
     {
-        PreferencesNow now = new PreferencesNow { FullScreen = true, FileListWidth = 333 };
+        PreferencesNow now = new PreferencesNow { FullScreen = true, FileListWidth = 333, MarkUnreachableConnections = false };
         WindowSizeList.Set(now.WindowSizes, "SmarTTY.GUI.SocksProxyWindow", 620, 520);
         WindowSizeList.Set(now.WindowSizes, "SmarTTY.GUI.FileListWindow", 900, 700);
         PreferencesNow back = RoundTrip(now);
         Equal(2, back.WindowSizes.Count, "both sizes come back from XML");
         Check(WindowSizeList.TryGet(back.WindowSizes, "SmarTTY.GUI.SocksProxyWindow", out int w, out int h) && w == 620 && h == 520, "a size read from XML");
         Equal(333, back.FileListWidth, "the file manager width comes back");
+        Check(!back.MarkUnreachableConnections, "the launcher's mark of unreachable connections switched off comes back off");
         Check(back.FullScreen, "the other fields are not disturbed");
 
         // A file of the version before: the new members are not there and keep their defaults.
@@ -187,6 +190,7 @@ internal static class Program
             read = (PreferencesNow)new XmlSerializer(typeof(PreferencesNow)).Deserialize(reader);
         }
         Check(read.FullScreen && read.WindowSizes != null && read.WindowSizes.Count == 0 && read.FileListWidth == 0, "an old file has no sizes and no file manager width");
+        Check(read.MarkUnreachableConnections, "an old file has the mark of unreachable connections on (the default)");
 
         // A file of the new version read by the old program (a downgrade): the unknown elements are ignored.
         using (StringWriter writer = new StringWriter())

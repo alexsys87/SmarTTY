@@ -63,7 +63,7 @@ PR that changes them.
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
 | `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, the terminal colour schemes `TerminalColorPresets`; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
-| `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore | no |
+| `Transport/` | TCP, telnet (+TLS), serial, netconsole transports; file transfer manager; backup/restore; `ReachabilityChecker` (whether the port of a saved connection answers, see "Launcher") | no |
 | `IO/` | Remote command and file helpers, `ls`/`df` parsers, editor drafts, transfer protocols (X/Y/ZMODEM, Kermit, gzip+base64, TFTP) | no |
 | `Ssh/` | SSH.NET wrappers, SFTP/SCP, keys, port forwarding, X11; `Connection/SshConnector` | no |
 | `Sync/`, `LocalRepo/`, `PackageManagers/` | Folder sync and tar, local OpenWrt repository, remote package managers | no |
@@ -812,6 +812,26 @@ class handler of `Loaded` that `WindowAppearance.Install()` (in `App.OnStartup`)
   it again, also from another monitor and with the owner on a monitor of another scale; a dialog with `SizeToContent="Height"` (the directory
   download window) keeps only its width; a window made larger than the monitor is cut to it; the file manager width after a restart (shown,
   hidden before closing, never changed); an old `GUIPreferences.xml`.
+
+### Launcher: unreachable connections (after stage 5)
+
+Done: the launcher (`GUI/ConnectionSelectionWindow`) checks the address and port of every saved SSH, raw TCP and telnet connection once, in
+the background, the first time it lists it after the window opened, and marks the ones that did not answer with a red badge (bottom left
+of the icon, `IConnectionSettingsWrapper.IsUnreachable`; the found computers of the network scan have their badge top left). The check is
+`Transport/ReachabilityChecker` (the nested `MachineConnectionTester` of the window, moved and made UI-free): a TCP connect that is closed at
+once, on the thread pool, given up after 5 s; the results are kept by host (case and blanks do not count) and port for the life of the
+window, `Check(host, port, recheck)` starts a check only for a port never checked, or, with `recheck`, one whose result is older than 30 s
+(the old "Probe all connections in the background", which also dims what has not answered and sorts it last, `IsInactive`, as before);
+`BackgroundCheckCompleted` redraws the list, so it never waits. `ControllerImpl.UpdateMachineStates(list, probeContinuously, check)` sets
+both flags; an SSH connection with `SuppressAutoProbing` and a netconsole receiver (UDP) are never checked. The check box "Mark unreachable
+connections" in the options popup of the list (`CommonGUIPreferences.MarkUnreachableConnections`, on by default, an older file keeps the
+default) switches the one-time check off, for devices that serve one client at a time. Tests: `TcpTransportTests` (the checker with a
+queue of work and a fake connect: one check per port, none while one runs, none again without `recheck`, a recheck that waits, the case of
+the host, a failure and a throw, invalid hosts and ports; and for real against a listening and a closed port on 127.0.0.1, and after
+`Dispose`); `WindowChromeTests` (the new member of the preferences in XML and its default in an old file). A mutation that rechecks always
+makes five checks fail. Manual check on Windows: the launcher with reachable and unreachable SSH, TCP and telnet connections (the badge
+appears within 5 s, the window stays responsive, the tool tip), a COM port and a netconsole receiver (no badge), the check box off and on,
+"Probe all connections" on (dimmed and sorted, the badge too), File > Back to launcher (checked again).
 
 ### Stage 3 (the editor and the hex editor on WPF)
 

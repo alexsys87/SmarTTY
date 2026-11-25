@@ -31,150 +31,12 @@ namespace SmarTTY.GUI;
 
 public partial class ConnectionSelectionWindow : Window, IComponentConnector, IStyleConnector
 {
-    private class MachineConnectionTester : IDisposable
+    /// <summary>The host and port the reachability of a saved SSH connection is checked at (22 when the host names none).</summary>
+    private static ReachabilityChecker.State CheckSsh(ReachabilityChecker checker, SSHConnectionSettings connection, bool recheck)
     {
-        public enum State
-        {
-            Checking,
-            Succeeded,
-            Failed
-        }
-
-        // A result is trusted this long: a device that appears later (or goes away) shows up at the next refresh after it.
-        private const long ResultLifetimeMs = 30000;
-
-        // A host that does not answer is given up after this long instead of waiting for the operating system.
-        private const int CheckTimeoutMs = 5000;
-
-        private static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
-
-        private class Context
-        {
-            // The result being shown; the previous one stays until a new check has an answer, so the list does not flicker.
-            public State State = State.Checking;
-
-            public long CheckedAtMs;
-
-            public bool InProgress;
-
-            public TcpConnector Connector;
-        }
-
-        private struct Key
-        {
-            public string Host;
-
-            public int Port;
-        }
-
-        private readonly object _lock = new object();
-
-        private readonly Dictionary<Key, Context> _AllContexts = new Dictionary<Key, Context>();
-
-        private bool _disposed;
-
-        public event Action BackgroundCheckCompleted;
-
-        /// <summary>
-        /// The last known state of the port; a check that is due (never made, or older than <see cref="ResultLifetimeMs"/>)
-        /// is started in the background. The check opens the TCP connection and closes it at once: it cannot tell whether
-        /// a port listens without connecting, so a device that serves one client at a time may be busy for a moment
-        /// (the "Probe all connections in the background" option turns this off).
-        /// </summary>
-        public State CheckMachine(string host, int port)
-        {
-            Key key = new Key
-            {
-                Host = host,
-                Port = port
-            };
-            lock (_lock)
-            {
-                if (_disposed)
-                {
-                    return State.Failed;
-                }
-                if (!_AllContexts.TryGetValue(key, out Context context))
-                {
-                    context = _AllContexts[key] = new Context();
-                }
-                if (!context.InProgress && (context.CheckedAtMs == 0 || Clock.ElapsedMilliseconds - context.CheckedAtMs >= ResultLifetimeMs))
-                {
-                    context.InProgress = true;
-                    ThreadPool.QueueUserWorkItem(_ => RunCheck(context, host, port));
-                }
-                return context.State;
-            }
-        }
-
-        private void RunCheck(Context context, string host, int port)
-        {
-            TcpConnector connector = new TcpConnector();
-            lock (_lock)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-                context.Connector = connector;
-            }
-            State result;
-            try
-            {
-                connector.Connect(host, port, CheckTimeoutMs).Close();
-                result = State.Succeeded;
-            }
-            catch
-            {
-                result = State.Failed;
-            }
-            bool changed;
-            lock (_lock)
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-                changed = context.CheckedAtMs == 0 || context.State != result;
-                context.State = result;
-                context.CheckedAtMs = Math.Max(1, Clock.ElapsedMilliseconds);
-                context.InProgress = false;
-                context.Connector = null;
-            }
-            if (changed)
-            {
-                BackgroundCheckCompleted?.Invoke();
-            }
-        }
-
-        public void Dispose()
-        {
-            List<TcpConnector> running = new List<TcpConnector>();
-            lock (_lock)
-            {
-                _disposed = true;
-                foreach (Context context in _AllContexts.Values)
-                {
-                    if (context.Connector != null)
-                    {
-                        running.Add(context.Connector);
-                    }
-                }
-            }
-            // Ends the checks that are still waiting for an answer; none of them reports back after this.
-            foreach (TcpConnector connector in running)
-            {
-                connector.Abort();
-            }
-        }
-
-        internal State CheckMachine(SSHConnectionSettings connection)
-        {
-            // The same split as the connection itself uses: a bare IPv6 address ("::1") has no port, and "[::1]:2222" has one.
-            // Cutting at the first colon made int.Parse throw for every IPv6 host in the list.
-            string host = SSHConnectionSettings.SplitHostPort(connection.HostName, out int? port);
-            return CheckMachine(host, port ?? 22);
-        }
+        // The same split as the connection itself uses: a bare IPv6 address ("::1") has no port, and "[::1]:2222" has one.
+        string host = SSHConnectionSettings.SplitHostPort(connection.HostName, out int? port);
+        return checker.Check(host, port ?? 22, recheck);
     }
 
     public enum SubtypeImage
@@ -203,6 +65,12 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         string Detail2 { get; }
 
         bool IsInactive { get; set; }
+
+        /// <summary>
+        /// The address and port of the connection did not answer the check made when the list was opened (once, in the background);
+        /// the item is marked with a badge. Always false for what has no TCP port to check (a COM port, a netconsole receiver).
+        /// </summary>
+        bool IsUnreachable { get; set; }
 
         bool HasBaudRate { get; }
 
@@ -248,6 +116,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
             private bool _IsInactive;
 
+            private bool _IsUnreachable;
+
             public string ImagePath => IconPathOf(Connection.Icon);
 
             public ImageSource Image => IconImages.FromIconOrFile(ImagePath);
@@ -286,6 +156,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     _IsInactive = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsInactive"));
+                }
+            }
+
+            public bool IsUnreachable
+            {
+                get
+                {
+                    return _IsUnreachable;
+                }
+                set
+                {
+                    if (_IsUnreachable != value)
+                    {
+                        _IsUnreachable = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("IsUnreachable"));
+                    }
                 }
             }
 
@@ -510,6 +396,17 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
+            public bool IsUnreachable
+            {
+                get
+                {
+                    return false;
+                }
+                set
+                {
+                }
+            }
+
             public SerialPort(SavedConnectionStore mgr, SetupApiDeviceSet.ComPortInfo port, RawConnectionSettings settings, string serialNumber, bool isUsb)
                 : base(mgr, settings)
             {
@@ -536,6 +433,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             private bool _IsInactive;
 
+            private bool _IsUnreachable;
+
             public bool IsInactive
             {
                 get
@@ -546,6 +445,22 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 {
                     _IsInactive = value;
                     OnPropertyChanged("IsInactive");
+                }
+            }
+
+            public bool IsUnreachable
+            {
+                get
+                {
+                    return _IsUnreachable;
+                }
+                set
+                {
+                    if (_IsUnreachable != value)
+                    {
+                        _IsUnreachable = value;
+                        OnPropertyChanged("IsUnreachable");
+                    }
                 }
             }
 
@@ -675,6 +590,17 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
                 }
             }
 
+            public bool IsUnreachable
+            {
+                get
+                {
+                    return false;
+                }
+                set
+                {
+                }
+            }
+
             public bool HasBaudRate => false;
 
             public int BaudRate { get; set; }
@@ -777,7 +703,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
 
         private bool _ShowRawConnections;
 
-        private MachineConnectionTester _ConnectionTester = new MachineConnectionTester();
+        private ReachabilityChecker _ConnectionTester = new ReachabilityChecker();
 
         private SshConnector _Initiator = new SshConnector();
 
@@ -804,6 +730,8 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         private int _KnownSerialPortSettingsChanged;
 
         private bool _ProbeConnections;
+
+        private bool _MarkUnreachable = true;
 
         private ConnectionIcon[] _CachedIcons;
 
@@ -993,6 +921,24 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             }
         }
 
+        /// <summary>
+        /// The saved connections are checked once when the list opens and the ones that do not answer are marked (on by default);
+        /// see <see cref="UpdateMachineStates"/>.
+        /// </summary>
+        public bool MarkUnreachable
+        {
+            get
+            {
+                return _MarkUnreachable;
+            }
+            set
+            {
+                _MarkUnreachable = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("MarkUnreachable"));
+                UpdateFilteredItems();
+            }
+        }
+
         public ConnectionIcon[] AllIcons
         {
             get
@@ -1115,6 +1061,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             };
             _ShownTypes = prefs.ShownConnections;
             _ProbeConnections = prefs.ProbeConnections;
+            _MarkUnreachable = prefs.MarkUnreachableConnections;
             CurrentSortMode = prefs.SortMode;
             RefreshAll();
             if (!suppressUpdateThread)
@@ -1226,18 +1173,38 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             return connection == null ? null : new SettingsWrappers.SSH(_Connections, connection);
         }
 
-        private void UpdateMachineStates(IEnumerable<IConnectionSettingsWrapper> settings)
+        /// <summary>
+        /// The reachability of the saved SSH, raw TCP and telnet connections listed. Every address and port is checked once, in the
+        /// background, the first time it is listed after the window opened, and one that did not answer gets its badge
+        /// (<see cref="IConnectionSettingsWrapper.IsUnreachable"/>); the list never waits for a check, and the answer redraws it. With
+        /// <paramref name="probeContinuously"/> (the "Probe all connections in the background" option) the checks are made again every
+        /// 30 seconds and a connection that has not answered yet is also dimmed and sorted last (<see cref="IConnectionSettingsWrapper.IsInactive"/>).
+        /// A connection with automatic probing switched off in its settings is never checked, and nothing is when <paramref name="check"/> is
+        /// false (both options of the launcher off).
+        /// </summary>
+        private void UpdateMachineStates(IEnumerable<IConnectionSettingsWrapper> settings, bool probeContinuously, bool check)
         {
             foreach (IConnectionSettingsWrapper setting in settings)
             {
-                if (setting is SettingsWrappers.SSH sSH && !sSH.Connection.SuppressAutoProbing)
+                ReachabilityChecker.State? state = null;
+                if (!check)
                 {
-                    sSH.IsInactive = _ConnectionTester.CheckMachine(sSH.Connection) != MachineConnectionTester.State.Succeeded;
+                    // Both options off: nothing is checked and nothing is marked.
+                }
+                else if (setting is SettingsWrappers.SSH sSH)
+                {
+                    if (!sSH.Connection.SuppressAutoProbing)
+                    {
+                        state = CheckSsh(_ConnectionTester, sSH.Connection, probeContinuously);
+                    }
                 }
                 else if (setting is SettingsWrappers.RawTcp rawTcp && rawTcp.Settings.Settings.Connection is DeviceTerminalSettings.ConnectionSettings.Tcp tcp)
                 {
-                    rawTcp.IsInactive = _ConnectionTester.CheckMachine(tcp.Host, tcp.Port) != MachineConnectionTester.State.Succeeded;
+                    // Telnet is a TCP connection too; a netconsole receiver (UDP) is not, and is never checked.
+                    state = _ConnectionTester.Check(tcp.Host, tcp.Port, probeContinuously);
                 }
+                setting.IsInactive = probeContinuously && state.HasValue && state.Value != ReachabilityChecker.State.Succeeded;
+                setting.IsUnreachable = state == ReachabilityChecker.State.Failed;
             }
         }
 
@@ -1324,17 +1291,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
             List<IConnectionSettingsWrapper> list = (from connectionSettingsWrapper in AllItems().Where(ShouldShowThisType)
                                                      where string.IsNullOrEmpty(_Filter) || connectionSettingsWrapper.MatchesFilter(_Filter)
                                                      select connectionSettingsWrapper).ToList();
-            if (ProbeConnections)
-            {
-                UpdateMachineStates(list);
-            }
-            else
-            {
-                foreach (IConnectionSettingsWrapper entry in list)
-                {
-                    entry.IsInactive = false;
-                }
-            }
+            UpdateMachineStates(list, ProbeConnections, MarkUnreachable || ProbeConnections);
             list.Sort(CompareConnections);
             FilteredSettings = list;
             if (FilteredSettings.Count == 0)
@@ -1947,6 +1904,7 @@ public partial class ConnectionSelectionWindow : Window, IComponentConnector, IS
         {
             prefs.ShownConnections = _ShownTypes;
             prefs.ProbeConnections = ProbeConnections;
+            prefs.MarkUnreachableConnections = MarkUnreachable;
         }
 
         internal void CreateQuickConnection(Window parent, SmarTTYTheme theme)

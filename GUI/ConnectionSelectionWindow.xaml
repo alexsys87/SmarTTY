@@ -137,8 +137,11 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ListBox>
+            <CheckBox IsChecked="{Binding MarkUnreachable}">
+              <TextBlock Text="Mark unreachable connections (checked once when the list opens)" ToolTip="When the list opens, SmarTTY opens and immediately closes a TCP connection to the address and port of each saved SSH, TCP and telnet connection once, in the background (no SSH handshake is performed), and marks the ones that do not answer with a red badge. A device that serves one client at a time may be busy for a moment; switch this off for such devices." />
+            </CheckBox>
             <CheckBox IsChecked="{Binding ProbeConnections}">
-              <TextBlock Text="Probe all connections in the background" ToolTip="SmarTTY will open and immediately close a TCP connection to the port of each saved connection (no SSH handshake will be performed), repeat it every 30 seconds, and show responding connections first. A device that serves one client at a time may be busy for a moment; switch this off for such devices." />
+              <TextBlock Text="Probe all connections in the background" ToolTip="SmarTTY will open and immediately close a TCP connection to the port of each saved connection (no SSH handshake will be performed), repeat it every 30 seconds, dim the connections that do not answer and show responding connections first. A device that serves one client at a time may be busy for a moment; switch this off for such devices." />
             </CheckBox>
           </StackPanel>
         </Border>
@@ -214,6 +217,20 @@
                   </Style>
                 </FrameworkElement.Style>
                 <Path Stroke="#FFFFFFFF" StrokeThickness="1.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 4.5,7.5 A 3,3 0 1 0 10.5,7.5 A 3,3 0 1 0 4.5,7.5 M 9.7,9.7 L 12.5,12.5" />
+              </Border>
+              <!-- The mark of a saved connection whose address and port did not answer the check made when the list was opened. -->
+              <Border Grid.RowSpan="4" HorizontalAlignment="Left" VerticalAlignment="Bottom" Width="18" Height="18" CornerRadius="9" Background="#FFD9534F" BorderBrush="#FFFFFFFF" BorderThickness="1" Panel.ZIndex="1" ToolTip="Not reachable: nothing answered on the address and port of this connection when the list was opened. You can still try to connect.">
+                <FrameworkElement.Style>
+                  <Style TargetType="{x:Type Border}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Value="true" Binding="{Binding IsUnreachable}">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </FrameworkElement.Style>
+                <Path Stroke="#FFFFFFFF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M 5,5 L 11,11 M 11,5 L 5,11" />
               </Border>
               <ToggleButton VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.RowSpan="4" Margin="2" Checked="IconPicker_Checked">
                 <FrameworkElement.Style>
