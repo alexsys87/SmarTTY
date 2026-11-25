@@ -49,6 +49,12 @@ public class CommonGUIPreferences
 
     public bool ProbeConnections;
 
+    /// <summary>
+    /// The launcher checks every saved connection once when it opens and marks the ones that do not answer (on by default; an older
+    /// file without it keeps the default).
+    /// </summary>
+    public bool MarkUnreachableConnections = true;
+
     [XmlIgnore]
     public DateTime _Timestamp;
 

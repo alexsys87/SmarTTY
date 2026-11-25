@@ -9,6 +9,7 @@
   <ItemGroup>
     <!-- The real raw TCP transport and the connection class that drives it; Stubs.cs replaces the Windows-only pieces. -->
     <Compile Include="../../Transport/TcpConnector.cs" Link="TcpConnector.cs" />
+    <Compile Include="../../Transport/ReachabilityChecker.cs" Link="ReachabilityChecker.cs" />
     <Compile Include="../../Transport/TcpTransport.cs" Link="TcpTransport.cs" />
     <Compile Include="../../Transport/AsyncTransportConnection.cs" Link="AsyncTransportConnection.cs" />
     <Compile Include="../../Transport/IDeviceTransport.cs" Link="IDeviceTransport.cs" />

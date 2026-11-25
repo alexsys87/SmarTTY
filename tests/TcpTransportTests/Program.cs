@@ -500,6 +500,65 @@ internal static class Program
             Check(transport.GetStream() != null, "connected");
         });
 
+        Run("the reachability of a port is checked once, in the background, unless rechecks are asked for", () =>
+        {
+            Queue<Action> work = new Queue<Action>();
+            List<string> connects = new List<string>();
+            Dictionary<int, bool> answers = new Dictionary<int, bool> { [22] = true, [23] = false };
+            using ReachabilityChecker checker = new ReachabilityChecker(work.Enqueue, (host, port, timeout) =>
+            {
+                connects.Add(host + ":" + port);
+                Check(timeout == ReachabilityChecker.CheckTimeoutMs, "the check is given its timeout");
+                if (port == 99)
+                {
+                    throw new SocketException();
+                }
+                return answers[port];
+            });
+            int events = 0;
+            checker.BackgroundCheckCompleted += () => events++;
+            Check(checker.Check("pi", 22, recheck: false) == ReachabilityChecker.State.Checking, "the first ask: still checking, the list does not wait");
+            Check(work.Count == 1, "one check started in the background");
+            Check(checker.Check("pi", 22, recheck: false) == ReachabilityChecker.State.Checking && work.Count == 1, "asked again while it runs: no second check");
+            Check(checker.Check("PI", 22, recheck: true) == ReachabilityChecker.State.Checking && work.Count == 1, "the host name is the same in another case");
+            work.Dequeue()();
+            Check(connects.Count == 1 && connects[0] == "pi:22", "the port was connected to once: " + string.Join(",", connects));
+            Check(events == 1, "the first result is told");
+            Check(checker.Check("pi", 22, recheck: false) == ReachabilityChecker.State.Succeeded, "it answered");
+            Check(work.Count == 0, "checked once: no new check without rechecks");
+            Check(checker.Check("pi", 22, recheck: true) == ReachabilityChecker.State.Succeeded && work.Count == 0, "a recheck waits until the result is old");
+            Check(checker.Check(" pi ", 22, recheck: false) == ReachabilityChecker.State.Succeeded && work.Count == 0, "the blanks around a host name do not count");
+
+            Check(checker.Check("pi", 23, recheck: false) == ReachabilityChecker.State.Checking, "another port of the same host is a check of its own");
+            work.Dequeue()();
+            Check(checker.Check("pi", 23, recheck: false) == ReachabilityChecker.State.Failed && events == 2, "a port that does not answer is Failed");
+            Check(checker.Check("pi", 99, recheck: false) == ReachabilityChecker.State.Checking, "a check that throws");
+            work.Dequeue()();
+            Check(checker.Check("pi", 99, recheck: false) == ReachabilityChecker.State.Failed, "a connect that throws is Failed");
+
+            Check(checker.Check("", 22, recheck: false) == ReachabilityChecker.State.Failed && work.Count == 0, "no host: Failed, nothing checked");
+            Check(checker.Check("pi", 0, recheck: false) == ReachabilityChecker.State.Failed && work.Count == 0, "port 0: Failed, nothing checked");
+            Check(checker.Check("pi", 70000, recheck: false) == ReachabilityChecker.State.Failed && work.Count == 0, "a port past 65535: Failed, nothing checked");
+            Check(connects.Count == 3, "three connects in all: " + connects.Count);
+        });
+
+        Run("the reachability check connects for real: a listening port and a closed one", () =>
+        {
+            int closedPort;
+            using (Server probe = new Server(IPAddress.Loopback)) closedPort = probe.Port;
+            using Server server = new Server(IPAddress.Loopback);
+            using ReachabilityChecker checker = new ReachabilityChecker();
+            int events = 0;
+            checker.BackgroundCheckCompleted += () => Interlocked.Increment(ref events);
+            checker.Check("127.0.0.1", server.Port, recheck: false);
+            checker.Check("127.0.0.1", closedPort, recheck: false);
+            Check(WaitFor(() => Volatile.Read(ref events) == 2), "both checks finished in the background");
+            Check(checker.Check("127.0.0.1", server.Port, recheck: false) == ReachabilityChecker.State.Succeeded, "the listening port answered");
+            Check(checker.Check("127.0.0.1", closedPort, recheck: false) == ReachabilityChecker.State.Failed, "the closed port did not");
+            checker.Dispose();
+            Check(checker.Check("127.0.0.1", server.Port, recheck: true) == ReachabilityChecker.State.Failed, "after Dispose nothing is checked");
+        });
+
         Console.WriteLine();
         if (_failures > 0)
         {
