@@ -11,14 +11,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
 using VisualTTY;
 
 /// <summary>
 /// Runs the real remote file editor (Controls/RemoteFileEditor.cs) against the test SSH servers of tests/SshNetIntegrationTests (OpenSSH, and
 /// Dropbear with BusyBox ash, as on OpenWRT): the file is loaded, changed in the editor, saved, and read back from the server, byte by byte.
-/// The questions the editor asks the user are caught (UserDialogs.MessageImpl) and answered by the checks. It is a .NET Framework 4.8
-/// WinForms program: on Linux it is built with the .NET SDK and run by Mono under a virtual X display, see the project file.
+/// The questions the editor asks the user are caught (UserDialogs.MessageImpl) and answered by the checks. It is a plain console program
+/// (it ran on Mono as a .NET Framework 4.8 WinForms program until the stands left Mono): the main thread is the UI thread (TestUiThread).
 ///
 /// It is the safety net of the move of the logic of the editor out of the control (stage 1, step A4, and stage 3, step 3A: the "hex-view" and
 /// "hex-draft" scenarios): it was written against the code before the move, and what it checks must stay the same.
@@ -182,7 +181,7 @@ internal static class Program
             {
                 throw new TimeoutException("FAIL: timed out waiting for " + what);
             }
-            Application.DoEvents();
+            TestUiThread.Pump();
             Thread.Sleep(10);
         }
     }
@@ -194,7 +193,7 @@ internal static class Program
         Stopwatch watch = Stopwatch.StartNew();
         while (watch.ElapsedMilliseconds < 400)
         {
-            Application.DoEvents();
+            TestUiThread.Pump();
             Thread.Sleep(10);
         }
     }
@@ -236,8 +235,6 @@ internal static class Program
     {
         public RemoteFileEditor Editor;
 
-        public Form Form;
-
         public Server Server;
 
         public string Path;
@@ -245,7 +242,6 @@ internal static class Program
         public void Close()
         {
             Editor.Dispose();
-            Form.Dispose();
         }
     }
 
@@ -253,16 +249,14 @@ internal static class Program
     {
         GlobalSettings settings = new GlobalSettings();
         configure?.Invoke(settings);
-        Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/" + name;
         RemoteFileEditor editor = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(), null, ColumnUnit.Characters, new HexReplayView(), new TestTextView());
         ShownPlace place = new ShownPlace();
         editor.HexViewPlace = place;
         Places[editor] = place;
-        form.Show();
         Pump(() => editor.CanSave || editor.IsReadOnlyMode, "the file " + name + " to load");
         Settle(server);
-        return new Opened { Editor = editor, Form = form, Server = server, Path = path };
+        return new Opened { Editor = editor, Server = server, Path = path };
     }
 
     private static string Text(Opened opened)
@@ -314,7 +308,7 @@ internal static class Program
         // The end of the save is posted to the editor: let what it posted run.
         for (int i = 0; i < 20; i++)
         {
-            Application.DoEvents();
+            TestUiThread.Pump();
             Thread.Sleep(10);
         }
         Settle(opened.Server);
@@ -789,7 +783,7 @@ internal static class Program
         Stopwatch wait = Stopwatch.StartNew();
         while (wait.Elapsed < TimeSpan.FromSeconds(13))
         {
-            Application.DoEvents();
+            TestUiThread.Pump();
             Thread.Sleep(20);
         }
         o.Close();
@@ -999,7 +993,6 @@ internal static class Program
         Console.WriteLine("-- a hex view given to the editor and shown by its place");
         WriteRemote(server, "place.txt", Bytes("abc\ndef\n"));
         GlobalSettings settings = new GlobalSettings();
-        Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/place.txt";
         HexReplayView given = new HexReplayView();
         TestTextView text = new TestTextView();
@@ -1013,8 +1006,7 @@ internal static class Program
         string family = e.View().FontFamily;
         Check(e.View().FontSize == 12f, "the font of the text has 12 points");
         Check(look.StartsWith("look ", StringComparison.Ordinal) && look.EndsWith(" " + family + " 12", StringComparison.Ordinal), "the place gets the colours and the font of the text when it is set (" + look + ")");
-        form.Show();
-        Opened o = new Opened { Editor = e, Form = form, Server = server, Path = path };
+        Opened o = new Opened { Editor = e, Server = server, Path = path };
         Pump(() => e.CanSave, "the file to load");
         Settle(server);
         place.Calls.RemoveAll(call => call.StartsWith("look ", StringComparison.Ordinal));
@@ -1073,7 +1065,7 @@ internal static class Program
         Stopwatch wait = Stopwatch.StartNew();
         while (wait.Elapsed < TimeSpan.FromSeconds(13))
         {
-            Application.DoEvents();
+            TestUiThread.Pump();
             Thread.Sleep(20);
         }
         o.Close();
@@ -1103,10 +1095,8 @@ internal static class Program
         // closing the tab has nothing of the user's to save. The caret of a compiler message (gcc: screen columns, tab stops of 8) is put
         // on the character it names once the text is in.
         GlobalSettings settings = new GlobalSettings();
-        Form form = new Form { Width = 800, Height = 600 };
         string path = server.Directory + "/flow.txt";
         RemoteFileEditor e = new RemoteFileEditor(server.Context, path, settings, new TextDocument.TextPosition(8, 1), null, ColumnUnit.TabStops, new HexReplayView(), new TestTextView());
-        form.Show();
         Check(!e.CanSave && !e.CanToggleHexMode && !e.CanReopenWithEncoding && !e.CanFollowLog && !e.CanRunInTerminal, "before the file is loaded nothing can be saved, switched, read again, followed or run");
         int savingChanges = 0;
         e.SavingChanged += (sender, args) => savingChanges++;
@@ -1119,7 +1109,7 @@ internal static class Program
         });
         NoPrompt(server, "saves and a reload before the file is loaded");
         Check(!e.IsSaving && savingChanges == 0, "no save was started");
-        Opened o = new Opened { Editor = e, Form = form, Server = server, Path = path };
+        Opened o = new Opened { Editor = e, Server = server, Path = path };
         Pump(() => e.CanSave, "the file to load");
         Settle(server);
         Equal(Caret(e), "1:1", "the column of a compiler message in screen columns is the character after the tab");
@@ -1482,6 +1472,7 @@ internal static class Program
 
     private static int Main()
     {
+        TestUiThread.Initialize();
         bool ran = false;
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMARTTY_SSH_TEST_PORT")))
         {

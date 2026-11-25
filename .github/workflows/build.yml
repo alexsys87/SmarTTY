@@ -475,20 +475,11 @@ jobs:
           SMARTTY_DROPBEAR_TEST_REQUIRED: 1
         run: dotnet run --project tests/SshNetIntegrationTests -c Release
 
-      - name: Install Mono and a virtual display for the remote file editor and hex editor checks
-        run: sudo apt-get install -y mono-runtime libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil libmono-system-xml-linq4.0-cil libmono-microsoft-csharp4.0-cil libmono-windowsbase4.0-cil libmono-i18n4.0-all libgdiplus xvfb
+      - name: Run the remote file editor checks (the real editor loads, changes, saves and reloads files on OpenSSH and Dropbear)
+        run: dotnet run --project tests/RemoteFileEditorIntegrationTests -c Release
 
-      - name: Build the remote file editor checks
-        run: dotnet build tests/RemoteFileEditorIntegrationTests -c Release
-
-      - name: Run the remote file editor checks (the real editor loads, changes, saves and reloads files on OpenSSH and Dropbear, under Mono)
-        run: xvfb-run -a mono tests/RemoteFileEditorIntegrationTests/bin/Release/net48/RemoteFileEditorIntegrationTests.exe
-
-      - name: Build the model interop checks
-        run: dotnet build tests/ModelInteropTests -c Release
-
-      - name: Run the model interop checks (VirtualKey matches the WinForms Keys member by member, the key conversions, the colour numbers of the settings are the named GDI+ colours they replaced, under Mono)
-        run: xvfb-run -a mono tests/ModelInteropTests/bin/Release/net48/ModelInteropTests.exe
+      - name: Run the model interop checks (VirtualKey matches the recorded WinForms Keys member by member, key strokes, the colour numbers of the settings are the named GDI+ colours they replaced)
+        run: dotnet run --project tests/ModelInteropTests -c Release
 
   build:
     name: Build SmarTTY (Release)

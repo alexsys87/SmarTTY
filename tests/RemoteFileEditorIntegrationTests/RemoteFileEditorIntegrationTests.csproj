@@ -3,19 +3,14 @@
   <!--
     Runs the real remote file editor (Controls/RemoteFileEditor.cs) against the test SSH servers of tests/SshNetIntegrationTests (OpenSSH and
     Dropbear with BusyBox ash): the file is loaded, changed, saved and read back from the server, and the questions the editor asks are
-    answered by the checks. It is a .NET Framework 4.8 WinForms program, so on Linux it is built with the .NET SDK and run by Mono under a
-    virtual X display (Mono also needs its code page tables for the encodings: libmono-i18n4.0-all):
-
-      dotnet build tests/RemoteFileEditorIntegrationTests -c Release
-      xvfb-run -a mono tests/RemoteFileEditorIntegrationTests/bin/Release/net48/RemoteFileEditorIntegrationTests.exe
-
-    On a machine without IPv6 (a container) Mono cannot open its dual-mode sockets: gcc -shared -fPIC -o shim.so mono-ipv4-shim.c -ldl
-    and LD_PRELOAD=shim.so make it use IPv4. The WPF part of the application (GUI/) is not compiled in.
+    answered by the checks. It is a console program on the .NET of the application, built and run on any machine with dotnet run (project
+    tests/RemoteFileEditorIntegrationTests, configuration Release) once the servers are up. It compiles all the code of the application but
+    the WPF part (GUI/, App.xaml.cs), so that code must build without Windows; the one Windows-only class the editor uses, the DPAPI
+    protector of the drafts, is replaced by TestDraftProtector.cs. It ran on Mono as a .NET Framework 4.8 WinForms program until then.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net48</TargetFramework>
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
@@ -25,31 +20,24 @@
     <SmarTTYProjectFile>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../SmarTTY.csproj'))</SmarTTYProjectFile>
     <SmarTTYProjectText>$([System.IO.File]::ReadAllText('$(SmarTTYProjectFile)'))</SmarTTYProjectText>
     <SmarTTY_SshNetVersion>$([System.Text.RegularExpressions.Regex]::Match('$(SmarTTYProjectText)', 'Include="SSH\.NET"\s+Version="([^"]+)"').Groups[1].Value)</SmarTTY_SshNetVersion>
+    <SmarTTY_PortsVersion>$([System.Text.RegularExpressions.Regex]::Match('$(SmarTTYProjectText)', 'Include="System\.IO\.Ports"\s+Version="([^"]+)"').Groups[1].Value)</SmarTTY_PortsVersion>
+    <SmarTTY_ProtectedDataVersion>$([System.Text.RegularExpressions.Regex]::Match('$(SmarTTYProjectText)', 'Include="System\.Security\.Cryptography\.ProtectedData"\s+Version="([^"]+)"').Groups[1].Value)</SmarTTY_ProtectedDataVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="TestTextView.cs" />
+    <Compile Include="TestUiThread.cs" />
+    <Compile Include="TestDraftProtector.cs" />
     <!-- The hex view the stand gives the editor: the one the replay of the hex control stand runs on (the WinForms control is gone, 3E-5). -->
     <Compile Include="../HexEditorModelSnapshots/HexReplayView.cs" Link="HexReplayView.cs" />
     <Compile Include="../HexEditorModelSnapshots/HexReplayInspector.cs" Link="HexReplayInspector.cs" />
     <!-- Used by VisualTTY/AppEnvironment.cs; plain code, unlike the rest of GUI/. -->
     <Compile Include="../../GUI/Backend/IFileListHost.cs" />
-    <Compile Include="../../**/*.cs" Exclude="../../GUI/**;../../App.xaml.cs;../../tests/**;../../obj/**;../../bin/**;../../Properties/AssemblyInfo.cs" />
+    <Compile Include="../../**/*.cs" Exclude="../../GUI/**;../../App.xaml.cs;../../IO/DpapiDraftProtector.cs;../../tests/**;../../obj/**;../../bin/**;../../Properties/AssemblyInfo.cs" />
     <PackageReference Include="SSH.NET" Version="$(SmarTTY_SshNetVersion)" />
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="PresentationCore" />
-    <Reference Include="WindowsBase" />
-    <Reference Include="System.Xaml" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Management" />
-    <Reference Include="System.Security" />
-    <Reference Include="Microsoft.CSharp" />
+    <PackageReference Include="System.IO.Ports" Version="$(SmarTTY_PortsVersion)" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="$(SmarTTY_ProtectedDataVersion)" />
   </ItemGroup>
 
 </Project>

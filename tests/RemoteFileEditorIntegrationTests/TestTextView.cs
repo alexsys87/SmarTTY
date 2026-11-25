@@ -3,14 +3,12 @@ using SmarTTY.Controls;
 using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Windows.Forms;
 
 // The text view the stand gives the remote editor (stage 3E-5: the WinForms view, RemoteTextView, is gone and the WPF view cannot be made under
 // Mono). It is built on the models the WPF view uses: the document, the undo history and the edit commands (UndoHistory, TextReplace,
 // TextEditCommands), the selection, the search (TextSearch), the folds (FoldingManager on a token cache without a tokenizer) and the messages
 // (InlineMessageProvider). What a window did is done here as simply as it can be: the posts and the questions of the loading go to the UI thread
-// through a WinForms control that only marshals (the stand pumps its messages), the colours and the font are values.
+// of the stand (TestUiThread, which the stand pumps), the colours and the font are values.
 internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchTarget, ILineCommandHost
 {
     private EditableTextDocument _document = new EditableTextDocument(new[] { "" }, TextDocument.LineEnding.CrLf);
@@ -33,9 +31,6 @@ internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchT
 
     private int _lastHighlightId;
 
-    // Takes the posts and the questions of the loading thread to the UI thread.
-    private readonly Control _marshal = new Control();
-
     private TextDocument.TextPosition _caret;
 
     private bool _readOnly;
@@ -55,8 +50,6 @@ internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchT
         _lineCommands = new LineCommands(this);
         _tokens.SetDocument(_document, null);
         _folding = new FoldingManager(_tokens);
-        _marshal.CreateControl();
-        IntPtr handle = _marshal.Handle;
     }
 
     /// <summary>The modified state of the text changed (sender, modified).</summary>
@@ -349,34 +342,34 @@ internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchT
         }
         _closed = true;
         Closed?.Invoke(this, EventArgs.Empty);
-        _marshal.Dispose();
     }
 
     public bool Post(Action action)
     {
-        try
-        {
-            _marshal.BeginInvoke((ThreadStart)(() => action()));
-            return true;
-        }
-        catch
+        if (_closed)
         {
             // The view was closed meanwhile.
             return false;
         }
+        // A post that has not run when the view is closed is dropped, as the posts of a window that went away.
+        TestUiThread.Post(() =>
+        {
+            if (!_closed)
+            {
+                action();
+            }
+        });
+        return true;
     }
 
     public IUiDispatcher UiDispatcher => new Dispatcher(this);
 
     public IUserPrompt UserPrompt => new Prompt(this);
 
-    // The stand keeps the WinForms timer the editor had (the stand is WinForms: its marshalling control runs the posts).
+    // A timer of the UI thread of the stand, as the WPF view gives a timer of its dispatcher.
     public IDisposable StartTimer(int intervalMs, Action tick)
     {
-        System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer { Interval = intervalMs };
-        timer.Tick += (sender, e) => tick();
-        timer.Start();
-        return timer;
+        return TestUiThread.StartTimer(intervalMs, tick);
     }
 
     private sealed class Dispatcher : IUiDispatcher
@@ -413,7 +406,12 @@ internal sealed class TestTextView : IRemoteTextView, ITextReplaceHost, ISearchT
                 : (buttons == PromptButtons.YesNo ? DialogButtons.YesNo : DialogButtons.YesNoCancel);
             try
             {
-                DialogAnswer result = (DialogAnswer)_view._marshal.Invoke((Func<DialogAnswer>)(() => UserDialogs.Show(text, "SmarTTY", boxButtons, DialogIcon.Warning)));
+                if (_view._closed)
+                {
+                    // The question of a view that went away cannot be asked (a closed window).
+                    throw new InvalidOperationException("the view is closed");
+                }
+                DialogAnswer result = TestUiThread.Invoke(() => UserDialogs.Show(text, "SmarTTY", boxButtons, DialogIcon.Warning));
                 switch (result)
                 {
                     case DialogAnswer.Ok:
