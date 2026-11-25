@@ -13,7 +13,9 @@ namespace SmarTTY.Terminal.Rendering;
 /// (<see cref="TerminalDisplayModel.ReplaceDocumentTail(int, IList{string})"/>), and the places in the text are mapped to the document by the
 /// layout of those rows. An index is a place in <see cref="Text"/> (0 is the start, <c>Text.Length</c> the end). A wide character takes two cells
 /// of a row (<see cref="CellWidth"/>) and is never cut by its end: when one cell is left, it stays empty and the character starts the next row.
-/// The end of a full row and the start of the next one are the same index; the caret is shown at the end of the row then.
+/// The end of a full row and the start of the next one are the same index; the caret is shown at the end of the row then. A character of no
+/// width (a combining mark, a joiner) takes no cell: it is kept with the cell of the character before it, as the screen keeps it
+/// (<see cref="LineInfo.Marks"/>), and the caret moves over a character and the marks after it as one.
 /// </summary>
 internal sealed class PromptLine
 {
@@ -215,7 +217,10 @@ internal sealed class PromptLine
         CaretMoved?.Invoke();
     }
 
-    /// <summary>Left and Right move by one index (a surrogate pair is one character); with <paramref name="word"/> to the next word boundary.</summary>
+    /// <summary>
+    /// Left and Right move by one character (a surrogate pair, and a character with the characters of no width after it, are one); with
+    /// <paramref name="word"/> to the next word boundary.
+    /// </summary>
     public int StepIndex(bool forward, bool word)
     {
         if (word)
@@ -231,7 +236,17 @@ internal sealed class PromptLine
         {
             return _text.Length;
         }
-        return char.IsHighSurrogate(_text[index]) && index + 1 < _text.Length && char.IsLowSurrogate(_text[index + 1]) ? index + 2 : index + 1;
+        int next = char.IsHighSurrogate(_text[index]) && index + 1 < _text.Length && char.IsLowSurrogate(_text[index + 1]) ? index + 2 : index + 1;
+        while (next < _text.Length)
+        {
+            int zeroWidth = CellWidth.ZeroWidthLength(_text, next);
+            if (zeroWidth == 0)
+            {
+                break;
+            }
+            next += zeroWidth;
+        }
+        return next;
     }
 
     private int PreviousIndex(int index)
@@ -240,7 +255,13 @@ internal sealed class PromptLine
         {
             return 0;
         }
-        return char.IsLowSurrogate(_text[index - 1]) && index >= 2 && char.IsHighSurrogate(_text[index - 2]) ? index - 2 : index - 1;
+        int previous = index;
+        do
+        {
+            previous = char.IsLowSurrogate(_text[previous - 1]) && previous >= 2 && char.IsHighSurrogate(_text[previous - 2]) ? previous - 2 : previous - 1;
+        }
+        while (previous > 0 && CellWidth.ZeroWidthLength(_text, previous) > 0);
+        return previous;
     }
 
     // What SshTerminalControl.FindWordBoundary did with IsWordChar of the terminal (letters, digits, '_', '.', '-').
@@ -253,15 +274,21 @@ internal sealed class PromptLine
             {
                 position--;
             }
-            while (position > 0 && IsWordChar(text[position - 1]) && IsWordChar(text[position]));
+            while (position > 0 && IsWordPart(text[position - 1]) && IsWordPart(text[position]));
             return Math.Max(position, 0);
         }
         do
         {
             position++;
         }
-        while (position > 0 && position < text.Length && IsWordChar(text[position - 1]) && IsWordChar(text[position]));
+        while (position > 0 && position < text.Length && IsWordPart(text[position - 1]) && IsWordPart(text[position]));
         return Math.Min(position, text.Length);
+    }
+
+    // A character of no width (the accent of a decomposed letter) is part of the word of the letter before it.
+    private static bool IsWordPart(char ch)
+    {
+        return IsWordChar(ch) || CellWidth.IsZeroWidth(ch);
     }
 
     /// <summary>A character of a word for Ctrl+Left, Ctrl+Right and Ctrl+Backspace.</summary>
@@ -338,6 +365,10 @@ internal sealed class PromptLine
         int columns = Math.Max(1, _model.Columns);
         List<string> rows = new List<string>();
         StringBuilder row = new StringBuilder(columns);
+        List<KeyValuePair<TextDocument.TextPosition, string>> marks = new List<KeyValuePair<TextDocument.TextPosition, string>>();
+        // The cell of the last character laid out, which a character of no width goes with; none in the device's prompt, whose cells keep
+        // what the device put on them.
+        TextDocument.TextPosition? head = null;
         // The device's prompt is the text of its cells already; a local one is laid out as the text is.
         if (PromptOnScreen)
         {
@@ -353,11 +384,11 @@ internal sealed class PromptLine
         }
         else
         {
-            Place(Prompt, rows, row, columns, null, null);
+            Place(Prompt, rows, row, columns, null, null, ref head, marks);
         }
         TextDocument.TextPosition[] places = new TextDocument.TextPosition[text.Length + 1];
         cells = new TextDocument.TextPosition[text.Length];
-        Place(text, rows, row, columns, places, cells);
+        Place(text, rows, row, columns, places, cells, ref head, marks);
         places[text.Length] = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
         rows.Add(row.ToString());
         if (PromptOnScreen && StartColumn < columns)
@@ -370,15 +401,41 @@ internal sealed class PromptLine
         {
             _model.ReplaceDocumentTail(StartLine, rows);
         }
+        _model.AddMarks(marks);
         return places;
     }
 
-    // Lays out characters after the rows made so far: a full row is ended before the next character, and a wide character that would start in
-    // the last cell leaves it empty (a filler of its own) and starts the next row. The places and the cells are those of the start line on.
-    private void Place(string text, List<string> rows, StringBuilder row, int columns, TextDocument.TextPosition[] places, TextDocument.TextPosition[] cells)
+    // Lays out characters after the rows made so far: a full row is ended before the next character, a wide character that would start in
+    // the last cell leaves it empty (a filler of its own) and starts the next row, and a character of no width takes no cell and goes to the
+    // marks of the cell of the character before it (dropped when there is none). The places and the cells are those of the start line on.
+    private void Place(string text, List<string> rows, StringBuilder row, int columns, TextDocument.TextPosition[] places, TextDocument.TextPosition[] cells,
+        ref TextDocument.TextPosition? head, List<KeyValuePair<TextDocument.TextPosition, string>> marks)
     {
         for (int index = 0; index < text.Length; index++)
         {
+            int zeroWidth = CellWidth.ZeroWidthLength(text, index);
+            if (zeroWidth > 0)
+            {
+                // The caret before it is after the character it goes with; a click on that cell is that character.
+                TextDocument.TextPosition after = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
+                for (int unit = index; unit < index + zeroWidth; unit++)
+                {
+                    if (places != null)
+                    {
+                        places[unit] = after;
+                    }
+                    if (cells != null)
+                    {
+                        cells[unit] = head ?? after;
+                    }
+                }
+                if (head.HasValue)
+                {
+                    marks.Add(new KeyValuePair<TextDocument.TextPosition, string>(head.Value, text.Substring(index, zeroWidth)));
+                }
+                index += zeroWidth - 1;
+                continue;
+            }
             char ch = text[index];
             bool wide = CellWidth.IsWide(ch);
             bool full = row.Length >= columns;
@@ -402,9 +459,15 @@ internal sealed class PromptLine
                 // Before a wide character that starts the next row the caret is beside it, not in the cell left empty.
                 places[index] = new TextDocument.TextPosition(0, StartLine + rows.Count);
             }
+            TextDocument.TextPosition cell = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
             if (cells != null)
             {
-                cells[index] = new TextDocument.TextPosition(row.Length, StartLine + rows.Count);
+                cells[index] = cell;
+            }
+            if (!(char.IsLowSurrogate(ch) && index > 0 && char.IsHighSurrogate(text[index - 1])))
+            {
+                // The marks of a surrogate pair are kept on the cell of its first half.
+                head = cell;
             }
             row.Append(ch == CellWidth.Filler ? '\uFFFD' : ch);
             if (wide)

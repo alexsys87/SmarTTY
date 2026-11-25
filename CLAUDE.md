@@ -708,12 +708,18 @@ there; a narrow one takes a cell too many). A character of no width takes no cel
   (`RowLayout.Marks`, in the signature; a blank with a mark is drawn), and `DrawGlyphs` draws a cell with marks as the character they compose with
   it in Normalization Form C when that is one character (e and U+0301 as é), otherwise as its character with each mark as a glyph of no advance
   put to end at the right edge of the cell (`DrawMarks`: a mark of no advance has its ink left of its origin; one of a cell's advance lands on the
-  cell). Not done: the command line (`PromptLine`) still gives a mark a cell of its own. Tests: `TerminalScreenTests` (189 checks, 20 of the marks),
-  `TerminalRenderModelTests` (242, 8 of them: the runs and the signature, the copy, the search); `TerminalModelSnapshots` compares the cases with
+  cell). The command line (`PromptLine`) lays marks out the same way: a character of no width takes no cell, its place is after the character
+  before it, and it goes to the marks of that character's cell (the first cell of a wide character, the first half of a surrogate pair; a local
+  prompt's last cell when the text starts with one, none on the device's prompt, whose cells keep the device's own marks), written after the rows
+  (`TerminalDisplayModel.AddMarks`, `LineInfoStore.AddMarkToLine`; `ReplaceDocumentTail` with kept columns clears the marks after them); Left,
+  Right, Backspace and Delete step over a character with the marks after it, and a mark is part of the word of its letter for Ctrl+Left/Right; the
+  grey suggestion draws its marks over their cells (`CellWidth.ToCells(text, out marks)`). Tests: `TerminalScreenTests` (189 checks, 20 of the marks),
+  `TerminalRenderModelTests` (262, 28 of them: the runs and the signature, the copy, the search, the command line); `TerminalModelSnapshots` compares the cases with
   a character of no width (the hand-written "combining marks", "unicode text" and generated ones with `e\u0301`) with the wide goldens too, which
   were recorded again and write the marks of a line (`mark 0:\u0301`): 111 cases there now, and of the 59 recorded before only the five with marks
   changed (checked case by case); every other case still gives the WinForms lines. Of four mutations (a mark on the filler, a write that keeps the
-  marks, an insertion that copies one into the cell put in, a copy without the marks) each makes a check fail, the third after a check was added.
+  marks, an insertion that copies one into the cell put in, a copy without the marks) each makes a check fail, the third after a check was added; of
+  nine of the command line eight did at once, the ninth (the place before a mark on its letter's cell) after a check was added.
 - Manual check on Windows: `ls` of a directory with Chinese, Japanese and Korean names in a classic tab and in a Smart Terminal; `vim` and `mc` with
   such files (the columns stay in place, the cursor over a wide character); `htop` with a process of a CJK name; a line of wide characters longer than
   the screen (the wrap, the empty last cell); emoji such as U+231A and U+1F600; the selection and the copy of wide characters, a double click on a
@@ -722,7 +728,9 @@ there; a narrow one takes a cell too many). A character of no width takes no cel
   suggestion); a BusyBox device in byte mode (one cell each, as before). For the characters of no width: `ls` of files made on macOS (names with
   decomposed accents: the letters and the columns in place), `printf 'e\u0301 o\u0302\u0323 \u0915\u093f \u231a\ufe0f \U0001F468\u200D\U0001F469\n'`
   (the accents over their letters, the Devanagari vowel sign, the emoji with the selector and the joined emoji, the cursor after each in its
-  place), `vim` with such a line, the copy of it pasted elsewhere (the same bytes), and the selection over it.
+  place), `vim` with such a line, the copy of it pasted elsewhere (the same bytes), and the selection over it; a name with decomposed accents pasted into a
+  Smart Terminal and into the input line of a device (the accent over its letter, Left, Right, Backspace and Ctrl+Left over it, Tab completing
+  it, the grey suggestion of a command with it).
 
 Boundary check: `tests/check-model-boundary.sh` greps the four model folders for `System.Windows*`, `System.Drawing`,
 `SmarTTY.Controls/Forms/GUI`; files of `tests/model-boundary-allowlist.txt` are the known violations (23 at the start, 15 after A2, 12 after A3a, 10 after A3b, 5 after A3c, 4 after B2, 0 after C1: the 20

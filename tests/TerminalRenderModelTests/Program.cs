@@ -82,6 +82,7 @@ internal static class Program
             PromptLineChecks();
             DevicePromptChecks();
             WidePromptChecks();
+            MarkPromptChecks();
         }
         catch (Exception exception)
         {
@@ -711,6 +712,69 @@ internal static class Program
         PromptLine input = new PromptLine(device, device.CursorDocumentLine, prompt, promptOnScreen: true);
         input.Insert("ls");
         Equal(Row(device, 0) + " " + input.StartColumn + " " + device.Caret.Column, Ri + "## ls 4 6", "the device's prompt with a wide character is kept as its cells");
+    }
+
+    // Characters of no width in the command line: no cell, kept on the cell before them, stepped over with that character.
+    private static void MarkPromptChecks()
+    {
+        const string Acute = "\u0301";
+        TerminalDisplayModel model = new TerminalDisplayModel(10, 4);
+        PromptLine line = new PromptLine(model, 0, "$ ");
+        line.Insert("cafe" + Acute);
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 5), "$ cafe|" + Acute, "a combining mark takes no cell and is on the cell of its letter");
+        Equal(Pos(model.Caret), "0:6", "the caret is after the letter");
+        Equal(Pos(line.PositionAt(4)), "0:6", "the place before the mark is after its letter (a caret set there by a completion)");
+        Equal(line.Text, "cafe" + Acute, "the text keeps the mark");
+        line.Insert("x");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 5) + "|" + Pos(model.Caret), "$ cafex|" + Acute + "|0:7", "a letter after it takes the next cell");
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        line.MoveCaret(line.StepIndex(forward: false, word: false), extend: false);
+        Equal(line.CaretIndex + " " + Pos(model.Caret), "3 0:5", "Left steps over a letter and its mark as one");
+        line.MoveCaret(line.StepIndex(forward: true, word: false), extend: false);
+        Equal(line.CaretIndex, 5, "Right too");
+        line.DeleteBackward(word: false);
+        Equal(line.Text + "|" + Row(model, 0) + "|" + Mark(model, 0, 5) + "|" + Mark(model, 0, 4), "cafx|$ cafx||", "Backspace takes the letter with its mark, and the marks go with the old rows");
+        line.SetText("e" + Acute + "\u0323z");
+        line.MoveCaret(0, extend: false);
+        line.DeleteForward(word: false);
+        Equal(line.Text, "z", "Delete takes a letter with all its marks");
+        line.SetText("ab e" + Acute + "f");
+        Equal(line.StepIndex(forward: false, word: true) + " " + line.StepIndex(forward: false, word: false), "3 5", "a mark is part of the word of its letter");
+        line.MoveCaret(3, extend: false);
+        line.MoveCaret(5, extend: true);
+        Equal(model.GetSelectedText(), "e" + Acute, "the copy of the selection keeps the mark after its letter");
+        Equal(line.IndexOf(new TextDocument.TextPosition(5, 0)), 3, "a click on the cell of a letter with a mark is that letter");
+        Equal(line.IndexOf(new TextDocument.TextPosition(6, 0)), 5, "the next cell is the character after the mark");
+
+        line.SetText("abcdefgh" + Acute + "i");
+        Equal(Row(model, 0) + "|" + Row(model, 1) + "|" + Mark(model, 0, 9), "$ abcdefgh|i|" + Acute, "a mark after the last cell of a row goes on that cell");
+        Equal(Pos(line.PositionAt(9)) + " " + Pos(line.PositionAt(10)), "0:10 1:1", "the caret before it is at the end of the row");
+        line.SetText("\u65e5" + Acute);
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 2) + "|" + Pos(model.Caret), "$ \u65e5#|" + Acute + "|0:4", "a mark of a wide character is on its first cell");
+        line.SetText("\U0001F468\u200D\U0001F469");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 2), "$ \U0001F468\U0001F469|\u200D", "a joiner is on the first half of the surrogate pair before it");
+        line.SetText(Acute + "a");
+        Equal(Row(model, 0) + "|" + Mark(model, 0, 1) + "|" + line.CaretIndex, "$ a|" + Acute + "|2", "a mark at the start of the text goes on the last cell of a local prompt");
+
+        TerminalDisplayModel device = new TerminalDisplayModel(12, 4);
+        device.ProcessOutput("o\u0302# ");
+        string prompt = device.GetScreenLineText(device.CursorPosition.Y).Substring(0, device.CursorPosition.X);
+        PromptLine input = new PromptLine(device, device.CursorDocumentLine, prompt, promptOnScreen: true);
+        input.Insert("e" + Acute);
+        input.Insert("x");
+        input.DeleteBackward(word: false);
+        input.DeleteBackward(word: false);
+        input.Insert("a" + Acute);
+        Equal(Row(device, 0) + "|" + Mark(device, 0, 0) + "|" + Mark(device, 0, 3) + "|" + Mark(device, 0, 4), "o# a|\u0302|" + Acute + "|", "the device's prompt keeps its marks and the text's are written again");
+        input.SetText(Acute + "b");
+        input.SetText(Acute + "c");
+        Equal(Row(device, 0) + "|" + Mark(device, 0, 0) + "|" + Mark(device, 0, 2) + "|" + Mark(device, 0, 3), "o# c|\u0302||", "a mark at the start of the text is not put on a cell of the device's prompt");
+    }
+
+    private static string Mark(TerminalDisplayModel model, int line, int column)
+    {
+        string[] marks = model.Lines.GetLine(line)?.Marks;
+        return marks != null && column < marks.Length ? marks[column] ?? "" : "";
     }
 
     private static string Row(TerminalDisplayModel model, int line)

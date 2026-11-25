@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace SmarTTY.Terminal.Emulation;
@@ -192,6 +194,61 @@ public static class CellWidth
             }
         }
         return cells?.ToString() ?? text;
+    }
+
+    /// <summary>
+    /// The cells of a text as <see cref="ToCells(string)"/> makes them, with the characters of no width taken out of the text and kept in
+    /// <paramref name="marks"/> (null when there are none) on the cell of the character before them; one with no character before it is dropped.
+    /// </summary>
+    public static string ToCells(string text, out string[] marks)
+    {
+        marks = null;
+        StringBuilder cells = new StringBuilder(text.Length + 8);
+        List<string> found = null;
+        int head = -1;
+        for (int index = 0; index < text.Length; index++)
+        {
+            int zeroWidth = ZeroWidthLength(text, index);
+            if (zeroWidth > 0)
+            {
+                if (head >= 0)
+                {
+                    if (found == null)
+                    {
+                        found = new List<string>();
+                    }
+                    while (found.Count <= head)
+                    {
+                        found.Add(null);
+                    }
+                    found[head] += text.Substring(index, zeroWidth);
+                }
+                index += zeroWidth - 1;
+                continue;
+            }
+            char ch = text[index];
+            head = cells.Length;
+            if (ch == Filler)
+            {
+                cells.Append('\uFFFD');
+                continue;
+            }
+            cells.Append(ch);
+            if (IsWide(ch))
+            {
+                cells.Append(Filler);
+            }
+            else if (char.IsHighSurrogate(ch) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]))
+            {
+                cells.Append(text[++index]);
+            }
+        }
+        if (found != null)
+        {
+            marks = new string[cells.Length];
+            found.CopyTo(0, marks, 0, Math.Min(found.Count, marks.Length));
+        }
+        return cells.ToString();
     }
 
     /// <summary>The cell at <paramref name="index"/> is the second cell of the wide character before it.</summary>

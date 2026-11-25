@@ -292,8 +292,9 @@ internal sealed class TerminalRenderView : FrameworkElement
             // The rest of the command after the caret; what does not fit on the row is cut (the line wraps when it is taken).
             int column = _ghostPosition.Column;
             int fits = Math.Max(0, model.Columns - column);
-            // In cells: a wide character takes two (a filler after it), and one that does not fit whole is not drawn.
-            string cells = CellWidth.ToCells(_ghostText);
+            // In cells: a wide character takes two (a filler after it), one that does not fit whole is not drawn, and a character of no width
+            // is drawn over the cell before it.
+            string cells = CellWidth.ToCells(_ghostText, out string[] marks);
             string text = cells.Length > fits ? cells.Substring(0, fits) : cells;
             if (text.Length > 0 && CellWidth.IsWide(text[text.Length - 1]))
             {
@@ -304,7 +305,7 @@ internal sealed class TerminalRenderView : FrameworkElement
                 return;
             }
             context.PushTransform(new TranslateTransform(column * font.CellWidth, row * font.CellHeight));
-            DrawGlyphs(context, text, 0, text.Length, GetBrush(new RgbColor((uint)(GhostTextColor.A << 24 | GhostTextColor.R << 16 | GhostTextColor.G << 8 | GhostTextColor.B))), font, 0);
+            DrawGlyphs(context, text, 0, text.Length, GetBrush(new RgbColor((uint)(GhostTextColor.A << 24 | GhostTextColor.R << 16 | GhostTextColor.G << 8 | GhostTextColor.B))), font, 0, marks);
             context.Pop();
         }
     }

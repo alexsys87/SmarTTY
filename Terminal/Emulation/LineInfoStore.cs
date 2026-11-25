@@ -84,12 +84,21 @@ public class LineInfoStore
     /// <summary>Adds a character of no width to the cell of a screen row (after the marks it has already).</summary>
     internal void AddMark(int row, int column, string mark)
     {
-        TextDocument.TextPosition textPosition = _host.ToDocumentPosition(new GridPoint(0, row));
-        while (textPosition.Line >= _lines.Count)
+        AddMarkToLine(_host.ToDocumentPosition(new GridPoint(0, row)).Line, column, mark);
+    }
+
+    /// <summary>Adds a character of no width to the cell of a line of the document (the command line writes its rows itself).</summary>
+    internal void AddMarkToLine(int documentLine, int column, string mark)
+    {
+        if (documentLine < 0 || column < 0)
+        {
+            return;
+        }
+        while (documentLine >= _lines.Count)
         {
             _lines.Add(null);
         }
-        LineInfo lineInfo = _lines[textPosition.Line] ?? (_lines[textPosition.Line] = new LineInfo());
+        LineInfo lineInfo = _lines[documentLine] ?? (_lines[documentLine] = new LineInfo());
         if (lineInfo.Marks == null || lineInfo.Marks.Length <= column)
         {
             string[] marks = new string[Math.Max(column + 1, _host.VisibleColumns)];
@@ -115,7 +124,8 @@ public class LineInfoStore
         {
             return;
         }
-        for (int index = Math.Max(0, column); index < column + count && index < marks.Length; index++)
+        // Counted from the column, so that a count up to int.MaxValue (to the end of the line) does not overflow.
+        for (int index = Math.Max(0, column); index < marks.Length && index - column < count; index++)
         {
             marks[index] = null;
         }

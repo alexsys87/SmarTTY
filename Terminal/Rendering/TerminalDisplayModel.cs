@@ -222,6 +222,8 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
             document.RemoveLines(startLine + 1, document.LineCount - startLine - 1);
         }
         Lines.RemoveLines(startLine + 1, int.MaxValue);
+        // The characters of no width of the text that was written after the kept columns go with it.
+        Lines.ClearMarks(startLine, keepColumns, int.MaxValue);
         string line = document.GetLineText(startLine);
         string kept = line.Length >= keepColumns ? line.Substring(0, keepColumns) : line.PadRight(keepColumns);
         string first = rows.Count > 0 ? rows[0] ?? "" : "";
@@ -238,6 +240,23 @@ internal sealed class TerminalDisplayModel : ITerminalScreenView, ITerminalHost
         {
             _selectionAnchor = Clamp(_selectionAnchor);
             _selectionEnd = Clamp(_selectionEnd);
+        }
+        OnChanged();
+    }
+
+    /// <summary>
+    /// Puts characters of no width on cells of the document, after what they have (the command line, which writes its rows with
+    /// <see cref="ReplaceDocumentTail(int, IList{string})"/>, keeps them out of the text, as the screen does).
+    /// </summary>
+    public void AddMarks(IList<KeyValuePair<TextDocument.TextPosition, string>> marks)
+    {
+        if (marks == null || marks.Count == 0)
+        {
+            return;
+        }
+        foreach (KeyValuePair<TextDocument.TextPosition, string> mark in marks)
+        {
+            Lines.AddMarkToLine(mark.Key.Line, mark.Key.Column, mark.Value);
         }
         OnChanged();
     }
