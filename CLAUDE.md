@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 SmarTTY: a graphical SSH client and terminal for Windows (SSH, SFTP/SCP, COM/TCP/telnet device terminals, remote file
-editor). C#, WPF (no WinForms since stage 5B, no `System.Drawing` since 5C). User docs: `README.md` (in Russian).
+editor). C#, WPF (no WinForms since stage 5B, no `System.Drawing` since 5C). User docs (in Russian): short `README.md` plus the detailed guides in `docs/` (indexed in the README).
 
 Read this file instead of re-exploring the repository. Update the "Migration status" and the maps below in the same
 PR that changes them.
