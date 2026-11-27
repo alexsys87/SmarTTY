@@ -401,6 +401,18 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
 
     private bool IsWindowsHost => _server.IsWindows;
 
+    /// <summary>Reads another file of the same server whole (an image of the Markdown preview), from any thread; see <see cref="RemoteFileServer.ReadOtherFile"/>.</summary>
+    public byte[] ReadServerFile(string path, int maxBytes)
+    {
+        return _server.ReadOtherFile(path, maxBytes);
+    }
+
+    /// <summary>Whether a path exists on the same server (the .git folder of the repository of a Markdown file), from any thread.</summary>
+    public bool ServerPathExists(string path)
+    {
+        return _server.Exists(path);
+    }
+
     /// <summary>
     /// Shows the downloaded file (UI thread) and makes the editor editable. <paramref name="file"/> is null for a
     /// new file.

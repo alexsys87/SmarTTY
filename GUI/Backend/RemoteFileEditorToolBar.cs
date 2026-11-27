@@ -45,7 +45,8 @@ internal sealed class RemoteFileEditorToolBar : ToolBar
             bool isToggle = command.Value == EditorToolbarCommand.ShowAllCharacters
                 || command.Value == EditorToolbarCommand.WordWrap
                 || command.Value == EditorToolbarCommand.ToggleHex
-                || command.Value == EditorToolbarCommand.DataInspector;
+                || command.Value == EditorToolbarCommand.DataInspector
+                || command.Value == EditorToolbarCommand.MarkdownPreview;
             ButtonBase button = isToggle
                 ? new ToggleButton { Content = icon, ToolTip = description.ToolTip }
                 : new Button { Content = icon, ToolTip = description.ToolTip };

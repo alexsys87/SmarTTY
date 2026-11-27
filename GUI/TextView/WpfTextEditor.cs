@@ -260,6 +260,7 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
             UpdateScrollBars();
             InvalidateVisual();
             OnStateChanged();
+            TextChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -391,7 +392,20 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         _layout.InvalidateRows();
         UpdateScrollBars();
         InvalidateVisual();
+        SyntaxChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary><see cref="SetSyntax"/> gave the view another tokenizer or other colours.</summary>
+    public event EventHandler SyntaxChanged;
+
+    /// <summary>The colours of the token types (the first for the plain text) that <see cref="SetSyntax"/> gave; empty without a tokenizer.</summary>
+    internal RgbColor[] SyntaxColors => _tokenColors;
+
+    /// <summary>The background of the text (<see cref="SetColors"/>).</summary>
+    internal RgbColor TextBackground => _backColor;
+
+    /// <summary>The colour of the text (<see cref="SetColors"/>).</summary>
+    internal RgbColor TextForeground => _foreColor;
 
     /// <summary>
     /// Adds messages under their lines, as a check reports them: the line and the column counted from 1 (a column of 0: the message goes in the
@@ -1671,7 +1685,11 @@ internal sealed class WpfTextEditor : FrameworkElement, ITextLayoutView, ICaretN
         {
             _history.IsModified = true;
         }
+        TextChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>The text changed: a line or a range was edited, or another document was given (the Markdown preview follows it).</summary>
+    public event EventHandler TextChanged;
 
     void ITextEditView.InvalidateLine(int line)
     {

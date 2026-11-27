@@ -4,7 +4,7 @@
 
 **Для запуска:** Windows 10 или 11 **x64** и [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) (x64) для обычной сборки; без него Windows покажет системное сообщение с предложением установить среду. Единый exe-файл (см. [ниже](#сборка-единого-exe-файла)) не требует ничего. Приложение использует WPF и Windows Forms; 32-разрядная Windows, Windows 7 и 8.1 не поддерживаются (.NET 10 их не поддерживает), нативный запуск в Linux/macOS не предусмотрен.
 
-**Для сборки:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0); Visual Studio 2026 с компонентом **.NET desktop development** по желанию, достаточно одного SDK. Нужен доступ к NuGet для восстановления зависимостей (`SSH.NET` версии `2026.0.0`, `System.IO.Ports`, `System.Security.Cryptography.ProtectedData`).
+**Для сборки:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0); Visual Studio 2026 с компонентом **.NET desktop development** по желанию, достаточно одного SDK. Нужен доступ к NuGet для восстановления зависимостей (`SSH.NET` версии `2026.0.0`, `System.IO.Ports`, `System.Security.Cryptography.ProtectedData`, `SharpVectors.Wpf` для SVG-картинок в просмотре Markdown).
 
 ```powershell
 git clone https://github.com/alexsys87/SmarTTY.git

@@ -13,7 +13,7 @@ PR that changes them.
 - Build (also works on Linux for compile checks thanks to `EnableWindowsTargeting`; the app runs only on Windows):
   `dotnet build SmarTTY.csproj -c Release`
 - Single exe: `dotnet publish SmarTTY.csproj -c Release -p:SingleExe=true` → `bin/Release/net10.0-windows/publish/SmarTTY.exe`
-- Tests: 141 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
+- Tests: 143 console projects in `tests/`, each run with `dotnet run --project tests/<Name> -c Release`. The full list
   and order are in `.github/workflows/build.yml`; run the ones that compile the files you touched
   (`grep -rln <FileName> tests/*/*.csproj`).
 - No test needs Mono any more (see "The stands off Mono"). `RemoteFileEditorIntegrationTests` (net10.0, the real remote editor on
@@ -51,13 +51,13 @@ PR that changes them.
 | `GUI/Icons/` | Stage 5A: the icons as vector images, one resource dictionary of `DrawingImage`s for each folder the PNG files were in (`Root`, `MainWindow`, `Editor`, `Menu`, `Keys`, `Transfers`, `FileTypes`; converted from SVG outside the repository) | WPF |
 | `GUI/Backend/` | `MainWindowController`, tab contexts (`NormalTabContext` and `DeviceTabContext` show WPF terminals; `EditorTabContext` shows the WPF text view and the WPF hex view of a `RemoteFileEditor` and holds the commands of the tab, `Controls/RemoteFileEditorCommands`), `TextSearcher`, `RemoteFileEditorStatusBar` | WPF |
 | `GUI/HexView/` | Stage 3B: the hex editor on WPF that the editor tab shows (`WpfHexEditor`, its data inspector `WpfHexInspector`, its context menu `HexViewContextMenu`) | WPF |
-| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4 | WPF |
+| `GUI/TextView/` | Stage 3D: the text view on WPF on the models of the text view, with the syntax colours, the folds, the inline messages and the completion (`WpfTextEditor`, its word list `WpfSuggestionList` and parameter hint `WpfHintView`), its context menu in the tab `TextViewContextMenu`, its thread for the editor `WpfViewDispatcher`), the text view of the editor tab since 3E-4; `MarkdownPreview`, the rendered Markdown beside the text (see "Markdown preview") | WPF |
 | `GUI/Styles/` | `ThemeManager`, theme palettes | WPF |
 | `GUI/TerminalView/` | Stage 2: the WPF terminal of every tab (`WpfTerminal`: the classic tab and the sudo prompt; `WpfSmartTerminal`: the Smart Terminal; `WpfSerialTerminal` and `WpfHexTerminal`: the text and HEX views of a device; `TerminalRenderView`, `TerminalPanel`, `TerminalFont`, `KeyScanFlags`) | WPF |
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar, netconsole bar and menus are WPF since 4A) | WPF |
 | `Controls/` | The code the remote editor stand compiles that is not model: the remote file editor (not a control since 3E-4) and the commands of its tab, `UserDialogs` (the message boxes and file choosers that `App` points at the WPF windows), the interop of the model types, the interfaces of the terminal tabs; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5, the themed facades and `Forms/` in 4B | no window of its own |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
-| `TextEditing/` | Text and hex documents, encodings, line endings, matching; also carets and margins (UI) | partly |
+| `TextEditing/` | Text and hex documents, encodings, line endings, matching, the Markdown parser of the preview (`MarkdownParser`, `MarkdownDocument`, `MarkdownLinks`, `MarkdownImages`); also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
 | `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, the terminal colour schemes `TerminalColorPresets`; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
@@ -882,6 +882,55 @@ It is a fifth kind of device connection, so the device tab (`WpfDeviceTerminal`)
   names), `vim`, `mc` and `htop` in WSL (the mouse, the size after a resize of the tab), `exit` (the closed prompt, reconnect starts it again),
   closing the tab while a program runs (no process left), a console with arguments and a start folder, one with a program that does not exist
   (the error), a saved console with the name of a built-in one, the filter, an older `GUIPreferences.xml`.
+
+### Markdown preview (after stage 5)
+
+Done: a Markdown file (`.md`, `.markdown`, or any file whose syntax is Markdown, `RemoteFileEditor.DetectSyntax`) can be shown rendered beside
+its text in the editor tab.
+
+- Model (UI-free, `tests/MarkdownPreviewTests`, 245 checks): `TextEditing/MarkdownParser.Parse` reads the text into a `MarkdownDocument` of
+  `MarkdownBlock`s (paragraph, ATX and setext heading, fenced and indented code, quote, list with tight/loose and task items, GitHub table with the
+  alignments, rule, HTML block shown as its text) with the first and last line of the source of each block, and `MarkdownInline`s (text, code
+  span, emphasis and strong by the delimiter rules of CommonMark, `~~struck~~`, inline and reference links and images, autolinks and bare
+  addresses, escapes, entities, hard breaks; `<br>` is a break and `<img>` an image, other tags show nothing). Headings get the anchors of
+  GitHub (`MakeAnchor`, `-1`, `-2` for repeats). It is not the full specification (a lazy line of a quote or an item is taken whatever it
+  continues) and never throws: the nesting of quotes and lists (64) and of emphasis and links (32) is limited, so deep input cannot overflow
+  the stack. `MarkdownLinks.Resolve` says what a link leads to: a web address (http, https, ftp, mailto; other schemes open nothing), a heading
+  (`#x`) or a file of the server relative to the document or the root (dots, percent escapes, the query dropped, a drive of a Windows host).
+  `CodeEditing/MarkdownCodeColoring` gives the language of a fence's info string (aliases such as `bash`, `python`, then the extension rules of
+  `SyntaxHighlighting`) and the coloured parts of its lines from the editor's tokenizers.
+- View: `GUI/TextView/MarkdownPreview` (a `FlowDocumentScrollViewer`) builds a `FlowDocument` in the brushes of the theme (`Theme.*` resource
+  references, so a theme switch applies at once); code blocks take the background, the text and the token colours of the editor
+  (`WpfTextEditor.TextBackground`, `TextForeground`, `SyntaxColors`, `SyntaxChanged`). A web link opens through `UrlOpener`, an anchor scrolls to its heading, a file link
+  raises `FileLinkClicked`, which `MainWindowController.OpenLinkedFile` opens in an editor tab (`EditorTabContext.ShowMarkdownAnchor` once loaded).
+- The tab (`EditorTabContext`): a grid of the text (or the hex view), a `GridSplitter` and the preview; the preview is shown while
+  `RemoteFileEditorCommands.MarkdownPreviewOn` is set, the file is Markdown and the hex view is closed; it is drawn again 300 ms after the last
+  `WpfTextEditor.TextChanged` (a new event: an edit of a line or a range, a new document) and brings the block of the caret into view
+  (`MarkdownDocument.BlockIndexAtLine`) when the caret moves to another block. The command `EditorToolbarCommand.MarkdownPreview` (a toggle on
+  the tool bar and in the context menu, shown only for a Markdown file, off in the hex view, `Ctrl+Shift+M` in the text and in the preview) switches
+  it; the choice is `EditorSettings.HideMarkdownPreview` (an "off" switch: an old settings file shows the preview).
+- Manual check on Windows: a README with headings, lists, a nested and a task list, a table, code blocks in `bash`/`python`/`json`, a quote, HTML
+  (`<p align="center"><img ...></p>`, `<details>`), badges (images in links); typing (the preview follows, the caret block in view), the splitter,
+  Ctrl+Shift+M and the tool bar button, the setting after a restart, the hex view on and off, a file without the extension with the syntax chosen
+  by hand, links (web, `#anchor`, `docs/x.md`, `../y.md#z`, a folder), light and dark themes and a theme switched while open, 150 % and 200 %,
+  selection and copy, Ctrl+wheel, a file of some MB.
+- Images (for a repository cloned on the server; nothing is loaded from the internet): `TextEditing/MarkdownImages` (UI-free, in
+  `MarkdownPreviewTests`) says where a picture is (`Locate`: a data address or a file of the server relative to the document; web addresses,
+  other schemes and folders are not read; a web image keeps its alternative text, a click opens it in the browser) and the key it is kept under,
+  where a path from `/` is looked for (`ServerFileCandidates`: under the root of the git repository first, as GitHub shows it, then from the root
+  of the file system; `RepositoryRootCandidates`, the folders up from the document, the first with `.git` is the root), decodes data addresses,
+  tells the format by the first bytes (`Detect`: the raster formats of Windows, SVG; an HTML page or an error text is no picture), and the shown
+  width (`ShownWidth`, the `width`/`height` of `<img>` through `ParseLength`, never wider than the preview). `GUI/TextView/MarkdownImageLoader`
+  (one a tab, `EditorTabContext`) reads them in the background, four at a time: a file of the server through `RemoteFileEditor.ReadServerFile`
+  (`RemoteFileServer.ReadOtherFile`, SCP or SFTP as the file itself, at most `MarkdownImages.MaxBytes`, 16 MB; the root of the repository found
+  once through `RemoteFileEditor.ServerPathExists`), a data address from itself; it decodes a raster picture frozen on the pool and an SVG on the UI thread with
+  SharpVectors (`SharpVectors.Wpf`, BSD-3; external resources ignored), keeps every picture or its error until the tab closes or the file is loaded
+  again (`Clear`), and calls back on the UI thread. `MarkdownPreview` shows the alternative text until the picture arrives (a later drawing
+  of the document ignores the callback of an earlier one by a generation number), then an `Image` in an `InlineUIContainer` at its pixel size,
+  narrowed with the preview; a picture in a link takes its own press and opens the link. Manual check on Windows: the README of a cloned GitHub
+  repository with relative PNG, JPEG, GIF and SVG pictures (`?raw=true`, `#gh-dark-mode-only`), a path from `/` inside the repository and in
+  `docs/`, shields.io badges in links (their text, the browser on a click), a data address, `<img width>`, a missing file, a picture of more than
+  16 MB, an HTML page given as a picture, a Windows server, Reload from Server after replacing a picture, a narrow preview.
 
 ### Stage 3 (the editor and the hex editor on WPF)
 

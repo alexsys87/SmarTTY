@@ -136,6 +136,18 @@ internal static class Program
         Check(new EditorCommandState().IsVisible(EditorToolbarCommand.ToggleHex) && hex.IsVisible(EditorToolbarCommand.ToggleHex), "Hex Editor is shown in both views");
         Check(EditorCommandCatalog.Describe(EditorToolbarCommand.DataInspector).ToolTip == "Data Inspector (Ctrl+I)", "catalog: Data Inspector shows its key");
 
+        // The Markdown preview: only for a Markdown file, in the text view.
+        EditorCommandState markdown = new EditorCommandState { IsMarkdown = true };
+        Check(!new EditorCommandState().IsVisible(EditorToolbarCommand.MarkdownPreview), "markdown: the preview is hidden for another file");
+        Check(!new EditorCommandState().IsEnabled(EditorToolbarCommand.MarkdownPreview), "markdown: the preview is off for another file");
+        Check(markdown.IsVisible(EditorToolbarCommand.MarkdownPreview) && markdown.IsEnabled(EditorToolbarCommand.MarkdownPreview), "markdown: the preview is shown and on");
+        Check(!markdown.IsChecked(EditorToolbarCommand.MarkdownPreview), "markdown: a preview not switched on is not checked");
+        Check(new EditorCommandState { IsMarkdown = true, MarkdownPreview = true }.IsChecked(EditorToolbarCommand.MarkdownPreview), "markdown: a shown preview is checked");
+        Check(new EditorCommandState { IsMarkdown = true, ReadOnly = true }.IsEnabled(EditorToolbarCommand.MarkdownPreview), "markdown: a read-only file can be previewed");
+        EditorCommandState markdownHex = new EditorCommandState { IsMarkdown = true, HexMode = true };
+        Check(markdownHex.IsVisible(EditorToolbarCommand.MarkdownPreview) && !markdownHex.IsEnabled(EditorToolbarCommand.MarkdownPreview), "markdown: the preview is off in the hex view");
+        Check(EditorCommandCatalog.Describe(EditorToolbarCommand.MarkdownPreview).ToolTip == "Markdown Preview (Ctrl+Shift+M)", "catalog: Markdown Preview shows its key");
+
         // The tool bar and the context menu list every command once, and each has a label and an icon.
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
@@ -181,7 +193,7 @@ internal static class Program
         foreach (EditorToolbarCommand command in Enum.GetValues(typeof(EditorToolbarCommand)))
         {
             // A command shown only in the hex view is checked there.
-            EditorCommandState everything = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true, CanFollow = true };
+            EditorCommandState everything = new EditorCommandState { HasText = true, HasSelection = true, CanUndo = true, CanRedo = true, IsModified = true, CanUseHex = true, CanRun = true, CanFollow = true, IsMarkdown = true };
             if (!everything.IsVisible(command))
             {
                 everything.HexMode = true;

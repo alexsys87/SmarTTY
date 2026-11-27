@@ -291,6 +291,9 @@ jobs:
       - name: Run line command checks (duplicate, move, delete and comment lines, the transforms of the Text menu, the moves to a bracket, the zoom steps)
         run: dotnet run --project tests/LineCommandTests -c Release
 
+      - name: Run Markdown preview checks (the blocks and inlines of the parser, the lines of the source, the anchors, the targets of the links, the colours of the code blocks)
+        run: dotnet run --project tests/MarkdownPreviewTests -c Release
+
       - name: Run text search checks (the search of a text view, the highlight of the matches, the pair of a bracket, the marks of the blanks)
         run: dotnet run --project tests/TextSearchTests -c Release
 

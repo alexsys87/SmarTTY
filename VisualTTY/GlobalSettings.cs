@@ -140,6 +140,10 @@ public class GlobalSettings : INotifyPropertyChanged
 
         public bool HexShowDataInspector;
 
+        // A Markdown file opens with its preview beside the text unless the preview was switched off last (an "off" switch, so that the
+        // old settings files, which lack it, show the preview).
+        public bool HideMarkdownPreview;
+
         public EditorColors DarkColors;
 
         public EditorColors LightColors;

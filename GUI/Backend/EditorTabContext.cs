@@ -6,6 +6,7 @@ using SmarTTY.TextEditing;
 using System;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 
@@ -14,6 +15,8 @@ namespace SmarTTY.GUI.Backend;
 /// <summary>
 /// The tab of a file on the server (stage 3E-4: on WPF): the WPF text view and the WPF hex view of a <see cref="RemoteFileEditor"/>, one of them
 /// shown, with the tool bar and the status bar of the editor and their context menus, all running the same <see cref="RemoteFileEditorCommands"/>.
+/// A Markdown file can also be shown rendered beside its text (<see cref="TextView.MarkdownPreview"/>, the Markdown Preview command): the preview
+/// follows the text a moment after it changes and brings the block of the caret into view; its images are read from the same server.
 /// </summary>
 public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement, IHexViewPlace
 {
@@ -30,6 +33,27 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     private readonly TextView.WpfTextEditor _textView;
 
     private readonly HexView.WpfHexEditor _wpfHexView;
+
+    // The Markdown preview at the right of the text, the splitter between them and their columns.
+    private readonly TextView.MarkdownPreview _preview;
+
+    private readonly GridSplitter _splitter;
+
+    private readonly ColumnDefinition _splitterColumn;
+
+    private readonly ColumnDefinition _previewColumn;
+
+    // The preview is drawn again this long after the last change of the text.
+    private readonly UiTimer _previewTimer = new UiTimer { Interval = 300 };
+
+    private GridLength _previewWidth = new GridLength(1, GridUnitType.Star);
+
+    private bool _previewShown;
+
+    // The heading a link from another file asked for, shown once the text has been loaded.
+    private string _pendingAnchor;
+
+    private bool _textLoaded;
 
     public readonly string FilePath;
 
@@ -75,6 +99,12 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
+    /// <summary>A link of the Markdown preview to another file was clicked: its full path and the anchor after # (or null).</summary>
+    public event Action<string, string> FileLinkClicked;
+
+    /// <summary>The Markdown preview is shown beside the text.</summary>
+    internal bool IsMarkdownPreviewShown => _previewShown;
+
     public EditorTabContext(SessionWrapper sessionWrapper, RemoteFileEditor editor, string filePath)
     {
         Editor = editor;
@@ -94,10 +124,78 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             Editor.FocusActiveView();
             Commands.RefreshState();
         });
-        System.Windows.Controls.Grid place = new System.Windows.Controls.Grid();
+        // The text (or the hex view) at the left, the Markdown preview at the right, hidden with its splitter until it is switched on.
+        _preview = new TextView.MarkdownPreview
+        {
+            DocumentPath = filePath,
+            Visibility = Visibility.Collapsed
+        };
+        // The pictures of the images: the files of the same server through the editor's connection (a path from / under the root of the git
+        // repository first) and the data addresses; nothing from the internet.
+        _preview.Images = new TextView.MarkdownImageLoader(_preview.Dispatcher)
+        {
+            ReadServerFile = editor.ReadServerFile,
+            ServerPathExists = editor.ServerPathExists
+        };
+        _preview.FileLinkClicked += (path, anchor) => FileLinkClicked?.Invoke(path, anchor);
+        _preview.PreviewKeyDown += (object sender, KeyEventArgs e) =>
+        {
+            if (IsMarkdownPreviewKey(e))
+            {
+                e.Handled = TryToggleMarkdownPreview();
+            }
+        };
+        _splitter = new GridSplitter
+        {
+            Width = 5,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            ResizeDirection = GridResizeDirection.Columns,
+            ResizeBehavior = GridResizeBehavior.PreviousAndNext,
+            Focusable = false,
+            Visibility = Visibility.Collapsed
+        };
+        _splitter.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Theme.Divider");
+        Grid place = new Grid();
+        place.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 80 });
+        _splitterColumn = new ColumnDefinition { Width = new GridLength(0) };
+        _previewColumn = new ColumnDefinition { Width = new GridLength(0) };
+        place.ColumnDefinitions.Add(_splitterColumn);
+        place.ColumnDefinitions.Add(_previewColumn);
         place.Children.Add(_textView);
         place.Children.Add(_wpfHexView);
+        Grid.SetColumn(_splitter, 1);
+        Grid.SetColumn(_preview, 2);
+        place.Children.Add(_splitter);
+        place.Children.Add(_preview);
         Control = place;
+        _previewTimer.Tick += (object sender, EventArgs e) =>
+        {
+            _previewTimer.Stop();
+            RefreshPreview();
+        };
+        _textView.TextChanged += (object sender, EventArgs e) => SchedulePreview();
+        _textView.SyntaxChanged += (object sender, EventArgs e) => SchedulePreview();
+        _textView.AppearanceChanged += (object sender, EventArgs e) => SchedulePreview();
+        _textView.StateChanged += (object sender, EventArgs e) =>
+        {
+            if (_previewShown)
+            {
+                _preview.ShowLine(_textView.CaretPosition.Line);
+            }
+        };
+        Commands.MarkdownPreviewChanged += (object sender, EventArgs e) => UpdatePreviewLayout();
+        editor.HexModeChanged += (object sender, EventArgs e) => UpdatePreviewLayout();
+        editor.CurrentLanguageChanged += (object sender, EventArgs e) => UpdatePreviewLayout();
+        editor.SyntaxChoiceChanged += (object sender, EventArgs e) => UpdatePreviewLayout();
+        editor.LoadCompleted += (object sender, EventArgs e) =>
+        {
+            _textLoaded = true;
+            // A reload from the server reads the pictures again too.
+            _preview.Images.Clear();
+            UpdatePreviewLayout();
+            SchedulePreview();
+        };
         editor.HexViewPlace = this;
         ToolBar = (FrameworkElement)new RemoteFileEditorToolBar(Commands);
         StatusBar = (FrameworkElement)new RemoteFileEditorStatusBar(new RemoteFileEditorStatusSource(editor, Commands));
@@ -150,6 +248,104 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             }
         }));
         return true;
+    }
+
+    /// <summary>Ctrl+Shift+M: the key of the Markdown Preview command.</summary>
+    internal static bool IsMarkdownPreviewKey(KeyEventArgs e)
+    {
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        return key == Key.M && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift);
+    }
+
+    /// <summary>Switches the Markdown preview on or off when the file is Markdown and shown as text; false when it cannot be.</summary>
+    internal bool TryToggleMarkdownPreview()
+    {
+        if (!Commands.CaptureState().IsEnabled(EditorToolbarCommand.MarkdownPreview))
+        {
+            return false;
+        }
+        Commands.RunCommand(EditorToolbarCommand.MarkdownPreview);
+        return true;
+    }
+
+    /// <summary>Shows the heading of an anchor in the Markdown preview, at once or when the text has been loaded and shown.</summary>
+    internal void ShowMarkdownAnchor(string anchor)
+    {
+        if (string.IsNullOrEmpty(anchor))
+        {
+            return;
+        }
+        if (_previewShown && _textLoaded)
+        {
+            _preview.ShowAnchor(anchor);
+            return;
+        }
+        _pendingAnchor = anchor;
+    }
+
+    // Shows or hides the preview: it is shown while it is switched on, the file is Markdown and the text (not the hex view) is shown.
+    private void UpdatePreviewLayout()
+    {
+        bool show = Commands.MarkdownPreviewOn && !Editor.IsHexMode && Editor.DetectSyntax() == SyntaxHighlighting.Language.Markdown;
+        if (show == _previewShown)
+        {
+            return;
+        }
+        _previewShown = show;
+        if (show)
+        {
+            _splitterColumn.Width = GridLength.Auto;
+            _previewColumn.Width = _previewWidth;
+            _previewColumn.MinWidth = 80;
+            _splitter.Visibility = Visibility.Visible;
+            _preview.Visibility = Visibility.Visible;
+            RefreshPreview();
+            return;
+        }
+        // The width the splitter gave it comes back the next time.
+        if (_previewColumn.Width.Value > 0)
+        {
+            _previewWidth = _previewColumn.Width;
+        }
+        _previewTimer.Stop();
+        _previewColumn.MinWidth = 0;
+        _previewColumn.Width = new GridLength(0);
+        _splitterColumn.Width = new GridLength(0);
+        _splitter.Visibility = Visibility.Collapsed;
+        bool hadFocus = _preview.IsKeyboardFocusWithin;
+        _preview.Visibility = Visibility.Collapsed;
+        if (hadFocus)
+        {
+            Editor.FocusActiveView();
+        }
+    }
+
+    // The preview is drawn again a moment after the last of a series of changes.
+    private void SchedulePreview()
+    {
+        if (!_previewShown || _textView.IsClosed)
+        {
+            return;
+        }
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private void RefreshPreview()
+    {
+        if (!_previewShown || _textView.IsClosed)
+        {
+            return;
+        }
+        _preview.SetCodeColors(_textView.TextBackground, _textView.TextForeground, _textView.SyntaxColors);
+        _preview.ShowText(_textView.Document.GetText());
+        _preview.ShowLine(_textView.CaretPosition.Line);
+        if (_pendingAnchor != null && _textLoaded)
+        {
+            string anchor = _pendingAnchor;
+            _pendingAnchor = null;
+            _preview.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() => _preview.ShowAnchor(anchor)));
+        }
     }
 
     /// <summary>Opens (or brings forward) the modeless find window of the hex view.</summary>
@@ -287,6 +483,7 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
     public void Dispose()
     {
         CloseHexFind();
+        _previewTimer.Dispose();
         Editor.Dispose();
     }
 

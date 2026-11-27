@@ -36,6 +36,34 @@ public class RemoteFileServer
         return _host.OpenScpDownload(_remotePath, out length);
     }
 
+    /// <summary>
+    /// Another file of the server read whole (an image of a Markdown document), over SCP or SFTP as the file of the editor; a file larger than
+    /// <paramref name="maxBytes"/> throws <see cref="IOException"/> before it is read.
+    /// </summary>
+    public byte[] ReadOtherFile(string path, int maxBytes)
+    {
+        long length;
+        using (Stream stream = IsWindows ? _host.OpenSftpRead(path, out length) : _host.OpenScpDownload(path, out length))
+        {
+            if (length > maxBytes)
+            {
+                throw new IOException(path + " is larger than " + (maxBytes / (1024 * 1024)) + " MB");
+            }
+            MemoryStream bytes = new MemoryStream((int)Math.Max(0, length));
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((length <= 0 || bytes.Length < length) && (read = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                bytes.Write(buffer, 0, read);
+                if (bytes.Length > maxBytes)
+                {
+                    throw new IOException(path + " is larger than " + (maxBytes / (1024 * 1024)) + " MB");
+                }
+            }
+            return bytes.ToArray();
+        }
+    }
+
     /// <summary>The path exists on the server. Without an answer from a Unix host the connection is checked: no answer is not "does not exist".</summary>
     public bool Exists(string path)
     {
