@@ -191,6 +191,14 @@ internal static class Program
             Equal(stream.Length, 3L, "Windows: the stream is the SFTP read");
         }
         Equal(Joined(windows), "sftp read C:/a.txt", "Windows: the file of the editor is read over SFTP");
+
+        // Another file of the server (an image of the Markdown preview) read whole.
+        FakeHost other = new FakeHost();
+        Equal(string.Join(",", new RemoteFileServer(other, "/srv/README.md").ReadOtherFile("/srv/logo.png", 100)), "1,2,3,4,5,6,7", "another file: its bytes over SCP");
+        Equal(Joined(other), "scp /srv/logo.png", "another file: the path asked for, not the file of the editor");
+        FakeHost otherWindows = new FakeHost { IsWindows = true };
+        Equal(new RemoteFileServer(otherWindows, "C:/README.md").ReadOtherFile("C:/logo.png", 100).Length, 3, "another file of a Windows host: over SFTP");
+        Throws<IOException>(() => new RemoteFileServer(new FakeHost(), "/a").ReadOtherFile("/big.png", 6), "another file larger than the limit throws");
     }
 
     private static void Signature()

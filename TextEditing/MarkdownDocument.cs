@@ -57,6 +57,12 @@ public sealed class MarkdownInline
     /// <summary>The title of a link or an image, or null.</summary>
     public string Title { get; internal set; }
 
+    /// <summary>The width an <c>&lt;img&gt;</c> tag gives its image in pixels (<see cref="MarkdownImages.ParseLength"/>), 0 for none.</summary>
+    public double Width { get; internal set; }
+
+    /// <summary>The height an <c>&lt;img&gt;</c> tag gives its image in pixels, 0 for none.</summary>
+    public double Height { get; internal set; }
+
     /// <summary>The content of emphasis, strong, struck text and a link; empty for the others.</summary>
     public List<MarkdownInline> Children { get; } = new List<MarkdownInline>();
 

@@ -46,6 +46,8 @@
     <PackageReference Include="System.IO.Ports" Version="11.0.0" />
     <!-- ProtectedData (IO/DpapiDraftProtector.cs). -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="11.0.0" />
+    <!-- SVG images of the Markdown preview (GUI/TextView/MarkdownImageLoader.cs): WPF draws no SVG itself. -->
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.6" />
   </ItemGroup>
 
   <!--

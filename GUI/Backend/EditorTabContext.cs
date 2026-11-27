@@ -16,7 +16,7 @@ namespace SmarTTY.GUI.Backend;
 /// The tab of a file on the server (stage 3E-4: on WPF): the WPF text view and the WPF hex view of a <see cref="RemoteFileEditor"/>, one of them
 /// shown, with the tool bar and the status bar of the editor and their context menus, all running the same <see cref="RemoteFileEditorCommands"/>.
 /// A Markdown file can also be shown rendered beside its text (<see cref="TextView.MarkdownPreview"/>, the Markdown Preview command): the preview
-/// follows the text a moment after it changes and brings the block of the caret into view.
+/// follows the text a moment after it changes and brings the block of the caret into view; its images are read from the same server or the web.
 /// </summary>
 public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged, ICloseableElement, IHexViewPlace
 {
@@ -130,6 +130,8 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
             DocumentPath = filePath,
             Visibility = Visibility.Collapsed
         };
+        // The pictures of the images: the files of the same server through the editor's connection, the web and data addresses.
+        _preview.Images = new TextView.MarkdownImageLoader(_preview.Dispatcher) { ReadServerFile = editor.ReadServerFile };
         _preview.FileLinkClicked += (path, anchor) => FileLinkClicked?.Invoke(path, anchor);
         _preview.PreviewKeyDown += (object sender, KeyEventArgs e) =>
         {
@@ -184,6 +186,8 @@ public class EditorTabContext : ITabContext, IDisposable, INotifyPropertyChanged
         editor.LoadCompleted += (object sender, EventArgs e) =>
         {
             _textLoaded = true;
+            // A reload from the server reads the pictures again too.
+            _preview.Images.Clear();
             UpdatePreviewLayout();
             SchedulePreview();
         };

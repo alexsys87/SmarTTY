@@ -57,7 +57,7 @@ PR that changes them.
 | `GUI/DevicePanel/` | Stage 2D: `WpfDeviceTerminal`, the COM/TCP/telnet/netconsole tab (the port of `DeviceTerminalControl` and its partials; its tool bar, netconsole bar and menus are WPF since 4A) | WPF |
 | `Controls/` | The code the remote editor stand compiles that is not model: the remote file editor (not a control since 3E-4) and the commands of its tab, `UserDialogs` (the message boxes and file choosers that `App` points at the WPF windows), the interop of the model types, the interfaces of the terminal tabs; the WinForms terminals went in 2E, the text view, code editor and hex control in 3E-5, the themed facades and `Forms/` in 4B | no window of its own |
 | `Terminal/` | Terminal logic: xterm protocol, decoders, paste, completion sessions, command history, links | mostly no |
-| `TextEditing/` | Text and hex documents, encodings, line endings, matching, the Markdown parser of the preview (`MarkdownParser`, `MarkdownDocument`, `MarkdownLinks`); also carets and margins (UI) | partly |
+| `TextEditing/` | Text and hex documents, encodings, line endings, matching, the Markdown parser of the preview (`MarkdownParser`, `MarkdownDocument`, `MarkdownLinks`, `MarkdownImages`); also carets and margins (UI) | partly |
 | `CodeEditing/` | Syntax highlighting, folding, editor commands, key bindings, multi-cursor, diff | partly |
 | `Completion/` | Suggestion and signature sources and controllers, API symbols | partly |
 | `VisualTTY/` | Settings and their models (`GlobalSettings`, palettes, the terminal colour schemes `TerminalColorPresets`; colours as `ColorWrapper`/`RgbColor`, `FontSpec`, `ScreenRect` since 5C), `DeviceTerminal/` state and line input | no |
@@ -888,7 +888,7 @@ It is a fifth kind of device connection, so the device tab (`WpfDeviceTerminal`)
 Done: a Markdown file (`.md`, `.markdown`, or any file whose syntax is Markdown, `RemoteFileEditor.DetectSyntax`) can be shown rendered beside
 its text in the editor tab.
 
-- Model (UI-free, `tests/MarkdownPreviewTests`, 192 checks): `TextEditing/MarkdownParser.Parse` reads the text into a `MarkdownDocument` of
+- Model (UI-free, `tests/MarkdownPreviewTests`, 232 checks): `TextEditing/MarkdownParser.Parse` reads the text into a `MarkdownDocument` of
   `MarkdownBlock`s (paragraph, ATX and setext heading, fenced and indented code, quote, list with tight/loose and task items, GitHub table with the
   alignments, rule, HTML block shown as its text) with the first and last line of the source of each block, and `MarkdownInline`s (text, code
   span, emphasis and strong by the delimiter rules of CommonMark, `~~struck~~`, inline and reference links and images, autolinks and bare
@@ -901,8 +901,7 @@ its text in the editor tab.
   `SyntaxHighlighting`) and the coloured parts of its lines from the editor's tokenizers.
 - View: `GUI/TextView/MarkdownPreview` (a `FlowDocumentScrollViewer`) builds a `FlowDocument` in the brushes of the theme (`Theme.*` resource
   references, so a theme switch applies at once); code blocks take the background, the text and the token colours of the editor
-  (`WpfTextEditor.TextBackground`, `TextForeground`, `SyntaxColors`, `SyntaxChanged`). Images are never loaded (the file is on a server): their
-  alternative text is shown, a web image opens in the browser. A web link opens through `UrlOpener`, an anchor scrolls to its heading, a file link
+  (`WpfTextEditor.TextBackground`, `TextForeground`, `SyntaxColors`, `SyntaxChanged`). A web link opens through `UrlOpener`, an anchor scrolls to its heading, a file link
   raises `FileLinkClicked`, which `MainWindowController.OpenLinkedFile` opens in an editor tab (`EditorTabContext.ShowMarkdownAnchor` once loaded).
 - The tab (`EditorTabContext`): a grid of the text (or the hex view), a `GridSplitter` and the preview; the preview is shown while
   `RemoteFileEditorCommands.MarkdownPreviewOn` is set, the file is Markdown and the hex view is closed; it is drawn again 300 ms after the last
@@ -915,6 +914,19 @@ its text in the editor tab.
   Ctrl+Shift+M and the tool bar button, the setting after a restart, the hex view on and off, a file without the extension with the syntax chosen
   by hand, links (web, `#anchor`, `docs/x.md`, `../y.md#z`, a folder), light and dark themes and a theme switched while open, 150 % and 200 %,
   selection and copy, Ctrl+wheel, a file of some MB.
+- Images: `TextEditing/MarkdownImages` (UI-free, in `MarkdownPreviewTests`) says where a picture is (`Locate`: a data address, http/https, a
+  file of the server relative to the document; other schemes and folders are not read) and the key it is kept under, decodes data addresses,
+  tells the format by the first bytes (`Detect`: the raster formats of Windows, SVG; an HTML page or an error text is no picture), and the shown
+  width (`ShownWidth`, the `width`/`height` of `<img>` through `ParseLength`, never wider than the preview). `GUI/TextView/MarkdownImageLoader`
+  (one a tab, `EditorTabContext`) reads them in the background, four at a time: a file of the server through `RemoteFileEditor.ReadServerFile`
+  (`RemoteFileServer.ReadOtherFile`, SCP or SFTP as the file itself, at most `MarkdownImages.MaxBytes`, 16 MB), a web address with `HttpClient`
+  (20 s, five redirects), a data address from itself; it decodes a raster picture frozen on the pool and an SVG on the UI thread with
+  SharpVectors (`SharpVectors.Wpf`, BSD-3; external resources ignored), keeps every picture or its error until the tab closes or the file is loaded
+  again (`Clear`), and calls back on the UI thread. `MarkdownPreview` shows the alternative text until the picture arrives (a later drawing
+  of the document ignores the callback of an earlier one by a generation number), then an `Image` in an `InlineUIContainer` at its pixel size,
+  narrowed with the preview; a picture in a link takes its own press and opens the link. Manual check on Windows: a README with relative PNG
+  and SVG pictures, shields.io badges in links, a JPEG and a GIF from the web, a data address, `<img width>`, a missing file, a picture of more
+  than 16 MB, an HTML page given as a picture, a Windows server, Reload from Server after replacing a picture, a narrow preview.
 
 ### Stage 3 (the editor and the hex editor on WPF)
 

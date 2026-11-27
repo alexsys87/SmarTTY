@@ -16,7 +16,8 @@ namespace SmarTTY.GUI.TextView;
 /// The preview of a Markdown file beside its text in the editor tab: the <see cref="MarkdownDocument"/> of the text (<see cref="MarkdownParser"/>)
 /// shown as a WPF <see cref="FlowDocument"/> in the colours of the theme, with the code blocks in the colours of the syntax of the editor. The links
 /// open: a web address in the browser, a heading of the document by scrolling to it, another file through <see cref="FileLinkClicked"/>. Images are
-/// not loaded (the file is on a server): they are shown as their alternative text. The text can be selected and copied; Ctrl+wheel zooms.
+/// shown by <see cref="Images"/> (a file of the server, a web address, a data address; their alternative text until the picture is there, or when
+/// it cannot be), at most as wide as the preview. The text can be selected and copied; Ctrl+wheel zooms.
 /// </summary>
 internal sealed class MarkdownPreview : FlowDocumentScrollViewer
 {
@@ -45,6 +46,12 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
 
     private SolidColorBrush[] _tokenBrushes = new SolidColorBrush[0];
 
+    // The images shown, made narrower when the preview is (their width as the document wants it is in their Tag).
+    private readonly List<Image> _images = new List<Image>();
+
+    // Counts the drawings of the document: a picture that arrives for an earlier one is not put in.
+    private int _generation;
+
     public MarkdownPreview()
     {
         _document = new FlowDocument
@@ -62,7 +69,11 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         Focusable = true;
+        SizeChanged += (sender, e) => FitImages();
     }
+
+    /// <summary>The pictures of the images; null: an image is shown as its alternative text.</summary>
+    public MarkdownImageLoader Images { get; set; }
 
     /// <summary>The path of the file on the server: the relative links are taken from its folder.</summary>
     public string DocumentPath { get; set; }
@@ -107,6 +118,8 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
         _model = model;
         _blocks.Clear();
         _headings.Clear();
+        _images.Clear();
+        _generation++;
         _shownBlock = -1;
         _document.Blocks.Clear();
         foreach (MarkdownBlock block in model.Blocks)
@@ -204,7 +217,7 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
             {
                 // A paragraph, or the text of an HTML block.
                 Paragraph paragraph = new Paragraph { Margin = tight ? new Thickness(0) : new Thickness(0, 0, 0, 12) };
-                AddInlines(paragraph.Inlines, block.Inlines, false);
+                AddInlines(paragraph.Inlines, block.Inlines, null);
                 return paragraph;
             }
         }
@@ -237,7 +250,7 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
         {
             heading.SetResourceReference(Paragraph.ForegroundProperty, "Theme.TextSecondary");
         }
-        AddInlines(heading.Inlines, block.Inlines, false);
+        AddInlines(heading.Inlines, block.Inlines, null);
         _headings[block] = heading;
         return heading;
     }
@@ -394,7 +407,7 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
         for (int i = 0; i < cells.Count; i++)
         {
             Paragraph text = new Paragraph { Margin = new Thickness(0) };
-            AddInlines(text.Inlines, cells[i], false);
+            AddInlines(text.Inlines, cells[i], null);
             MarkdownAlignment alignment = (i < alignments.Count) ? alignments[i] : MarkdownAlignment.None;
             text.TextAlignment = alignment == MarkdownAlignment.Center ? TextAlignment.Center
                 : alignment == MarkdownAlignment.Right ? TextAlignment.Right : TextAlignment.Left;
@@ -411,11 +424,12 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
 
     // ---------------------------------------------------------------- inlines
 
-    private void AddInlines(InlineCollection target, List<MarkdownInline> inlines, bool inLink)
+    // linkUrl: the target of the link the inlines are in, or null.
+    private void AddInlines(InlineCollection target, List<MarkdownInline> inlines, string linkUrl)
     {
         foreach (MarkdownInline inline in inlines)
         {
-            Inline shown = BuildInline(inline, inLink);
+            Inline shown = BuildInline(inline, linkUrl);
             if (shown != null)
             {
                 target.Add(shown);
@@ -423,7 +437,7 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
         }
     }
 
-    private Inline BuildInline(MarkdownInline inline, bool inLink)
+    private Inline BuildInline(MarkdownInline inline, string linkUrl)
     {
         switch (inline.Kind)
         {
@@ -438,63 +452,145 @@ internal sealed class MarkdownPreview : FlowDocumentScrollViewer
             case MarkdownInlineKind.Emphasis:
             {
                 Italic italic = new Italic();
-                AddInlines(italic.Inlines, inline.Children, inLink);
+                AddInlines(italic.Inlines, inline.Children, linkUrl);
                 return italic;
             }
             case MarkdownInlineKind.Strong:
             {
                 Bold bold = new Bold();
-                AddInlines(bold.Inlines, inline.Children, inLink);
+                AddInlines(bold.Inlines, inline.Children, linkUrl);
                 return bold;
             }
             case MarkdownInlineKind.Strikethrough:
             {
                 Span struck = new Span { TextDecorations = TextDecorations.Strikethrough };
-                AddInlines(struck.Inlines, inline.Children, inLink);
+                AddInlines(struck.Inlines, inline.Children, linkUrl);
                 return struck;
             }
             case MarkdownInlineKind.Link:
             {
-                if (inLink)
+                if (linkUrl != null)
                 {
                     // A link cannot hold another one: its text only.
                     Span span = new Span();
-                    AddInlines(span.Inlines, inline.Children, true);
+                    AddInlines(span.Inlines, inline.Children, linkUrl);
                     return span;
                 }
                 Hyperlink link = new Hyperlink();
                 link.SetResourceReference(Hyperlink.ForegroundProperty, "Theme.Link");
-                AddInlines(link.Inlines, inline.Children, true);
+                AddInlines(link.Inlines, inline.Children, inline.Url ?? "");
                 ConnectLink(link, inline.Url, inline.Title);
                 return link;
             }
             case MarkdownInlineKind.Image:
-            {
-                string alt = string.IsNullOrWhiteSpace(inline.Text) ? ImageName(inline.Url) : inline.Text;
-                Run picture = new Run("[\U0001F5BC " + alt + "]");
-                picture.SetResourceReference(Run.ForegroundProperty, "Theme.TextSecondary");
-                if (inLink)
-                {
-                    return picture;
-                }
-                // The picture is not loaded; a click opens it when it is on the web.
-                MarkdownLinkTarget target = MarkdownLinks.Resolve(inline.Url, DocumentPath);
-                if (target.Kind != MarkdownLinkKind.Web)
-                {
-                    picture.ToolTip = inline.Url;
-                    return picture;
-                }
-                Hyperlink link = new Hyperlink(picture);
-                link.SetResourceReference(Hyperlink.ForegroundProperty, "Theme.Link");
-                ConnectLink(link, inline.Url, inline.Title);
-                return link;
-            }
+                return BuildImage(inline, linkUrl);
             case MarkdownInlineKind.SoftBreak:
                 return new Run(" ");
             case MarkdownInlineKind.LineBreak:
                 return new LineBreak();
             default:
                 return null;
+        }
+    }
+
+    // An image: its picture when it is loaded, otherwise its alternative text, which the picture replaces when it arrives.
+    private Inline BuildImage(MarkdownInline inline, string linkUrl)
+    {
+        Span holder = new Span();
+        int generation = _generation;
+        MarkdownImageLoader.Entry entry = Images?.Request(inline.Url, DocumentPath, loaded =>
+        {
+            if (generation != _generation)
+            {
+                return;
+            }
+            holder.Inlines.Clear();
+            holder.Inlines.Add(ImageOrText(inline, loaded, linkUrl));
+        });
+        holder.Inlines.Add(ImageOrText(inline, entry, linkUrl));
+        return holder;
+    }
+
+    private Inline ImageOrText(MarkdownInline inline, MarkdownImageLoader.Entry entry, string linkUrl)
+    {
+        if (entry != null && entry.State == MarkdownImageLoader.State.Loaded)
+        {
+            return ImageInline(inline, entry, linkUrl);
+        }
+        string alt = string.IsNullOrWhiteSpace(inline.Text) ? ImageName(inline.Url) : inline.Text;
+        Run picture = new Run("[\U0001F5BC " + alt + "]");
+        picture.SetResourceReference(Run.ForegroundProperty, "Theme.TextSecondary");
+        string tip = inline.Url;
+        if (entry != null && entry.State == MarkdownImageLoader.State.Failed)
+        {
+            tip = inline.Url + "\n" + entry.Error;
+        }
+        else if (entry != null)
+        {
+            tip = inline.Url + "\nLoading...";
+        }
+        if (linkUrl != null)
+        {
+            return picture;
+        }
+        picture.ToolTip = tip;
+        // A picture that is not shown opens in the browser when it is on the web.
+        MarkdownLinkTarget target = MarkdownLinks.Resolve(inline.Url, DocumentPath);
+        if (target.Kind != MarkdownLinkKind.Web)
+        {
+            return picture;
+        }
+        Hyperlink link = new Hyperlink(picture);
+        link.SetResourceReference(Hyperlink.ForegroundProperty, "Theme.Link");
+        ConnectLink(link, inline.Url, inline.Title);
+        link.ToolTip = tip;
+        return link;
+    }
+
+    private Inline ImageInline(MarkdownInline inline, MarkdownImageLoader.Entry entry, string linkUrl)
+    {
+        double wanted = MarkdownImages.ShownWidth(entry.Width, entry.Height, inline.Width, inline.Height, 0);
+        Image image = new Image
+        {
+            Source = entry.Image,
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.Both,
+            Width = MarkdownImages.ShownWidth(entry.Width, entry.Height, inline.Width, inline.Height, AvailableWidth()),
+            Tag = wanted,
+            ToolTip = string.IsNullOrEmpty(inline.Title) ? (string.IsNullOrEmpty(inline.Text) ? inline.Url : inline.Text) : inline.Title,
+            SnapsToDevicePixels = true
+        };
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+        if (!string.IsNullOrEmpty(linkUrl))
+        {
+            // A click on a picture inside a link follows the link (a picture in a Hyperlink takes the mouse itself).
+            image.Cursor = System.Windows.Input.Cursors.Hand;
+            // The press is the picture's, so that the link does not take the mouse and open it a second time.
+            image.MouseLeftButtonDown += (sender, e) => e.Handled = true;
+            image.MouseLeftButtonUp += (sender, e) =>
+            {
+                e.Handled = true;
+                OpenLink(linkUrl);
+            };
+        }
+        _images.Add(image);
+        return new InlineUIContainer(image) { BaselineAlignment = BaselineAlignment.Bottom };
+    }
+
+    // The width an image may take: the preview less its margins and a scroll bar.
+    private double AvailableWidth()
+    {
+        double width = ActualWidth - _document.PagePadding.Left - _document.PagePadding.Right - SystemParameters.VerticalScrollBarWidth - 8;
+        return width > 32 ? width : 0;
+    }
+
+    private void FitImages()
+    {
+        double available = AvailableWidth();
+        foreach (Image image in _images)
+        {
+            double wanted = image.Tag is double width ? width : image.Width;
+            image.Width = (available > 0 && wanted > available) ? available : wanted;
         }
     }
 

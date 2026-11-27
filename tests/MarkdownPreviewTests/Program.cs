@@ -165,6 +165,7 @@ internal static class Program
             SourceLines();
             Links();
             CodeColors();
+            Images();
             Robustness();
         }
         catch (Exception exception)
@@ -426,6 +427,60 @@ internal static class Program
         // A tokenizer that keeps a state over lines: a Python string of three quotes.
         List<MarkdownCodeRun>[] multi = MarkdownCodeColoring.Color("x = '''a\nb'''\ny", python);
         Check(multi[1].Count > 0 && multi[1][0].Type != 0, "the state of the tokenizer goes on to the next line");
+    }
+
+    private static void Images()
+    {
+        string doc = "/srv/project/README.md";
+        Equal(MarkdownImages.Locate("img/logo.png", doc, out string key) + " " + key, "ServerFile /srv/project/img/logo.png", "a relative image is a file of the server");
+        Equal(MarkdownImages.Locate("/usr/share/a.svg", doc, out key) + " " + key, "ServerFile /usr/share/a.svg", "an absolute image path");
+        Equal(MarkdownImages.Locate("https://img.shields.io/badge/a-b-green", doc, out key) + " " + key,
+            "Web https://img.shields.io/badge/a-b-green", "a web image");
+        Equal(MarkdownImages.Locate("//cdn.example.com/x.png", doc, out key) + " " + key, "Web https://cdn.example.com/x.png", "a web image without a scheme");
+        Equal(MarkdownImages.Locate(" data:image/png;base64,AAAA ", doc, out key) + " " + key, "Data data:image/png;base64,AAAA", "a data address keeps itself as the key");
+        Equal(MarkdownImages.Locate("ftp://host/x.png", doc, out key), MarkdownImageOrigin.None, "ftp is not loaded");
+        Equal(MarkdownImages.Locate("file:///etc/passwd", doc, out key), MarkdownImageOrigin.None, "file: is not loaded");
+        Equal(MarkdownImages.Locate("img/", doc, out key), MarkdownImageOrigin.None, "a folder is no image");
+        Equal(MarkdownImages.Locate("", doc, out key), MarkdownImageOrigin.None, "an empty address");
+        Equal(MarkdownImages.Locate("a.png", null, out key), MarkdownImageOrigin.None, "a relative image without a document path");
+
+        Check(MarkdownImages.TryDecodeDataUri("data:image/png;base64,iVBORw0K", out byte[] bytes) && bytes.Length == 6 && bytes[0] == 0x89,
+            "a base64 data address");
+        Check(MarkdownImages.TryDecodeDataUri("data:image/png;base64,iVBO\n Rw0K", out bytes) && bytes.Length == 6, "blanks in base64 are ignored");
+        Check(MarkdownImages.TryDecodeDataUri("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D'x'%3E%3C/svg%3E", out bytes)
+            && Encoding.UTF8.GetString(bytes) == "<svg xmlns='x'></svg>", "a percent-encoded SVG");
+        Check(!MarkdownImages.TryDecodeDataUri("data:image/png;base64,!!!", out bytes), "bad base64");
+        Check(!MarkdownImages.TryDecodeDataUri("data:image/png;base64", out bytes), "no comma");
+        Check(!MarkdownImages.TryDecodeDataUri("data:,", out bytes), "no bytes");
+        Check(!MarkdownImages.TryDecodeDataUri("https://x", out bytes), "not a data address");
+
+        Equal(MarkdownImages.Detect(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A }), MarkdownImageFormat.Raster, "PNG");
+        Equal(MarkdownImages.Detect(new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }), MarkdownImageFormat.Raster, "JPEG");
+        Equal(MarkdownImages.Detect(Encoding.ASCII.GetBytes("GIF89a")), MarkdownImageFormat.Raster, "GIF");
+        Equal(MarkdownImages.Detect(Encoding.ASCII.GetBytes("RIFF\0\0\0\0WEBPVP8 ")), MarkdownImageFormat.Raster, "WebP");
+        Equal(MarkdownImages.Detect(Encoding.UTF8.GetBytes("\uFEFF<?xml version=\"1.0\"?>\n<!-- c -->\n<svg width=\"10\"/>")), MarkdownImageFormat.Svg, "SVG after a declaration and a comment");
+        Equal(MarkdownImages.Detect(Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>")), MarkdownImageFormat.Svg, "SVG");
+        Equal(MarkdownImages.Detect(Encoding.UTF8.GetBytes("<!DOCTYPE html><html><body><svg/></body></html>")), MarkdownImageFormat.Unknown, "an HTML page with an SVG is no image");
+        Equal(MarkdownImages.Detect(Encoding.UTF8.GetBytes("Not Found")), MarkdownImageFormat.Unknown, "an error text");
+        Equal(MarkdownImages.Detect(new byte[] { 1, 2 }), MarkdownImageFormat.Unknown, "too short");
+        Equal(MarkdownImages.Detect(null), MarkdownImageFormat.Unknown, "nothing");
+
+        Equal(MarkdownImages.ParseLength("200"), 200.0, "a width");
+        Equal(MarkdownImages.ParseLength(" 120px "), 120.0, "a width in px");
+        Equal(MarkdownImages.ParseLength("50%"), 0.0, "a percentage is ignored");
+        Equal(MarkdownImages.ParseLength("-3"), 0.0, "a negative width is ignored");
+        Equal(MarkdownImages.ParseLength("99999"), 10000.0, "a huge width is limited");
+        Equal(MarkdownImages.ParseLength(null), 0.0, "no width");
+        Equal(MarkdownImages.ShownWidth(400, 200, 0, 0, 0), 400.0, "its own width");
+        Equal(MarkdownImages.ShownWidth(400, 200, 100, 0, 0), 100.0, "the width given");
+        Equal(MarkdownImages.ShownWidth(400, 200, 0, 50, 0), 100.0, "the height given keeps the proportions");
+        Equal(MarkdownImages.ShownWidth(400, 200, 0, 0, 300), 300.0, "not wider than the preview");
+        Equal(MarkdownImages.ShownWidth(400, 0, 0, 50, 0), 400.0, "no height of its own: its width");
+
+        MarkdownInline img = MarkdownParser.Parse("<img src=\"a.png\" width=\"64\" height=\"32px\" alt=\"A\">").Blocks[0].Inlines[0];
+        Equal(img.Kind + " " + img.Width + "x" + img.Height + " " + img.Url, "Image 64x32 a.png", "the size of an <img> tag");
+        MarkdownInline md = MarkdownParser.Parse("![A](a.png)").Blocks[0].Inlines[0];
+        Equal(md.Width + "x" + md.Height, "0x0", "a Markdown image has no size of its own");
     }
 
     private static void Robustness()

@@ -1709,7 +1709,9 @@ public static class MarkdownParser
                     AddNode(new MarkdownInline(MarkdownInlineKind.Image, Attribute(open.Groups[2].Value, "alt") ?? "")
                     {
                         Url = Attribute(open.Groups[2].Value, "src") ?? "",
-                        Title = Attribute(open.Groups[2].Value, "title")
+                        Title = Attribute(open.Groups[2].Value, "title"),
+                        Width = MarkdownImages.ParseLength(Attribute(open.Groups[2].Value, "width")),
+                        Height = MarkdownImages.ParseLength(Attribute(open.Groups[2].Value, "height"))
                     });
                 }
                 else
