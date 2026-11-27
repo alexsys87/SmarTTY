@@ -22,6 +22,8 @@ internal sealed class RemoteFileEditorCommands
 
     private bool _refreshPending;
 
+    private bool _markdownPreview;
+
     /// <summary>The Save button or menu item was used.</summary>
     public event EventHandler SaveRequested;
 
@@ -46,6 +48,9 @@ internal sealed class RemoteFileEditorCommands
     /// <summary>The toolbar or the context menu switched the word wrap on or off.</summary>
     public event EventHandler WordWrapChanged;
 
+    /// <summary>The preview of a Markdown file was switched on or off (<see cref="MarkdownPreviewOn"/>).</summary>
+    public event EventHandler MarkdownPreviewChanged;
+
     /// <summary>The byte order, the groups, the row width, the inspector or the colours of the hex view changed.</summary>
     public event EventHandler HexViewOptionsChanged;
 
@@ -68,6 +73,25 @@ internal sealed class RemoteFileEditorCommands
 
     internal EditorCommandState CommandState { get; private set; }
 
+    /// <summary>
+    /// The preview of a Markdown file is switched on: the tab shows it beside the text while the file is Markdown and the hex view is closed. Setting
+    /// it raises <see cref="MarkdownPreviewChanged"/> when it changes.
+    /// </summary>
+    public bool MarkdownPreviewOn
+    {
+        get => _markdownPreview;
+        set
+        {
+            if (_markdownPreview == value)
+            {
+                return;
+            }
+            _markdownPreview = value;
+            MarkdownPreviewChanged?.Invoke(this, EventArgs.Empty);
+            ScheduleRefresh();
+        }
+    }
+
     /// <param name="post">Runs an action later on the thread of the tab; false when the tab cannot take it now (then nothing is refreshed).</param>
     public RemoteFileEditorCommands(RemoteFileEditor editor, Func<Action, bool> post)
     {
@@ -79,6 +103,9 @@ internal sealed class RemoteFileEditorCommands
         _editor.LoadCompleted += (sender, e) => ScheduleRefresh();
         _editor.FormatChanged += (sender, e) => ScheduleRefresh();
         _editor.HexModeChanged += (sender, e) => ScheduleRefresh();
+        // Whether the file is Markdown (the preview command) follows the syntax.
+        _editor.CurrentLanguageChanged += (sender, e) => ScheduleRefresh();
+        _editor.SyntaxChoiceChanged += (sender, e) => ScheduleRefresh();
         _editor.HexEditor.StateChanged += (sender, e) => ScheduleRefresh();
         // Keys handled by the hex control itself (it has the focus while it is shown).
         _editor.HexEditor.SaveRequested += (sender, e) => SaveRequested?.Invoke(this, EventArgs.Empty);
@@ -214,6 +241,9 @@ internal sealed class RemoteFileEditorCommands
                 case EditorToolbarCommand.DataInspector:
                     _editor.HexEditor.ShowDataInspector = !_editor.HexEditor.ShowDataInspector;
                     break;
+                case EditorToolbarCommand.MarkdownPreview:
+                    MarkdownPreviewOn = !MarkdownPreviewOn;
+                    break;
             }
         }
         catch (Exception exception)
@@ -230,6 +260,7 @@ internal sealed class RemoteFileEditorCommands
     internal EditorCommandState CaptureState()
     {
         bool hex = _editor.IsHexMode;
+        bool markdown = _editor.DetectSyntax() == SyntaxHighlighting.Language.Markdown;
         if (hex)
         {
             IHexEditorView hexEditor = _editor.HexEditor;
@@ -249,7 +280,8 @@ internal sealed class RemoteFileEditorCommands
                 CanFollow = _editor.CanFollowLog,
                 CanUseHex = _editor.CanToggleHexMode,
                 ShowAllCharacters = _text.ShowAllCharacters,
-                WordWrap = _text.WordWrap
+                WordWrap = _text.WordWrap,
+                IsMarkdown = markdown
             };
         }
         int lineCount = _text.LineCount;
@@ -269,7 +301,9 @@ internal sealed class RemoteFileEditorCommands
             CanFollow = _editor.CanFollowLog,
             CanUseHex = _editor.CanToggleHexMode,
             ShowAllCharacters = _text.ShowAllCharacters,
-            WordWrap = _text.WordWrap
+            WordWrap = _text.WordWrap,
+            IsMarkdown = markdown,
+            MarkdownPreview = markdown && _markdownPreview
         };
     }
 

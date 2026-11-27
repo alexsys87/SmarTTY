@@ -389,6 +389,14 @@ public class MainWindowController : INotifyPropertyChanged
             view.ZoomChanged += (object sender, EventArgs e) => _Controller.ApplyEditorZoom(view.FontZoom);
             EditorTabContext newTab = session.AddNewFileEditorOrThrow(editor, fn);
             editor.Tag = newTab;
+            // A Markdown file shows its preview as it was switched last.
+            newTab.Commands.MarkdownPreviewOn = !_Controller.Settings.Editor.HideMarkdownPreview;
+            newTab.Commands.MarkdownPreviewChanged += (object sender, EventArgs e) =>
+            {
+                _Controller.Settings.Editor.HideMarkdownPreview = !newTab.Commands.MarkdownPreviewOn;
+                _Controller.Settings.Save();
+            };
+            newTab.FileLinkClicked += (path, anchor) => OpenLinkedFile(session, path, anchor);
             // The tool bar and the context menu of the editor.
             newTab.Commands.SaveRequested += (object sender, EventArgs e) => SaveFile();
             newTab.Commands.GoToLineRequested += (object sender, EventArgs e) => GoToLine(editor);
@@ -417,6 +425,27 @@ public class MainWindowController : INotifyPropertyChanged
                 _Controller.Settings.Editor.HexShowDataInspector = hex.ShowDataInspector;
                 _Controller.Settings.Save();
             };
+        }
+
+        // A link of the Markdown preview to another file of the server: the file opens in an editor tab (or its tab comes forward), at the heading
+        // of the anchor when it is Markdown too.
+        private void OpenLinkedFile(SessionWrapper session, string path, string anchor)
+        {
+            if (path.EndsWith("/", StringComparison.Ordinal))
+            {
+                MessageBoxes.Info(path + " is a folder.");
+                return;
+            }
+            try
+            {
+                string fn = session.IsWindowsHost ? SmarTTY.Ssh.WindowsSftpPath.Normalize(path) : path;
+                CreateNewEditorTab(session, fn);
+                session.TryActivateEditorForFile(fn)?.ShowMarkdownAnchor(anchor);
+            }
+            catch (Exception exception)
+            {
+                MessageBoxes.Exception(exception);
+            }
         }
 
         internal void Search()
@@ -595,6 +624,13 @@ public class MainWindowController : INotifyPropertyChanged
                         e.Handled = true;
                         GoToLine(editor);
                         break;
+                }
+            }
+            else if (control && shift && !alt && key == System.Windows.Input.Key.M)
+            {
+                if (editor.Tag is EditorTabContext markdownTab)
+                {
+                    e.Handled = markdownTab.TryToggleMarkdownPreview();
                 }
             }
             else if (!control && !alt && !shift && key == System.Windows.Input.Key.F5)

@@ -24,7 +24,8 @@ internal enum EditorToolbarCommand
     RunFile,
     FollowLog,
     ToggleHex,
-    DataInspector
+    DataInspector,
+    MarkdownPreview
 }
 
 /// <summary>
@@ -78,6 +79,12 @@ internal struct EditorCommandState
     /// <summary>The file is loaded and no save is running: the hex view can be opened.</summary>
     public bool CanUseHex { get; set; }
 
+    /// <summary>The file is Markdown (by its name or the syntax chosen for it): it can be previewed.</summary>
+    public bool IsMarkdown { get; set; }
+
+    /// <summary>The preview of a Markdown file is shown beside the text (it is switched on, and the file is Markdown and shown as text).</summary>
+    public bool MarkdownPreview { get; set; }
+
     public bool IsEnabled(EditorToolbarCommand command)
     {
         switch (command)
@@ -126,6 +133,9 @@ internal struct EditorCommandState
             case EditorToolbarCommand.DataInspector:
                 // The inspector reads the bytes: it belongs to the hex view only.
                 return HexMode;
+            case EditorToolbarCommand.MarkdownPreview:
+                // The preview shows the text; the hex view takes the whole tab.
+                return IsMarkdown && !HexMode;
             default:
                 return false;
         }
@@ -142,11 +152,19 @@ internal struct EditorCommandState
 
     /// <summary>
     /// Whether the command is shown on the tool bar and in the context menu: the commands of the hex view only while
-    /// the hex view is open.
+    /// the hex view is open, the Markdown preview only for a Markdown file.
     /// </summary>
     public bool IsVisible(EditorToolbarCommand command)
     {
-        return command != EditorToolbarCommand.DataInspector || HexMode;
+        switch (command)
+        {
+            case EditorToolbarCommand.DataInspector:
+                return HexMode;
+            case EditorToolbarCommand.MarkdownPreview:
+                return IsMarkdown;
+            default:
+                return true;
+        }
     }
 
     /// <summary>Whether a command that switches something on is currently on.</summary>
@@ -155,7 +173,8 @@ internal struct EditorCommandState
         return (command == EditorToolbarCommand.ShowAllCharacters && ShowAllCharacters)
             || (command == EditorToolbarCommand.WordWrap && WordWrap)
             || (command == EditorToolbarCommand.ToggleHex && HexMode)
-            || (command == EditorToolbarCommand.DataInspector && HexMode && ShowDataInspector);
+            || (command == EditorToolbarCommand.DataInspector && HexMode && ShowDataInspector)
+            || (command == EditorToolbarCommand.MarkdownPreview && MarkdownPreview);
     }
 }
 
@@ -216,7 +235,8 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.ShowAllCharacters,
         EditorToolbarCommand.WordWrap,
         EditorToolbarCommand.ToggleHex,
-        EditorToolbarCommand.DataInspector
+        EditorToolbarCommand.DataInspector,
+        EditorToolbarCommand.MarkdownPreview
     };
 
     public static readonly EditorToolbarCommand?[] ContextMenuLayout =
@@ -236,6 +256,7 @@ internal static class EditorCommandCatalog
         EditorToolbarCommand.GoToLine,
         EditorToolbarCommand.ShowAllCharacters,
         EditorToolbarCommand.WordWrap,
+        EditorToolbarCommand.MarkdownPreview,
         null,
         EditorToolbarCommand.ToggleHex,
         EditorToolbarCommand.DataInspector,
@@ -289,6 +310,8 @@ internal static class EditorCommandCatalog
                 return new EditorCommandDescription("Hex Editor", "hex", "editor/hex.png", "");
             case EditorToolbarCommand.DataInspector:
                 return new EditorCommandDescription("Data Inspector", "data-inspector", "editor/data-inspector.png", "Ctrl+I");
+            case EditorToolbarCommand.MarkdownPreview:
+                return new EditorCommandDescription("Markdown Preview", "markdown", "FileTypes/markdown.png", "Ctrl+Shift+M");
             default:
                 throw new ArgumentOutOfRangeException(nameof(command));
         }
