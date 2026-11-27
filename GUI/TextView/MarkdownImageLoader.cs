@@ -5,8 +5,6 @@ using SmarTTY.TextEditing;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
@@ -16,10 +14,11 @@ using System.Windows.Threading;
 namespace SmarTTY.GUI.TextView;
 
 /// <summary>
-/// The pictures of the images of a Markdown preview: read in the background (a file of the server through <see cref="ReadServerFile"/>, a web
-/// address over HTTP, a data address from itself), decoded (the raster formats by the codecs of Windows, SVG by SharpVectors without its external
-/// resources) and kept by their key (<see cref="MarkdownImages.Locate"/>) for the life of the preview, so that drawing the preview again after
-/// an edit finds them at once. A picture that cannot be read or decoded is kept as its error. The callbacks run on the thread of the preview.
+/// The pictures of the images of a Markdown preview: read in the background (a file of the server through <see cref="ReadServerFile"/>, a path
+/// from <c>/</c> first under the root of the git repository of the document, as GitHub shows it; a data address from itself; nothing from the
+/// internet), decoded (the raster formats by the codecs of Windows, SVG by SharpVectors without its external resources) and kept by their key
+/// (<see cref="MarkdownImages.Locate"/>) for the life of the preview, so that drawing the preview again after an edit finds them at once. A
+/// picture that cannot be read or decoded is kept as its error. The callbacks run on the thread of the preview.
 /// </summary>
 internal sealed class MarkdownImageLoader
 {
@@ -47,23 +46,7 @@ internal sealed class MarkdownImageLoader
         public readonly List<Action<Entry>> Waiting = new List<Action<Entry>>();
     }
 
-    private static readonly Lazy<HttpClient> Http = new Lazy<HttpClient>(() =>
-    {
-        HttpClient client = new HttpClient(new HttpClientHandler
-        {
-            AutomaticDecompression = DecompressionMethods.All,
-            AllowAutoRedirect = true,
-            MaxAutomaticRedirections = 5
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(20)
-        };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("SmarTTY-MarkdownPreview/1.0");
-        client.DefaultRequestHeaders.Accept.ParseAdd("image/*");
-        return client;
-    });
-
-    // A few pictures at a time: a README with fifty badges should not open fifty channels or connections at once.
+    // A few pictures at a time: a README with fifty pictures should not open fifty channels at once.
     private static readonly SemaphoreSlim Parallel = new SemaphoreSlim(4);
 
     private readonly Dictionary<string, Entry> _entries = new Dictionary<string, Entry>(StringComparer.Ordinal);
@@ -71,6 +54,13 @@ internal sealed class MarkdownImageLoader
     private readonly Dispatcher _dispatcher;
 
     private int _generation;
+
+    // The root of the git repository of the document (the folder with .git), looked for once, on the first picture from "/".
+    private readonly object _rootLock = new object();
+
+    private bool _rootKnown;
+
+    private string _repositoryRoot;
 
     public MarkdownImageLoader(Dispatcher dispatcher)
     {
@@ -80,11 +70,19 @@ internal sealed class MarkdownImageLoader
     /// <summary>Reads a file of the server whole, up to a number of bytes (called on a background thread); null: no files of the server are read.</summary>
     public Func<string, int, byte[]> ReadServerFile { get; set; }
 
+    /// <summary>Whether a path exists on the server (called on a background thread): finds the root of the repository; null: it is not looked for.</summary>
+    public Func<string, bool> ServerPathExists { get; set; }
+
     /// <summary>Forgets the pictures (the document was loaded again from the server: its pictures may have changed too).</summary>
     public void Clear()
     {
         _generation++;
         _entries.Clear();
+        lock (_rootLock)
+        {
+            _rootKnown = false;
+            _repositoryRoot = null;
+        }
     }
 
     /// <summary>
@@ -114,6 +112,7 @@ internal sealed class MarkdownImageLoader
         _entries[key] = entry;
         int generation = _generation;
         Func<string, int, byte[]> readServerFile = ReadServerFile;
+        bool rootRelative = MarkdownImages.IsRootRelative(url);
         Task.Run(async () =>
         {
             byte[] bytes = null;
@@ -122,7 +121,7 @@ internal sealed class MarkdownImageLoader
             await Parallel.WaitAsync().ConfigureAwait(false);
             try
             {
-                bytes = await ReadAsync(origin, key, readServerFile).ConfigureAwait(false);
+                bytes = Read(origin, key, rootRelative, documentPath, readServerFile);
                 switch (MarkdownImages.Detect(bytes))
                 {
                     case MarkdownImageFormat.Raster:
@@ -149,44 +148,64 @@ internal sealed class MarkdownImageLoader
         return entry;
     }
 
-    private static async Task<byte[]> ReadAsync(MarkdownImageOrigin origin, string key, Func<string, int, byte[]> readServerFile)
+    private byte[] Read(MarkdownImageOrigin origin, string key, bool rootRelative, string documentPath, Func<string, int, byte[]> readServerFile)
     {
-        switch (origin)
+        if (origin == MarkdownImageOrigin.Data)
         {
-            case MarkdownImageOrigin.Data:
-                if (!MarkdownImages.TryDecodeDataUri(key, out byte[] data))
-                {
-                    throw new InvalidDataException("the data address does not decode");
-                }
-                return data;
-            case MarkdownImageOrigin.ServerFile:
-                return readServerFile(key, MarkdownImages.MaxBytes);
-            default:
+            if (!MarkdownImages.TryDecodeDataUri(key, out byte[] data))
             {
-                using (HttpResponseMessage response = await Http.Value.GetAsync(key, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+                throw new InvalidDataException("the data address does not decode");
+            }
+            return data;
+        }
+        string[] paths = MarkdownImages.ServerFileCandidates(key, rootRelative, rootRelative ? RepositoryRoot(documentPath) : null);
+        Exception first = null;
+        foreach (string path in paths)
+        {
+            try
+            {
+                return readServerFile(path, MarkdownImages.MaxBytes);
+            }
+            catch (Exception exception)
+            {
+                first = first ?? exception;
+            }
+        }
+        throw first;
+    }
+
+    // The folder of the document or above it that holds .git, or null (asked of the server once).
+    private string RepositoryRoot(string documentPath)
+    {
+        lock (_rootLock)
+        {
+            if (_rootKnown)
+            {
+                return _repositoryRoot;
+            }
+            _rootKnown = true;
+            Func<string, bool> exists = ServerPathExists;
+            if (exists == null)
+            {
+                return null;
+            }
+            foreach (string folder in MarkdownImages.RepositoryRootCandidates(documentPath))
+            {
+                try
                 {
-                    response.EnsureSuccessStatusCode();
-                    if (response.Content.Headers.ContentLength > MarkdownImages.MaxBytes)
+                    if (exists(folder + "/.git"))
                     {
-                        throw new InvalidDataException("the picture is larger than 16 MB");
+                        _repositoryRoot = folder;
+                        break;
                     }
-                    using (Stream stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
-                    {
-                        MemoryStream bytes = new MemoryStream();
-                        byte[] buffer = new byte[64 * 1024];
-                        int read;
-                        while ((read = await stream.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
-                        {
-                            bytes.Write(buffer, 0, read);
-                            if (bytes.Length > MarkdownImages.MaxBytes)
-                            {
-                                throw new InvalidDataException("the picture is larger than 16 MB");
-                            }
-                        }
-                        return bytes.ToArray();
-                    }
+                }
+                catch (Exception)
+                {
+                    // No answer: the pictures are read from the root of the file system only.
+                    break;
                 }
             }
+            return _repositoryRoot;
         }
     }
 

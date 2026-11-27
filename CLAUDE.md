@@ -888,7 +888,7 @@ It is a fifth kind of device connection, so the device tab (`WpfDeviceTerminal`)
 Done: a Markdown file (`.md`, `.markdown`, or any file whose syntax is Markdown, `RemoteFileEditor.DetectSyntax`) can be shown rendered beside
 its text in the editor tab.
 
-- Model (UI-free, `tests/MarkdownPreviewTests`, 232 checks): `TextEditing/MarkdownParser.Parse` reads the text into a `MarkdownDocument` of
+- Model (UI-free, `tests/MarkdownPreviewTests`, 245 checks): `TextEditing/MarkdownParser.Parse` reads the text into a `MarkdownDocument` of
   `MarkdownBlock`s (paragraph, ATX and setext heading, fenced and indented code, quote, list with tight/loose and task items, GitHub table with the
   alignments, rule, HTML block shown as its text) with the first and last line of the source of each block, and `MarkdownInline`s (text, code
   span, emphasis and strong by the delimiter rules of CommonMark, `~~struck~~`, inline and reference links and images, autolinks and bare
@@ -914,19 +914,23 @@ its text in the editor tab.
   Ctrl+Shift+M and the tool bar button, the setting after a restart, the hex view on and off, a file without the extension with the syntax chosen
   by hand, links (web, `#anchor`, `docs/x.md`, `../y.md#z`, a folder), light and dark themes and a theme switched while open, 150 % and 200 %,
   selection and copy, Ctrl+wheel, a file of some MB.
-- Images: `TextEditing/MarkdownImages` (UI-free, in `MarkdownPreviewTests`) says where a picture is (`Locate`: a data address, http/https, a
-  file of the server relative to the document; other schemes and folders are not read) and the key it is kept under, decodes data addresses,
+- Images (for a repository cloned on the server; nothing is loaded from the internet): `TextEditing/MarkdownImages` (UI-free, in
+  `MarkdownPreviewTests`) says where a picture is (`Locate`: a data address or a file of the server relative to the document; web addresses,
+  other schemes and folders are not read; a web image keeps its alternative text, a click opens it in the browser) and the key it is kept under,
+  where a path from `/` is looked for (`ServerFileCandidates`: under the root of the git repository first, as GitHub shows it, then from the root
+  of the file system; `RepositoryRootCandidates`, the folders up from the document, the first with `.git` is the root), decodes data addresses,
   tells the format by the first bytes (`Detect`: the raster formats of Windows, SVG; an HTML page or an error text is no picture), and the shown
   width (`ShownWidth`, the `width`/`height` of `<img>` through `ParseLength`, never wider than the preview). `GUI/TextView/MarkdownImageLoader`
   (one a tab, `EditorTabContext`) reads them in the background, four at a time: a file of the server through `RemoteFileEditor.ReadServerFile`
-  (`RemoteFileServer.ReadOtherFile`, SCP or SFTP as the file itself, at most `MarkdownImages.MaxBytes`, 16 MB), a web address with `HttpClient`
-  (20 s, five redirects), a data address from itself; it decodes a raster picture frozen on the pool and an SVG on the UI thread with
+  (`RemoteFileServer.ReadOtherFile`, SCP or SFTP as the file itself, at most `MarkdownImages.MaxBytes`, 16 MB; the root of the repository found
+  once through `RemoteFileEditor.ServerPathExists`), a data address from itself; it decodes a raster picture frozen on the pool and an SVG on the UI thread with
   SharpVectors (`SharpVectors.Wpf`, BSD-3; external resources ignored), keeps every picture or its error until the tab closes or the file is loaded
   again (`Clear`), and calls back on the UI thread. `MarkdownPreview` shows the alternative text until the picture arrives (a later drawing
   of the document ignores the callback of an earlier one by a generation number), then an `Image` in an `InlineUIContainer` at its pixel size,
-  narrowed with the preview; a picture in a link takes its own press and opens the link. Manual check on Windows: a README with relative PNG
-  and SVG pictures, shields.io badges in links, a JPEG and a GIF from the web, a data address, `<img width>`, a missing file, a picture of more
-  than 16 MB, an HTML page given as a picture, a Windows server, Reload from Server after replacing a picture, a narrow preview.
+  narrowed with the preview; a picture in a link takes its own press and opens the link. Manual check on Windows: the README of a cloned GitHub
+  repository with relative PNG, JPEG, GIF and SVG pictures (`?raw=true`, `#gh-dark-mode-only`), a path from `/` inside the repository and in
+  `docs/`, shields.io badges in links (their text, the browser on a click), a data address, `<img width>`, a missing file, a picture of more than
+  16 MB, an HTML page given as a picture, a Windows server, Reload from Server after replacing a picture, a narrow preview.
 
 ### Stage 3 (the editor and the hex editor on WPF)
 

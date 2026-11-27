@@ -407,6 +407,12 @@ public partial class RemoteFileEditor : IDisposable, IRemoteFileLoadView, IRemot
         return _server.ReadOtherFile(path, maxBytes);
     }
 
+    /// <summary>Whether a path exists on the same server (the .git folder of the repository of a Markdown file), from any thread.</summary>
+    public bool ServerPathExists(string path)
+    {
+        return _server.Exists(path);
+    }
+
     /// <summary>
     /// Shows the downloaded file (UI thread) and makes the editor editable. <paramref name="file"/> is null for a
     /// new file.

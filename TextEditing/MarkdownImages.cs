@@ -26,10 +26,7 @@ public enum MarkdownImageOrigin
     /// <summary>The address holds the bytes itself (<c>data:image/png;base64,...</c>).</summary>
     Data,
 
-    /// <summary>An http or https address.</summary>
-    Web,
-
-    /// <summary>A file of the same server as the document.</summary>
+    /// <summary>A file of the same server as the document (a picture of a repository cloned there).</summary>
     ServerFile
 }
 
@@ -40,8 +37,9 @@ public static class MarkdownImages
     public const int MaxBytes = 16 * 1024 * 1024;
 
     /// <summary>
-    /// Where the picture of an image address is, and the key it is kept under once read: the address of a web picture, the full path of a file
-    /// of the server (relative to the folder of the document), the address itself for a data address.
+    /// Where the picture of an image address is, and the key it is kept under once read: the full path of a file of the server (relative to the
+    /// folder of the document; a path from <c>/</c> as it is written, see <see cref="ServerFileCandidates"/>), the address itself for a data
+    /// address. A web address (http, https) is not read: the preview loads nothing from the internet.
     /// </summary>
     public static MarkdownImageOrigin Locate(string url, string documentPath, out string key)
     {
@@ -55,13 +53,6 @@ public static class MarkdownImages
         MarkdownLinkTarget link = MarkdownLinks.Resolve(target, documentPath);
         switch (link.Kind)
         {
-            case MarkdownLinkKind.Web:
-                if (link.Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || link.Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                {
-                    key = link.Url;
-                    return MarkdownImageOrigin.Web;
-                }
-                return MarkdownImageOrigin.None;
             case MarkdownLinkKind.File:
                 if (link.Path.EndsWith("/", StringComparison.Ordinal))
                 {
@@ -72,6 +63,59 @@ public static class MarkdownImages
             default:
                 return MarkdownImageOrigin.None;
         }
+    }
+
+    /// <summary>
+    /// Whether an image address starts at <c>/</c> (but is not <c>//host</c>). GitHub takes such a path from the root of the repository, the file
+    /// system from its own root, so both places are tried (<see cref="ServerFileCandidates"/>).
+    /// </summary>
+    public static bool IsRootRelative(string url)
+    {
+        string target = (url ?? "").Trim();
+        return target.StartsWith("/", StringComparison.Ordinal) && !target.StartsWith("//", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The paths of the server a picture is read from, in order: the file of <paramref name="key"/> (<see cref="Locate"/>); for an address from
+    /// <c>/</c> in a git repository (<paramref name="repositoryRoot"/>, the folder that holds <c>.git</c>, or null) first the same path under the
+    /// root of the repository, as GitHub shows it.
+    /// </summary>
+    public static string[] ServerFileCandidates(string key, bool rootRelative, string repositoryRoot)
+    {
+        if (!rootRelative || string.IsNullOrEmpty(repositoryRoot))
+        {
+            return new[] { key };
+        }
+        string root = repositoryRoot.TrimEnd('/');
+        string underRoot = root + key;
+        return underRoot == key ? new[] { key } : new[] { underRoot, key };
+    }
+
+    /// <summary>
+    /// The folders a git repository that holds a document could start at, from the folder of the document up to the root of the file system
+    /// (the first one with <c>.git</c> in it is the root of the repository); none for a path that is not absolute.
+    /// </summary>
+    public static string[] RepositoryRootCandidates(string documentPath)
+    {
+        string path = (documentPath ?? "").Replace('\\', '/');
+        System.Collections.Generic.List<string> folders = new System.Collections.Generic.List<string>();
+        int slash = path.LastIndexOf('/');
+        if (slash < 0 || !(path.StartsWith("/", StringComparison.Ordinal) || (path.Length > 2 && path[1] == ':')))
+        {
+            return folders.ToArray();
+        }
+        string folder = path.Substring(0, slash);
+        while (folder.Length > 0 && !(folder.Length == 2 && folder[1] == ':') && !(folder.Length == 3 && folder[0] == '/' && folder[2] == ':'))
+        {
+            folders.Add(folder);
+            int up = folder.LastIndexOf('/');
+            if (up < 0)
+            {
+                break;
+            }
+            folder = folder.Substring(0, up);
+        }
+        return folders.ToArray();
     }
 
     /// <summary>

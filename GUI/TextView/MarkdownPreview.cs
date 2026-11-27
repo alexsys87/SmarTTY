@@ -16,8 +16,8 @@ namespace SmarTTY.GUI.TextView;
 /// The preview of a Markdown file beside its text in the editor tab: the <see cref="MarkdownDocument"/> of the text (<see cref="MarkdownParser"/>)
 /// shown as a WPF <see cref="FlowDocument"/> in the colours of the theme, with the code blocks in the colours of the syntax of the editor. The links
 /// open: a web address in the browser, a heading of the document by scrolling to it, another file through <see cref="FileLinkClicked"/>. Images are
-/// shown by <see cref="Images"/> (a file of the server, a web address, a data address; their alternative text until the picture is there, or when
-/// it cannot be), at most as wide as the preview. The text can be selected and copied; Ctrl+wheel zooms.
+/// shown by <see cref="Images"/> (a file of the server or a data address; their alternative text until the picture is there, when it cannot be,
+/// and for a web address, which is not loaded), at most as wide as the preview. The text can be selected and copied; Ctrl+wheel zooms.
 /// </summary>
 internal sealed class MarkdownPreview : FlowDocumentScrollViewer
 {

@@ -434,9 +434,29 @@ internal static class Program
         string doc = "/srv/project/README.md";
         Equal(MarkdownImages.Locate("img/logo.png", doc, out string key) + " " + key, "ServerFile /srv/project/img/logo.png", "a relative image is a file of the server");
         Equal(MarkdownImages.Locate("/usr/share/a.svg", doc, out key) + " " + key, "ServerFile /usr/share/a.svg", "an absolute image path");
-        Equal(MarkdownImages.Locate("https://img.shields.io/badge/a-b-green", doc, out key) + " " + key,
-            "Web https://img.shields.io/badge/a-b-green", "a web image");
-        Equal(MarkdownImages.Locate("//cdn.example.com/x.png", doc, out key) + " " + key, "Web https://cdn.example.com/x.png", "a web image without a scheme");
+        Equal(MarkdownImages.Locate("https://img.shields.io/badge/a-b-green", doc, out key), MarkdownImageOrigin.None, "a web image is not loaded");
+        Equal(MarkdownImages.Locate("http://example.com/x.png", doc, out key), MarkdownImageOrigin.None, "an http image is not loaded");
+        Equal(MarkdownImages.Locate("//cdn.example.com/x.png", doc, out key), MarkdownImageOrigin.None, "a web image without a scheme is not loaded");
+        Equal(MarkdownImages.Locate("./docs/../img/a b.png?raw=true#gh-dark-mode-only", doc, out key) + " " + key,
+            "ServerFile /srv/project/img/a b.png", "a relative image of a GitHub README: dots, the query and the fragment");
+        Equal(MarkdownImages.Locate("img/%D0%BB%D0%BE%D0%B3%D0%BE.png", doc, out key) + " " + key, "ServerFile /srv/project/img/лого.png", "percent escapes");
+
+        Check(MarkdownImages.IsRootRelative(" /docs/a.png") && !MarkdownImages.IsRootRelative("docs/a.png") && !MarkdownImages.IsRootRelative("//host/a.png"),
+            "a path from / is told apart");
+        Equal(string.Join(" ", MarkdownImages.ServerFileCandidates("/docs/a.png", true, "/srv/project")), "/srv/project/docs/a.png /docs/a.png",
+            "a path from /: the root of the repository first, then the root of the file system");
+        Equal(string.Join(" ", MarkdownImages.ServerFileCandidates("/docs/a.png", true, "/srv/project/")), "/srv/project/docs/a.png /docs/a.png",
+            "a root with a slash");
+        Equal(string.Join(" ", MarkdownImages.ServerFileCandidates("/docs/a.png", true, null)), "/docs/a.png", "no repository: the file system only");
+        Equal(string.Join(" ", MarkdownImages.ServerFileCandidates("/srv/project/img/a.png", false, "/srv/project")), "/srv/project/img/a.png",
+            "a relative path is read where it is");
+        Equal(string.Join(" ", MarkdownImages.RepositoryRootCandidates("/srv/project/docs/guide.md")), "/srv/project/docs /srv/project /srv",
+            "the folders a repository can start at, from the document up");
+        Equal(string.Join(" ", MarkdownImages.RepositoryRootCandidates("/README.md")), "", "a document at the root");
+        Equal(string.Join(" ", MarkdownImages.RepositoryRootCandidates("/c:/Users/me/repo/README.md")), "/c:/Users/me/repo /c:/Users/me /c:/Users",
+            "a Windows host stops at the drive");
+        Equal(string.Join(" ", MarkdownImages.RepositoryRootCandidates("README.md")), "", "a relative document path");
+        Equal(MarkdownImages.RepositoryRootCandidates(null).Length, 0, "no document path");
         Equal(MarkdownImages.Locate(" data:image/png;base64,AAAA ", doc, out key) + " " + key, "Data data:image/png;base64,AAAA", "a data address keeps itself as the key");
         Equal(MarkdownImages.Locate("ftp://host/x.png", doc, out key), MarkdownImageOrigin.None, "ftp is not loaded");
         Equal(MarkdownImages.Locate("file:///etc/passwd", doc, out key), MarkdownImageOrigin.None, "file: is not loaded");
