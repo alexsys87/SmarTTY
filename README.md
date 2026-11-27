@@ -12,7 +12,7 @@
 
 ## Возможности
 
-Кратко; полное описание каждой возможности — в [docs/features.md](docs/features.md).
+Кратко; полное описание — в [docs/features.md](docs/features.md): [подключения и SSH](docs/features-ssh.md), [терминал](docs/features-terminal.md), [передача файлов](docs/features-transfer.md), [редактор](docs/features-editor.md), [обслуживание сервера](docs/features-maintenance.md), [COM и TCP](docs/features-com-tcp.md), [настройка и запуск](docs/features-settings.md).
 
 - **Подключения:** несколько сеансов в одном окне; профили SSH, COM, Raw TCP, Telnet (в том числе поверх TLS), netconsole (UDP) и локальные консоли (cmd, PowerShell, WSL); вход по паролю или ключу, проверка ключа сервера, прокси (HTTP CONNECT, SOCKS5), X11 forwarding, проброс портов и SOCKS5 через SSH, поиск компьютеров в сети.
 - **Терминал:** обычный терминал (xterm-совместимый) и **Smart Terminal** с историей, `Ctrl+R`, подсказками серым текстом, умным автодополнением команд и путей, кодом завершения и подсветкой ошибок.
@@ -40,7 +40,7 @@ dotnet build SmarTTY.csproj -c Release
 
 | № | Раздел | Файл |
 | --- | --- | --- |
-| — | Все возможности подробно | [docs/features.md](docs/features.md) |
+| — | Все возможности подробно: [SSH](docs/features-ssh.md), [терминал](docs/features-terminal.md), [передача файлов](docs/features-transfer.md), [редактор](docs/features-editor.md), [обслуживание сервера](docs/features-maintenance.md), [COM и TCP](docs/features-com-tcp.md), [настройка](docs/features-settings.md) | [docs/features.md](docs/features.md) |
 | 1 | Требования и сборка: [единый exe](docs/build.md#сборка-единого-exe-файла), [отладочная трассировка](docs/build.md#отладочная-трассировка-терминала-только-debug) | [docs/build.md](docs/build.md) |
 | 2–3 | [Первое SSH-подключение](docs/ssh-connection.md#2-первое-ssh-подключение), [ключи и безопасность](docs/ssh-connection.md#3-ключи-и-безопасность) | [docs/ssh-connection.md](docs/ssh-connection.md) |
 | 4 | Сеансы, вкладки и Smart Terminal: [Tools](docs/sessions-tools.md#какие-пункты-tools-показываются), [диспетчер процессов](docs/sessions-tools.md#диспетчер-процессов), [резервная копия tar.gz](docs/sessions-tools.md#резервная-копия-в-targz), [восстановление](docs/sessions-tools.md#восстановление-из-targz), [devmem](docs/sessions-tools.md#память-и-регистры-devmem), [flash (MTD)](docs/sessions-tools.md#резервная-копия-и-восстановление-flash-mtd), [быстрые команды](docs/sessions-tools.md#быстрые-команды-и-скрипты), [запуск скрипта](docs/sessions-tools.md#запуск-скрипта), [свободное место](docs/sessions-tools.md#свободное-место-на-диске) | [docs/sessions-tools.md](docs/sessions-tools.md) |
